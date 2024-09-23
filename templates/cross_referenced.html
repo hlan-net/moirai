@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Cross-Referenced Articles</title>
+</head>
+<body>
+    <h1>Cross-Referenced Articles</h1>
+    <ul>
+        {% for title, links in articles.items() %}
+            <li>
+                <strong>{{ title }}</strong>
+                <ul>
+                    {% for link in links %}
+                        <li><a href="{{ link }}">{{ link }}</a></li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="/">Go back to aggregator</a>
+</body>
+</html>
