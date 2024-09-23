@@ -7,12 +7,22 @@
 </head>
 <body>
     <h1>RSS Feed Aggregator</h1>
+    
+    <!-- Navigation Links -->
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/correlated">Correlated Articles</a></li>
+            <!-- Add more links here if you have other templates -->
+        </ul>
+    </nav>
+    
     <form method="POST" enctype="multipart/form-data">
         <label for="file">Upload a file with feed URLs (one per line):</label>
         <input type="file" name="file" required>
         <button type="submit">Submit</button>
     </form>
-    <h2>Articles in Feeds:</h2>
+    <h2>Feeds:</h2>
     <ul>
         {% for feed in feeds %}
             <h3>{{ feed.feed.title }}</h3>

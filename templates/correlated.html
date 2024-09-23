@@ -7,6 +7,16 @@
 </head>
 <body>
     <h1>Correlated Articles</h1>
+    
+    <!-- Navigation Links -->
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/correlated">Correlated Articles</a></li>
+            <!-- Add more links here if you have other templates -->
+        </ul>
+    </nav>
+    
     <ul>
         {% for title, links in articles.items() %}
             <li>
@@ -19,6 +29,5 @@
             </li>
         {% endfor %}
     </ul>
-    <a href="/">Go back to aggregator</a>
 </body>
 </html>
