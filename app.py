@@ -36,16 +36,17 @@ def fetch_feeds(feed_urls):
             feed = feedparser.parse(url)
             feeds.append(feed)
             for entry in feed.entries:
-                articles.append({
+                article = {
                     'title': entry.title,
                     'link': entry.link,
                     'feed_title': feed.feed.title
-                })
-                mongo.db.articles.insert_one({
-                    'title': entry.title,
-                    'link': entry.link,
-                    'feed_title': feed.feed.title
-                })
+                }
+                articles.append(article)
+                mongo.db.articles.replace_one(
+                    {'link': entry.link},  # Filter by link
+                    article,               # Document to insert/replace
+                    upsert=True            # Insert if no match is found
+                )
         except Exception as e:
             print(f"Failed to fetch {url}: {e}")
     return feeds, articles
