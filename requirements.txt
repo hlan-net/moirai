@@ -2,6 +2,6 @@ Flask==2.2.5
 feedparser==6.0.8
 Werkzeug==3.0.3
 Flask-PyMongo==2.3.0
-scikit-learn==1.0.2
+scikit-learn==1.5.0
 numpy==1.22.0  # or the latest compatible version
 
