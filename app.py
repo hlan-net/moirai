@@ -2,6 +2,9 @@ from flask import Flask, render_template, request
 from flask_pymongo import PyMongo
 import feedparser
 from collections import defaultdict
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 app = Flask(__name__)
 
@@ -15,13 +18,17 @@ def read_feed_urls(file_path):
 
 def fetch_feeds(feed_urls):
     feeds = []
-    articles_map = defaultdict(list)  # To track articles by title for cross-referencing
+    articles = []  # Store articles for correlation
     for url in feed_urls:
         try:
             feed = feedparser.parse(url)
             feeds.append(feed)
             for entry in feed.entries:
-                articles_map[entry.title].append(entry.link)  # Group links by title
+                articles.append({
+                    'title': entry.title,
+                    'link': entry.link,
+                    'feed_title': feed.feed.title
+                })
                 mongo.db.articles.insert_one({
                     'title': entry.title,
                     'link': entry.link,
@@ -29,7 +36,23 @@ def fetch_feeds(feed_urls):
                 })
         except Exception as e:
             print(f"Failed to fetch {url}: {e}")
-    return feeds, articles_map
+    return feeds, articles
+
+def correlate_articles(articles):
+    titles = [article['title'] for article in articles]
+    vectorizer = TfidfVectorizer().fit_transform(titles)
+    vectors = vectorizer.toarray()
+
+    cosine_matrix = cosine_similarity(vectors)
+    correlated_articles = defaultdict(list)
+
+    for i in range(len(titles)):
+        correlated_indices = np.where(cosine_matrix[i] > 0.5)[0]  # Adjust threshold as needed
+        for index in correlated_indices:
+            if index != i:
+                correlated_articles[titles[i]].append(articles[index]['link'])
+
+    return correlated_articles
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -40,18 +63,18 @@ def index():
             file_path = "feeds.txt"
             file.save(file_path)  # Save uploaded file
             feed_urls = read_feed_urls(file_path)
-            feeds, _ = fetch_feeds(feed_urls)
+            feeds, articles = fetch_feeds(feed_urls)
+            # Store articles in database
+            return render_template("index.html", feeds=feeds)
     return render_template("index.html", feeds=feeds)
 
-@app.route("/cross-referenced")
-def cross_referenced():
-    articles_map = defaultdict(list)
+@app.route("/correlated")
+def correlated():
     all_articles = mongo.db.articles.find()
-    
-    for article in all_articles:
-        articles_map[article['title']].append(article['link'])
+    articles = [{'title': a['title'], 'link': a['link']} for a in all_articles]
+    correlated_articles = correlate_articles(articles)
 
-    return render_template("cross_referenced.html", articles=articles_map)
+    return render_template("correlated.html", articles=correlated_articles)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
