@@ -12,9 +12,13 @@ app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb://mongo:27017/rss_aggregator"
 mongo = PyMongo(app)
 
-def read_feed_urls(file_path):
-    with open(file_path, 'r') as file:
-        return [line.strip() for line in file if line.strip()]
+def save_feed_urls(feed_urls):
+    for url in feed_urls:
+        if not mongo.db.feeds.find_one({"url": url}):
+            mongo.db.feeds.insert_one({"url": url})
+
+def get_feed_urls():
+    return [feed['url'] for feed in mongo.db.feeds.find()]
 
 def fetch_feeds(feed_urls):
     feeds = []
@@ -63,9 +67,12 @@ def index():
             file_path = "feeds.txt"
             file.save(file_path)  # Save uploaded file
             feed_urls = read_feed_urls(file_path)
-            feeds, articles = fetch_feeds(feed_urls)
-            # Store articles in database
+            save_feed_urls(feed_urls)  # Save feeds to MongoDB
+            feeds, articles = fetch_feeds(feed_urls)  # Fetch feeds
             return render_template("index.html", feeds=feeds)
+    else:
+        feed_urls = get_feed_urls()  # Get feed URLs from MongoDB
+        feeds, articles = fetch_feeds(feed_urls)  # Fetch feeds
     return render_template("index.html", feeds=feeds)
 
 @app.route("/correlated")
