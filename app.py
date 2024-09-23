@@ -39,7 +39,8 @@ def fetch_feeds(feed_urls):
                 article = {
                     'title': entry.title,
                     'link': entry.link,
-                    'feed_title': feed.feed.title
+                    'feed_title': feed.feed.title,
+                    'description': entry.get('description', '')  # Use get method with default value
                 }
                 articles.append(article)
                 mongo.db.articles.replace_one(
