@@ -17,7 +17,7 @@ jobs:
         uses: azure/setup-helm@v1
 
       - name: Build Helm package
-        run: helm package ./path/to/chart
+        run: helm package helm
 
       - name: Upload Helm package
         env:
