@@ -39,4 +39,4 @@ jobs:
         run: |
           helm init
           helm repo add hlan-repo $HELM_REPOSITORY_URL --username $HELM_USERNAME --password $HELM_PASSWORD
-          helm push ./helm/chart-*.tgz my-repo
+          helm push ./helm/chart-*.tgz hlan-repo
