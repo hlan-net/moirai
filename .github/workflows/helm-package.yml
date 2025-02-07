@@ -28,6 +28,9 @@ jobs:
       - name: Install helm-push plugin
         run: helm plugin install https://github.com/chartmuseum/helm-push.git
 
+      - name: Add stable repo
+        run: helm repo add stable https://charts.helm.sh/stable
+
       - name: Build Helm package
         run: helm package ./helm
 
