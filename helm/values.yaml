@@ -1,7 +1,7 @@
 # Default values for GenAI Press Review service
 replicaCount: 1
 image:
-  repository: your-image-repo
+  repository: slorba/morai
   pullPolicy: IfNotPresent
   tag: "latest"
 service:
