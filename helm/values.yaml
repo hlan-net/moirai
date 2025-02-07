@@ -1,0 +1,9 @@
+# Default values for GenAI Press Review service
+replicaCount: 1
+image:
+  repository: your-image-repo
+  pullPolicy: IfNotPresent
+  tag: "latest"
+service:
+  type: ClusterIP
+  port: 80
