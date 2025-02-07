@@ -29,7 +29,9 @@ jobs:
         run: helm plugin install https://github.com/chartmuseum/helm-push.git
 
       - name: Add stable repo
-        run: helm repo add stable https://charts.helm.sh/stable
+        run: |
+          helm init
+          helm repo add stable https://charts.helm.sh/stable
 
       - name: Build Helm package
         run: helm package ./helm
@@ -40,6 +42,5 @@ jobs:
           HELM_USERNAME: ${{ secrets.HELM_USERNAME }}
           HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
         run: |
-          helm init
           helm repo add hlan-repo $HELM_REPOSITORY_URL --username $HELM_USERNAME --password $HELM_PASSWORD
           helm push ./helm/chart-*.tgz hlan-repo
