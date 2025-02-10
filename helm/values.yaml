@@ -1,7 +1,7 @@
 # Default values for GenAI Press Review service
 replicaCount: 1
 image:
-  repository: my-app-repo
+  repository: slorba/morai
   tag: "latest"
 
 ingress:
@@ -29,3 +29,9 @@ persistentVolumeClaim:
   name: morai-pvc
   storage: 10Gi
   accessMode: ReadWriteOnce
+
+ollama:
+  endpoint: "https://ollama.example.com"
+
+openWebui:
+  endpoint: "https://open-webui.example.com"

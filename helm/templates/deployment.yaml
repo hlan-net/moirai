@@ -20,3 +20,7 @@ spec:
           env:
             - name: ENVIRONMENT
               value: {{ .Values.environment }}
+            - name: OLLAMA_ENDPOINT
+              value: {{ .Values.ollama.endpoint }}
+            - name: OPEN_WEBUI_ENDPOINT
+              value: {{ .Values.openWebui.endpoint }}
