@@ -1,9 +1,15 @@
 from flask import Flask, send_from_directory
+from flask_wtf.csrf import CSRFProtect
 import os
 import requests
 from api.routes import api_blueprint
 
 app = Flask(__name__, static_folder='ui/dist')
+
+# Disable CSRF protection
+csrf = CSRFProtect()
+csrf.init_app(app)
+app.config['WTF_CSRF_ENABLED'] = False
 
 @app.route("/")
 def index():

@@ -1,4 +1,18 @@
-# Use an official Python runtime as a parent image
+# Stage 1: Build the Vue.js application
+FROM node:14 as build-stage
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the package.json and install dependencies
+COPY ui/package.json ui/package-lock.json ./
+RUN npm install
+
+# Copy the rest of the UI code and build it
+COPY ui/ .
+RUN npm run build
+
+# Stage 2: Build the Python application
 FROM python:3.9-slim
 
 # Set the working directory in the container
@@ -7,11 +21,16 @@ WORKDIR /app
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
-	useradd -m appuser
+    useradd -m appuser
 USER appuser
 
+# Copy the built UI from the previous stage
+COPY --from=build-stage /app/dist ./ui
+
 # Copy the rest of the application code into the container
-COPY *.py .
+COPY main.py .
+
+COPY api/ api/
 
 # Expose port 80 for the Flask app
 EXPOSE 80
