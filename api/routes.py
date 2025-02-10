@@ -1,27 +1,30 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, abort
 import os
 import requests
 
 api_blueprint = Blueprint('api', __name__)
 
-@api_blueprint.route("/fetch_urls", methods=["GET"])
-def fetch_urls():
+@api_blueprint.route("/feeds", methods=["GET"])
+def list_feeds():
     feeds_directory = 'feeds'
-    urls = fetch_urls_from_files(feeds_directory)
-    return jsonify(urls)
+    feeds = os.listdir(feeds_directory)
+    return jsonify(feeds)
 
-def fetch_urls_from_files(directory):
-    urls = []
-    for filename in os.listdir(directory):
-        filepath = os.path.join(directory, filename)
-        if os.path.isfile(filepath):
-            with open(filepath, 'r') as file:
-                file_urls = file.readlines()
-                for url in file_urls:
-                    url = url.strip()
-                    if url:
-                        urls.append(fetch_url(url))
-    return urls
+@api_blueprint.route("/feeds/<int:feed_id>", methods=["GET"])
+def get_feed(feed_id):
+    feeds_directory = 'feeds'
+    feeds = os.listdir(feeds_directory)
+    if feed_id < 0 or feed_id >= len(feeds):
+        abort(404, description="Feed not found")
+    feed_filename = feeds[feed_id]
+    feed_filepath = os.path.join(feeds_directory, feed_filename)
+    if os.path.isfile(feed_filepath):
+        with open(feed_filepath, 'r') as file:
+            file_urls = file.readlines()
+            urls = [fetch_url(url.strip()) for url in file_urls if url.strip()]
+        return jsonify(urls)
+    else:
+        abort(404, description="Feed file not found")
 
 def fetch_url(url):
     try:
