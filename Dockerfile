@@ -5,12 +5,12 @@ FROM node:14 as build-stage
 WORKDIR /app
 
 # Copy the package.json and install dependencies
-COPY ui/package.json ui/package-lock.json ./
-RUN npm install
+COPY ui/package.json ui/yarn.lock ./
+RUN yarn install
 
 # Copy the rest of the UI code and build it
 COPY ui/ .
-RUN npm run build
+RUN yarn build
 
 # Stage 2: Build the Python application
 FROM python:3.9-slim
