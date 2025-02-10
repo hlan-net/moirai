@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue.js application
-FROM node:14 as build-stage
+FROM node:14 AS build-stage
 
 # Set the working directory in the container
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY ui/ .
 RUN yarn build
 
 # Stage 2: Build the Python application
-FROM python:3.9-slim
+FROM python:3.9-slim AS final-stage
 
 # Set the working directory in the container
 WORKDIR /app
