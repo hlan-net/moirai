@@ -1,12 +1,19 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 import os
 import requests
+from api.routes import api_blueprint
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='ui/dist')
 
 @app.route("/")
 def index():
-    return "Hello from GenAI Press Review Service!"
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/ui/<path:path>')
+def serve_ui(path):
+    return send_from_directory(app.static_folder, path)
+
+app.register_blueprint(api_blueprint, url_prefix='/api')
 
 def fetch_urls_from_files(directory):
     for filename in os.listdir(directory):
