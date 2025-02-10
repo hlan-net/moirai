@@ -1,2 +1,4 @@
-https://www.linuxjournal.com/node/feed
+https://lwn.net/headlines/rss
 https://www.debian.org/News/news
+https://feeds.feedburner.com/kerneltalks
+https://www.gentoo.org/feeds/news.xml

@@ -1,3 +1,6 @@
-http://feeds.bbci.co.uk/news/rss.xml
-http://feeds.reuters.com/reuters/topNews
+https://feeds.bbci.co.uk/news/rss.xml
+https://www.theguardian.com/world/rss
 https://www.aljazeera.com/xml/rss/all.xml
+https://rss.dw.com/rdf/rss-en-all
+https://www.france24.com/en/rss
+https://www.euronews.com/rss?format=mrss&level=theme&name=news
