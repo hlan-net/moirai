@@ -8,6 +8,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Add a non-root user and switch to that user
+RUN useradd -m appuser
+USER appuser
+
 # Copy the rest of the application code into the container
 COPY . .
 
