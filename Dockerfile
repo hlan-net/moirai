@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 USER appuser
 
 # Copy the built UI from the previous stage
-COPY --from=build-stage /app/dist ./ui
+COPY --from=build-stage /app/dist/ ./ui/dist/
 
 # Copy the rest of the application code into the container
 COPY main.py .
