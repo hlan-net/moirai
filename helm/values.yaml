@@ -1,9 +1,31 @@
 # Default values for GenAI Press Review service
 replicaCount: 1
 image:
-  repository: slorba/morai
-  pullPolicy: IfNotPresent
+  repository: my-app-repo
   tag: "latest"
+
+ingress:
+  host: my-app.example.com
+
 service:
-  type: ClusterIP
+  name: morai-service
   port: 80
+  targetPort: 8080
+
+app:
+  name: morai-app
+
+deployment:
+  name: morai-deployment
+  replicas: 3
+
+environment: production
+
+persistentVolume:
+  name: morai-pv
+  storage: 10Gi
+
+persistentVolumeClaim:
+  name: morai-pvc
+  storage: 10Gi
+  accessMode: ReadWriteOnce
