@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.mongodb.name }}-headless
+  name: {{ .Release.Name }}-{{ .Values.mongodb.name }}-headless
   labels:
-    app: {{ .Values.mongodb.name }}
+    app: {{ .Release.Name }}-{{ .Values.mongodb.name }}
 spec:
   ports:
     - port: {{ .Values.mongodb.port }}
       targetPort: {{ .Values.mongodb.port }}
   clusterIP: None
   selector:
-    app: {{ .Values.mongodb.name }}
+    app: {{ .Release.Name }}-{{ .Values.mongodb.name }}

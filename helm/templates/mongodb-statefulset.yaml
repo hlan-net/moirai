@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ .Values.mongodb.name }}
+  name: {{ .Release.Name }}-{{ .Values.mongodb.name }}
   labels:
-    app: {{ .Values.mongodb.name }}
+    app: {{ .Release.Name }}-{{ .Values.mongodb.name }}
 spec:
-  serviceName: {{ .Values.mongodb.name }}-headless
+  serviceName: {{ .Release.Name }}-{{ .Values.mongodb.name }}-headless
   replicas: {{ .Values.mongodb.replicas }}
   selector:
     matchLabels:
-      app: {{ .Values.mongodb.name }}
+      app: {{ .Release.Name }}-{{ .Values.mongodb.name }}
   template:
     metadata:
       labels:
-        app: {{ .Values.mongodb.name }}
+        app: {{ .Release.Name }}-{{ .Values.mongodb.name }}
     spec:
       containers:
-        - name: mongodb
+        - name: {{ .Release.Name }}-mongodb
           image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
           ports:
             - containerPort: {{ .Values.mongodb.port }}
