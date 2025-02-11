@@ -1,22 +1,22 @@
 # Default values for GenAI Press Review service
 replicaCount: 1
 image:
-  repository: slorba/morai
+  repository: slorba/moirai
   tag: "latest"
 
 ingress:
   host: my-app.example.com
 
 service:
-  name: morai-service
+  name: moirai-service
   port: 80
   targetPort: 8080
 
 app:
-  name: morai-app
+  name: moirai-app
 
 deployment:
-  name: morai-deployment
+  name: moirai-deployment
   replicas: 3
 
 environment: production

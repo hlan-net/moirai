@@ -13,7 +13,7 @@ COPY ui/ .
 RUN yarn build
 
 # Stage 2: Build the Python application
-FROM python:3.9-slim AS final-stage
+FROM python:3-slim AS final-stage
 
 # Set the working directory in the container
 WORKDIR /app
