@@ -4,8 +4,10 @@ FROM node:14 AS build-stage
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the package.json and install dependencies
+# Copy the package.json and yarn.lock
 COPY ui/package.json ui/yarn.lock ./
+
+# Install dependencies - this layer is cached unless package.json or yarn.lock changes
 RUN yarn install
 
 # Copy the rest of the UI code and build it
@@ -24,13 +26,12 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     useradd -m appuser
 USER appuser
 
-# Copy the built UI from the previous stage
-COPY --from=build-stage /app/dist/ ./ui/dist/
-
 # Copy the rest of the application code into the container
 COPY main.py .
-
 COPY api/ api/
+
+# Copy the built UI from the previous stage
+COPY --from=build-stage /app/dist/ ./ui/dist/
 
 # Expose port 80 for the Flask app
 EXPOSE 80
