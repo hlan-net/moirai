@@ -19,7 +19,8 @@ jobs:
         uses: docker/metadata-action@v5
         id: docker_meta
         with:
-          images: slorba/moirai:latest
+          images: |
+            slorba/moirai
           tags: |
             type=schedule
             type=ref,event=branch
