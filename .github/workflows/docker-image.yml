@@ -15,6 +15,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Docker Metadata
+        uses: docker/metadata-action@v5
+        id: docker_meta
+        with:
+          images: slorba/moirai:latest
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -33,4 +47,5 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: slorba/moirai:latest
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
