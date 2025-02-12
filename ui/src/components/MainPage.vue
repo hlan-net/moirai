@@ -37,18 +37,27 @@ export default defineComponent({
         console.error('Error fetching files:', error)
       }
 
-      // For each file, try to fetch its corresponding feed.
-      for (const file of files.value) {
-        try {
-          const responseFeed = await fetch(`/api/feeds/${encodeURIComponent(file)}`)
-          const feedData = await responseFeed.json()
-          feedsByFile.value[file] =
-            Array.isArray(feedData) && feedData.length > 0 ? feedData : "Empty"
-        } catch (error) {
-          console.error(`Error fetching feed for ${file}:`, error)
-          feedsByFile.value[file] = "Empty"
-        }
+      // For each file, try to fetch its corresponding feed using the index.
+      interface Feed {
+        url: string;
       }
+
+      interface FeedsByFile {
+        [key: string]: Feed[] | 'Empty';
+      }
+
+      files.value.forEach(async (file: string, index: number) => {
+        try {
+          const responseFeed: Response = await fetch(`/api/feeds/${index}`);
+          const feedData: Feed[] = await responseFeed.json();
+          feedsByFile.value[file] =
+            Array.isArray(feedData) && feedData.length > 0 ? feedData : 'Empty';
+        } catch (error) {
+          console.error(`Error fetching feed for index ${index}:`, error);
+          feedsByFile.value[file] = 'Empty';
+        }
+      });
+      })
     })
 
     return { files, feedsByFile }
