@@ -32,6 +32,7 @@ export default defineComponent({
     onMounted(async () => {
       try {
         const responseFiles = await fetch('/api/feeds')
+        // Example response: ['file1', 'file2', 'file3']
         files.value = await responseFiles.json()
       } catch (error) {
         console.error('Error fetching files:', error)
@@ -40,14 +41,22 @@ export default defineComponent({
       // For each file, try to fetch its corresponding feed using the index.
       interface Feed {
         url: string;
+        code?: number;
+        status: string;
       }
 
       files.value.forEach(async (file: string, index: number) => {
         try {
           const responseFeed: Response = await fetch(`/api/feeds/${index}`);
+          // Example response: [{"code":404,"status":"failed","url":"https://www.example.org/feed/"},{"status":"success","url":"https://sitename.com/atom.xml"}]
           const feedData: Feed[] = await responseFeed.json();
-      feedsByFile.value[file] =
-            Array.isArray(feedData) && feedData.length > 0 ? feedData : 'Empty';
+
+          // Filter out feeds with status "failed"
+          const filteredFeeds = Array.isArray(feedData)
+            ? feedData.filter(feed => feed.status !== 'failed')
+            : [];
+
+          feedsByFile.value[file] = filteredFeeds.length > 0 ? filteredFeeds : 'Empty';
         } catch (error) {
           console.error(`Error fetching feed for index ${index}:`, error);
           feedsByFile.value[file] = 'Empty';
