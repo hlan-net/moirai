@@ -42,10 +42,6 @@ export default defineComponent({
         url: string;
       }
 
-      interface FeedsByFile {
-        [key: string]: Feed[] | 'Empty';
-      }
-
       files.value.forEach(async (file: string, index: number) => {
         try {
           const responseFeed: Response = await fetch(`/api/feeds/${index}`);
