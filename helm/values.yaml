@@ -26,7 +26,7 @@ mongodb:
   replicas: 1
   image:
     repository: mongo       # Docker's official MongoDB image
-    tag: "6.0"              # Adjust the tag as needed
+    tag: "4.2"              # Adjust the tag as needed
   port: 27017
   persistence:
     storageClass: "standard"  # Name of your storage class (can be adjusted)
