@@ -1,5 +1,4 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
   <MainPage msg="Moirai App - under construction"/>
 </template>
 
