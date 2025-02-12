@@ -5,7 +5,7 @@ image:
   tag: "latest"
 
 ingress:
-  host: my-app.example.com
+  host: moirai.hlan.net 
 
 service:
   name: moirai-service

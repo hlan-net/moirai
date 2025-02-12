@@ -27,7 +27,7 @@ spec:
             - name: MONGODB_URI
               value: mongodb://{{ .Values.mongodb.name }}:{{ .Values.mongodb.port }}/{{ .Values.mongodb.database }}
             - name: HTTP_PORT
-              value: {{ .Values.service.targetPort }}
+              value: {{ .Values.service.targetPort | quote }}
 
           volumeMounts:
             - name: feeds-volume
