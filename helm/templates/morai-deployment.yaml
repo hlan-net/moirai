@@ -26,6 +26,9 @@ spec:
               value: {{ .Values.openWebui.endpoint }}
             - name: MONGODB_URI
               value: mongodb://{{ .Values.mongodb.name }}:{{ .Values.mongodb.port }}/{{ .Values.mongodb.database }}
+            - name: HTTP_PORT
+              value: {{ .Values.service.targetPort }}
+
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds

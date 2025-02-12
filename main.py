@@ -45,4 +45,5 @@ def fetch_url(url):
 if __name__ == "__main__":
     feeds_directory = 'feeds'
     fetch_urls_from_files(feeds_directory)
-    app.run(host="0.0.0.0", port=80)
+    port = int(os.environ.get("HTTP_PORT", 80))
+    app.run(host="0.0.0.0", port=port)
