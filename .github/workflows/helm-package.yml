@@ -22,12 +22,6 @@ jobs:
       - name: Set HELM_HOME environment variable
         run: echo "HELM_HOME=$HOME/.helm" >> $GITHUB_ENV
 
-      - name: Create Helm plugin directory
-        run: mkdir -p $HELM_HOME/plugins
-
-      - name: Install helm-push plugin
-        run: helm plugin install https://github.com/chartmuseum/helm-push.git
-
       - name: Build Helm package
         run: helm package helm
 
@@ -38,4 +32,6 @@ jobs:
           HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
         run: |
           helm repo add hlan-repo $HELM_REPOSITORY_URL --username $HELM_USERNAME --password $HELM_PASSWORD
+          mkdir -p $HELM_HOME/plugins
+          helm plugin install https://github.com/chartmuseum/helm-push.git
           helm cm-push moirai-*.tgz hlan-repo
