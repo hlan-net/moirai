@@ -23,12 +23,7 @@ spec:
           volumeMounts:
             - name: mongodb-data
               mountPath: /data/db
-  volumeClaimTemplates:
-    - metadata:
-        name: mongodb-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: {{ .Values.mongodb.persistence.storageClass }}
-        resources:
-          requests:
-            storage: {{ .Values.mongodb.persistence.size }}
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-mongodb-pvc

@@ -5,7 +5,7 @@ image:
   tag: "latest"
 
 ingress:
-  host: moirai.hlan.net 
+  host: moirai.example.com 
 
 service:
   name: moirai-service
@@ -17,7 +17,7 @@ app:
 
 deployment:
   name: moirai-deployment
-  replicas: 3
+  replicas: 1
 
 environment: production
 
