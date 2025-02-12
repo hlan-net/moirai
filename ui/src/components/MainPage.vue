@@ -46,15 +46,14 @@ export default defineComponent({
         try {
           const responseFeed: Response = await fetch(`/api/feeds/${index}`);
           const feedData: Feed[] = await responseFeed.json();
-          feedsByFile.value[file] =
+      feedsByFile.value[file] =
             Array.isArray(feedData) && feedData.length > 0 ? feedData : 'Empty';
         } catch (error) {
           console.error(`Error fetching feed for index ${index}:`, error);
           feedsByFile.value[file] = 'Empty';
         }
       });
-      })
-    })
+    });
 
     return { files, feedsByFile }
   }
