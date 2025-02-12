@@ -38,3 +38,41 @@ ollama:
 
 openWebui:
   endpoint: "https://open-webui.example.com"
+
+feeds:
+  linux.txt: |
+    https://www.linux.com/feed/
+    https://www.linuxtoday.com/feed/
+    https://www.linuxjournal.com/feed
+  python.txt: |
+    https://planetpython.org/rss20.xml
+    https://www.python.org/blogs/feed/
+    https://realpython.com/atom.xml
+  java.txt: |
+    https://www.baeldung.com/feed/
+    https://www.infoq.com/java/feed/
+    https://www.javaworld.com/index.rss
+  devops.txt: |
+    https://devops.com/feed/
+    https://www.infoq.com/devops/feed/
+    https://www.docker.com/blog/feed/
+  security.txt: |
+    https://www.darkreading.com/rss_simple.asp
+    https://www.schneier.com/blog/index.rdf
+    https://www.csoonline.com/feed/
+  ai.txt: |
+    https://www.kdnuggets.com/feed/
+    https://www.infoq.com/ai-ml-data-eng/feed/
+    https://www.technologyreview.com/artificial-intelligence/feed/
+  blockchain.txt: |
+    https://www.coindesk.com/feed
+    https://cointelegraph.com/feed
+    https://www.blockchain.com/rss
+  news.txt: |
+    https://www.bbc.co.uk/news/10628494
+    https://www.theguardian.com/uk/rss
+    https://www.aljazeera.com/xml/rss/all.xml
+  tech.txt: |    
+    https://www.wired.com/feed/rss
+    https://techcrunch.com/feed/
+    https://www.theverge.com/rss/index.xml

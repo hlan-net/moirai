@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feeds-config
+data:
+{{- range $filename, $content := .Values.feeds }}
+  {{ $filename }}: |-
+{{ $content | indent 4 }}
+{{- end }}
