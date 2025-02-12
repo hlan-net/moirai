@@ -31,7 +31,7 @@ jobs:
           HELM_USERNAME: ${{ secrets.HELM_USERNAME }}
           HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
         run: |
-          #mkdir -p $HELM_HOME/plugins
-          #helm plugin install https://github.com/chartmuseum/helm-push.git
+          mkdir -p $HELM_HOME/plugins
+          helm plugin install https://github.com/chartmuseum/helm-push.git
           helm repo add hlan-repo $HELM_REPOSITORY_URL --username $HELM_USERNAME --password $HELM_PASSWORD
-          helm push moirai-*.tgz hlan-repo
+          helm cm-push moirai-*.tgz hlan-repo
