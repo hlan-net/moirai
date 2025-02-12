@@ -7,13 +7,13 @@ api_blueprint = Blueprint('api', __name__)
 @api_blueprint.route("/feeds", methods=["GET"])
 def list_feeds():
     feeds_directory = 'feeds'
-    feeds = os.listdir(feeds_directory)
+    feeds = [feed for feed in os.listdir(feeds_directory) if not feed.startswith('.')]
     return jsonify(feeds)
 
 @api_blueprint.route("/feeds/<int:feed_id>", methods=["GET"])
 def get_feed(feed_id):
     feeds_directory = 'feeds'
-    feeds = os.listdir(feeds_directory)
+    feeds = [feed for feed in os.listdir(feeds_directory) if not feed.startswith('.')]
     if feed_id < 0 or feed_id >= len(feeds):
         abort(404, description="Feed not found")
     feed_filename = feeds[feed_id]
