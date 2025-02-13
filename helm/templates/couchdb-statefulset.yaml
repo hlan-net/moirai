@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+  labels:
+    app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+spec:
+  serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless
+  replicas: {{ .Values.couchdb.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    spec:
+      containers:
+        - name: {{ .Release.Name }}-couchdb
+          image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.couchdb.port }}
+          volumeMounts:
+            - name: couchdb-data
+              mountPath: /opt/couchdb/data
+      volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-couchdb-pvc

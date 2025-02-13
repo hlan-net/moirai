@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless
+  labels:
+    app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+spec:
+  ports:
+    - port: {{ .Values.couchdb.port }}
+      targetPort: {{ .Values.couchdb.port }}
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
