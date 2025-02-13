@@ -18,6 +18,11 @@ spec:
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
+          env:
+            - name: COUCHDB_USER
+              value: "{{ .Values.couchdb.adminUser }}"       # Admin username from values.yaml
+            - name: COUCHDB_PASSWORD
+              value: "{{ .Values.couchdb.adminPassword }}"    # Admin password from values.yaml
           ports:
             - containerPort: {{ .Values.couchdb.port }}
           volumeMounts:

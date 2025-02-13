@@ -30,6 +30,8 @@ couchdb:
   persistence:
     enabled: true
     size: 1Gi
+  adminUser: "admin"
+  adminPassword: "password"
 
 ollama:
   endpoint: "https://ollama.example.com"
