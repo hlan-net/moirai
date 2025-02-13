@@ -1,26 +1,22 @@
-<template>
-  <MainPage msg="Moirai App - under construction"/>
-</template>
-
-<script lang="ts">
-import { Options, Vue } from 'vue-class-component';
-import MainPage from './components/MainPage.vue';
-
-@Options({
-  components: {
-    MainPage,
-  },
-})
-export default class App extends Vue {}
+<script setup lang="ts">
+import MainPage from './components/MainPage.vue'
 </script>
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
+<template>
+  <MainPage msg="Vite + Vue" />
+</template>
+
+<style scoped>
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.vue:hover {
+  filter: drop-shadow(0 0 2em #42b883aa);
 }
 </style>
