@@ -7,6 +7,9 @@ metadata:
 spec:
   serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless
   replicas: {{ .Values.couchdb.replicas }}
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
@@ -15,16 +18,25 @@ spec:
       labels:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     spec:
+      initContainers:
+        - name: init-couchdb
+          image: busybox
+          command: ['sh', '-c', 'echo "Initializing CouchDB"']
+          volumeMounts:
+            - name: couchdb-data
+              mountPath: /opt/couchdb/data
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
+          imagePullPolicy: {{ .Values.couchdb.image.pullPolicy | default "IfNotPresent" }}
           env:
             - name: COUCHDB_USER
-              value: "{{ .Values.couchdb.adminUser }}"       # Admin username from values.yaml
+              value: "{{ .Values.couchdb.adminUser }}"
             - name: COUCHDB_PASSWORD
-              value: "{{ .Values.couchdb.adminPassword }}"    # Admin password from values.yaml
+              value: "{{ .Values.couchdb.adminPassword }}"
           ports:
             - containerPort: {{ .Values.couchdb.port }}
+              name: couchdb
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
