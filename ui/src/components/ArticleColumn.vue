@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h2>Column Two</h2>
+    <h2>Articles</h2>
     <!-- Add content for column two -->
     <p>Placeholder content for Column Two.</p>
   </div>

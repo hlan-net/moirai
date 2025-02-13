@@ -1,14 +1,53 @@
 <script setup lang="ts">
-import { defineProps } from 'vue'
+import { onMounted, ref } from 'vue'
 
-defineProps<{
-  files: string[]
-  feedsByFile: Record<string, any>
-}>()
+const files = ref<string[]>([])
+const feedsByFile = ref<Record<string, any>>({})
+
+onMounted(async () => {
+  try {
+    const responseFiles = await fetch('/api/feeds')
+    // Example response: ['file1', 'file2', 'file3']
+    const fileList = await responseFiles.json()
+    files.value = fileList
+
+    // Initialize each file's feed value so the UI renders immediately
+    fileList.forEach((file: string) => {
+      feedsByFile.value[file] = null
+    })
+  } catch (error) {
+    console.error('Error fetching files:', error)
+  }
+
+  // For each file, fetch its corresponding feed 
+  interface Feed {
+    url: string;
+    code?: number;
+    status: string;
+  }
+
+  files.value.forEach(async (file: string, index: number) => {
+    try {
+      const responseFeed: Response = await fetch(`/api/feeds/${index}`)
+      const feedData: Feed[] = await responseFeed.json()
+
+      // Filter out feeds with status "failed"
+      const filteredFeeds = Array.isArray(feedData)
+        ? feedData.filter(feed => feed.status !== 'failed')
+        : []
+
+      feedsByFile.value[file] = filteredFeeds.length > 0 ? filteredFeeds : 'Empty'
+    } catch (error) {
+      console.error(`Error fetching feed for index ${index}:`, error)
+      feedsByFile.value[file] = 'Empty'
+    }
+  })
+})
 </script>
 
 <template>
   <div>
+    <h2>Feeds</h2>
     <!-- Dynamic Feeds by File -->
     <section v-for="file in files" :key="file">
       <h2>{{ file }}</h2>
