@@ -3,7 +3,7 @@ import MainPage from './components/MainPage.vue'
 </script>
 
 <template>
-  <MainPage msg="Vite + Vue" />
+  <MainPage msg="Moirai App - under construction" />
 </template>
 
 <style scoped>
