@@ -2,7 +2,7 @@ import os
 from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
 from api.routes import api_blueprint
-from fetcher import scheduled_url_fetch  # Import the URL fetching function
+from tasks.scheduler import scheduler
 
 app = Flask(__name__, static_folder='ui/dist')
 
@@ -23,6 +23,6 @@ app.register_blueprint(api_blueprint, url_prefix='/api')
 
 if __name__ == "__main__":
     # Start scheduling URL fetches
-    scheduled_url_fetch()
+    scheduler.start(os.environ.get("ITERATION_INTERVAL", 600))
     port = int(os.environ.get("HTTP_PORT", 80))
     app.run(host="0.0.0.0", port=port)
