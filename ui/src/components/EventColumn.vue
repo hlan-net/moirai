@@ -1,0 +1,14 @@
+<template>
+  <div>
+    <h2>Column Three</h2>
+    <!-- Add content for column three -->
+    <p>Placeholder content for Column Three.</p>
+  </div>
+</template>
+
+<style scoped>
+h2 {
+  color: #d83b01;
+  margin-top: 30px;
+}
+</style>
