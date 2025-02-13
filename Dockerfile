@@ -29,6 +29,7 @@ USER appuser
 # Copy the rest of the application code into the container
 COPY main.py .
 COPY api/ api/
+COPY tasks/ tasks/
 
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/
