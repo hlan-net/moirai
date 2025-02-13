@@ -1,3 +1,7 @@
+<script setup lang="ts">
+// This component is for showing articles that are fetched from the feeds
+</script>
+
 <template>
   <div>
     <h2>Articles</h2>

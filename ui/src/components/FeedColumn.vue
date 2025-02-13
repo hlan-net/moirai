@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
+// This component is for showing feeds that are sources for the articles
+
 const files = ref<string[]>([])
 const feedsByFile = ref<Record<string, any>>({})
 

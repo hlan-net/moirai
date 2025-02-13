@@ -1,3 +1,7 @@
+<script setup lang="ts">
+// This component is for showing events that are correlated from the multible articles
+</script>
+
 <template>
   <div>
     <h2>Events</h2>
