@@ -21,17 +21,15 @@ deployment:
 
 environment: production
 
-mongodb:
-  name: mongodb
-  replicas: 1
+couchdb:
+  name: couchdb
+  port: 5984
   image:
-    repository: mongo       # Docker's official MongoDB image
-    tag: "4.2"              # Adjust the tag as needed
-  port: 27017
+    repository: couchdb
+    tag: 3.1.1
   persistence:
-    storageClass: "standard"  # Name of your storage class (can be adjusted)
-    size: "8Gi"               # Desired persistent storage size
-  database: mydatabase
+    enabled: true
+    size: 1Gi
 
 ollama:
   endpoint: "https://ollama.example.com"

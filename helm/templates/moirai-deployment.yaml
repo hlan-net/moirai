@@ -24,8 +24,8 @@ spec:
               value: {{ .Values.ollama.endpoint }}
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint }}
-            - name: MONGODB_URI
-              value: mongodb://{{ .Values.mongodb.name }}:{{ .Values.mongodb.port }}/{{ .Values.mongodb.database }}
+            - name: COUCHDB_URI
+              value: http://{{ .Values.couchdb.name }}:{{ .Values.couchdb.port }}/{{ .Values.couchdb.database }}
             - name: HTTP_PORT
               value: {{ .Values.service.targetPort | quote }}
 
