@@ -5,13 +5,17 @@
     <!-- Dynamic Feeds by File -->
     <section v-for="file in files" :key="file">
       <h2>{{ file }}</h2>
-      <ul v-if="feedsByFile[file] !== 'Empty' && feedsByFile[file].length">
+      <ul
+        v-if="feedsByFile[file] && feedsByFile[file] !== 'Empty' && feedsByFile[file].length"
+      >
         <li v-for="(feed, i) in feedsByFile[file]" :key="i">
           <a :href="feed.url" target="_blank">{{ feed.url }}</a>
         </li>
       </ul>
       <div v-else>
-        Empty
+        <!-- Show loading status if feedsByFile[file] is still null -->
+        <span v-if="feedsByFile[file] === null">Loading...</span>
+        <span v-else>Empty</span>
       </div>
     </section>
   </div>
@@ -33,12 +37,18 @@ export default defineComponent({
       try {
         const responseFiles = await fetch('/api/feeds')
         // Example response: ['file1', 'file2', 'file3']
-        files.value = await responseFiles.json()
+        const fileList = await responseFiles.json()
+        files.value = fileList
+
+        // Initialize each file's feed value so the UI renders immediately
+        fileList.forEach((file: string) => {
+          feedsByFile.value[file] = null
+        })
       } catch (error) {
         console.error('Error fetching files:', error)
       }
 
-      // For each file, try to fetch its corresponding feed using the index.
+      // For each file, try to fetch its corresponding feed 
       interface Feed {
         url: string;
         code?: number;
@@ -47,22 +57,22 @@ export default defineComponent({
 
       files.value.forEach(async (file: string, index: number) => {
         try {
-          const responseFeed: Response = await fetch(`/api/feeds/${index}`);
-          // Example response: [{"code":404,"status":"failed","url":"https://www.example.org/feed/"},{"status":"success","url":"https://sitename.com/atom.xml"}]
-          const feedData: Feed[] = await responseFeed.json();
+          const responseFeed: Response = await fetch(`/api/feeds/${index}`)
+          // Example response: [{"code":404,"status":"failed",...},{"status":"success",...}]
+          const feedData: Feed[] = await responseFeed.json()
 
           // Filter out feeds with status "failed"
           const filteredFeeds = Array.isArray(feedData)
             ? feedData.filter(feed => feed.status !== 'failed')
-            : [];
+            : []
 
-          feedsByFile.value[file] = filteredFeeds.length > 0 ? filteredFeeds : 'Empty';
+          feedsByFile.value[file] = filteredFeeds.length > 0 ? filteredFeeds : 'Empty'
         } catch (error) {
-          console.error(`Error fetching feed for index ${index}:`, error);
-          feedsByFile.value[file] = 'Empty';
+          console.error(`Error fetching feed for index ${index}:`, error)
+          feedsByFile.value[file] = 'Empty'
         }
-      });
-    });
+      })
+    })
 
     return { files, feedsByFile }
   }
