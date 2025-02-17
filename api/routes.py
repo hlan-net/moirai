@@ -47,6 +47,27 @@ def get_article(article_id):
     else:
         abort(404, description="Article file not found")
 
+@api_blueprint.route("/events", methods=["GET"])
+def list_events():
+    events_directory = 'events'
+    events = [event for event in os.listdir(events_directory) if not event.startswith('.')]
+    return jsonify(events)
+
+@api_blueprint.route("/events/<int:event_id>", methods=["GET"])
+def get_event(event_id):
+    events_directory = 'events'
+    events = [event for event in os.listdir(events_directory) if not event.startswith('.')]
+    if event_id < 0 or event_id >= len(events):
+        abort(404, description="Event not found")
+    event_filename = events[event_id]
+    event_filepath = os.path.join(events_directory, event_filename)
+    if os.path.isfile(event_filepath):
+        with open(event_filepath, 'r') as file:
+            event_content = file.read()
+        return jsonify({"content": event_content})
+    else:
+        abort(404, description="Event file not found")
+
 def fetch_url(url):
     try:
         response = requests.get(url)
