@@ -18,6 +18,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     spec:
+      automountServiceAccountToken: false
       initContainers:
         - name: init-couchdb
           image: busybox
@@ -37,6 +38,13 @@ spec:
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
+          resources:
+            requests:
+              ephemeral-storage: "{{ .Values.couchdb.resources.requests.ephemeralStorage }}"
+              memory: "{{ .Values.couchdb.resources.requests.memory }}"
+            limits:
+              ephemeral-storage: "{{ .Values.couchdb.resources.limits.ephemeralStorage }}"
+              memory: "{{ .Values.couchdb.resources.limits.memory }}"
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data

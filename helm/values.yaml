@@ -32,6 +32,13 @@ couchdb:
     size: 1Gi
   adminUser: "admin"
   adminPassword: "password"
+  resources:
+    requests:
+      ephemeralStorage: "1Gi"
+      memory: "1Gi"
+    limits:
+      ephemeralStorage: "2Gi"
+      memory: "2Gi"
 
 ollama:
   endpoint: "https://ollama.example.com"
