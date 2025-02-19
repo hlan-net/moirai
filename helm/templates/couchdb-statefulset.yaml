@@ -4,6 +4,8 @@ metadata:
   name: {{ .Release.Name }}-{{ .Values.couchdb.name }}
   labels:
     app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb
 spec:
   serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless
   replicas: {{ .Values.couchdb.replicas }}
@@ -32,9 +34,15 @@ spec:
           imagePullPolicy: {{ .Values.couchdb.image.pullPolicy | default "IfNotPresent" }}
           env:
             - name: COUCHDB_USER
-              value: "{{ .Values.couchdb.adminUser }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: username
             - name: COUCHDB_PASSWORD
-              value: "{{ .Values.couchdb.adminPassword }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: password
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
@@ -48,6 +56,18 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.couchdb.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.couchdb.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
       volumes:
         - name: couchdb-data
           persistentVolumeClaim:

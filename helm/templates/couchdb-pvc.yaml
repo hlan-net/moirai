@@ -4,6 +4,8 @@ metadata:
   name: {{ .Release.Name }}-couchdb-pvc
   labels:
     app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb
 spec:
   accessModes:
     - ReadWriteOnce

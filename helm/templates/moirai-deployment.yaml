@@ -1,34 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.deployment.name }}
+  name: "{{ .Release.Name }}-{{ .Values.deployment.name }}"
 spec:
   replicas: {{ .Values.deployment.replicas }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-{{ .Values.app.name }}
+      app: "{{ .Release.Name }}-{{ .Values.app.name }}"
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-{{ .Values.app.name }}
+        app: "{{ .Release.Name }}-{{ .Values.app.name }}"
+        {{- include "common.labels" . | nindent 8 }}
+        app.kubernetes.io/component: moirai
     spec:
       containers:
-        - name: {{ .Release.Name }}-{{ .Values.app.name }}
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        - name: "{{ .Release.Name }}-{{ .Values.app.name }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - containerPort: {{ .Values.service.targetPort }}
           env:
             - name: ENVIRONMENT
-              value: {{ .Values.environment }}
+              value: {{ .Values.environment | quote }}
             - name: OLLAMA_ENDPOINT
-              value: {{ .Values.ollama.endpoint }}
+              value: {{ .Values.ollama.endpoint | quote }}
             - name: OPEN_WEBUI_ENDPOINT
-              value: {{ .Values.openWebui.endpoint }}
+              value: {{ .Values.openWebui.endpoint | quote }}
             - name: COUCHDB_URI
-              value: http://{{ .Values.couchdb.name }}:{{ .Values.couchdb.port }}/{{ .Values.couchdb.database }}
+              value: "http://{{ .Values.couchdb.name }}:{{ .Values.couchdb.port }}/{{ .Values.couchdb.database }}"
             - name: HTTP_PORT
               value: {{ .Values.service.targetPort | quote }}
-
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds

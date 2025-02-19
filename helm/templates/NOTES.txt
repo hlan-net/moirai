@@ -1,0 +1,13 @@
+# templates/NOTES.txt
+Thank you for installing {{ .Chart.Name }}!
+Your application is running at:
+{{- $status := .status | default dict }}
+{{- $lb := $status.loadBalancer | default dict }}
+{{- with $lb.ingress }}
+Load Balancer Ingress:
+{{- range . }}
+  - {{ . }}
+{{- end }}
+{{- else }}
+Load balancer info not available.
+{{- end }}

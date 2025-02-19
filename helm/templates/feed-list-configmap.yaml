@@ -2,6 +2,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: feed-lists
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
 data:
 {{- range $filename, $content := .Values.feeds }}
   {{ $filename }}: |-
