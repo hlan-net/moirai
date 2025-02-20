@@ -30,12 +30,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-couchdb-secret
-                  key: username
+                  key: admin-username
             - name: COUCHDB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-couchdb-secret
-                  key: password
+                  key: admin-password
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
