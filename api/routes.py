@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, abort
 import os
 import requests
+import urllib.parse
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -9,8 +10,10 @@ COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
 def fetch_from_couchdb(db_name, doc_id=None):
     """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
     try:
-        # Use COUCHDB_URI directly in the request
         if doc_id:
+            safe_db_name = urllib.parse.quote(db_name, safe="")
+            safe_doc_id = urllib.parse.quote(doc_id, safe="")
+            response = requests.get(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
             response = requests.get(f"{COUCHDB_URI}{db_name}/{doc_id}")
         else:
             response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})

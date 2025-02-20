@@ -78,28 +78,41 @@ spec:
                   - -c
                   - |
                     {{- if gt (int .Values.couchdb.replicas) 1 }}
-                    echo "$(date) Checking if CouchDB cluster is already enabled..."
-                    if curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_membership | grep -q "all_nodes"; then
-                      echo "$(date) CouchDB cluster is already enabled. Skipping setup."
-                      exit 0
-                    fi
-                    echo "$(date) Setting up CouchDB cluster..."
-                    POD_HOSTNAME=$(hostname)
-                    POD_IP=$(nslookup "$POD_HOSTNAME" | awk '/Address/ {print $2}' | tail -n 1)
-                    echo "$(date) Pod IP address: $POD_IP"
-                    curl -X POST -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
-                      http://localhost:{{ .Values.couchdb.port }}/_cluster_setup \
-                      -H "Content-Type: application/json" \
-                      -d '{
-                            "action": "enable_cluster",
-                            "bind_address": "'"$POD_IP"'",
-                            "node_count": {{ .Values.couchdb.replicas }}
-                          }'
-                    if [ $? -ne 0 ]; then
-                      echo "$(date) Error setting up CouchDB cluster. Exiting."
-                      exit 1
-                    fi
-                    echo "$(date) CouchDB cluster setup completed."
+                    echo "$(date) Waiting for CouchDB to be ready..."
+                    sleep 15 # Wait 15 seconds before proceeding
+
+                    MAX_RETRIES=5
+                    RETRY_DELAY=5
+
+                    for i in $(seq 1 $MAX_RETRIES); do
+                      echo "$(date) Attempt \$i: Checking if CouchDB cluster is already enabled..."
+                      if curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_membership | grep -q "all_nodes"; then
+                        echo "$(date) CouchDB cluster is already enabled. Skipping setup."
+                        exit 0
+                      fi
+
+                      echo "$(date) Setting up CouchDB cluster..."
+                      POD_HOSTNAME=$(hostname)
+                      POD_IP=$(nslookup "$POD_HOSTNAME" | awk '/Address/ {print $2}' | tail -n 1)
+                      echo "$(date) Pod IP address: $POD_IP"
+                      curl -X POST -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
+                        http://localhost:{{ .Values.couchdb.port }}/_cluster_setup \
+                        -H "Content-Type: application/json" \
+                        -d '{
+                              "action": "enable_cluster",
+                              "bind_address": "'"$POD_IP"'",
+                              "node_count": {{ .Values.couchdb.replicas }}
+                            }'
+                      if [ $? -eq 0 ]; then
+                        echo "$(date) CouchDB cluster setup completed."
+                        exit 0
+                      else
+                        echo "$(date) Error setting up CouchDB cluster. Retry in \$RETRY_DELAY seconds..."
+                        sleep $RETRY_DELAY
+                      fi
+                    done
+                    echo "$(date) Failed to setup CouchDB cluster after $MAX_RETRIES attempts. Exiting."
+                    exit 1
                     {{- end }}
   volumeClaimTemplates:
     - metadata:
