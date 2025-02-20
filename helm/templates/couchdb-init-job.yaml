@@ -68,26 +68,25 @@ spec:
               else
                 echo "moirai CouchDB user already exists."
               fi
-              DATABASES="{{ .Values.couchdb.databases }}"
-              for db in $DATABASES; do
-                echo "Checking if $db database exists..."
-                if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/$db; then
-                  echo "Creating $db database..."
-                  curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/$db
-                else
-                  echo "$db database already exists."
-                fi
-                echo "Setting permissions for {{ .Values.couchdb.applicationUser }} on $db..."
-                curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/$db/_security \
-                  -H "Content-Type: application/json" \
-                  -d '{
-                        "admins": {
-                          "names": ["{{ .Values.couchdb.adminUser }}"],
-                          "roles": []
-                        },
-                        "members": {
-                          "names": ["{{ .Values.couchdb.applicationUser }}"],
-                          "roles": []
-                        }
-                      }'
-              done
+              {{- range .Values.couchdb.databases }}
+              echo "Checking if {{ . }} database exists..."
+              if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}; then
+                echo "Creating {{ . }} database..."
+                curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}
+              else
+                echo "{{ . }} database already exists."
+              fi
+              echo "Setting permissions for {{ $.Values.couchdb.applicationUser }} on {{ . }}..."
+              curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}/_security \
+                -H "Content-Type: application/json" \
+                -d '{
+                      "admins": {
+                        "names": ["{{ $.Values.couchdb.adminUser }}"],
+                        "roles": []
+                      },
+                      "members": {
+                        "names": ["{{ $.Values.couchdb.applicationUser }}"],
+                        "roles": []
+                      }
+                    }'
+              {{- end }}
