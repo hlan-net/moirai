@@ -39,6 +39,14 @@ class FetchFeedTask:
                 res = requests.post(self.couchdb_url, json=doc)
                 if res.status_code in (200, 201):
                     print("Feed stored successfully in CouchDB.")
+                elif res.status_code in (404):
+                    requests.put(self.couchdb_url)
+                    print(f"Database not found in CouchDB, creating it and then storing feed: {res.text}")
+                    res = requests.post(self.couchdb_url, json=doc)
+                    if res.status_code in (200, 201):
+                        print("Feed stored successfully in CouchDB.")
+                    else;
+                        print(f"Failed to store feed in new database in CouchDB: {res.text}")
                 else:
                     print(f"Failed to store feed in CouchDB: {res.text}")
             except requests.exceptions.RequestException as e:
