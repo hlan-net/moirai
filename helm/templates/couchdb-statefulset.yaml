@@ -21,6 +21,24 @@ spec:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     spec:
       automountServiceAccountToken: false
+      initContainers:
+        - name: wait-for-couchdb
+          image: curlimages/curl:latest
+          command: ['sh', '-c', 'until curl --fail -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_up; do sleep 5; done']
+          env:
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: admin-username
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: admin-password
+          ports:
+            - containerPort: {{ .Values.couchdb.port }}
+              name: couchdb
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"

@@ -1,0 +1,93 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-couchdb-init
+  labels:
+    app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb-init
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      containers:
+        - name: couchdb-init
+          image: curlimages/curl:latest
+          env:
+            - name: COUCHDB_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: admin-username
+            - name: COUCHDB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: admin-password
+            - name: COUCHDB_APPLICATION_USER
+              valueFrom:
+                secretKeyRef:
+                    name: {{ .Release.Name }}-couchdb-secret
+                    key: application-username
+            - name: COUCHDB_APPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: application-password
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for CouchDB to become available..."
+              until curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_up; do
+                sleep 5
+              done
+              echo "Checking if _users database exists..."
+              if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users; then
+                echo "Creating _users database..."
+                curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users
+              else
+                echo "_users database already exists."
+              fi
+              echo "Checking if moirai CouchDB user exists..."
+              if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }}; then
+                echo "Creating moirai CouchDB user..."
+                curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
+                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }} \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                        "name": "{{ .Values.couchdb.applicationUser }}",
+                        "password": "$COUCHDB_APPLICATION_PASSWORD",
+                        "roles": ["{{ .Values.app.name }}-user"],
+                        "type": "user"
+                      }'
+              else
+                echo "moirai CouchDB user already exists."
+              fi
+              DATABASES="{{ .Values.couchdb.databases }}"
+              for db in $DATABASES; do
+                echo "Checking if $db database exists..."
+                if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/$db; then
+                  echo "Creating $db database..."
+                  curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/$db
+                else
+                  echo "$db database already exists."
+                fi
+                echo "Setting permissions for {{ .Values.couchdb.applicationUser }} on $db..."
+                curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/$db/_security \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                        "admins": {
+                          "names": ["{{ .Values.couchdb.adminUser }}"],
+                          "roles": []
+                        },
+                        "members": {
+                          "names": ["{{ .Values.couchdb.applicationUser }}"],
+                          "roles": []
+                        }
+                      }'
+              done
