@@ -28,6 +28,27 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
+        - name: create-database
+          image: curlimages/curl
+          command:
+            - sh
+            - -c
+            - |
+              # Wait for CouchDB to become available
+              until curl -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_all_dbs; do sleep 5; done
+              # Create the database (replace "feed" with your database name if different)
+              curl -X PUT -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/feed
+          env:
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: username
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: password
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
