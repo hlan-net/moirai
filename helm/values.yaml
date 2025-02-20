@@ -36,9 +36,9 @@ couchdb:
     - "events"
   replicas: 3
   adminUser: "admin"
-  adminPassword: "password"
+  adminPassword: "password0"
   applicationUser: "app-user"
-  applicationPassword: "password"
+  applicationPassword: "password1"
   resources:
     requests:
       ephemeralStorage: "1Gi"
