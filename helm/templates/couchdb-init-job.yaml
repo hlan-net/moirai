@@ -47,17 +47,6 @@ spec:
                 echo "$(date) CouchDB not yet available, sleeping..."
                 sleep 5
               done
-              {{- if gt (int .Values.couchdb.replicas) 1 }}
-              echo "$(date) Setting up CouchDB cluster..."
-              curl -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
-                http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_cluster_setup \
-                -H "Content-Type: application/json" \
-                -d '{
-                      "action": "enable_cluster",
-                      "bind_address": "0.0.0.0",
-                      "node_count": {{ .Values.couchdb.replicas }}
-                    }'
-              {{- end }}
               echo "$(date) Checking if _users database exists..."
               if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users; then
                 echo "$(date) Creating _users database..."
@@ -118,10 +107,15 @@ spec:
               fi
               {{- range .Values.couchdb.databases }}
               echo "$(date) Checking {{ . }} database..."
-              if curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}; then
+              if curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}; then
                 echo "$(date) {{ . }} database exists."
               else
                 echo "$(date) {{ . }} database does not exist."
               fi
+              {{- end }}
+              {{- if gt (int .Values.couchdb.replicas) 1 }}
+              echo "$(date) --- Cluster Status ---"
+              echo "$(date) Checking cluster membership..."
+              curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_membership
               {{- end }}
               echo "$(date) --- End Summary ---"
