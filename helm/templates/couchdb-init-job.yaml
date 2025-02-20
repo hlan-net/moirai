@@ -46,6 +46,17 @@ spec:
               until curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_up; do
                 sleep 5
               done
+              {{- if gt (int .Values.couchdb.replicas) 1 }}
+              echo "Setting up CouchDB cluster..."
+              curl -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
+                http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_cluster_setup \
+                -H "Content-Type: application/json" \
+                -d '{
+                      "action": "enable_cluster",
+                      "bind_address": "0.0.0.0",
+                      "node_count": {{ .Values.couchdb.replicas }}
+                    }'
+              {{- end }}
               echo "Checking if _users database exists..."
               if ! curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users; then
                 echo "Creating _users database..."
