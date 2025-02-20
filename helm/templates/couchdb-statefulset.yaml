@@ -21,6 +21,42 @@ spec:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     spec:
       automountServiceAccountToken: false
+      initContainers:
+        - name: init-couchdb
+          image: curlimages/curl:8.1.2
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for CouchDB to become available..."
+              until curl --fail -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_up; do
+                sleep 5
+              done
+              echo "Creating moirai CouchDB user..."
+              curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
+                http://localhost:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }} \
+                -H "Content-Type: application/json" \
+                -d '{
+                      "name": "{{ .Values.couchdb.applicationUser }}",
+                      "password": "{{ .Values.couchdb.applicationPassword }}",
+                      "roles": ["{{ .Values.app.name }}-user"],
+                      "type": "user"
+                    }'
+              for db in {{ .Values.couchdb.databases }}; do
+                echo "Creating $db database..."
+                curl -X PUT -u "moirai:{{ .Values.couchdb.applicationPassword }}" http://localhost:{{ .Values.couchdb.port }}/$db
+              done
+          env:
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: username
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: password
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"

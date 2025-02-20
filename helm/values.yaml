@@ -30,8 +30,15 @@ couchdb:
   persistence:
     enabled: true
     size: 1Gi
+  databases:
+    - feeds
+    - articles
+    - events
+  replicas: 1
   adminUser: "admin"
   adminPassword: "password"
+  applicationUser: "app-user"
+  applicationPassword: "password"
   resources:
     requests:
       ephemeralStorage: "1Gi"
