@@ -27,7 +27,7 @@ spec:
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
             - name: COUCHDB_URI
-              value: "http://{{ .Values.couchdb.name }}:{{ .Values.couchdb.port }}/{{ .Values.couchdb.database }}"
+              value: "http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:{{ .Values.couchdb.port }}/{{ .Values.couchdb.database }}"
             - name: HTTP_PORT
               value: {{ .Values.service.targetPort | quote }}
           volumeMounts:
