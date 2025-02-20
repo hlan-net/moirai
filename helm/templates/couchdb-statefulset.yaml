@@ -72,6 +72,8 @@ spec:
                     until curl --fail -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_up; do
                       sleep 5
                     done
+                    echo "Creating _users database..."
+                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_users
                     echo "Creating moirai CouchDB user..."
                     curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
                       http://localhost:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }} \
@@ -82,10 +84,12 @@ spec:
                             "roles": ["{{ .Values.app.name }}-user"],
                             "type": "user"
                           }'
-                    for db in {{ .Values.couchdb.databases }}; do
-                      echo "Creating $db database..."
-                      curl -X PUT -u "moirai:{{ .Values.couchdb.applicationPassword }}" http://localhost:{{ .Values.couchdb.port }}/$db
-                    done
+                    echo "Creating feeds database..."
+                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/feeds
+                    echo "Creating articles database..."
+                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/articles
+                    echo "Creating events database..."
+                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/events
       volumes:
         - name: couchdb-data
           persistentVolumeClaim:
