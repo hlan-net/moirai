@@ -101,7 +101,11 @@ spec:
                     fi
                     echo "$(date) CouchDB cluster setup completed."
                     {{- end }}
-      volumes:
-        - name: couchdb-data
-          persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-couchdb-pvc
+  volumeClaimTemplates:
+    - metadata:
+        name: couchdb-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
