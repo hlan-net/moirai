@@ -75,11 +75,11 @@ spec:
               else
                 echo "$(date) _users database already exists."
               fi
-              echo "$(date) Checking if moirai CouchDB user exists..."
-              if ! curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }}; then
+              echo "$(date) Checking if {{ .Values.couchdb.applicationUsername }} for moirai CouchDB user exists..."
+              if ! curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }}; then
                 echo "$(date) Creating moirai CouchDB user..."
                 curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
-                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }} \
+                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }} \
                   -H "Content-Type: application/json" \
                   -d '{
                         "name": "{{ .Values.couchdb.applicationUser }}",
@@ -88,7 +88,7 @@ spec:
                         "type": "user"
                       }'
               else
-                echo "$(date) moirai CouchDB user already exists."
+                echo "$(date) moirai CouchDB user {{ .Values.couchdb.applicationUser }} already exists."
               fi
               {{- range .Values.couchdb.databases }}
               echo "$(date) Checking if {{ . }} database exists..."
@@ -103,11 +103,11 @@ spec:
                 -H "Content-Type: application/json" \
                 -d '{
                       "admins": {
-                        "names": ["{{ $.Values.couchdb.adminUser }}"],
+                        "names": ["{{ $.Values.couchdb.adminUsername }}"],
                         "roles": []
                       },
                       "members": {
-                        "names": ["{{ $.Values.couchdb.applicationUser }}"],
+                        "names": ["{{ $.Values.couchdb.applicationUsername }}"],
                         "roles": []
                       }
                     }'
@@ -121,7 +121,7 @@ spec:
                 echo "$(date) _users database does not exist."
               fi
               echo "$(date) Checking moirai CouchDB user..."
-              if curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }}; then
+              if curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }}; then
                 echo "$(date) moirai CouchDB user exists."
               else
                 echo "$(date) moirai CouchDB user does not exist."
