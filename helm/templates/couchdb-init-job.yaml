@@ -108,7 +108,7 @@ spec:
                       },
                       "members": {
                         "names": ["{{ $.Values.couchdb.applicationUsername }}"],
-                        "roles": ["{{ .Values.app.name }}-user"]
+                        "roles": ["{{ $.Values.app.name }}-user"]
                       }
                     }'
               {{- end }}
