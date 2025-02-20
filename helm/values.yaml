@@ -31,9 +31,9 @@ couchdb:
     enabled: true
     size: 1Gi
   databases:
-    - feeds
-    - articles
-    - events
+    - "feeds"
+    - "articles"
+    - "events"
   replicas: 3
   adminUser: "admin"
   adminPassword: "password"
