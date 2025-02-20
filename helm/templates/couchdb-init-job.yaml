@@ -31,13 +31,19 @@ spec:
             - name: COUCHDB_APPLICATION_USER
               valueFrom:
                 secretKeyRef:
-                    name: {{ .Release.Name }}-couchdb-secret
-                    key: application-username
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: application-username
             - name: COUCHDB_APPLICATION_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-couchdb-secret
                   key: application-password
+            - name: REPLICA_COUNT
+              value: "{{ .Values.couchdb.replicas }}"
+            - name: POD_BASE
+              value: "{{ .Release.Name }}-{{ .Values.couchdb.name }}"
+            - name: SERVICE_NAME
+              value: "{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless"
           command:
             - sh
             - -c
@@ -119,3 +125,16 @@ spec:
               curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_membership
               {{- end }}
               echo "$(date) --- End Summary ---"
+              echo 'Waiting for CouchDB pods to be ready...'; \
+              sleep 30; \
+              LEADER=${POD_BASE}-0.${SERVICE_NAME}; \
+              echo 'Setting up cluster on leader:' $LEADER; \
+              curl -X POST http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup -H 'Content-Type: application/json' -d '{\"action\": \"enable_cluster\", \"bind_address\": \"0.0.0.0\", \"username\": \"'$COUCHDB_USER'\", \"password\": \"'$COUCHDB_PASSWORD'\", \"node_count\": \"'$REPLICA_COUNT'\"}'; \
+              for i in $(seq 1 $(($REPLICA_COUNT - 1))); do \
+                NODE=${POD_BASE}-$i.${SERVICE_NAME}; \
+                echo 'Adding node:' $NODE; \
+                curl -X POST http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup -H 'Content-Type: application/json' -d '{\"action\": \"add_node\", \"host\": \"'$NODE'\", \"port\": {{ .Values.couchdb.port }}, \"username\": \"'$COUCHDB_USER'\", \"password\": \"'$COUCHDB_PASSWORD'\"}'; \
+              done; \
+              echo 'Finalizing cluster setup...'; \
+              curl -X POST http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup -H 'Content-Type: application/json' -d '{\"action\": \"finish_cluster\"}'; \
+              echo 'Cluster setup complete.'
