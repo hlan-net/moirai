@@ -3,12 +3,12 @@ import threading
 import requests
 
 class FetchFeedTask:
-    def __init__(self, url, delay, couchdb_url="http://localhost:5984/feeds"):
+    def __init__(self, url, delay):
         self.url = url
         self.delay = delay
         self.timer = None
         # Use the COUCHDB_URI environment variable if available
-        self.couchdb_url = os.environ.get("COUCHDB_URI" + "/feeds", couchdb_url)
+        self.couchdb_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/") + "feeds"
 
     def start(self):
         self.schedule_fetch()
