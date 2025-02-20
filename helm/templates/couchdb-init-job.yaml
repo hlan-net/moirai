@@ -76,7 +76,7 @@ spec:
                 echo "$(date) _users database already exists."
               fi
               echo "$(date) Checking if {{ .Values.couchdb.applicationUsername }} for moirai CouchDB user exists..."
-              if ! curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }}; then
+              if ! curl --fail -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }}; then
                 echo "$(date) Creating moirai CouchDB user..."
                 curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
                   http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }} \
@@ -112,6 +112,23 @@ spec:
                       }
                     }'
               {{- end }}
+
+              {{/* Add this section to set root level _security */}}
+              echo "$(date) Setting root-level permissions for application user..."
+              curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_security \
+                -H "Content-Type: application/json" \
+                -d '{
+                      "admins": {
+                        "names": ["{{ .Values.couchdb.adminUsername }}"],
+                        "roles": []
+                      },
+                      "members": {
+                        "names": ["{{ .Values.couchdb.applicationUsername }}"],
+                        "roles": []
+                      }
+                    }'
+              {{/* End of root level _security */}}
+
               echo "$(date) Initialization script completed."
               echo "$(date) --- Summary ---"
               echo "$(date) Checking _users database..."
@@ -143,9 +160,7 @@ spec:
               {{/* Add this section to verify application user access */}}
               echo "$(date) --- Verify Application User Access ---"
               echo "$(date) Attempting to list databases with application user..."
-              APP_USER={{ .Values.couchdb.applicationUsername }}
-              APP_PASS="$COUCHDB_APPLICATION_PASSWORD"
-              if curl --fail -s -u "$APP_USER:$APP_PASS" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_all_dbs; then
+              if curl --fail -s -u "$COUCHDB_APPLICATION_USER:$COUCHDB_APPLICATION_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_all_dbs; then
                 echo "$(date) Application user can list databases."
               else
                 echo "$(date) Application user cannot list databases!"
