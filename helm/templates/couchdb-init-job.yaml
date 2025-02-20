@@ -79,7 +79,7 @@ spec:
               if ! curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }}; then
                 echo "$(date) Creating moirai CouchDB user..."
                 curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
-                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }} \
+                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:name \
                   -H "Content-Type: application/json" \
                   -d '{
                         "name": "{{ .Values.couchdb.applicationUser }}",
@@ -152,5 +152,4 @@ spec:
                 echo "$(date) Listing databases failed."
               fi
               echo "$(date) --- End Verify Application User Access ---"
-
               echo "$(date) --- End Summary ---"
