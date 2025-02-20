@@ -113,22 +113,6 @@ spec:
                     }'
               {{- end }}
 
-              {{/* Add this section to set root level _security */}}
-              echo "$(date) Setting root-level permissions for application user..."
-              curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_security \
-                -H "Content-Type: application/json" \
-                -d '{
-                      "admins": {
-                        "names": ["{{ .Values.couchdb.adminUsername }}"],
-                        "roles": []
-                      },
-                      "members": {
-                        "names": ["{{ .Values.couchdb.applicationUsername }}"],
-                        "roles": []
-                      }
-                    }'
-              {{/* End of root level _security */}}
-
               echo "$(date) Initialization script completed."
               echo "$(date) --- Summary ---"
               echo "$(date) Checking _users database..."
