@@ -4,69 +4,68 @@ import requests
 
 api_blueprint = Blueprint('api', __name__)
 
+COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
+
+def fetch_from_couchdb(db_name, doc_id=None):
+    """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
+    try:
+        if doc_id:
+            response = requests.get(f"{COUCHDB_URI}{db_name}/{doc_id}")
+        else:
+            response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
+
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+
+        if doc_id:
+            return response.json()
+        else:
+            # Extract documents from the _all_docs response
+            docs = [row["doc"] for row in response.json()["rows"]]
+            return docs
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching from CouchDB: {e}")
+        abort(500, description=f"Error fetching from CouchDB: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        abort(500, description=f"Unexpected error: {e}")
+
 @api_blueprint.route("/feeds", methods=["GET"])
 def list_feeds():
-    feeds_directory = 'feeds'
-    feeds = [feed for feed in os.listdir(feeds_directory) if not feed.startswith('.')]
-    return jsonify(feeds)
+    feeds = fetch_from_couchdb("feeds")
+    # Extract only the URL from each feed document to return as a list
+    feed_urls = [feed['url'] for feed in feeds]
+    return jsonify(feed_urls)
 
-@api_blueprint.route("/feeds/<int:feed_id>", methods=["GET"])
+@api_blueprint.route("/feeds/<feed_id>", methods=["GET"])
 def get_feed(feed_id):
-    feeds_directory = 'feeds'
-    feeds = [feed for feed in os.listdir(feeds_directory) if not feed.startswith('.')]
-    if feed_id < 0 or feed_id >= len(feeds):
+    feed = fetch_from_couchdb("feeds", feed_id)
+    if not feed:
         abort(404, description="Feed not found")
-    feed_filename = feeds[feed_id]
-    feed_filepath = os.path.join(feeds_directory, feed_filename)
-    if os.path.isfile(feed_filepath):
-        with open(feed_filepath, 'r') as file:
-            file_urls = file.readlines()
-            urls = [fetch_url(url.strip()) for url in file_urls if url.strip()]
-        return jsonify(urls)
-    else:
-        abort(404, description="Feed file not found")
+    return jsonify(feed)
 
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
-    articles_directory = 'articles'
-    articles = [article for article in os.listdir(articles_directory) if not article.startswith('.')]
+    articles = fetch_from_couchdb("articles")
     return jsonify(articles)
 
-@api_blueprint.route("/articles/<int:article_id>", methods=["GET"])
+@api_blueprint.route("/articles/<article_id>", methods=["GET"])
 def get_article(article_id):
-    articles_directory = 'articles'
-    articles = [article for article in os.listdir(articles_directory) if not article.startswith('.')]
-    if article_id < 0 or article_id >= len(articles):
+    article = fetch_from_couchdb("articles", article_id)
+    if not article:
         abort(404, description="Article not found")
-    article_filename = articles[article_id]
-    article_filepath = os.path.join(articles_directory, article_filename)
-    if os.path.isfile(article_filepath):
-        with open(article_filepath, 'r') as file:
-            article_content = file.read()
-        return jsonify({"content": article_content})
-    else:
-        abort(404, description="Article file not found")
+    return jsonify(article)
 
 @api_blueprint.route("/events", methods=["GET"])
 def list_events():
-    events_directory = 'events'
-    events = [event for event in os.listdir(events_directory) if not event.startswith('.')]
+    events = fetch_from_couchdb("events")
     return jsonify(events)
 
-@api_blueprint.route("/events/<int:event_id>", methods=["GET"])
+@api_blueprint.route("/events/<event_id>", methods=["GET"])
 def get_event(event_id):
-    events_directory = 'events'
-    events = [event for event in os.listdir(events_directory) if not event.startswith('.')]
-    if event_id < 0 or event_id >= len(events):
+    event = fetch_from_couchdb("events", event_id)
+    if not event:
         abort(404, description="Event not found")
-    event_filename = events[event_id]
-    event_filepath = os.path.join(events_directory, event_filename)
-    if os.path.isfile(event_filepath):
-        with open(event_filepath, 'r') as file:
-            event_content = file.read()
-        return jsonify({"content": event_content})
-    else:
-        abort(404, description="Event file not found")
+    return jsonify(event)
 
 def fetch_url(url):
     try:
