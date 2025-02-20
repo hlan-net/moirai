@@ -7,10 +7,11 @@ from .event_correlator import EventCorrelator
 def scheduler_loop(interval):
     # Run tasks once per iteration interval.
     while True:
-        # Assuming FetchFeedTask and EventCorrelator are callable as tasks.
-        EventCorrelator().run()
-        # Collect list of feeds in the files in feeds directory and setup Task for each feed to fecth them.
-        feeds_directory = 'feeds'
+        EventCorrelator([]).run()
+        feeds_directory = '/app/feeds'
+        # Create the feeds directory if it doesn't exist
+        if not os.path.exists(feeds_directory):
+            os.makedirs(feeds_directory)
         for filename in os.listdir(feeds_directory):
             filepath = os.path.join(feeds_directory, filename)
             if os.path.isfile(filepath):
@@ -18,7 +19,7 @@ def scheduler_loop(interval):
                     for line in file.readlines():
                         url = line.strip()
                         if url:
-                            # Assuming a delay of 0 for simplicity.  Adjust as needed.
+                            # Assuming a delay of 0 for simplicity. Adjust as needed.
                             FetchFeedTask(url, 0).start()
         time.sleep(interval)
 

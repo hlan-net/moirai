@@ -22,8 +22,12 @@ WORKDIR /app
 
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    useradd -m appuser
+RUN useradd -m appuser && \
+    pip install --no-cache-dir -r requirements.txt && \
+    mkdir feeds && \
+    chmod 755 feeds && \
+    chown -R appuser:appuser feeds
+    
 USER appuser
 
 # Copy the rest of the application code into the container
