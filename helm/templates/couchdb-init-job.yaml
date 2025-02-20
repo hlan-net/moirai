@@ -111,6 +111,19 @@ spec:
                         "roles": []
                       }
                     }'
+              echo "$(date) Setting permissions for {{ $.Values.couchdb.applicationUsername }} on {{ . }}..."
+              curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}/_security \
+                -H "Content-Type: application/json" \
+                -d '{
+                      "admins": {
+                        "names": ["{{ $.Values.couchdb.adminUsername }}"],
+                        "roles": []
+                      },
+                      "members": {
+                        "names": [],
+                        "roles": ["{{ $.Values.app.name }}-user"]
+                      }
+                    }'
               {{- end }}
 
               echo "$(date) Initialization script completed."
