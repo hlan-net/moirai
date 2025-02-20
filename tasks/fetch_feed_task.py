@@ -1,6 +1,10 @@
+import hashlib
+import json
 import os  # Added to read environment variables
 import threading
+
 import requests
+
 
 class FetchFeedTask:
     def __init__(self, url, delay):
@@ -35,26 +39,50 @@ class FetchFeedTask:
                 "headers": dict(response.headers),
                 "body": response.text
             }
+
+            # Calculate hash of the document
+            doc_hash = hashlib.sha256(json.dumps(doc, sort_keys=True).encode('utf-8')).hexdigest()
+
+            # Check if the document already exists based on the hash
+            if self.is_duplicate(doc_hash):
+                print("Feed already exists and hasn't changed. Skipping storage.")
+                return
+
+            doc["_id"] = doc_hash  # Use the hash as the document ID
+
             try:
                 res = requests.post(self.couchdb_url, json=doc)
                 if res.status_code in (200, 201):
                     print("Feed stored successfully in CouchDB.")
-                elif res.status_code in (404):
-                    requests.put(self.couchdb_url)
-                    print(f"Database not found in CouchDB, creating it and then storing feed: {res.text}")
-                    res = requests.post(self.couchdb_url, json=doc)
-                    if res.status_code in (200, 201):
-                        print("Feed stored successfully in CouchDB.")
-                    else:
-                        print(f"Failed to store feed in new database in CouchDB: {res.text}")
+                elif res.status_code == 404:
+                    print(f"Database not found in CouchDB, cannot store feed.")
                 else:
                     print(f"Failed to store feed in CouchDB: {res.text}")
             except requests.exceptions.RequestException as e:
                 print(f"Error storing feed in CouchDB: {e}")
-            
         else:
             print(f"Failed to fetch: {self.url} with status code: {response.status_code}")
 
     def cancel(self):
         if self.timer is not None:
             self.timer.cancel()
+
+    def is_duplicate(self, doc_hash):
+        """
+        Checks if a document with the given hash already exists in CouchDB.
+        """
+        try:
+            # Attempt to retrieve the document by its ID (hash)
+            response = requests.get(f"{self.couchdb_url}/{doc_hash}")
+            if response.status_code == 200:
+                # Document exists
+                return True
+            elif response.status_code == 404:
+                # Document does not exist
+                return False
+            else:
+                print(f"Error checking for duplicate: {response.text}")
+                return False  # Assume not a duplicate to avoid data loss in case of error
+        except requests.exceptions.RequestException as e:
+            print(f"Error checking for duplicate: {e}")
+            return False  # Assume not a duplicate to avoid data loss in case of error
