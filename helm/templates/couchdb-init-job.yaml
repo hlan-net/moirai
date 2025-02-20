@@ -159,12 +159,14 @@ spec:
 
               {{/* Add this section to verify application user access */}}
               echo "$(date) --- Verify Application User Access ---"
-              echo "$(date) Attempting to list databases with application user..."
-              if curl --fail -s -u "$COUCHDB_APPLICATION_USER:$COUCHDB_APPLICATION_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_all_dbs; then
-                echo "$(date) Application user can list databases."
+              {{- range .Values.couchdb.databases }}
+              echo "$(date) Attempting to access database {{ . }} with application user..."
+              if curl --fail -s -u "$COUCHDB_APPLICATION_USER:$COUCHDB_APPLICATION_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}; then
+                echo "$(date) Application user can access database {{ . }}."
               else
-                echo "$(date) Application user cannot list databases!"
-                echo "$(date) Listing databases failed."
+                echo "$(date) Application user cannot access database {{ . }}!"
+                echo "$(date) Access to database {{ . }} failed."
               fi
+              {{- end }}
               echo "$(date) --- End Verify Application User Access ---"
               echo "$(date) --- End Summary ---"
