@@ -139,4 +139,18 @@ spec:
               echo "$(date) Checking cluster membership..."
               curl -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_membership
               {{- end }}
+
+              {{/* Add this section to verify application user access */}}
+              echo "$(date) --- Verify Application User Access ---"
+              echo "$(date) Attempting to list databases with application user..."
+              APP_USER={{ .Values.couchdb.applicationUsername }}
+              APP_PASS="$COUCHDB_APPLICATION_PASSWORD"
+              if curl --fail -s -u "$APP_USER:$APP_PASS" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_all_dbs; then
+                echo "$(date) Application user can list databases."
+              else
+                echo "$(date) Application user cannot list databases!"
+                echo "$(date) Listing databases failed."
+              fi
+              echo "$(date) --- End Verify Application User Access ---"
+
               echo "$(date) --- End Summary ---"
