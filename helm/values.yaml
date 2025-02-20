@@ -34,7 +34,7 @@ couchdb:
     - feeds
     - articles
     - events
-  replicas: 1
+  replicas: 3
   adminUser: "admin"
   adminPassword: "password"
   applicationUser: "app-user"
