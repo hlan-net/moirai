@@ -79,16 +79,16 @@ spec:
               if ! curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }}; then
                 echo "$(date) Creating moirai CouchDB user..."
                 curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
-                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:name \
+                  http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }} \
                   -H "Content-Type: application/json" \
                   -d '{
-                        "name": "{{ .Values.couchdb.applicationUser }}",
+                        "name": "{{ .Values.couchdb.applicationUsername }}",
                         "password": "$COUCHDB_APPLICATION_PASSWORD",
                         "roles": ["{{ .Values.app.name }}-user"],
                         "type": "user"
                       }'
               else
-                echo "$(date) moirai CouchDB user {{ .Values.couchdb.applicationUser }} already exists."
+                echo "$(date) moirai CouchDB user {{ .Values.couchdb.applicationUsername }} already exists."
               fi
               {{- range .Values.couchdb.databases }}
               echo "$(date) Checking if {{ . }} database exists..."
@@ -98,7 +98,7 @@ spec:
               else
                 echo "$(date) {{ . }} database already exists."
               fi
-              echo "$(date) Setting permissions for {{ $.Values.couchdb.applicationUser }} on {{ . }}..."
+              echo "$(date) Setting permissions for {{ $.Values.couchdb.applicationUsername }} on {{ . }}..."
               curl -X PUT -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-0.{{ $.Release.Name }}-{{ $.Values.couchdb.name }}-headless.{{ $.Release.Namespace }}.svc.cluster.local:{{ $.Values.couchdb.port }}/{{ . }}/_security \
                 -H "Content-Type: application/json" \
                 -d '{
