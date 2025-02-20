@@ -21,24 +21,6 @@ spec:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     spec:
       automountServiceAccountToken: false
-      initContainers:
-        - name: wait-for-couchdb
-          image: curlimages/curl:latest
-          command: ['sh', '-c', 'until curl --fail -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_up; do sleep 5; done']
-          env:
-            - name: COUCHDB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
-                  key: admin-username
-            - name: COUCHDB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
-                  key: admin-password
-          ports:
-            - containerPort: {{ .Values.couchdb.port }}
-              name: couchdb
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
@@ -79,62 +61,6 @@ spec:
               port: {{ .Values.couchdb.port }}
             initialDelaySeconds: 5
             periodSeconds: 10
-          lifecycle:
-            postStart:
-              exec:
-                command:
-                  - sh
-                  - -c
-                  - |
-                    echo "Waiting for CouchDB to become available..."
-                    until curl --fail -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_up; do
-                      sleep 5
-                    done
-                    echo "Checking if _users database exists..."
-                    if ! curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_users; then
-                      echo "Creating _users database..."
-                      curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_users
-                    else
-                      echo "_users database already exists."
-                    fi
-                    echo "Checking if moirai CouchDB user exists..."
-                    if ! curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }}; then
-                      echo "Creating moirai CouchDB user..."
-                      curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
-                        http://localhost:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUser }} \
-                        -H "Content-Type: application/json" \
-                        -d '{
-                              "name": "{{ .Values.couchdb.applicationUser }}",
-                              "password": "{{ .Values.couchdb.applicationPassword }}",
-                              "roles": ["{{ .Values.app.name }}-user"],
-                              "type": "user"
-                            }'
-                    else
-                      echo "moirai CouchDB user already exists."
-                    fi
-                    DATABASES="{{ .Values.couchdb.databases }}"
-                    for db in $DATABASES; do
-                      echo "Checking if $db database exists..."
-                      if ! curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/$db; then
-                        echo "Creating $db database..."
-                        curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/$db
-                      else
-                        echo "$db database already exists."
-                      fi
-                      echo "Setting permissions for {{ .Values.couchdb.applicationUser }} on $db..."
-                      curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/$db/_security \
-                        -H "Content-Type: application/json" \
-                        -d '{
-                              "admins": {
-                                "names": ["{{ .Values.couchdb.adminUser }}"],
-                                "roles": []
-                              },
-                              "members": {
-                                "names": ["{{ .Values.couchdb.applicationUser }}"],
-                                "roles": []
-                              }
-                            }'
-                    done
       volumes:
         - name: couchdb-data
           persistentVolumeClaim:
