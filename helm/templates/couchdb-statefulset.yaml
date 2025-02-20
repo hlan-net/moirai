@@ -84,12 +84,24 @@ spec:
                             "roles": ["{{ .Values.app.name }}-user"],
                             "type": "user"
                           }'
-                    echo "Creating feeds database..."
-                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/feeds
-                    echo "Creating articles database..."
-                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/articles
-                    echo "Creating events database..."
-                    curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/events
+                    DATABASES="{{ .Values.couchdb.databases }}"
+                    for db in $DATABASES; do
+                      echo "Creating $db database..."
+                      curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/$db
+                      echo "Setting permissions for {{ .Values.couchdb.applicationUser }} on $db..." .Values.couchdb.applicationUser }} on $db..."
+                      curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://localhost:{{ .Values.couchdb.port }}/$db/_security \
+                        -H "Content-Type: application/json" \
+                        -d '{
+                              "admins": {
+                                "names": ["{{ .Values.couchdb.adminUser }}"],
+                                "roles": []
+                              },
+                              "members": {
+                                "names": ["{{ .Values.couchdb.applicationUser }}"],
+                                "roles": []
+                              }
+                            }'
+                    done
       volumes:
         - name: couchdb-data
           persistentVolumeClaim:
