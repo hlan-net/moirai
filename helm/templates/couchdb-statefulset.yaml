@@ -103,7 +103,11 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
-      volumes:
-        - name: couchdb-data
-          persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-couchdb-pvc
+  volumeClaimTemplates:
+    - metadata:
+        name: couchdb-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
