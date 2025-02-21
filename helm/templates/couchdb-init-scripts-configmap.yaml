@@ -118,6 +118,7 @@ data:
     #!/bin/sh
     set -e
 
+    cd /scripts
     # Set common environment variables
     POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
     SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
