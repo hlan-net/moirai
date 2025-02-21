@@ -120,21 +120,21 @@ data:
 
     cd /scripts
     # Set common environment variables
-    POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
-    SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
-    REPLICA_COUNT={{ .Values.couchdb.replicas }}
-    LEADER=${POD_BASE}-0.${SERVICE_NAME}
+    EXPORT POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
+    EXPORT SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+    EXPORT REPLICA_COUNT={{ .Values.couchdb.replicas }}
+    EXPORT LEADER=${POD_BASE}-0.${SERVICE_NAME}
 
     # If clustering is required, run cluster setup
     {{- if gt (int .Values.couchdb.replicas) 1 }}
-    ./cluster.sh
+    sh ./cluster.sh
     {{- end }}
 
     # Run access setup (creates _users database and application user)
-    ./access-setup.sh
+    sh ./access-setup.sh
 
     # Run databases setup (creates each database and sets permissions)
-    ./databases.sh
+    sh ./databases.sh
 
     # Run verifications (summary and checks)
-    ./verifications.sh
+    sh ./verifications.sh
