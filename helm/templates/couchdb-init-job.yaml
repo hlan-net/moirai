@@ -10,7 +10,7 @@ metadata:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
     "helm.sh/hook-delete-policy": hook-succeeded
-    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secres.yaml") . | sha256sum | quote }}
+    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
     "moirai/couchdb-statefulset-hash": {{ include (print $.Template.BasePath "/couchdb-statefulset.yaml") . | sha256sum | quote }}
 spec:
   template:
