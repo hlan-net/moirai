@@ -59,6 +59,15 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-couchdb-secret
                   key: erlang-cookie
+            {{- if gt (int .Values.couchdb.replicas) 1 }}
+            # Clustering configurations
+            - name: COUCHDB_NODE_COUNT
+              value: "{{ .Values.couchdb.replicas }}"
+            - name: COUCHDB_CLUSTER
+              value: "true"
+            - name: COUCHDB_QUORUM
+              value: "{{ div (add .Values.couchdb.replicas 1) 2 }}"
+            {{- end }}
           ports:
             - containerPort: {{ .Values.couchdb.ports.app }}
               name: couchdb
