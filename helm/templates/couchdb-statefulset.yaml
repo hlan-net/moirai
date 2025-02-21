@@ -47,6 +47,18 @@ spec:
             - name: COUCHDB_QUORUM
               value: "{{ div (add .Values.couchdb.replicas 1) 2 }}"
             {{- end }}
+            # Setup Erlang cookie from secret and node name based on pod hostname
+            - name: ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: erlang-cookie
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: COUCHDB_NODENAME
+              value: "{{ .Release.Name }}-{{ .Values.couchdb.name }}-$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless"
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
