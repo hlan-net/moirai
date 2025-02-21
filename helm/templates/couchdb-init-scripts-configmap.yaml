@@ -171,9 +171,9 @@ data:
     export REPLICA_COUNT={{ .Values.couchdb.replicas }}
     export LEADER=${POD_BASE}-0.${SERVICE_NAME}
 
-    # If clustering is required, run cluster setup
+    # If clustering is required, run cluster setup using bash
     {{- if gt (int .Values.couchdb.replicas) 1 }}
-    sh ./cluster.sh
+    bash ./cluster.sh
     {{- end }}
 
     # Run access setup (creates _users database and application user)
