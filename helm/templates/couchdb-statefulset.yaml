@@ -56,7 +56,7 @@ spec:
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
-            - containerPort: {{ .Values.couchdb.epmd-port }}
+            - containerPort: {{ .Values.couchdb.empdPort }}
               name: epmd
           resources:
             requests:
