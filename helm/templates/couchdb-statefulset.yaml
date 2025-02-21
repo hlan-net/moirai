@@ -28,6 +28,10 @@ spec:
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
           imagePullPolicy: {{ .Values.couchdb.image.pullPolicy | default "IfNotPresent" }}
           env:
+            - name: COUCHDB_NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: COUCHDB_USER
               valueFrom:
                 secretKeyRef:
