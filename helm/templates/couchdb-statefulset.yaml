@@ -53,15 +53,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-couchdb-secret
                   key: erlang-cookie
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: COUCHDB_NODENAME
-              value: "{{ .Release.Name }}-{{ .Values.couchdb.name }}-$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless"
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
+            - containerPort: {{ .Values.couchdb.epmd-port }}
+              name: epmd
           resources:
             requests:
               ephemeral-storage: "{{ .Values.couchdb.resources.requests.ephemeralStorage }}"
@@ -73,14 +69,24 @@ spec:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
           livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -G --silent --fail -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_up
             httpGet:
-              path: /
+              path: /_up
               port: {{ .Values.couchdb.port }}
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - curl -G --silent --fail -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_up
             httpGet:
-              path: /
+              path: /_up
               port: {{ .Values.couchdb.port }}
             initialDelaySeconds: 5
             periodSeconds: 10
