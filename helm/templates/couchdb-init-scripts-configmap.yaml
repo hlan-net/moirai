@@ -3,15 +3,6 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-couchdb-init-script
 data:
-  showConfig.sh: |-
-    #!/bin/bash
-    echo "$(date) --- Show Config ---"
-    cd /configs
-    for file in *; do
-      echo "File: $file"
-      cat $file
-    done
-    echo "$(date) --- End Show Config ---"
   cluster.sh: |-
     #!/bin/bash
     set -euo pipefail
