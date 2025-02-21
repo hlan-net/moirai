@@ -61,7 +61,15 @@ spec:
             - name: init-script
               mountPath: /scripts
               readOnly: true
+            - name: config
+              mountPath: /configs
+              readOnly: true
       volumes:
         - name: init-script
           configMap:
             name: {{ .Release.Name }}-couchdb-init-script
+        - name: config
+          configMap:
+            name: {{ .Release.Name }}-couchdb-config
+            items:
+              - key: seedlistinifile
