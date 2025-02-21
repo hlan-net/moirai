@@ -7,10 +7,13 @@ data:
     #!/bin/bash
     set -euo pipefail
 
-    # Function to perform a curl request and check the HTTP status code.
+    # Function to perform a curl request.
+    # An optional third parameter (ignore_invalid) will, if true,
+    # ignore a 400 error whose response body contains "Invalid Action".
     perform_curl() {
       local url=$1
       local data=$2
+      local ignore_invalid=${3:-false}
       echo "Sending request: $data"
       response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
         "$url" \
@@ -20,6 +23,10 @@ data:
       response_body=$(echo "$response" | sed '$d')
       
       if [ "$http_code" -ne 200 ]; then
+        if [ "$ignore_invalid" = true ] && echo "$response_body" | grep -q "Invalid Action"; then
+          echo "Warning: Reset action not supported by this CouchDB version. Continuing without reset."
+          return
+        fi
         echo "Error: Request to $url failed with HTTP status code $http_code"
         echo "Response: $response_body"
         exit 1
@@ -35,7 +42,8 @@ data:
     {{- if .Values.couchdb.allways_reset }}
     echo "Resetting cluster configuration on leader: $LEADER"
     reset_data='{"action": "reset_cluster"}'
-    perform_curl "$LEADER_URL" "$reset_data"
+    # Attempt the reset; if it fails with "Invalid Action", ignore it.
+    perform_curl "$LEADER_URL" "$reset_data" true
     {{- end }}
 
     echo "Enabling cluster on leader: $LEADER"
