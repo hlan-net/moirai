@@ -4,30 +4,71 @@ metadata:
   name: {{ .Release.Name }}-couchdb-init-script
 data:
   cluster.sh: |-
-    #!/bin/sh
+    #!/bin/bash
+    set -euo pipefail
+
+    # Function to perform a curl request and check the HTTP status code
+    perform_curl() {
+      local url=$1
+      local data=$2
+      echo "Sending request: $data"
+      http_code=$(curl -s -w "%{http_code}" -o /dev/null -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
+        "$url" \
+        -H 'Content-Type: application/json' \
+        -d "$data")
+      if [ "$http_code" -ne 200 ]; then
+        echo "Error: Request to $url failed with HTTP status code $http_code"
+        exit 1
+      fi
+    }
+
     echo "$(date) --- Cluster Setup ---"
     echo 'Waiting for CouchDB pods to be ready...'
     sleep 30
-    echo 'Setting up cluster on leader:' $LEADER
-    curl -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup \
-    -H 'Content-Type: application/json' \
-    -d '{"action": "enable_cluster", "bind_address": "0.0.0.0", "username": "'"$COUCHDB_ADMIN_USER"'", "password": "'"$COUCHDB_ADMIN_PASSWORD"'", "node_count": "'"$REPLICA_COUNT"'"}'
+
+    LEADER_URL="http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup"
+
+    echo 'Setting up cluster on leader:' "$LEADER"
+    # Enable cluster on leader
+    enable_data=$(cat <<EOF
+    {
+      "action": "enable_cluster",
+      "bind_address": "0.0.0.0",
+      "username": "$COUCHDB_ADMIN_USER",
+      "password": "$COUCHDB_ADMIN_PASSWORD",
+      "node_count": "$REPLICA_COUNT"
+    }
+    EOF
+    )
+    perform_curl "$LEADER_URL" "$enable_data"
+
+    # Add additional nodes to the cluster
     for i in $(seq 1 $(($REPLICA_COUNT - 1))); do
-    NODE=${POD_BASE}-$i.${SERVICE_NAME}
-    echo 'Adding node:' $NODE
-    curl -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup \
-        -H 'Content-Type: application/json' \
-        -d '{"action": "add_node", "host": "'"$NODE"'", "port": {{ .Values.couchdb.port }}, "username": "'"$COUCHDB_ADMIN_USER"'", "password": "'"$COUCHDB_ADMIN_PASSWORD"'"}'
+      NODE=${POD_BASE}-$i.${SERVICE_NAME}
+      echo 'Adding node:' "$NODE"
+      add_data=$(cat <<EOF
+    {
+      "action": "add_node",
+      "host": "$NODE",
+      "port": {{ .Values.couchdb.port }},
+      "username": "$COUCHDB_ADMIN_USER",
+      "password": "$COUCHDB_ADMIN_PASSWORD"
+    }
+    EOF
+    )
+      perform_curl "$LEADER_URL" "$add_data"
     done
+
     echo 'Finalizing cluster setup...'
-    curl -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://${LEADER}:{{ .Values.couchdb.port }}/_cluster_setup \
-    -H 'Content-Type: application/json' \
-    -d '{"action": "finish_cluster"}'
+    finish_data='{"action": "finish_cluster"}'
+    perform_curl "$LEADER_URL" "$finish_data"
+
     echo 'Cluster setup complete.'
     echo "$(date) --- End Cluster Setup ---"
 
   access-setup.sh: |-
     #!/bin/sh
+    echo "$(date) --- Access Setup ---"
     echo "$(date) Waiting for CouchDB to become available..."
     until curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://${LEADER}:{{ .Values.couchdb.port }}/_up; do
     echo "$(date) CouchDB not yet available, sleeping..."
@@ -51,9 +92,11 @@ data:
     else
     echo "$(date) moirai CouchDB user {{ .Values.couchdb.applicationUsername }} already exists."
     fi
+    echo "$(date) --- End Access Setup ---"
 
   databases.sh: |-
     #!/bin/sh
+    echo "$(date) --- Databases Setup ---"
     {{- range .Values.couchdb.databases }}
     echo "$(date) Checking if {{ . }} database exists..."
     if ! curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://${LEADER}:{{ $.Values.couchdb.port }}/{{ . }}; then
@@ -67,10 +110,11 @@ data:
     -H "Content-Type: application/json" \
     -d '{"admins": {"names": ["$COUCHDB_ADMIN_USER"], "roles": []}, "members": {"names": ["$COUCHDB_APPLICATION_USER"], "roles": ["${APP_NAME}-user"]}}'
     {{- end }}
+    echo "$(date) --- End Databases Setup ---"
 
   verifications.sh: |-
     #!/bin/sh
-    echo "$(date) --- Summary ---"
+    echo "$(date) --- Verifications ---"
     echo "$(date) Checking _users database..."
     if curl --fail -s -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" http://${LEADER}:{{ .Values.couchdb.port }}/_users; then
     echo "$(date) _users database exists."
@@ -112,18 +156,20 @@ data:
     fi
     {{- end }}
     echo "$(date) --- End Verify Application User Access ---"
-    echo "$(date) --- End Summary ---"
+    echo "$(date) --- End Verifications ---"
 
   init.sh: |-
     #!/bin/sh
     set -e
 
     cd /scripts
+
+    echo "$(date) --- Start CouchDB Initialization ---"
     # Set common environment variables
-    EXPORT POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
-    EXPORT SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
-    EXPORT REPLICA_COUNT={{ .Values.couchdb.replicas }}
-    EXPORT LEADER=${POD_BASE}-0.${SERVICE_NAME}
+    POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
+    SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+    REPLICA_COUNT={{ .Values.couchdb.replicas }}
+    LEADER=${POD_BASE}-0.${SERVICE_NAME}
 
     # If clustering is required, run cluster setup
     {{- if gt (int .Values.couchdb.replicas) 1 }}
@@ -138,3 +184,5 @@ data:
 
     # Run verifications (summary and checks)
     sh ./verifications.sh
+
+    echo "$(date) --- End CouchDB Initialization ---"
