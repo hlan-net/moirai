@@ -189,7 +189,7 @@ data:
 
     # If clustering is required, run cluster setup using sh
     {{- if gt (int .Values.couchdb.replicas) 1 }}
-    # sh ./cluster.sh
+    sh ./cluster.sh
     {{- end }}
 
     # Run access setup (creates _users database and application user)
