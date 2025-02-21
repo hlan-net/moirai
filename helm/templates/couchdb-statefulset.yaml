@@ -78,7 +78,7 @@ spec:
               ephemeral-storage: {{ .Values.couchdb.resources.limits.ephemeralStorage | quote }}
               memory: {{ .Values.couchdb.resources.limits.memory | quote }}
               cpu: {{ .Values.couchdb.resources.limits.cpu | quote }}
-                   livenessProbe:
+          livenessProbe:
             exec:
               command:
                 - sh
@@ -101,8 +101,7 @@ spec:
               readOnly: true
             - name: couchdb-data
               mountPath: /opt/couchdb/data
-
-   volumeClaimTemplates:
+  volumeClaimTemplates:
     - metadata:
         name: couchdb-data
       spec:
