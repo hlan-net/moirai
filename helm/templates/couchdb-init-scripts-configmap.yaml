@@ -77,7 +77,7 @@ data:
 
     echo 'Finalizing cluster setup...'
     finish_data='{"action": "finish_cluster"}'
-    perform_curl "$LEADER_URL" "$finish_data"
+    perform_curl "$LEADER_URL" "$finish_data" "Cluster is already finished"
 
     echo 'Cluster setup complete.'
     echo "$(date) --- End Cluster Setup ---"
