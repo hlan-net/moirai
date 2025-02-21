@@ -27,7 +27,7 @@ couchdb:
   epmdPort: 4369
   image:
     repository: couchdb
-    tag: 3.1.1
+    tag: 3.4
   persistence:
     enabled: true
     size: 1Gi
