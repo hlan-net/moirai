@@ -97,4 +97,4 @@ spec:
       volumes:
         - name: couchdb-data
           persistentVolumeClaim:
-            claimName: {{ include "fullname" . }}-pvc
+            claimName: {{ .Release.Name }}-couchdb-pvc
