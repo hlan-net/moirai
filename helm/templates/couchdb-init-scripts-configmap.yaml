@@ -21,7 +21,7 @@ data:
       http_code=$(echo "$response" | tail -n1 | cut -d: -f2)
       response_body=$(echo "$response" | sed '$d')
       
-      if [ "$http_code" -ne 200 ]; then
+      if [ "$http_code" -ne 200 ] && [ "$http_code" -ne 201 ]; then
         if [ -n "$ignore_msg" ] && echo "$response_body" | grep -q "$ignore_msg"; then
           echo "Warning: $ignore_msg encountered. Continuing."
           return
