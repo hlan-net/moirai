@@ -159,17 +159,17 @@ data:
     echo "$(date) --- End Verifications ---"
 
   init.sh: |-
-    #!/bin/sh
+    #!/bin/bash
     set -e
 
     cd /scripts
 
     echo "$(date) --- Start CouchDB Initialization ---"
-    # Set common environment variables
-    POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
-    SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
-    REPLICA_COUNT={{ .Values.couchdb.replicas }}
-    LEADER=${POD_BASE}-0.${SERVICE_NAME}
+    # Set common environment variables and export them globally
+    export POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
+    export SERVICE_NAME={{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+    export REPLICA_COUNT={{ .Values.couchdb.replicas }}
+    export LEADER=${POD_BASE}-0.${SERVICE_NAME}
 
     # If clustering is required, run cluster setup
     {{- if gt (int .Values.couchdb.replicas) 1 }}
@@ -177,12 +177,12 @@ data:
     {{- end }}
 
     # Run access setup (creates _users database and application user)
-    sh ./access-setup.sh
+    bash ./access-setup.sh
 
     # Run databases setup (creates each database and sets permissions)
-    sh ./databases.sh
+    bash ./databases.sh
 
     # Run verifications (summary and checks)
-    sh ./verifications.sh
+    bash ./verifications.sh
 
     echo "$(date) --- End CouchDB Initialization ---"
