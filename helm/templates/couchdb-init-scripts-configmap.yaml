@@ -159,7 +159,7 @@ data:
     echo "$(date) --- End Verifications ---"
 
   init.sh: |-
-    #!/bin/bash
+    #!/bin/sh
     set -e
 
     cd /scripts
@@ -171,18 +171,18 @@ data:
     export REPLICA_COUNT={{ .Values.couchdb.replicas }}
     export LEADER=${POD_BASE}-0.${SERVICE_NAME}
 
-    # If clustering is required, run cluster setup using bash
+    # If clustering is required, run cluster setup using sh
     {{- if gt (int .Values.couchdb.replicas) 1 }}
-    bash ./cluster.sh
+    sh ./cluster.sh
     {{- end }}
 
     # Run access setup (creates _users database and application user)
-    bash ./access-setup.sh
+    sh ./access-setup.sh
 
     # Run databases setup (creates each database and sets permissions)
-    bash ./databases.sh
+    sh ./databases.sh
 
     # Run verifications (summary and checks)
-    bash ./verifications.sh
+    sh ./verifications.sh
 
     echo "$(date) --- End CouchDB Initialization ---"
