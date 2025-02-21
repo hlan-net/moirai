@@ -19,6 +19,9 @@ deployment:
   name: moirai-deployment
   replicas: 1
 
+dns:
+  clusterDomainSuuffix: cluster.local
+
 environment: production
 
 couchdb:
@@ -42,6 +45,8 @@ couchdb:
   applicationUsername: "app-user"
   applicationPassword: "password1"
   erlangCookie: "erlang-cookie"
+  erlangFlags: 
+    name: "couchdb"
   resources:
     requests:
       ephemeralStorage: "1Gi"

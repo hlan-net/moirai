@@ -71,6 +71,13 @@ spec:
               ephemeral-storage: {{ .Values.couchdb.resources.limits.ephemeralStorage | quote }}
               memory: {{ .Values.couchdb.resources.limits.memory | quote }}
               cpu: {{ .Values.couchdb.resources.limits.cpu | quote }}
+          volumes:
+            - name: config
+              configMap:
+                name: {{ .Release.Name }}-couchdb-config
+                items:
+                  - key: seedlistinifile
+                    path: seedlist.ini
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
