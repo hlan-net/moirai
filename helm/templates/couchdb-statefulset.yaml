@@ -34,7 +34,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: NODENAME
-              value: "$(POD_NAME).{{ include "fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+              value: "$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
             # Set the Erlang cookie to a common secret shared across all nodes.
             - name: COUCHDB_ERLANG_COOKIE
               valueFrom:
