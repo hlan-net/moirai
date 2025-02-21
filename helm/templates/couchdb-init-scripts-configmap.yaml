@@ -180,9 +180,6 @@ data:
 
     cd /scripts
 
-    echo "$(date) --- Configurations on nodes ---"
-    sh ./showConfig.sh
-
     echo "$(date) --- Start CouchDB Initialization ---"
     # Set common environment variables and export them globally
     export POD_BASE={{ .Release.Name }}-{{ .Values.couchdb.name }}
