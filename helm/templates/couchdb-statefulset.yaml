@@ -29,8 +29,12 @@ spec:
           # Set the NODENAME to a stable DNS name that Kubernetes gives each pod.
           # The pod’s hostname is typically defined by the StatefulSet and service.
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: NODENAME
-              value: "{{ .Release.Name }}-couchdb-{{ .PodName }}.{{ include "fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+              value: "$(POD_NAME).{{ include "fullname" . }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
             # Set the Erlang cookie to a common secret shared across all nodes.
             - name: COUCHDB_ERLANG_COOKIE
               valueFrom:
@@ -62,7 +66,6 @@ spec:
               name: epmd
             - containerPort: {{ .Values.couchdb.ports.cluster }}
               name: erlang-distribution
-
           resources:
             requests:
               ephemeral-storage: {{ .Values.couchdb.resources.requests.ephemeralStorage | quote }}
@@ -88,7 +91,6 @@ spec:
                 - curl -G --silent --fail -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_up
             initialDelaySeconds: 5
             periodSeconds: 10
-
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
