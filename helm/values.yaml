@@ -35,6 +35,7 @@ couchdb:
     - "articles"
     - "events"
   replicas: 3
+  allways_reset: false
   adminUsername: "admin"
   adminPassword: "password0"
   applicationUsername: "app-user"
