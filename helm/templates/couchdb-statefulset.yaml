@@ -7,7 +7,7 @@ metadata:
     {{- include "common.labels" . | nindent 4 }}
     app.kubernetes.io/component: couchdb
   annotations:
-    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote}}
+    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
 spec:
   serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless # Use headless service
   replicas: {{ .Values.couchdb.replicas }}
@@ -56,15 +56,17 @@ spec:
           ports:
             - containerPort: {{ .Values.couchdb.port }}
               name: couchdb
-            - containerPort: {{ .Values.couchdb.empdPort }}
+            - containerPort: {{ .Values.couchdb.epmdPort }}
               name: epmd
           resources:
             requests:
-              ephemeral-storage: "{{ .Values.couchdb.resources.requests.ephemeralStorage }}"
-              memory: "{{ .Values.couchdb.resources.requests.memory }}"
+              ephemeral-storage: {{ .Values.couchdb.resources.requests.ephemeralStorage | quote }}
+              memory: {{ .Values.couchdb.resources.requests.memory | quote }}
+              cpu: {{ .Values.couchdb.resources.requests.cpu | quote }}
             limits:
-              ephemeral-storage: "{{ .Values.couchdb.resources.limits.ephemeralStorage }}"
-              memory: "{{ .Values.couchdb.resources.limits.memory }}"
+              ephemeral-storage: {{ .Values.couchdb.resources.limits.ephemeralStorage | quote }}
+              memory: {{ .Values.couchdb.resources.limits.memory | quote }}
+              cpu: {{ .Values.couchdb.resources.limits.cpu | quote }}
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data

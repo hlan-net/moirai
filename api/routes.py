@@ -9,12 +9,18 @@ COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
 
 def fetch_from_couchdb(db_name, doc_id=None):
     """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
+    # Validate that the database name is one of the allowed, trusted names
+    allowed_dbs = {"feeds", "articles", "events"}
+    if db_name not in allowed_dbs:
+        abort(400, description="Invalid database name.")
+    # Validate that the document ID contains only safe characters (alphanumeric, dash, and underscore)
+    if doc_id and not __import__('re').match(r'^[A-Za-z0-9\-_]+$', doc_id):
+        abort(400, description="Invalid document id.")
     try:
         if doc_id:
             safe_db_name = urllib.parse.quote(db_name, safe="")
             safe_doc_id = urllib.parse.quote(doc_id, safe="")
             response = requests.get(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
-            response = requests.get(f"{COUCHDB_URI}{db_name}/{doc_id}")
         else:
             response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
 

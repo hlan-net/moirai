@@ -23,7 +23,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: couchdb-init
-          image: curlimages/curl:latest
+          image: curlimages/curl:7.85.0
           env:
             - name: APP_NAME
               value: {{ .Values.app.name }}
@@ -50,6 +50,13 @@ spec:
           command:
             - sh
             - /scripts/init.sh
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+              ephemeral-storage: "1Gi"
+            limits:
+              memory: "256Mi"
           volumeMounts:
             - name: init-script
               mountPath: /scripts

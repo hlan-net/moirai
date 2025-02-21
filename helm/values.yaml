@@ -46,9 +46,11 @@ couchdb:
     requests:
       ephemeralStorage: "1Gi"
       memory: "1Gi"
+      cpu: "100m"
     limits:
       ephemeralStorage: "2Gi"
       memory: "2Gi"
+      cpu: "200m"
 
 ollama:
   endpoint: "https://ollama.example.com"
