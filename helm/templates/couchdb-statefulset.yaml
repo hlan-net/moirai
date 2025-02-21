@@ -65,7 +65,7 @@ spec:
             - containerPort: {{ .Values.couchdb.ports.epmd }}
               name: epmd
             - containerPort: {{ .Values.couchdb.ports.cluster }}
-              name: erlang-distribution
+              name: erldist
           resources:
             requests:
               ephemeral-storage: {{ .Values.couchdb.resources.requests.ephemeralStorage | quote }}
