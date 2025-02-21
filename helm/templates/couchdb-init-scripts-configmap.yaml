@@ -8,12 +8,11 @@ data:
     set -euo pipefail
 
     # Function to perform a curl request.
-    # An optional third parameter (ignore_invalid) will, if true,
-    # ignore a 400 error whose response body contains "Invalid Action".
+    # An optional third parameter (ignore_msg) allows certain errors to be ignored.
     perform_curl() {
       local url=$1
       local data=$2
-      local ignore_invalid=${3:-false}
+      local ignore_msg=${3:-}
       echo "Sending request: $data"
       response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
         "$url" \
@@ -23,8 +22,8 @@ data:
       response_body=$(echo "$response" | sed '$d')
       
       if [ "$http_code" -ne 200 ]; then
-        if [ "$ignore_invalid" = true ] && echo "$response_body" | grep -q "Invalid Action"; then
-          echo "Warning: Reset action not supported by this CouchDB version. Continuing without reset."
+        if [ -n "$ignore_msg" ] && echo "$response_body" | grep -q "$ignore_msg"; then
+          echo "Warning: $ignore_msg encountered. Continuing."
           return
         fi
         echo "Error: Request to $url failed with HTTP status code $http_code"
@@ -42,8 +41,8 @@ data:
     {{- if .Values.couchdb.allways_reset }}
     echo "Resetting cluster configuration on leader: $LEADER"
     reset_data='{"action": "reset_cluster"}'
-    # Attempt the reset; if it fails with "Invalid Action", ignore it.
-    perform_curl "$LEADER_URL" "$reset_data" true
+    # For reset, ignore "Invalid Action" errors.
+    perform_curl "$LEADER_URL" "$reset_data" "Invalid Action"
     {{- end }}
 
     echo "Enabling cluster on leader: $LEADER"
@@ -57,7 +56,8 @@ data:
     }
     EOF
     )
-    perform_curl "$LEADER_URL" "$enable_data"
+    # For enabling the cluster, ignore the "Cluster is already enabled" error.
+    perform_curl "$LEADER_URL" "$enable_data" "Cluster is already enabled"
 
     for i in $(seq 1 $(($REPLICA_COUNT - 1))); do
       NODE=${POD_BASE}-$i.${SERVICE_NAME}
