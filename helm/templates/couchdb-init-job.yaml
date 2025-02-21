@@ -18,6 +18,8 @@ spec:
         - name: couchdb-init
           image: curlimages/curl:latest
           env:
+            - name: APP_NAME
+              value: {{ .Values.app.name }}
             - name: COUCHDB_ADMIN_USER
               valueFrom:
                 secretKeyRef:
@@ -82,9 +84,9 @@ spec:
                   http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.couchdb.port }}/_users/org.couchdb.user:{{ .Values.couchdb.applicationUsername }} \
                   -H "Content-Type: application/json" \
                   -d '{
-                        "name": "{{ .Values.couchdb.applicationUsername }}",
+                        "name": "$COUCHDB_APPLICATION_USER",
                         "password": "$COUCHDB_APPLICATION_PASSWORD",
-                        "roles": ["{{ .Values.app.name }}-user"],
+                        "roles": ["${APP_NAME}-user"],
                         "type": "user"
                       }'
               else
@@ -103,12 +105,12 @@ spec:
                 -H "Content-Type: application/json" \
                 -d '{
                       "admins": {
-                        "names": ["{{ $.Values.couchdb.adminUsername }}"],
+                        "names": ["$COUCHDB_ADMIN_USER"],
                         "roles": []
                       },
                       "members": {
-                        "names": ["{{ $.Values.couchdb.applicationUsername }}"],
-                        "roles": ["{{ $.Values.app.name }}-user"]
+                        "names": ["$COUCHDB_APPLICATION_USER"],
+                        "roles": ["${APP_NAME}-user"]
                       }
                     }'
               {{- end }}
