@@ -75,6 +75,8 @@ data:
       perform_curl "$LEADER_URL" "$add_data"
     done
 
+    sleep 15
+
     echo 'Finalizing cluster setup...'
     finish_data='{"action": "finish_cluster"}'
     perform_curl "$LEADER_URL" "$finish_data" "Cluster is already finished"
