@@ -1,55 +1,53 @@
-# Morai - GenAI Press Review Service (non-functional, under implementation)
+# Morai - GenAI Press Review Service (Work in Progress)
 
-This project aggregates and processes RSS feeds to generate a press review using AI models.
-It supports the selection between local (Ollama) and external (Open-Webui) models via configurable endpoints.
+Morai is a GenAI-powered press review service that aggregates and processes RSS feeds using AI models. It supports both local (Ollama) and external (Open-WebUI) models via configurable endpoints.
 
-# Python Scheduled Tasks
+**Note:** This implementation is under active development and does not yet include all aspects of a Minimum Viable Product (MVP).
 
-This project provides a framework for scheduling tasks to fetch URLs and correlate events from the fetched articles. It is designed to be modular, allowing for easy extension and maintenance.
+## Project Overview
+
+Morai is built with:
+- **Frontend:** Typescript Vue
+- **Backend:** Python
+- **Deployment:** A single container image running in Kubernetes as a Helm Chart
+- **Supplementary Services:** CouchDB for data persistence, Open-WebUI, and Ollama for AI model processing
 
 ## Project Structure
-
-```
-python-scheduled-tasks
-├── feeds                # Directory containing feed files with URLs
-├── src
-│   ├── main.py         # Entry point of the application
-│   └── tasks
-│       ├── __init__.py # Initializes the tasks module
-│       ├── fetch_task.py # Defines the FetchTask class for URL fetching
-│       └── event_correlator.py # Defines the EventCorrelator class for event analysis
-├── requirements.txt     # Lists project dependencies
-└── README.md            # Project documentation
-```
+.
+├── api              # RESTful API handlers
+├── tasks            # Scheduled tasks handlers
+├── Dockerfile       # Docker file for container image
+├── feeds            # Example feeds for testing 
+├── helm             # Helm chart for deployment
+├── main.py          # Main Python for Backend 
+├── README.md        # This document
+├── requirements.txt # Python dependencies
+└── ui               # Vue frontend in Typescript
 
 ## Setup Instructions
 
 1. **Clone the repository:**
-   ```
-   git clone <repository-url>
-   cd python-scheduled-tasks
-   ```
+   ```bash
+   git clone https://github.com/hlan-net/moirai.git 
+   cd morai
 
-2. **Install dependencies:**
-   Make sure you have Python installed, then run:
-   ```
-   pip install -r requirements.txt
-   ```
+2. **Setup Python:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+	pip install -r requirements.txt
 
-## Usage
+3. **Setup Vue:**
+   ```bash
+   cd ui
+   yarn
 
-To start the application, run the following command:
-```
-python src/main.py
-```
-
-This will initialize the task scheduler, fetch URLs from the specified feed files, and begin correlating events from the fetched articles.
-
-## Task Descriptions
-
-- **FetchTask**: This task is responsible for fetching URLs at scheduled intervals. It handles the fetching process, manages responses, and ensures that tasks are executed as planned.
-
-- **EventCorrelator**: This task analyzes the articles fetched by the FetchTask. It extracts relevant events and provides insights based on the content of the articles.
+4. **Run locally:**
+   ```bash
+   cd ui
+   yarn build
+   cd ..
+   python3 main.py
 
 ## Contributing
 
