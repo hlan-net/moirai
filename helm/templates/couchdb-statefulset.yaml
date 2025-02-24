@@ -104,6 +104,8 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
+            - name: couchdb-local-config
+              mountPath: /opt/couchdb/etc/local.d
   volumeClaimTemplates:
     - metadata:
         name: couchdb-data
@@ -112,3 +114,8 @@ spec:
         resources:
           requests:
             storage: 10Gi
+  volumes:
+    - name: couchdb-local-config
+      configMap:
+        name: {{ .Release.Name }}-couchdb-config
+
