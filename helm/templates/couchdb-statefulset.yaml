@@ -104,8 +104,18 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
+            - name: couchdb-data # Mount the PV here
+              subPath: etc/local.d # Mount the subpath
+              mountPath: /opt/couchdb/etc/local.d # In the couchdb container
+      initContainers:
+        - name: init-couchdb-config
+          image: busybox:latest
+          command: ['sh', '-c', 'cp -r /config/* /opt/couchdb/etc/local.d/']
+          volumeMounts:
+            - name: couchdb-data
+              mountPath: /opt/couchdb/data
             - name: couchdb-local-config
-              mountPath: /opt/couchdb/etc/local.d
+              mountPath: /config
       volumes:
         - name: couchdb-local-config
           configMap:
