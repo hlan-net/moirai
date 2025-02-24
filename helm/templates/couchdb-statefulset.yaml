@@ -109,7 +109,7 @@ spec:
       volumes:
         - name: couchdb-local-config
           configMap:
-            name: {{ .Release.Name }}-couchdb-config
+            name: {{ .Release.Name }}-couchdb-local-config
   volumeClaimTemplates:
     - metadata:
         name: couchdb-data
