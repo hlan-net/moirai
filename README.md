@@ -13,6 +13,7 @@ Morai is built with:
 - **Supplementary Services:** CouchDB for data persistence, Open-WebUI, and Ollama for AI model processing
 
 ## Project Structure
+```
 .
 ├── api              # RESTful API handlers
 ├── tasks            # Scheduled tasks handlers
@@ -23,6 +24,7 @@ Morai is built with:
 ├── README.md        # This document
 ├── requirements.txt # Python dependencies
 └── ui               # Vue frontend in Typescript
+```
 
 ## Setup Instructions
 
