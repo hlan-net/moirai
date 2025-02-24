@@ -20,14 +20,16 @@ deployment:
   replicas: 1
 
 dns:
-  clusterDomainSuuffix: cluster.local
+  clusterDomainSuffix: cluster.local
 
 environment: production
 
 couchdb:
   name: couchdb
-  port: 5984
-  epmdPort: 4369
+  ports: 
+    app: 5984
+    epmd: 4369
+    cluster: 9100
   image:
     repository: couchdb
     tag: 3.4
