@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, abort
 import os
 import requests
 import urllib.parse
+import sys
+import re  # ensure re is imported
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -9,12 +11,10 @@ COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
 
 def fetch_from_couchdb(db_name, doc_id=None):
     """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
-    # Validate that the database name is one of the allowed, trusted names
     allowed_dbs = {"feeds", "articles", "events"}
     if db_name not in allowed_dbs:
         abort(400, description="Invalid database name.")
-    # Validate that the document ID contains only safe characters (alphanumeric, dash, and underscore)
-    if doc_id and not __import__('re').match(r'^[A-Za-z0-9\-_]+$', doc_id):
+    if doc_id and not re.match(r'^[A-Za-z0-9\-_]+$', doc_id):
         abort(400, description="Invalid document id.")
     try:
         if doc_id:
@@ -24,20 +24,18 @@ def fetch_from_couchdb(db_name, doc_id=None):
         else:
             response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
 
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-
+        response.raise_for_status()  # Raises HTTPError for bad responses
         if doc_id:
             return response.json()
         else:
-            # Extract documents from the _all_docs response
             docs = [row["doc"] for row in response.json()["rows"]]
             return docs
     except requests.exceptions.RequestException as e:
         print(f"Error fetching from CouchDB: {e}")
-        abort(500, description=f"Error fetching from CouchDB: {e}")
+        sys.exit(1)
     except Exception as e:
         print(f"Unexpected error: {e}")
-        abort(500, description=f"Unexpected error: {e}")
+        sys.exit(1)
 
 @api_blueprint.route("/feeds", methods=["GET"])
 def list_feeds():

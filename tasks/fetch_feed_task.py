@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os  # Added to read environment variables
+import sys  # Added for sys.exit
 import threading
 
 import requests
@@ -55,11 +56,14 @@ class FetchFeedTask:
                 if res.status_code in (200, 201):
                     print("Feed stored successfully in CouchDB.")
                 elif res.status_code == 404:
-                    print(f"Database not found in CouchDB, cannot store feed.")
+                    print("Database not found in CouchDB, cannot store feed.")
+                    os._exit(1)
                 else:
                     print(f"Failed to store feed in CouchDB: {res.text}")
+                    os._exit(1)
             except requests.exceptions.RequestException as e:
                 print(f"Error storing feed in CouchDB: {e}")
+                os._exit(1)
         else:
             print(f"Failed to fetch: {self.url} with status code: {response.status_code}")
 
@@ -82,7 +86,7 @@ class FetchFeedTask:
                 return False
             else:
                 print(f"Error checking for duplicate: {response.text}")
-                return False  # Assume not a duplicate to avoid data loss in case of error
+                os._exit(1)
         except requests.exceptions.RequestException as e:
             print(f"Error checking for duplicate: {e}")
-            return False  # Assume not a duplicate to avoid data loss in case of error
+            os._exit(1)
