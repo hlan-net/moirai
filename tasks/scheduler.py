@@ -8,7 +8,7 @@ def scheduler_loop(interval):
     # Run tasks once per iteration interval.
     while True:
         EventCorrelator([]).run()
-        feeds_directory = '/app/feeds'
+        feeds_directory = './feeds'
         # Create the feeds directory if it doesn't exist
         if not os.path.exists(feeds_directory):
             os.makedirs(feeds_directory)
