@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/component: couchdb
   annotations:
     "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
+    "moirai/couchdb-local-config-hash": {{ include (print $.Template.BasePath "/couchdb-local-configmap.yaml") . | sha256sum | quote }}
 spec:
   serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless # Use headless service
   replicas: {{ .Values.couchdb.replicas }}
@@ -104,22 +105,9 @@ spec:
           volumeMounts:
             - name: couchdb-data
               mountPath: /opt/couchdb/data
-            - name: couchdb-data # Mount the PV here
-              subPath: etc/local.d # Mount the subpath
-              mountPath: /opt/couchdb/etc/local.d # In the couchdb container
-      initContainers:
-        - name: init-couchdb-config
-          image: busybox:latest
-          command: ['sh', '-c', 'cp -r /config/* /opt/couchdb/etc/local.d/']
-          volumeMounts:
-            - name: couchdb-data
-              mountPath: /opt/couchdb/data
             - name: couchdb-local-config
-              mountPath: /config
-      volumes:
-        - name: couchdb-local-config
-          configMap:
-            name: {{ .Release.Name }}-couchdb-local-config
+              mountPath: /opt/couchdb/etc/local.d/database_creation.ini
+              subPath: database_creation.ini
   volumeClaimTemplates:
     - metadata:
         name: couchdb-data
