@@ -7,29 +7,46 @@ data:
     #!/bin/bash
     set -euo pipefail
 
-    # Function to perform a curl request.
-    # An optional third parameter (ignore_msg) allows certain errors to be ignored.
+    # Function to perform a curl request with retry logic.
     perform_curl() {
       local url=$1
       local data=$2
       local ignore_msg=${3:-}
-      echo "Sending request: $data"
-      response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
-        "$url" \
-        -H 'Content-Type: application/json' \
-        -d "$data")
-      http_code=$(echo "$response" | tail -n1 | cut -d: -f2)
-      response_body=$(echo "$response" | sed '$d')
-      
-      if [ "$http_code" -ne 200 ] && [ "$http_code" -ne 201 ]; then
-        if [ -n "$ignore_msg" ] && echo "$response_body" | grep -q "$ignore_msg"; then
-          echo "Warning: $ignore_msg encountered. Continuing."
+      local max_retries=5
+      local retry_delay=5
+
+      for i in $(seq 1 $max_retries); do
+        echo "Sending request (attempt $i/$max_retries): $data"
+        response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST -u "$COUCHDB_ADMIN_USER:$COUCHDB_ADMIN_PASSWORD" \
+          "$url" \
+          -H 'Content-Type: application/json' \
+          -d "$data")
+        http_code=$(echo "$response" | tail -n1 | cut -d: -f2)
+        response_body=$(echo "$response" | sed '$d')
+
+        if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+          echo "Request successful."
           return
+        elif [ "$http_code" -eq 409 ]; then
+          echo "Conflict (409) encountered."
+          if [ -n "$ignore_msg" ] && echo "$response_body" | grep -q "$ignore_msg"; then
+            echo "Warning: $ignore_msg encountered. Continuing."
+            return
+          fi
+          echo "Retrying in $retry_delay seconds..."
+          sleep $retry_delay
+        else
+          if [ -n "$ignore_msg" ] && echo "$response_body" | grep -q "$ignore_msg"; then
+            echo "Warning: $ignore_msg encountered. Continuing."
+            return
+          fi
+          echo "Error: Request to $url failed with HTTP status code $http_code"
+          echo "Response: $response_body"
+          exit 1
         fi
-        echo "Error: Request to $url failed with HTTP status code $http_code"
-        echo "Response: $response_body"
-        exit 1
-      fi
+      done
+      echo "Error: Max retries reached. Request to $url failed."
+      exit 1
     }
 
     echo "$(date) --- Cluster Setup ---"
