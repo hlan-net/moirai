@@ -22,6 +22,7 @@ spec:
       labels:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: {{ .Release.Name }}-couchdb
           image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
