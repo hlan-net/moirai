@@ -24,5 +24,5 @@ app.register_blueprint(api_blueprint, url_prefix='/api')
 if __name__ == "__main__":
     # Start scheduling URL fetches
     scheduler.start(os.environ.get("ITERATION_INTERVAL", 600))
-    port = int(os.environ.get("HTTP_PORT", 80))
+    port = int(os.environ.get("HTTP_PORT", 8088))
     app.run(host="0.0.0.0", port=port)
