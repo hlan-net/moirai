@@ -1,0 +1,53 @@
+{{- /*
+File: couchdb-cluster-setup-job.yaml
+Description: Job to initialize the CouchDB cluster. This Job is created only if replicaCount > 1 and clustering is enabled.
+*/ -}}
+{{- if and (gt (int .Values.couchdb.replicaCount) 1) .Values.couchdb.cluster.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-cluster-setup
+  labels:
+    app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb
+  annotations:
+    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
+    "moirai/couchdb-config-hash": {{ include (print $.Template.BasePath "/couchdb-configmap.yaml") . | sha256sum | quote }}
+    "helm.sh/hook": "post-install,post-upgrade"
+spec:
+  template:
+    spec:
+      containers:
+      - name: cluster-setup
+        image: curlimages/curl:latest
+        command:
+          - sh
+          - -c
+          - |
+            # Wait for all CouchDB pods to be ready (replace with a robust check in production)
+            sleep 30
+            for i in $(seq 0 $(expr {{ .Values.couchdb.replicaCount }} - 1)); do
+              echo "Adding node {{ .Release.Name }}-{{ .Values.couchdb.name }}-$i to the cluster"
+              curl -X POST http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-$i.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/_cluster_setup \
+                -H "Content-Type: application/json" \
+                -d "{\"action\": \"add_node\", \"host\": \"{{ .Release.Name }}-{{ .Values.couchdb.name }}-$i\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\": \"${COUCHDB_PASSWORD}\"}"
+              echo ""
+            done
+            echo "Finalizing cluster configuration on node 0"
+            curl -X POST http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/_cluster_setup \
+              -H "Content-Type: application/json" \
+              -d '{"action": "finish_cluster"}'
+        env:
+        - name: COUCHDB_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-user
+        - name: COUCHDB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-password
+      restartPolicy: OnFailure
+{{- end }}

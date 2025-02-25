@@ -1,20 +1,20 @@
+{{- /*
+File: couchdb-statefulset.yaml
+Description: StatefulSet for CouchDB deployment with Erlang settings.
+*/ -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+  name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-statefulset
   labels:
     app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     {{- include "common.labels" . | nindent 4 }}
     app.kubernetes.io/component: couchdb
   annotations:
     "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
-    "moirai/couchdb-local-config-hash": {{ include (print $.Template.BasePath "/couchdb-local-configmap.yaml") . | sha256sum | quote }}
 spec:
-  serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless # Use headless service
-  replicas: {{ .Values.couchdb.replicas }}
-  podManagementPolicy: Parallel
-  updateStrategy:
-    type: RollingUpdate
+  serviceName: {{ .Release.Name }}-{{ .Values.couchdb.name }}-headless
+  replicas: {{ .Values.couchdb.replicaCount | default 1 }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
@@ -22,104 +22,48 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+        {{- include "common.labels" . | nindent 8 }}
     spec:
-      automountServiceAccountToken: false
       containers:
-        - name: {{ .Release.Name }}-couchdb
-          image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
-          imagePullPolicy: {{ .Values.couchdb.image.pullPolicy | default "IfNotPresent" }}
-          # Set the NODENAME to a stable DNS name that Kubernetes gives each pod.
-          # The pod’s hostname is typically defined by the StatefulSet and service.
-          env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: NODENAME
-              value: "$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
-            # Set the Erlang cookie to a common secret shared across all nodes.
-            - name: COUCHDB_ERLANG_COOKIE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
-                  key: erlang-cookie
-            # Combine the above into the ERL_FLAGS that CouchDB’s vm.args will use.
-            - name: ERL_FLAGS
-              value: "-name couchdb@$(NODENAME) -setcookie $(COUCHDB_ERLANG_COOKIE)"
-            - name: COUCHDB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
-                  key: admin-username
-            - name: COUCHDB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
-                  key: admin-password
-            - name: ERLANG_COOKIE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
-                  key: erlang-cookie
-            {{- if gt (int .Values.couchdb.replicas) 1 }}
-            # Clustering configurations
-            - name: COUCHDB_NODE_COUNT
-              value: "{{ .Values.couchdb.replicas }}"
-            - name: COUCHDB_CLUSTER
-              value: "true"
-            - name: COUCHDB_QUORUM
-              value: "{{ div (add .Values.couchdb.replicas 1) 2 }}"
-            {{- end }}
-          ports:
-            - containerPort: {{ .Values.couchdb.ports.app }}
-              name: couchdb
-            - containerPort: {{ .Values.couchdb.ports.epmd }}
-              name: epmd
-            - containerPort: {{ .Values.couchdb.ports.cluster }}
-              name: erldist
-          resources:
-            requests:
-              ephemeral-storage: {{ .Values.couchdb.resources.requests.ephemeralStorage | quote }}
-              memory: {{ .Values.couchdb.resources.requests.memory | quote }}
-              cpu: {{ .Values.couchdb.resources.requests.cpu | quote }}
-            limits:
-              ephemeral-storage: {{ .Values.couchdb.resources.limits.ephemeralStorage | quote }}
-              memory: {{ .Values.couchdb.resources.limits.memory | quote }}
-              cpu: {{ .Values.couchdb.resources.limits.cpu | quote }}
-          livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - curl -G --silent --fail -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_up
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - curl -G --silent --fail -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_up
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          volumeMounts:
-            - name: couchdb-data
-              mountPath: /opt/couchdb/data
-            - name: couchdb-local-config
-              mountPath: /opt/couchdb/etc/local.d
-      volumes:
+      - name: couchdb
+        image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
+        imagePullPolicy: {{ .Values.couchdb.image.pullPolicy }}
+        ports:
+        - containerPort: 5984
+          name: couchdb
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: COUCHDB_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-user
+        - name: COUCHDB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-password
+        - name: COUCHDB_ERLANG_COOKIE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-erlang-cookie
+        - name: COUCHDB_NODENAME
+          value: "$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+        volumeMounts:
         - name: couchdb-data
-          persistentVolumeClaim:
-            claimName: couchdb-data
-        - name: couchdb-local-config
-          configMap:
-            name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-local-config
+          mountPath: /opt/couchdb/data
   volumeClaimTemplates:
-    - metadata:
-        name: couchdb-data
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        resources:
-          requests:
-            storage: 10Gi
-
+  - metadata:
+      name: couchdb-data
+      labels:
+        app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ .Values.couchdb.persistence.storageClass | quote }}
+      resources:
+        requests:
+          storage: {{ .Values.couchdb.persistence.size | default "8Gi" }}

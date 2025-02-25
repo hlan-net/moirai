@@ -26,38 +26,24 @@ environment: production
 
 couchdb:
   name: couchdb
-  ports: 
-    app: 5984
-    epmd: 4369
-    cluster: 9100
+  replicaCount: 1
   image:
-    repository: couchdb
-    tag: 3.4
+    repository: apache/couchdb
+    tag: "3.1.1"
+    pullPolicy: IfNotPresent
   persistence:
+    storageClass: "standard"
+    size: "8Gi"
+  credentials:
+    user: admin
+    password: changeme
+  erlangCookie: supersecretcookie
+  cluster:
     enabled: true
-    size: 1Gi
+  createDatabases: true
   databases:
-    - "feeds"
-    - "articles"
-    - "events"
-  replicas: 3
-  allways_reset: false
-  adminUsername: "admin"
-  adminPassword: "password0"
-  applicationUsername: "app-user"
-  applicationPassword: "password1"
-  erlangCookie: "erlang-cookie"
-  erlangFlags: 
-    name: "couchdb"
-  resources:
-    requests:
-      ephemeralStorage: "1Gi"
-      memory: "1Gi"
-      cpu: "100m"
-    limits:
-      ephemeralStorage: "2Gi"
-      memory: "2Gi"
-      cpu: "200m"
+    - mydatabase1
+    - mydatabase2
 
 ollama:
   endpoint: "https://ollama.example.com"

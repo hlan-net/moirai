@@ -1,0 +1,43 @@
+{{- /*
+File: couchdb-create-dbs-job.yaml
+Description: Optional Job to create CouchDB databases on post-install/upgrade.
+*/ -}}
+{{- if .Values.couchdb.createDatabases }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-create-dbs
+  labels:
+    app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: couchdb
+  annotations:
+    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
+    "helm.sh/hook": "post-install,post-upgrade"
+spec:
+  template:
+    spec:
+      containers:
+      - name: create-dbs
+        image: curlimages/curl:latest
+        command:
+          - sh
+          - -c
+          - |
+            for db in {{- range $index, $db := .Values.couchdb.databases }}{{ if $index }} {{ end }}{{ $db }}{{- end }}; do
+              echo "Creating database: $db";
+              curl -X PUT http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984/$db -u $COUCHDB_USER:$COUCHDB_PASSWORD;
+            done
+        env:
+        - name: COUCHDB_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-user
+        - name: COUCHDB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+              key: couchdb-password
+      restartPolicy: OnFailure
+{{- end }}
