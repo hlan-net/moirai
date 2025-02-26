@@ -24,19 +24,69 @@ spec:
           - sh
           - -c
           - |
-            # Wait for all CouchDB pods to be ready (replace with a robust check in production)
-            sleep 30
+            set -x
+            # Wait for all CouchDB pods to be ready and the CouchDB service to be available
+            initial_sleep=10
+            echo "Sleeping for $initial_sleep seconds to allow for initial pod startup"
+            sleep $initial_sleep
+
+            # Function to check if CouchDB is ready
+            is_couchdb_ready() {
+              node="$1"
+              until curl -s -o /dev/null -w "%{http_code}" http://$node.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984; do
+                echo "Waiting for CouchDB on $node to be ready..."
+                sleep 5
+              done
+              http_code=$(curl -s -o /dev/null -w "%{http_code}" http://$node.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984)
+              if [[ "$http_code" -eq "200" ]]; then
+                echo "CouchDB on $node is ready"
+                return 0
+              else
+                echo "CouchDB on $node is not ready (HTTP code: $http_code)"
+                return 1
+              fi
+            }
+
+            # Function to add a node to the cluster with retry logic
+            add_node_to_cluster() {
+              node="$1"
+              max_attempts=5
+              attempt=1
+              while true; do
+                echo "Attempting to add node $node to the cluster (attempt $attempt/$max_attempts)"
+                curl -X POST http://$node.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984/_cluster_setup \
+                  -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"action\": \"add_node\", \"host\": \"$node\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\": \"${COUCHDB_PASSWORD}\"}"
+                result=$?
+                if [ $result -eq 0 ]; then
+                  echo "Successfully added node $node to the cluster"
+                  break
+                else
+                  echo "Failed to add node $node to the cluster (attempt $attempt/$max_attempts).  Result code: $result"
+                  if [ $attempt -eq $max_attempts ]; then
+                    echo "Max attempts reached.  Failing."
+                    exit 1
+                  fi
+                  attempt=$((attempt + 1))
+                  sleep 10
+                fi
+              done
+            }
+
+            # Wait for all CouchDB pods to be ready
             for i in $(seq 0 $(expr {{ .Values.couchdb.replicaCount }} - 1)); do
               node="{{ .Release.Name }}-{{ .Values.couchdb.name }}-statefulset-$i"
-              echo "Adding node $node to the cluster"
-              curl -X POST http://$node.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984/_cluster_setup \
-                -H "Content-Type: application/json" \
-                -d "{\"action\": \"add_node\", \"host\": \"$node\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\": \"${COUCHDB_PASSWORD}\"}"
+              is_couchdb_ready "$node"
+              add_node_to_cluster "$node"
               echo ""
             done
+
+            # Finalize cluster configuration
             node="{{ .Release.Name }}-{{ .Values.couchdb.name }}-statefulset-0"
             echo "Finalizing cluster configuration on node 0"
             curl -X POST http://$node.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984/_cluster_setup \
+              -u "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
               -H "Content-Type: application/json" \
               -d '{"action": "finish_cluster"}'
         env:
