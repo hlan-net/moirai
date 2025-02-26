@@ -24,7 +24,8 @@ spec:
           - sh
           - -c
           - |
-            for db in {{- range $index, $db := .Values.couchdb.databases }}{{ if $index }} {{ end }}{{ $db }}{{- end }}; do
+            dbs=$( {{- range $index, $db := .Values.couchdb.databases }}{{if $index}} {{end}}{{$db}}{{ end -}} )
+            for db in $dbs; do
               echo "Creating database: $db";
               curl -X PUT http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984/$db -u $COUCHDB_USER:$COUCHDB_PASSWORD;
             done

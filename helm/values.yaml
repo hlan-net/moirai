@@ -42,8 +42,10 @@ couchdb:
     enabled: true
   createDatabases: true
   databases:
-    - mydatabase1
-    - mydatabase2
+    - users
+    - feeds
+    - articles
+    - events
 
 ollama:
   endpoint: "https://ollama.example.com"
