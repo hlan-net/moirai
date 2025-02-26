@@ -31,6 +31,10 @@ spec:
         ports:
         - containerPort: 5984
           name: couchdb
+        - containerPort: 4369
+          name: epmd
+        - containerPort: 9100
+          name: erlang
         env:
         - name: POD_NAME
           valueFrom:
