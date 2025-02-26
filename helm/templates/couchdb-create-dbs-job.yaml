@@ -31,7 +31,7 @@ spec:
             done
             echo "CouchDB is ready!";
 
-            dbs="users" ({{- range $index, $db := .Values.couchdb.databases }}{{if $index}},{{end}}"{{$db}}"{{ end -}} )
+            dbs=("users" {{- range $db := .Values.couchdb.databases }} "{{$db}}"{{ end -}} )
             for db in "${dbs[@]}"; do
               echo "Checking if database exists: $db";
               if curl -s -o /dev/null -w "%{http_code}" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984/$db -u $COUCHDB_USER:$COUCHDB_PASSWORD | grep -q "404"; then
