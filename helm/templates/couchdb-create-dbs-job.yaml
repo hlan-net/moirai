@@ -24,6 +24,13 @@ spec:
           - sh
           - -c
           - |
+            set -x
+            until curl -s http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984; do
+              echo "Waiting for CouchDB to be ready...";
+              sleep 5;
+            done
+            echo "CouchDB is ready!";
+
             dbs=$( {{- range $index, $db := .Values.couchdb.databases }}{{if $index}} {{end}}{{$db}}{{ end -}} )
             for db in $dbs; do
               echo "Creating database: $db";
