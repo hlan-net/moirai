@@ -37,12 +37,12 @@ couchdb:
   credentials:
     user: admin
     password: changeme
-  erlangCookie: supersecretcookie
+    cookieAuth: supersecretcookie123
+  erlangCookie: supersecretcookie456
   cluster:
     enabled: true
   createDatabases: true
   databases:
-    - users
     - feeds
     - articles
     - events

@@ -10,8 +10,6 @@ metadata:
     app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
     {{- include "common.labels" . | nindent 4 }}
     app.kubernetes.io/component: couchdb
-  annotations:
-    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
 spec:
   clusterIP: None
   ports:
