@@ -39,14 +39,12 @@ spec:
                 curl -X PUT http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984/$db -u $COUCHDB_USER:$COUCHDB_PASSWORD;
 
                 # Create a user for the database (optional)
-                user_name="user_$db"
-                user_password="password_$db"
                 user_roles="[\"db_admin\"]" # Example role
 
-                echo "Creating user: $user_name for database: $db"
+                echo "Creating user: $COUCHDB_USER for database: $db"
                 curl -X PUT http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984/_users/org.couchdb.user:$user_name -u $COUCHDB_USER:$COUCHDB_PASSWORD \
                   -H "Content-Type: application/json" \
-                  -d "{\"name\": \"$user_name\", \"password\": \"$user_password\", \"roles\": $user_roles, \"type\": \"user\"}";
+                  -d "{\"name\": \"$COUCHDB_USER\", \"password\": \"$COUCHDB_PASSWORD\", \"roles\": $user_roles, \"type\": \"user\"}";
               else
                 echo "Database already exists: $db";
               fi
