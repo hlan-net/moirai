@@ -32,7 +32,7 @@ spec:
             done
             echo "CouchDB is ready!";
 
-            dbs="_users {{- range $db := .Values.couchdb.databases }} {{$db}}{{ end -}}"
+            dbs="_global_changes _users {{- range $db := .Values.couchdb.databases }} {{$db}}{{ end -}}"
             for db in $dbs; do
               echo "Checking if database exists: $db";
               if curl -s -o /dev/null -w "%{http_code}" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}:5984/$db -u $COUCHDB_USER:$COUCHDB_PASSWORD | grep -q "404"; then
