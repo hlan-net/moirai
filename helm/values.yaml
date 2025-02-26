@@ -46,6 +46,10 @@ couchdb:
     - feeds
     - articles
     - events
+  erlangFlags:
+    name: couchdb
+    flags: "-name {{ .Release.Name }}-{{ .Values.couchdb.name }}"
+  erl_opts: "+epmd_module erlang_epmd -proto_dist inet_tcp +K true +A30 +P 65536 -kernel inet_default_listen_options '{reuseaddr, true}' -smp auto -noshell -noinput"
 
 ollama:
   endpoint: "https://ollama.example.com"
