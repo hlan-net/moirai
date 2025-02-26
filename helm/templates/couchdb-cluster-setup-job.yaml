@@ -13,7 +13,6 @@ metadata:
     app.kubernetes.io/component: couchdb
   annotations:
     "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote }}
-    "moirai/couchdb-config-hash": {{ include (print $.Template.BasePath "/couchdb-configmap.yaml") . | sha256sum | quote }}
     "helm.sh/hook": "post-install,post-upgrade"
 spec:
   template:
