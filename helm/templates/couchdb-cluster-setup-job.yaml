@@ -28,13 +28,13 @@ spec:
             sleep 30
             for i in $(seq 0 $(expr {{ .Values.couchdb.replicaCount }} - 1)); do
               echo "Adding node {{ .Release.Name }}-{{ .Values.couchdb.name }}-$i to the cluster"
-              curl -X POST http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-$i.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/_cluster_setup \
+              curl -X POST http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-$i.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984/_cluster_setup \
                 -H "Content-Type: application/json" \
                 -d "{\"action\": \"add_node\", \"host\": \"{{ .Release.Name }}-{{ .Values.couchdb.name }}-$i\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\": \"${COUCHDB_PASSWORD}\"}"
               echo ""
             done
             echo "Finalizing cluster configuration on node 0"
-            curl -X POST http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/_cluster_setup \
+            curl -X POST http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-0.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local:5984/_cluster_setup \
               -H "Content-Type: application/json" \
               -d '{"action": "finish_cluster"}'
         env:
