@@ -41,6 +41,13 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: COUCHDB_ERLANG_COOKIE
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+                key: couchdb-erlang-cookie
+          - name: ERL_FLAGS
+            value: "-name couchdb@$(NODENAME) -setcookie $(COUCHDB_ERLANG_COOKIE)"
           - name: COUCHDB_USER
             valueFrom:
               secretKeyRef:
@@ -51,22 +58,9 @@ spec:
               secretKeyRef:
                 name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
                 key: couchdb-password
-          - name: COUCHDB_ERLANG_COOKIE
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
-                key: couchdb-erlang-cookie
         volumeMounts:
           - name: couchdb-data
             mountPath: /opt/couchdb/data
-        command:
-          - /bin/sh
-          - -c
-          - |
-            # Set NODENAME dynamically using POD_NAME from the Downward API.
-            export NODENAME="${POD_NAME}.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
-            echo "Starting CouchDB with NODENAME=${NODENAME}"
-            exec /docker-entrypoint.sh couchdb
   volumeClaimTemplates:
     - metadata:
         name: couchdb-data
