@@ -37,10 +37,12 @@ spec:
             name: erlang
         env:
           # Set POD_NAME from the pod's metadata.
-          - name: POD_NAME
+          - name: HOSTNAME
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: POD_NAME
+            value: $(HOSTNAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}.default.svc.cluster.local
           - name: COUCHDB_ERLANG_COOKIE
             valueFrom:
               secretKeyRef:
