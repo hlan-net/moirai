@@ -64,7 +64,7 @@ spec:
           - -c
           - |
             # Set NODENAME dynamically using POD_NAME from the Downward API.
-            export NODENAME="couchdb@${POD_NAME}.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+            export NODENAME="${POD_NAME}.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
             echo "Starting CouchDB with NODENAME=${NODENAME}"
             exec /docker-entrypoint.sh couchdb
   volumeClaimTemplates:
