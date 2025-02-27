@@ -36,10 +36,10 @@ spec:
         - containerPort: 9100
           name: erlang
         env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
+        # The HOSTNAME variable is automatically set to the pod's name.
+        - name: NODENAME
+          # Using HOSTNAME (which equals the pod's name) ensures the value is substituted.
+          value: "couchdb@$(HOSTNAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
         - name: COUCHDB_USER
           valueFrom:
             secretKeyRef:
@@ -55,8 +55,6 @@ spec:
             secretKeyRef:
               name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
               key: couchdb-erlang-cookie
-        - name: COUCHDB_NODENAME
-          value: "couchdb@$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
         volumeMounts:
         - name: couchdb-data
           mountPath: /opt/couchdb/data
