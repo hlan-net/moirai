@@ -29,42 +29,52 @@ spec:
         image: "{{ .Values.couchdb.image.repository }}:{{ .Values.couchdb.image.tag }}"
         imagePullPolicy: {{ .Values.couchdb.image.pullPolicy }}
         ports:
-        - containerPort: 5984
-          name: couchdb
-        - containerPort: 4369
-          name: epmd
-        - containerPort: 9100
-          name: erlang
+          - containerPort: 5984
+            name: couchdb
+          - containerPort: 4369
+            name: epmd
+          - containerPort: 9100
+            name: erlang
         env:
-        - name: NODENAME
-          # Using POD_NAME ensures the value is substituted.
-          value: "$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
-        - name: COUCHDB_USER
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
-              key: couchdb-user
-        - name: COUCHDB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
-              key: couchdb-password
-        - name: COUCHDB_ERLANG_COOKIE
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
-              key: couchdb-erlang-cookie
+          # Set POD_NAME from the pod's metadata.
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+                key: couchdb-user
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+                key: couchdb-password
+          - name: COUCHDB_ERLANG_COOKIE
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
+                key: couchdb-erlang-cookie
         volumeMounts:
-        - name: couchdb-data
-          mountPath: /opt/couchdb/data
+          - name: couchdb-data
+            mountPath: /opt/couchdb/data
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Set NODENAME dynamically using POD_NAME from the Downward API.
+            export NODENAME="couchdb@${POD_NAME}.{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+            echo "Starting CouchDB with NODENAME=${NODENAME}"
+            exec /docker-entrypoint.sh couchdb
   volumeClaimTemplates:
-  - metadata:
-      name: couchdb-data
-      labels:
-        app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: {{ .Values.couchdb.persistence.storageClass | quote }}
-      resources:
-        requests:
-          storage: {{ .Values.couchdb.persistence.size | default "8Gi" }}
+    - metadata:
+        name: couchdb-data
+        labels:
+          app: {{ .Release.Name }}-{{ .Values.couchdb.name }}
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: {{ .Values.couchdb.persistence.storageClass | quote }}
+        resources:
+          requests:
+            storage: {{ .Values.couchdb.persistence.size | default "8Gi" }}
