@@ -55,10 +55,8 @@ spec:
             secretKeyRef:
               name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
               key: couchdb-erlang-cookie
-        # - name: COUCHDB_NODENAME
-        #   value: "$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
-        - name: NODENAME
-          value: "$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+        - name: COUCHDB_NODENAME
+          value: "couchdb@$(POD_NAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
         volumeMounts:
         - name: couchdb-data
           mountPath: /opt/couchdb/data
