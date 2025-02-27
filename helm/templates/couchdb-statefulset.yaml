@@ -47,7 +47,7 @@ spec:
                 name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
                 key: couchdb-erlang-cookie
           - name: ERL_FLAGS
-            value: "-name couchdb@$(NODENAME) -setcookie $(COUCHDB_ERLANG_COOKIE)"
+            value: "-name couchdb@$(POD_NAME) -setcookie $(COUCHDB_ERLANG_COOKIE)"
           - name: COUCHDB_USER
             valueFrom:
               secretKeyRef:
