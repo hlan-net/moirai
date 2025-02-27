@@ -39,7 +39,7 @@ spec:
         # The HOSTNAME variable is automatically set to the pod's name.
         - name: NODENAME
           # Using HOSTNAME (which equals the pod's name) ensures the value is substituted.
-          value: "couchdb@$(HOSTNAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
+          value: "$(HOSTNAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless.{{ .Release.Namespace }}.svc.cluster.local"
         - name: COUCHDB_USER
           valueFrom:
             secretKeyRef:
