@@ -114,7 +114,7 @@ spec:
               {{ .Values.couchdb.adminPassword | default "your-password" }}
             {{- end }}
           - name: COUCHDB_URI
-            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
+            value: "http://$COUCHDB_USER:$COUCHDB_PASSWORD@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
           - name: HTTP_PORT
             value: {{ .Values.service.targetPort | quote }}
           volumeMounts:
