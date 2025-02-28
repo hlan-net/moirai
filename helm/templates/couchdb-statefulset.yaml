@@ -37,19 +37,19 @@ spec:
             name: erlang
         env:
           # Set POD_NAME from the pod's metadata.
-          - name: HOSTNAME
+          - name: COUCHDB_HOST
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-          - name: POD_NAME
-            value: $(HOSTNAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}.default.svc.cluster.local
+          #- name: POD_NAME
+          #  value: $(HOSTNAME).{{ .Release.Name }}-{{ .Values.couchdb.name }}.default.svc.cluster.local
           - name: COUCHDB_ERLANG_COOKIE
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-{{ .Values.couchdb.name }}-secret
                 key: couchdb-erlang-cookie
-          - name: ERL_FLAGS
-            value: "-name couchdb@$(POD_NAME) -setcookie $(COUCHDB_ERLANG_COOKIE)"
+          #- name: ERL_FLAGS
+          #  value: "-name couchdb@$(POD_NAME) -setcookie $(COUCHDB_ERLANG_COOKIE)"
           - name: COUCHDB_USER
             valueFrom:
               secretKeyRef:
