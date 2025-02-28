@@ -8,5 +8,5 @@ appVersion: "1.0.0"
 # Define the dependencies for this chart
 dependencies:
   - name: couchdb
-    version: "{{ .Values.couchdb.chartVersion }}"
+    version: "4.5.6"
     repository: "https://apache.github.io/couchdb-helm"
