@@ -13,3 +13,10 @@ Create a default fully qualified app name.
 {{- define "fullname" -}}
 {{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+Define a helper template to construct the CouchDB secret name
+*/}}
+{{- define "moirai.couchdbSecretName" -}}
+{{ .Release.Name }}-couchdb
+{{- end -}}

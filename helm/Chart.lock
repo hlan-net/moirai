@@ -1,0 +1,6 @@
+dependencies:
+- name: couchdb
+  repository: https://apache.github.io/couchdb-helm
+  version: 4.5.6
+digest: sha256:e371f74ec1872a00db38d1ebd088be3b69704c207ecb77b6fd8da16196910f6f
+generated: "2025-02-28T11:44:25.086999111+02:00"
