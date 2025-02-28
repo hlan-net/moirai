@@ -36,10 +36,16 @@ couchdb:
   adminUsername: "admin"
   adminPassword: "your-password"
   cookieAuthSecret: "your-cookie-secret"
-  databases:
-    - feeds
-    - articles
-    - events
+  couchdbConfig:
+    couchdb:
+      uuid: "00000000-0000-0000-0000-000000000000"
+    databaseConfig:
+      feeds:
+        partitioned: true
+      articles:
+        partitioned: true
+      events:
+        partitioned: true
 
 ollama:
   endpoint: "https://ollama.example.com"
