@@ -27,13 +27,13 @@ spec:
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
             - name: COUCHDB_USER
-              value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) ) -}}
+              value: "{{- if not (empty (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) )) -}}
                 {{- ternary ( (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) ).data.adminUsername | b64dec ) .Values.couchdb.adminUsername "admin" }}
               {{- else -}}
                 {{ .Values.couchdb.adminUsername | default "admin" }}
               {{- end }}"
             - name: COUCHDB_PASSWORD
-              value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) ) -}}
+              value: "{{- if not (empty (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) )) -}}
                 {{- ternary ( (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) ).data.adminPassword | b64dec ) .Values.couchdb.adminPassword "your-password" }}
               {{- else -}}
                 {{ .Values.couchdb.adminPassword | default "your-password" }}
