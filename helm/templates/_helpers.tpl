@@ -13,25 +13,3 @@ Create a default fully qualified app name.
 {{- define "fullname" -}}
 {{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
-
-{{/*
-Generates a comma delimited list of nodes in the cluster
-*/}}
-{{- define "couchdb.seedlist" -}}
-{{- $nodeCount :=  min 5 .Values.couchdb.replicas | int }}
-  {{- range $index0 := until $nodeCount -}}
-    {{- $index1 := $index0 | add1 -}}
-    {{ $.Values.couchdb.erlangFlags.name }}@{{ template "fullname" $ }}-{{ $index0 }}.{{ template "fullname" $ }}.{{ $.Release.Namespace }}.svc.{{ $.Values.dns.clusterDomainSuffix }}{{ if ne $index1 $nodeCount }},{{ end }}
-  {{- end -}}
-{{- end -}}
-
-{{/*
-Create a random string if the supplied key does not exist
-*/}}
-{{- define "couchdb.defaultsecret" -}}
-{{- if . -}}
-{{- . | b64enc | quote -}}
-{{- else -}}
-{{- randAlphaNum 20 | b64enc | quote -}}
-{{- end -}}
-{{- end -}}

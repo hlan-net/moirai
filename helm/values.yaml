@@ -26,8 +26,7 @@ environment: production
 
 couchdb:
   name: couchdb
-  replicaCount: 1
-  chartVersion: latest
+  replicas: 1 # Renamed from replicaCount
   persistentVolume:
     enabled: true
     size: 10Gi
