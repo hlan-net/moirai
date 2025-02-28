@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: "{{ .Release.Name }}-{{ .Values.deployment.name }}"
   annotations:
-    "moirai/couchdb-secret-hash": {{ include (print $.Template.BasePath "/couchdb-secrets.yaml") . | sha256sum | quote}}
+    "moirai/couchdb-secret-hash": {{ include "couchdb-secrets" . | sha256sum | quote}}
 spec:
   replicas: {{ .Values.deployment.replicas }}
   selector:
@@ -29,7 +29,7 @@ spec:
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
             - name: COUCHDB_URI
-              value: "http://{{ .Values.couchdb.applicationUsername }}:{{ .Values.couchdb.applicationPassword }}@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:{{ .Values.couchdb.port }}/"
+              value: "http://{{ .Values.couchdb.adminUsername }}:{{ .Values.couchdb.adminPassword }}@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:{{ .Values.couchdb.port }}/"
             - name: HTTP_PORT
               value: {{ .Values.service.targetPort | quote }}
           volumeMounts:
