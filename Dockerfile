@@ -31,7 +31,7 @@ RUN useradd -m appuser && \
 USER appuser
 
 # Copy the rest of the application code into the container
-COPY main.py .
+COPY *.py .
 COPY api/ api/
 COPY tasks/ tasks/
 
