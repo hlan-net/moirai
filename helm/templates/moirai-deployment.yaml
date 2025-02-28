@@ -62,11 +62,11 @@ spec:
               # Function to create a database if it doesn't exist
               create_database() {
                 db_name=$1
-                if ! curl -s -u "$(COUCHDB_USER):$(COUCHDB_PASSWORD)" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name | grep -q '"error":"not_found"'; then
+                if ! curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name | grep -q '"error":"not_found"'; then
                   echo "Database '$db_name' already exists."
                 else
                   echo "Creating database '$db_name'..."
-                  until curl -X PUT -u "$(COUCHDB_USER):$(COUCHDB_PASSWORD)" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name; do
+                  until curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name; do
                     echo "Failed to create database '$db_name', retrying..."
                     sleep 5
                   done
@@ -85,7 +85,7 @@ spec:
 
               # Get cluster status
               echo "Fetching CouchDB cluster status..."
-              cluster_status=$(curl -s -u "$(COUCHDB_USER):$(COUCHDB_PASSWORD)" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/_membership)
+              cluster_status=$(curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/_membership)
               echo "CouchDB Cluster Status: $cluster_status"
       containers:
         - name: "{{ .Release.Name }}-{{ .Values.app.name }}"
@@ -114,7 +114,7 @@ spec:
               {{ .Values.couchdb.adminPassword | default "your-password" }}
             {{- end }}
           - name: COUCHDB_URI
-            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
+            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
           - name: HTTP_PORT
             value: {{ .Values.service.targetPort | quote }}
           volumeMounts:
