@@ -22,6 +22,9 @@ jobs:
       - name: Set HELM_HOME environment variable
         run: echo "HELM_HOME=$HOME/.helm" >> $GITHUB_ENV
 
+      - name: Get Dependencies
+        run: helm dependency update
+
       - name: Build Helm package
         run: helm package helm
 
