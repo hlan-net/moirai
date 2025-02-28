@@ -27,7 +27,7 @@ spec:
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
             - name: COUCHDB_URI
-              value: "http://{{ coalesce (.Values.couchdb.adminUsername | default (printf '{{ .Release.Name }}-couchdb' | lookup "v1" "Secret" .Release.Namespace | data.adminUsername | b64dec)) "admin" }}:{{ coalesce (.Values.couchdb.adminPassword | default (printf '{{ .Release.Name }}-couchdb' | lookup "v1" "Secret" .Release.Namespace | data.adminPassword | b64dec)) "your-password" }}@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
+              value: "http://{{ coalesce (.Values.couchdb.adminUsername | default (tpl (printf '{{ .Release.Name }}-couchdb' | quote) . | lookup "v1" "Secret" .Release.Namespace | data.adminUsername | b64dec)) "admin" }}:{{ coalesce (.Values.couchdb.adminPassword | default (tpl (printf '{{ .Release.Name }}-couchdb' | quote) . | lookup "v1" "Secret" .Release.Namespace | data.adminPassword | b64dec)) "your-password" }}@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
             - name: HTTP_PORT
               value: {{ .Values.service.targetPort | quote }}
           volumeMounts:
