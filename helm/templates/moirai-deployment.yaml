@@ -14,6 +14,50 @@ spec:
         {{- include "common.labels" . | nindent 8 }}
         app.kubernetes.io/component: moirai
     spec:
+      initContainers:
+        - name: couchdb-init
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              # Function to check if CouchDB is ready
+              check_couchdb_ready() {
+                until curl -s -o /dev/null -w "%{http_code}" http://{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984 | grep -q "200"; do
+                  echo "CouchDB not yet ready, waiting..."
+                  sleep 5
+                done
+                echo "CouchDB is ready!"
+              }
+
+              # Function to create a database if it doesn't exist
+              create_database() {
+                db_name=$1
+                if ! curl -s http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/$db_name | grep -q '"error":"not_found"'; then
+                  echo "Database '$db_name' already exists."
+                else
+                  echo "Creating database '$db_name'..."
+                  until curl -X PUT http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/$db_name; do
+                    echo "Failed to create database '$db_name', retrying..."
+                    sleep 5
+                  done
+                  echo "Database '$db_name' created successfully."
+                fi
+              }
+
+              # Check CouchDB readiness
+              check_couchdb_ready
+
+              # Create required databases
+              create_database "_users"
+              create_database "feeds"
+              create_database "articles"
+              create_database "events"
+
+              # Get cluster status
+              echo "Fetching CouchDB cluster status..."
+              cluster_status=$(curl -s http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/_membership)
+              echo "CouchDB Cluster Status: $cluster_status"
       containers:
         - name: "{{ .Release.Name }}-{{ .Values.app.name }}"
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
