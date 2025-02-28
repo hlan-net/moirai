@@ -27,29 +27,19 @@ environment: production
 couchdb:
   name: couchdb
   replicaCount: 1
-  image:
-    repository: apache/couchdb
-    tag: "latest"
-    pullPolicy: IfNotPresent
-  persistence:
-    storageClass: "standard"
-    size: "8Gi"
-  credentials:
-    user: admin
-    password: changeme
-    cookieAuth: supersecretcookie123
-  erlangCookie: supersecretcookie456
-  cluster:
+  chartVersion: latest
+  persistentVolume:
     enabled: true
-  createDatabases: true
+    size: 10Gi
+    storageClass: "your-storage-class"
+  createAdminSecret: true
+  adminUsername: "admin"
+  adminPassword: "your-password"
+  cookieAuthSecret: "your-cookie-secret"
   databases:
     - feeds
     - articles
     - events
-  erlangFlags:
-    name: couchdb
-    flags: "-name {{ .Release.Name }}-{{ .Values.couchdb.name }}"
-  erl_opts: "+epmd_module erlang_epmd -proto_dist inet_tcp +K true +A30 +P 65536 -kernel inet_default_listen_options '{reuseaddr, true}' -smp auto -noshell -noinput"
 
 ollama:
   endpoint: "https://ollama.example.com"
