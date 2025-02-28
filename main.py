@@ -2,6 +2,7 @@ import os
 from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
 from api.routes import api_blueprint
+import init
 from tasks.scheduler import scheduler
 
 app = Flask(__name__, static_folder='ui/dist')
@@ -22,6 +23,7 @@ def serve_ui(path):
 app.register_blueprint(api_blueprint, url_prefix='/api')
 
 if __name__ == "__main__":
+    init.run()
     # Start scheduling URL fetches
     scheduler.start(os.environ.get("ITERATION_INTERVAL", 600))
     port = int(os.environ.get("HTTP_PORT", 8088))
