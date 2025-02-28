@@ -17,35 +17,36 @@ spec:
       serviceAccountName: {{ .Release.Name }}-{{ .Values.service.name }}
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}
-      env:
-        - name: ENVIRONMENT
-          value: {{ .Values.environment | quote }}
-        - name: OLLAMA_ENDPOINT
-          value: {{ .Values.ollama.endpoint | quote }}
-        - name: OPEN_WEBUI_ENDPOINT
-          value: {{ .Values.openWebui.endpoint | quote }}
-        - name: COUCHDB_USER
-          value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
-          {{- if $secret }}
-            {{- default .Values.couchdb.adminUsername ($secret.data.adminUsername | b64dec) }}
-          {{- else }}
-            {{ .Values.couchdb.adminUsername | default "admin" }}
-          {{- end }}
-        - name: COUCHDB_PASSWORD
-          value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
-          {{- if $secret }}
-            {{- default .Values.couchdb.adminPassword ($secret.data.adminPassword | b64dec) }}
-          {{- else }}
-            {{ .Values.couchdb.adminPassword | default "your-password" }}
-          {{- end }}
-        - name: COUCHDB_URI
-          value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
-        - name: HTTP_PORT
-          value: {{ .Values.service.targetPort | quote }}
-          
       initContainers:
+
         - name: couchdb-init
           image: busybox:latest
+          env:
+          - name: ENVIRONMENT
+            value: {{ .Values.environment | quote }}
+          - name: OLLAMA_ENDPOINT
+            value: {{ .Values.ollama.endpoint | quote }}
+          - name: OPEN_WEBUI_ENDPOINT
+            value: {{ .Values.openWebui.endpoint | quote }}
+          - name: COUCHDB_USER
+            value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
+            {{- if $secret }}
+              {{- default .Values.couchdb.adminUsername ($secret.data.adminUsername | b64dec) }}
+            {{- else }}
+              {{ .Values.couchdb.adminUsername | default "admin" }}
+            {{- end }}
+          - name: COUCHDB_PASSWORD
+            value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
+            {{- if $secret }}
+              {{- default .Values.couchdb.adminPassword ($secret.data.adminPassword | b64dec) }}
+            {{- else }}
+              {{ .Values.couchdb.adminPassword | default "your-password" }}
+            {{- end }}
+          - name: COUCHDB_URI
+            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
+          - name: HTTP_PORT
+            value: {{ .Values.service.targetPort | quote }}
+          
           command:
             - sh
             - -c
@@ -92,6 +93,31 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - containerPort: {{ .Values.service.targetPort }}
+          env:
+          - name: ENVIRONMENT
+            value: {{ .Values.environment | quote }}
+          - name: OLLAMA_ENDPOINT
+            value: {{ .Values.ollama.endpoint | quote }}
+          - name: OPEN_WEBUI_ENDPOINT
+            value: {{ .Values.openWebui.endpoint | quote }}
+          - name: COUCHDB_USER
+            value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
+            {{- if $secret }}
+              {{- default .Values.couchdb.adminUsername ($secret.data.adminUsername | b64dec) }}
+            {{- else }}
+              {{ .Values.couchdb.adminUsername | default "admin" }}
+            {{- end }}
+          - name: COUCHDB_PASSWORD
+            value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
+            {{- if $secret }}
+              {{- default .Values.couchdb.adminPassword ($secret.data.adminPassword | b64dec) }}
+            {{- else }}
+              {{ .Values.couchdb.adminPassword | default "your-password" }}
+            {{- end }}
+          - name: COUCHDB_URI
+            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
+          - name: HTTP_PORT
+            value: {{ .Values.service.targetPort | quote }}
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
