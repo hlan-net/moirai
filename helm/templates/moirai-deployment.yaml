@@ -32,12 +32,7 @@ spec:
           - name: COUCHDB_USER
             value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminUsername ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminUsername | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminUsername | default "admin" -}}{{- end }}"
           - name: COUCHDB_PASSWORD
-            value: {{- $secret := lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .) -}}
-            {{- if $secret }}
-              {{- default .Values.couchdb.adminPassword ($secret.data.adminPassword | b64dec) }}
-            {{- else }}
-              {{ .Values.couchdb.adminPassword | default "your-password" }}
-            {{- end }}
+            value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminPassword ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminPassword | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminPassword | default "adminPass" -}}{{- end }}"
           - name: COUCHDB_URI
             value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
           - name: HTTP_PORT
