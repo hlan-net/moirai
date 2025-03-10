@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
-RUN useradd -m appuser && \
+RUN useradd -d /app appuser  && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir feeds && \
     chmod 755 feeds && \
@@ -31,9 +31,9 @@ RUN useradd -m appuser && \
 USER appuser
 
 # Copy the rest of the application code into the container
-COPY *.py .
-COPY api/ api/
-COPY tasks/ tasks/
+COPY --chown=appuser:appuser main.py .
+COPY --chown=appuser:appuser api/ api/
+COPY --chown=appuser:appuser tasks/ tasks/
 
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/

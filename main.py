@@ -2,8 +2,8 @@ import os
 from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
 from api.routes import api_blueprint
-import init
 from tasks.scheduler import scheduler
+from tasks import init
 
 app = Flask(__name__, static_folder='ui/dist')
 
@@ -23,8 +23,15 @@ def serve_ui(path):
 app.register_blueprint(api_blueprint, url_prefix='/api')
 
 if __name__ == "__main__":
+    # Initialise
+    print("Moirai starting...")
     init.run()
+    print("Moirai initialised.")
     # Start scheduling URL fetches
     scheduler.start(os.environ.get("ITERATION_INTERVAL", 600))
+    print("Scheduler started.")
+    # Start the application
     port = int(os.environ.get("HTTP_PORT", 8088))
+    print(f"Starting Moirai on port {port}")
     app.run(host="0.0.0.0", port=port)
+

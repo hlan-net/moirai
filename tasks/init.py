@@ -35,4 +35,5 @@ def init_db():
         os._exit(1)
 
 def run():
+  print("Initialising database...")
   init_db()
