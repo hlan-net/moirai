@@ -4,3 +4,9 @@ requests
 transformers
 flask-wtf
 schedule
+nltk
+sentence-transformers
+numpy
+scikit-learn
+beautifulsoup4
+dateutil

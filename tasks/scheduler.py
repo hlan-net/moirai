@@ -7,7 +7,7 @@ from .event_correlator import EventCorrelator
 def scheduler_loop(interval):
     # Run tasks once per iteration interval.
     while True:
-        EventCorrelator([]).run()
+        # First, fetch new feeds
         feeds_directory = './feeds'
         # Create the feeds directory if it doesn't exist
         if not os.path.exists(feeds_directory):
@@ -21,6 +21,18 @@ def scheduler_loop(interval):
                         if url:
                             # Assuming a delay of 0 for simplicity. Adjust as needed.
                             FetchFeedTask(url, 0).start()
+        
+        # Then analyze articles for events
+        from .article_processor import ArticleProcessor
+        processor = ArticleProcessor()
+        articles = processor.get_all_articles()
+        
+        if articles:
+            print(f"Analyzing {len(articles)} articles for events...")
+            EventCorrelator(articles).run()
+        else:
+            print("No articles found for analysis")
+            
         time.sleep(interval)
 
 class SchedulerWrapper:

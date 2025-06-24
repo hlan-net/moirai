@@ -5,6 +5,7 @@ import sys  # Added for sys.exit
 import threading
 
 import requests
+from .article_processor import ArticleProcessor
 
 
 class FetchFeedTask:
@@ -55,6 +56,8 @@ class FetchFeedTask:
                 res = requests.post(self.couchdb_url, json=doc)
                 if res.status_code in (200, 201):
                     print("Feed stored successfully in CouchDB.")
+                    # Process articles from the feed
+                    self.process_articles(response.text)
                 elif res.status_code == 404:
                     print("Database not found in CouchDB, cannot store feed.")
                     os._exit(1)
@@ -90,3 +93,20 @@ class FetchFeedTask:
         except requests.exceptions.RequestException as e:
             print(f"Error checking for duplicate: {e}")
             os._exit(1)
+    
+    def process_articles(self, feed_content):
+        """
+        Process individual articles from the RSS feed.
+        """
+        try:
+            processor = ArticleProcessor()
+            articles = processor.process_feed(self.url, feed_content)
+            
+            print(f"Processed {len(articles)} articles from {self.url}")
+            
+            # Store each article
+            for article in articles:
+                processor.store_article(article)
+                
+        except Exception as e:
+            print(f"Error processing articles from {self.url}: {e}")
