@@ -141,6 +141,7 @@ def delete_event(event_id):
         return jsonify({"status": "deleted"})
     abort(500)
 
+<<<<<<< HEAD
 @api_blueprint.route("/events/<event_id>/links", methods=["DELETE"])
 def remove_event_link(event_id):
     """Remove a specific article link from an event."""
@@ -163,6 +164,13 @@ def remove_event_link(event_id):
 def list_trends():
     trends = fetch_from_couchdb("trends")
     return jsonify(trends or [])
+
+@api_blueprint.route("/trends/<trend_id>", methods=["GET"])
+def get_trend(trend_id):
+    trend = fetch_from_couchdb("trends", trend_id)
+    if not trend:
+        abort(404, description="Trend not found")
+    return jsonify(trend)
 
 @api_blueprint.route("/trends/<trend_id>", methods=["DELETE"])
 def delete_trend(trend_id):
@@ -189,3 +197,13 @@ def remove_trend_event(trend_id):
             return jsonify(trend)
             
     abort(500, description="Failed to update trend")
+
+def fetch_url(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return {"url": url, "status": "success"}
+        else:
+            return {"url": url, "status": "failed", "code": response.status_code}
+    except requests.exceptions.RequestException as e:
+        return {"url": url, "status": "error", "message": str(e)}
