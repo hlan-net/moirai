@@ -3,6 +3,7 @@
 ## Project Overview
 
 This project, codenamed "Moirai," is a GenAI-powered press review service. It is designed to aggregate news articles from various RSS feeds, process them using Large Language Models (LLMs), and identify significant events and correlations.
+This is a public repository hosted on GitHub.
 
 The architecture consists of:
 -   **Backend:** A Python application built with the Flask web framework. It serves a RESTful API for accessing feeds, articles, and events.
