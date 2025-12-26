@@ -2,10 +2,10 @@
 import { onMounted, ref } from 'vue'
 
 interface Trend {
-  _id: string;
-  name: string;
-  description: string;
-  event_ids: string[];
+  _id: string
+  name: string
+  description: string
+  event_ids: string[]
 }
 
 const trends = ref<Trend[]>([])
@@ -16,7 +16,7 @@ const fetchTrends = async () => {
   try {
     const response = await fetch('/api/trends')
     if (response.ok) {
-        trends.value = await response.json()
+      trends.value = await response.json()
     }
   } catch (error) {
     console.error('Error fetching trends:', error)
@@ -26,24 +26,25 @@ const fetchTrends = async () => {
 }
 
 const deleteTrend = async (id: string) => {
-  if (!confirm("Delete this trend?")) return;
+  if (!confirm('Delete this trend?')) return
   try {
     const res = await fetch(`/api/trends/${id}`, { method: 'DELETE' })
     if (res.ok) {
       trends.value = trends.value.filter(t => t._id !== id)
+      expandedTrends.value.delete(id)
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   }
 }
 
 const removeEvent = async (trendId: string, eventId: string) => {
-  if (!confirm("Remove this event from the trend?")) return;
+  if (!confirm('Remove this event from the trend?')) return
   try {
     const res = await fetch(`/api/trends/${trendId}/events`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_id: eventId })
+      body: JSON.stringify({ event_id: eventId }),
     })
     if (res.ok) {
       const updatedTrend = await res.json()
@@ -52,8 +53,8 @@ const removeEvent = async (trendId: string, eventId: string) => {
         trends.value[index] = updatedTrend
       }
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -77,22 +78,28 @@ onMounted(() => {
     <div v-else-if="trends.length" class="trend-list">
       <div v-for="trend in trends" :key="trend._id" class="trend-card">
         <div class="card-header">
-           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
-           <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
+          <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
+          <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
         </div>
         <p class="desc">{{ trend.description }}</p>
-        
+
         <div v-if="expandedTrends.has(trend._id)" class="events-section">
           <h4>Linked Events ({{ trend.event_ids.length }})</h4>
           <ul>
             <li v-for="eid in trend.event_ids" :key="eid">
               <span class="event-id">{{ eid.substring(0, 8) }}...</span>
-              <button @click="removeEvent(trend._id, eid)" class="remove-event-btn" title="Remove event">-</button>
+              <button
+                @click="removeEvent(trend._id, eid)"
+                class="remove-event-btn"
+                title="Remove event"
+              >
+                -
+              </button>
             </li>
           </ul>
         </div>
         <div v-else class="expand-hint" @click="toggleExpand(trend._id)">
-           {{ trend.event_ids.length }} events (click to expand)
+          {{ trend.event_ids.length }} events (click to expand)
         </div>
       </div>
     </div>

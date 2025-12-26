@@ -2,58 +2,93 @@
 import { onMounted, ref } from 'vue'
 
 interface Event {
-  _id: string;
-  name: string;
-  description: string;
-  article_links: string[];
+  _id: string
+  name: string
+  description: string
+  article_links: string[]
+  trend_id?: string
+}
+
+interface Trend {
+  _id?: string
+  name?: string
+  title?: string
+  description?: string
 }
 
 const events = ref<Event[]>([])
+const trends = ref<Trend[]>([])
 const loading = ref(true)
 const expandedEvents = ref<Set<string>>(new Set())
 
-const fetchEvents = async () => {
+const normalizeEvent = (event: any): Event => ({
+  _id: event._id,
+  name: event.name || event.title || 'Unnamed Event',
+  description: event.description || '',
+  article_links: Array.isArray(event.article_links) ? event.article_links : [],
+  trend_id: event.trend_id,
+})
+
+const fetchEventsAndTrends = async () => {
+  loading.value = true
   try {
-    const response = await fetch('/api/events')
-    if (response.ok) {
-        events.value = await response.json()
+    const [eventsResponse, trendsResponse] = await Promise.all([
+      fetch('/api/events'),
+      fetch('/api/trends'),
+    ])
+
+    if (eventsResponse.ok) {
+      const eventsData = await eventsResponse.json()
+      events.value = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
+    } else {
+      events.value = []
+    }
+
+    if (trendsResponse.ok) {
+      const trendsData = await trendsResponse.json()
+      trends.value = Array.isArray(trendsData) ? trendsData : []
+    } else {
+      trends.value = []
     }
   } catch (error) {
-    console.error('Error fetching events:', error)
+    console.error('Error fetching events or trends:', error)
+    events.value = []
+    trends.value = []
   } finally {
     loading.value = false
   }
 }
 
 const deleteEvent = async (id: string) => {
-  if (!confirm("Delete this event?")) return;
+  if (!confirm('Delete this event?')) return
   try {
     const res = await fetch(`/api/events/${id}`, { method: 'DELETE' })
     if (res.ok) {
       events.value = events.value.filter(e => e._id !== id)
+      expandedEvents.value.delete(id)
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   }
 }
 
 const removeLink = async (eventId: string, link: string) => {
-  if (!confirm("Remove this article from the event?")) return;
+  if (!confirm('Remove this article from the event?')) return
   try {
     const res = await fetch(`/api/events/${eventId}/links`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ link })
+      body: JSON.stringify({ link }),
     })
     if (res.ok) {
-      const updatedEvent = await res.json()
+      const updatedEvent = normalizeEvent(await res.json())
       const index = events.value.findIndex(e => e._id === eventId)
       if (index !== -1) {
         events.value[index] = updatedEvent
       }
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -65,8 +100,16 @@ const toggleExpand = (id: string) => {
   }
 }
 
+const getTrendDisplayName = (trendId?: string) => {
+  if (!trendId) {
+    return ''
+  }
+  const trend = trends.value.find(t => t._id === trendId)
+  return trend?.name || trend?.title || trendId
+}
+
 onMounted(() => {
-  fetchEvents()
+  fetchEventsAndTrends()
 })
 </script>
 
@@ -77,22 +120,32 @@ onMounted(() => {
     <div v-else-if="events.length" class="event-list">
       <div v-for="event in events" :key="event._id" class="event-card">
         <div class="card-header">
-           <h3 @click="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
-           <button @click="deleteEvent(event._id)" class="delete-btn" title="Delete Event">×</button>
+          <h3 @click="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
+          <button @click="deleteEvent(event._id)" class="delete-btn" title="Delete Event">×</button>
         </div>
-        <p class="desc">{{ event.description }}</p>
-        
+        <p v-if="event.description" class="desc">{{ event.description }}</p>
+        <div v-if="event.trend_id" class="trend-link">
+          <span class="trend-label">Related Trend:</span>
+          <span class="trend-name">{{ getTrendDisplayName(event.trend_id) }}</span>
+        </div>
+
         <div v-if="expandedEvents.has(event._id)" class="links-section">
           <h4>Linked Articles ({{ event.article_links.length }})</h4>
           <ul>
             <li v-for="link in event.article_links" :key="link">
-              <a :href="link" target="_blank">{{ link }}</a>
-              <button @click="removeLink(event._id, link)" class="remove-link-btn" title="Remove link">-</button>
+              <a :href="link" target="_blank" rel="noopener noreferrer">{{ link }}</a>
+              <button
+                @click="removeLink(event._id, link)"
+                class="remove-link-btn"
+                title="Remove link"
+              >
+                -
+              </button>
             </li>
           </ul>
         </div>
         <div v-else class="expand-hint" @click="toggleExpand(event._id)">
-           {{ event.article_links.length }} articles (click to expand)
+          {{ event.article_links.length }} articles (click to expand)
         </div>
       </div>
     </div>
@@ -141,6 +194,20 @@ h3 {
   font-size: 0.9rem;
   color: #555;
   margin: 5px 0;
+}
+.trend-link {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+  font-size: 0.9em;
+}
+.trend-label {
+  color: #999;
+  margin-right: 5px;
+}
+.trend-name {
+  color: #ff6b6b;
+  font-weight: 500;
 }
 .delete-btn {
   background: none;
