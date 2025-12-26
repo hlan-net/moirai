@@ -160,8 +160,9 @@ def get_event(event_id):
                 article = fetch_from_couchdb("articles", article_id)
                 if article:
                     articles.append(article)
-            except:
+            except Exception as e:
                 # Skip articles that don't exist or can't be fetched
+                print(f"Warning: Could not fetch article {article_id}: {e}")
                 continue
         event['articles'] = articles
     
@@ -246,12 +247,14 @@ def get_trend(trend_id):
                                 article = fetch_from_couchdb("articles", article_id)
                                 if article:
                                     articles.append(article)
-                            except:
+                            except Exception as e:
+                                print(f"Warning: Could not fetch article {article_id}: {e}")
                                 continue
                         event['articles'] = articles
                     events.append(event)
-            except:
+            except Exception as e:
                 # Skip events that don't exist or can't be fetched
+                print(f"Warning: Could not fetch event {event_id}: {e}")
                 continue
         trend['events'] = events
     
