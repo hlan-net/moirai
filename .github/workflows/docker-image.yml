@@ -9,7 +9,47 @@ on:
       - '.github/workflows/helm-package.yml'
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run backend tests
+        run: |
+          PYTHONPATH=. pytest
+          
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: ui/yarn.lock
+          
+      - name: Install Frontend dependencies
+        working-directory: ui
+        run: yarn install
+        
+      - name: Install Playwright Browsers
+        working-directory: ui
+        run: npx playwright install --with-deps chromium
+        
+      - name: Run Playwright tests
+        working-directory: ui
+        run: yarn playwright test
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

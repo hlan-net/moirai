@@ -4,6 +4,14 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   base: '/ui',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8088',
+        changeOrigin: true,
+      }
+    }
+  },
   build: {
     outDir: 'dist'
   }

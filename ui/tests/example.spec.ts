@@ -4,7 +4,7 @@ test('has title', async ({ page }) => {
   await page.goto('/');
 
   // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/Vite \+ Vue/);
+  await expect(page).toHaveTitle(/Moirai/);
 });
 
 test('feeds column loads', async ({ page }) => {
