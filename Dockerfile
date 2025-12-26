@@ -32,6 +32,7 @@ USER appuser
 
 # Copy the rest of the application code into the container
 COPY --chown=appuser:appuser main.py .
+COPY --chown=appuser:appuser mcp_server.py .
 COPY --chown=appuser:appuser api/ api/
 COPY --chown=appuser:appuser tasks/ tasks/
 

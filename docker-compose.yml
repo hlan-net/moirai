@@ -13,6 +13,16 @@ services:
     volumes:
       - ./feeds:/app/feeds
 
+  mcp-server:
+    build: .
+    command: ["python", "mcp_server.py"]
+    ports:
+      - "8090:8090"
+    environment:
+      - COUCHDB_URI=http://admin:password@couchdb:5984/
+    depends_on:
+      - couchdb
+
   couchdb:
     image: couchdb:3
     ports:

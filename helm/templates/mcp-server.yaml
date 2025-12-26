@@ -1,0 +1,61 @@
+{{- if .Values.mcpServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+  labels:
+    app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+spec:
+  replicas: {{ .Values.mcpServer.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+        {{- include "common.labels" . | nindent 8 }}
+        app.kubernetes.io/component: mcp-server
+    spec:
+      serviceAccountName: {{ .Release.Name }}-{{ .Values.service.name }}
+      containers:
+        - name: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- with .Values.mcpServer.command }}
+          command:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          ports:
+            - containerPort: {{ .Values.mcpServer.service.targetPort }}
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            - name: OLLAMA_ENDPOINT
+              value: {{ .Values.ollama.endpoint | quote }}
+            - name: OPEN_WEBUI_ENDPOINT
+              value: {{ .Values.openWebui.endpoint | quote }}
+            - name: COUCHDB_USER
+              value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminUsername ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminUsername | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminUsername | default "admin" -}}{{- end }}"
+            - name: COUCHDB_PASSWORD
+              value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminPassword ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminPassword | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminPassword | default "adminPass" -}}{{- end }}"
+            - name: COUCHDB_URI
+              value: "http://$COUCHDB_USER:$COUCHDB_PASSWORD@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-{{ .Values.mcpServer.service.name }}"
+  labels:
+    app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
+spec:
+  selector:
+    app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+  ports:
+    - protocol: TCP
+      port: {{ .Values.mcpServer.service.port }}
+      targetPort: {{ .Values.mcpServer.service.targetPort }}
+{{- end }}

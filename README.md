@@ -34,10 +34,11 @@ docker compose up --build
 ```
 - **Admin UI:** `http://localhost:8088`
 - **REST API:** `http://localhost:8088/api`
+- **MCP Server:** `http://localhost:8090/sse`
 - **Default Credentials:** `username` / `password` (Configurable via `API_USERNAME`/`API_PASSWORD` env vars).
 
-### 2. Run the MCP Server
-To allow LLM agents to interact with Moirai, start the MCP server:
+### 2. Run the MCP Server (Optional Local Run)
+The MCP server is already included in `docker compose up`. To run it manually (for local debugging outside Docker):
 ```bash
 # Ensure dependencies are installed
 pip install -r requirements.txt
@@ -47,6 +48,8 @@ python mcp_server.py
 ```
 - **Transport:** SSE (HTTP)
 - **Endpoint:** `http://localhost:8090/sse`
+
+> **Helm users:** the chart now deploys both the admin API/UI and the MCP SSE server when `mcpServer.enabled` (default). Disable or customize it by overriding the `mcpServer` block in `values.yaml`.
 - **Isolation:** All data tools require a `namespace` (GUID).
 
 ## Agent Synthesis Flow

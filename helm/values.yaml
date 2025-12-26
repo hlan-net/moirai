@@ -12,6 +12,18 @@ service:
   port: 8088
   targetPort: 8080
 
+mcpServer:
+  enabled: true
+  name: mcp-server
+  replicas: 1
+  command:
+    - python
+    - mcp_server.py
+  service:
+    name: mcp-server
+    port: 8090
+    targetPort: 8090
+
 app:
   name: moirai-app
 
