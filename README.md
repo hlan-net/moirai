@@ -1,61 +1,63 @@
-# Morai - GenAI Press Review Service (Work in Progress)
+# Moirai - MCP-Powered GenAI Press Review Service
 
-Morai is a GenAI-powered press review service that aggregates and processes RSS feeds using AI models. It supports both local (Ollama) and external (Open-WebUI) models via configurable endpoints.
+Moirai is a GenAI-native press review platform designed for the Model Context Protocol (MCP) ecosystem. It allows AI agents to aggregate RSS feeds, synthesize them into "Events," and track long-term "Trends" across isolated namespaces.
 
-**Note:** This implementation is under active development and does not yet include all aspects of a Minimum Viable Product (MVP).
+**Note:** This project has transitioned from an autonomous scheduled service to an **agent-centric architecture**.
 
 ## Project Overview
 
-Morai is built with:
-- **Frontend:** Typescript Vue
-- **Backend:** Python
-- **Deployment:** A single container image running in Kubernetes as a Helm Chart
-- **Supplementary Services:** CouchDB for data persistence, Open-WebUI, and Ollama for AI model processing
+Moirai consists of three core components:
+-   **Admin UI:** A 4-column Vue.js dashboard for reviewing and pruning Feeds, Articles, Events, and Trends.
+-   **REST API:** A Flask backend that handles data persistence and administrative tasks (secured via HTTP Basic Auth).
+-   **MCP Server:** A FastMCP-powered SSE server that provides tools for LLM agents to fetch and synthesize news data.
 
 ## Project Structure
 ```
 .
-├── api              # RESTful API handlers
-├── tasks            # Scheduled tasks handlers
-├── Dockerfile       # Docker file for container image
-├── feeds            # Example feeds for testing 
-├── helm             # Helm chart for deployment
-├── main.py          # Main Python for Backend 
-├── README.md        # This document
-├── requirements.txt # Python dependencies
-└── ui               # Vue frontend in Typescript
+├── api              # RESTful API handlers (Flask)
+├── ui               # Admin Dashboard (Vue.js 3 + TypeScript)
+├── mcp_server.py    # MCP SSE Server (Agent Tools)
+├── tasks            # Core logic for RSS parsing and DB init
+├── Dockerfile       # Multi-stage build for API + UI
+├── docker-compose.yml # Full stack setup (App + CouchDB)
+└── helm             # Kubernetes deployment charts
 ```
 
-## Setup Instructions
+## Setup & Running
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/hlan-net/moirai.git 
-   cd morai
+### 1. Run the Application Stack (UI + API + Database)
+The easiest way to run the core stack is via Docker Compose:
+```bash
+docker compose up --build
+```
+- **Admin UI:** `http://localhost:8088`
+- **REST API:** `http://localhost:8088/api`
+- **Default Credentials:** `username` / `password` (Configurable via `API_USERNAME`/`API_PASSWORD` env vars).
 
-2. **Setup Python:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-	pip install -r requirements.txt
+### 2. Run the MCP Server
+To allow LLM agents to interact with Moirai, start the MCP server:
+```bash
+# Ensure dependencies are installed
+pip install -r requirements.txt
 
-3. **Setup Vue:**
-   ```bash
-   cd ui
-   yarn
+# Start the server
+python mcp_server.py
+```
+- **Transport:** SSE (HTTP)
+- **Endpoint:** `http://localhost:8090/sse`
+- **Isolation:** All data tools require a `namespace` (GUID).
 
-4. **Run locally:**
-   ```bash
-   cd ui
-   yarn build
-   cd ..
-   source venv/bin/activate
-   python3 main.py
+## Agent Synthesis Flow
+1.  **Ingest:** `add_feed` → Add RSS sources to a namespace.
+2.  **Fetch:** `read_feed` → Get latest articles.
+3.  **Synthesize Events:** `add_event` → Group articles into significant events.
+4.  **Synthesize Trends:** `add_trend` → Link events into broader trends.
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue for any enhancements or bug fixes.
+## Administrative Flow
+Human editors can use the Dashboard to:
+-   Delete noisy or irrelevant **Articles**.
+-   Prune links from **Events** to improve quality.
+-   Dissolve **Trends** that are no longer accurate.
 
 ## License
-
-This project is licensed under the MIT License. See the LICENSE file for more details.
+This project is licensed under the MIT License.
