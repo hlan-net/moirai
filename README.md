@@ -25,6 +25,8 @@ Moirai consists of three core components:
 
 ## Setup & Running
 
+For detailed examples on how to test the API and MCP tools, see [EXAMPLES.md](./EXAMPLES.md).
+
 ### 1. Run the Application Stack (UI + API + Database)
 The easiest way to run the core stack is via Docker Compose:
 ```bash
