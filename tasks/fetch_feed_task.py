@@ -1,36 +1,33 @@
 import hashlib
 import json
-import os  # Added to read environment variables
-import sys  # Added for sys.exit
+import os
+import random
 import threading
-
+import time
 import requests
 from .article_processor import ArticleProcessor
 
-
-class FetchFeedTask:
-    def __init__(self, url, delay):
+class FetchFeedTask(threading.Thread):
+    def __init__(self, url, delay_ignored=0):
+        threading.Thread.__init__(self)
         self.url = url
-        self.delay = delay
-        self.timer = None
         # Use the COUCHDB_URI environment variable if available
         self.couchdb_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/") + "feeds"
+        self.user_agent = "MoiraiBot/1.0 (+https://github.com/hlan-net/moirai)"
 
-    def start(self):
-        self.schedule_fetch()
-
-    def schedule_fetch(self):
-        self.timer = threading.Timer(self.delay, self.fetch_url)
-        self.timer.start()
+    def run(self):
+        # Add random jitter to avoid thundering herd and be polite
+        # Sleep between 1 and 30 seconds
+        time.sleep(random.uniform(1, 30))
+        self.fetch_url()
 
     def fetch_url(self):
         try:
-            response = requests.get(self.url)
+            headers = {'User-Agent': self.user_agent}
+            response = requests.get(self.url, headers=headers, timeout=30)
             self.handle_response(response)
         except requests.exceptions.RequestException as e:
             print(f"Error fetching {self.url}: {e}")
-        finally:
-            self.schedule_fetch()  # Reschedule for the next fetch
 
     def handle_response(self, response):
         if response.status_code == 200:
@@ -60,19 +57,15 @@ class FetchFeedTask:
                     self.process_articles(response.text)
                 elif res.status_code == 404:
                     print("Database not found in CouchDB, cannot store feed.")
-                    os._exit(1)
+                    return
                 else:
                     print(f"Failed to store feed in CouchDB: {res.text}")
-                    os._exit(1)
+                    return
             except requests.exceptions.RequestException as e:
                 print(f"Error storing feed in CouchDB: {e}")
-                os._exit(1)
+                return
         else:
             print(f"Failed to fetch: {self.url} with status code: {response.status_code}")
-
-    def cancel(self):
-        if self.timer is not None:
-            self.timer.cancel()
 
     def is_duplicate(self, doc_hash):
         """
@@ -89,10 +82,10 @@ class FetchFeedTask:
                 return False
             else:
                 print(f"Error checking for duplicate: {response.text}")
-                os._exit(1)
+                return True
         except requests.exceptions.RequestException as e:
             print(f"Error checking for duplicate: {e}")
-            os._exit(1)
+            return True
     
     def process_articles(self, feed_content):
         """

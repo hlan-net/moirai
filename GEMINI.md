@@ -1,79 +1,38 @@
-# Project Moirai: GenAI Press Review Service
+# Project Moirai: MCP-Powered Press Review Service
 
 ## Project Overview
+Moirai is a GenAI-native press review platform. It has transitioned from a scheduled background service to an **agent-centric architecture** powered by the Model Context Protocol (MCP).
 
-This project, codenamed "Moirai," is a GenAI-powered press review service. It is designed to aggregate news articles from various RSS feeds, process them using Large Language Models (LLMs), and identify significant events and correlations.
-This is a public repository hosted on GitHub.
+Instead of autonomous fetching, Moirai acts as a sophisticated data lake and synthesis engine that LLM agents use to analyze news, identify significant events, and track long-term trends across various namespaces.
 
-The architecture consists of:
--   **Backend:** A Python application built with the Flask web framework. It serves a RESTful API for accessing feeds, articles, and events.
--   **Frontend:** A modern web interface built with Vue.js and TypeScript.
--   **Data Storage:** Apache CouchDB is used as the primary database for storing feeds, articles, and processed event data.
--   **AI/ML:** The system is designed to integrate with LLMs for natural language processing tasks. It supports local models via Ollama and can be configured to use external services like Open-WebUI.
--   **Task Scheduling:** A background scheduler written in Python periodically fetches new articles from RSS feeds and triggers the analysis pipeline.
--   **Deployment:** The entire application is containerized using Docker and can be deployed to a Kubernetes cluster using the provided Helm chart.
+## New User & Agent Flow
+1.  **Ingestion:** An agent uses the `add_feed` tool via MCP to register RSS sources into a specific **Namespace** (GUID).
+2.  **Collection:** The agent triggers `read_feed` to pull live articles.
+3.  **Synthesis (Layer 1 - Events):** The agent analyzes raw articles and calls `add_event` to group related links into a named **Event** with a description.
+4.  **Synthesis (Layer 2 - Trends):** The agent identifies patterns across events and calls `add_trend` to group events into a high-level **Trend**.
+5.  **Review & Administration:** A human user accesses the Vue.js dashboard to review the agent's work, delete noisy data, or refine the groupings (removing specific links or events).
 
-## Key Technologies
+## Current Architecture
+-   **Backend (API):** Flask REST API on port `8088`.
+    -   **Security:** Enforces HTTP Basic Auth (`API_USERNAME` / `API_PASSWORD`).
+    -   **Responsibility:** Serves the UI and provides administrative CRUD operations.
+-   **MCP Server:** FastMCP SSE server on port `8090`.
+    -   **Security:** Enforces **Namespace isolation** (GUID required for all data tools).
+    -   **Tools:** `add_feed`, `list_feeds`, `read_feed`, `add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`.
+-   **Frontend:** Vue.js 3 + TypeScript.
+    -   **Layout:** 4-column admin view (Feeds, Articles, Events, Trends).
+    -   **Features:** Cross-namespace review and item-level cleanup.
+-   **Data Storage:** Apache CouchDB. Databases: `feeds`, `articles`, `events`, `trends`.
 
--   **Backend:** Python, Flask, NLTK, scikit-learn
--   **Frontend:** Vue.js, TypeScript, Vite
--   **Database:** CouchDB
--   **Containerization:** Docker
--   **Orchestration:** Kubernetes, Helm
+## Rewrite Progress
+- [x] **Remove Scheduler:** Autonomous background tasks have been disabled.
+- [x] **MCP Integration:** Stdio MCP server implemented and converted to HTTP/SSE.
+- [x] **Namespace Security:** Implemented GUID-based data segregation in MCP tools.
+- [x] **API Security:** Implemented HTTP Basic Auth for the Flask backend.
+- [x] **UI Overhaul:** Implemented 4-column layout with Event/Trend management.
+- [x] **Data Persistence:** Added `trends` database support and conflict handling.
+- [ ] **Polishing:** Finalize UI styling and add namespace filtering to the dashboard.
 
 ## How to Build and Run
-
-### Running the Backend
-
-1.  **Create a virtual environment:**
-    ```bash
-    python3 -m venv venv
-    ```
-
-2.  **Activate the virtual environment:**
-    ```bash
-    source venv/bin/activate
-    ```
-
-3.  **Install Python dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **Start the backend server:**
-    ```bash
-    python3 main.py
-    ```
-    The backend will start on port `8088` by default.
-
-### Running the Frontend (for development)
-
-1.  **Navigate to the `ui` directory:**
-    ```bash
-    cd ui
-    ```
-
-2.  **Install frontend dependencies using Yarn:**
-    ```bash
-    yarnpkg install
-    ```
-
-3.  **Start the development server:**
-    ```bash
-    yarnpkg dev
-    ```
-
-4.  **Build for production:**
-    ```bash
-    yarnpkg build
-    ```
-    The production-ready files will be placed in the `ui/dist` directory and are automatically served by the Python backend.
-
-## Development Conventions
-
--   The backend API endpoints are defined in `api/routes.py`.
--   Background processing tasks are located in the `tasks/` directory. `tasks/scheduler.py` orchestrates the execution of these tasks.
--   The frontend source code is in the `ui/src/` directory, with `App.vue` and `main.ts` as the main entry points.
--   The application is configured to run inside a Docker container. The `Dockerfile` uses a multi-stage build to first build the frontend and then combine it with the Python backend.
--   For Kubernetes deployments, the Helm chart is located in the `helm/` directory. It includes a dependency on the official CouchDB Helm chart.
--   Unit and integration tests can be found in files like `test_ollama.py`.
+1.  **App & DB:** `docker compose up --build` (Port 8088).
+2.  **MCP Server:** `python mcp_server.py` (Port 8090).

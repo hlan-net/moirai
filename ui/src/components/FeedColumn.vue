@@ -1,92 +1,125 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-// This component is for showing feeds that are sources for the articles
+interface Feed {
+  _id: string;
+  url: string;
+  category?: string;
+}
 
-const files = ref<string[]>([])
-const feedsByFile = ref<Record<string, any>>({})
+const feeds = ref<Feed[]>([])
+const loading = ref(true)
 
-onMounted(async () => {
+const fetchFeeds = async () => {
   try {
-    const responseFiles = await fetch('/api/feeds')
-    // Example response: ['file1', 'file2', 'file3']
-    const fileList = await responseFiles.json()
-    files.value = fileList
-
-    // Initialize each file's feed value so the UI renders immediately
-    fileList.forEach((file: string) => {
-      feedsByFile.value[file] = null
-    })
-  } catch (error) {
-    console.error('Error fetching files:', error)
-  }
-
-  // For each file, fetch its corresponding feed 
-  interface Feed {
-    url: string;
-    code?: number;
-    status: string;
-  }
-
-  files.value.forEach(async (file: string, index: number) => {
-    try {
-      const responseFeed: Response = await fetch(`/api/feeds/${index}`)
-      const feedData: Feed[] = await responseFeed.json()
-
-      // Filter out feeds with status "failed"
-      const filteredFeeds = Array.isArray(feedData)
-        ? feedData.filter(feed => feed.status !== 'failed')
-        : []
-
-      feedsByFile.value[file] = filteredFeeds.length > 0 ? filteredFeeds : 'Empty'
-    } catch (error) {
-      console.error(`Error fetching feed for index ${index}:`, error)
-      feedsByFile.value[file] = 'Empty'
+    const response = await fetch('/api/feeds')
+    if (response.ok) {
+        feeds.value = await response.json()
     }
-  })
+  } catch (error) {
+    console.error('Error fetching feeds:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const deleteFeed = async (id: string) => {
+  if (!confirm("Are you sure you want to delete this feed?")) return;
+  
+  try {
+    const res = await fetch(`/api/feeds/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      feeds.value = feeds.value.filter(f => f._id !== id)
+    } else {
+      alert("Failed to delete feed")
+    }
+  } catch (e) {
+    console.error(e)
+    alert("Error deleting feed")
+  }
+}
+
+onMounted(() => {
+  fetchFeeds()
 })
 </script>
 
 <template>
-  <div>
+  <div class="column-container">
     <h2>Feeds</h2>
-    <!-- Dynamic Feeds by File -->
-    <section v-for="file in files" :key="file">
-      <h2>{{ file }}</h2>
-      <ul
-        v-if="feedsByFile[file] && feedsByFile[file] !== 'Empty' && feedsByFile[file].length"
-      >
-        <li v-for="(feed, i) in feedsByFile[file]" :key="i">
-          <a :href="feed.url" target="_blank">{{ feed.url }}</a>
-        </li>
-      </ul>
-      <div v-else>
-        <!-- Show loading status if feedsByFile[file] is still null -->
-        <span v-if="feedsByFile[file] === null">Loading...</span>
-        <span v-else>Empty</span>
-      </div>
-    </section>
+    <div v-if="loading">Loading...</div>
+    <ul v-else-if="feeds.length" class="feed-list">
+      <li v-for="feed in feeds" :key="feed._id" class="feed-item">
+        <div class="feed-info">
+          <a :href="feed.url" target="_blank" class="feed-link">{{ feed.url }}</a>
+          <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
+        </div>
+        <button @click="deleteFeed(feed._id)" class="delete-btn" title="Delete Feed">×</button>
+      </li>
+    </ul>
+    <div v-else>No feeds found.</div>
   </div>
 </template>
 
 <style scoped>
-section {
-  margin-bottom: 20px;
+.column-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 h2 {
   margin-top: 30px;
   color: #42b983;
 }
-ul {
+.feed-list {
   list-style-type: none;
   padding: 0;
+  overflow-y: auto;
+  flex: 1;
 }
-li {
-  display: inline-block;
-  margin: 0 10px;
+.feed-item {
+  margin: 10px 0;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-a {
+.feed-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.feed-link {
   color: #42b983;
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+.feed-link:hover {
+  text-decoration: underline;
+}
+.category-tag {
+  font-size: 0.75rem;
+  background: #eef;
+  color: #669;
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+.delete-btn {
+  background: none;
+  border: none;
+  color: #cc0000;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 5px;
+}
+.delete-btn:hover {
+  color: #ff0000;
+  font-weight: bold;
 }
 </style>

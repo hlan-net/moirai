@@ -27,9 +27,6 @@ if __name__ == "__main__":
     print("Moirai starting...")
     init.run()
     print("Moirai initialised.")
-    # Start scheduling URL fetches
-    scheduler.start(os.environ.get("ITERATION_INTERVAL", 600))
-    print("Scheduler started.")
     # Start the application
     port = int(os.environ.get("HTTP_PORT", 8088))
     print(f"Starting Moirai on port {port}")

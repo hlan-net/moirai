@@ -4,4 +4,6 @@ requests
 flask-wtf
 schedule
 beautifulsoup4
-dateutil
+python-dateutil
+pytest
+mcp

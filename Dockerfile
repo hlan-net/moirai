@@ -24,8 +24,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN useradd -d /app appuser  && \
     pip install --no-cache-dir -r requirements.txt && \
-    mkdir feeds && \
-    chmod 755 feeds && \
+    mkdir -p feeds && \
+    chmod 777 feeds && \
     chown -R appuser:appuser feeds
     
 USER appuser
@@ -38,8 +38,8 @@ COPY --chown=appuser:appuser tasks/ tasks/
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/
 
-# Expose port 80 for the Flask app
-EXPOSE 80
+# Expose port 8088 for the Flask app
+EXPOSE 8088
 
 # Run the application
 CMD ["python", "main.py"]
