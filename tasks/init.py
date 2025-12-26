@@ -6,7 +6,7 @@ import time
 
 def init_db():
   db_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
-  dbs = ['feeds', 'articles', 'events']
+  dbs = ['feeds', 'articles', 'events', 'trends']
 
   # Wait for CouchDB to be ready
   max_retries = 10
