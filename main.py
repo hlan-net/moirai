@@ -2,6 +2,7 @@ import os
 from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
 from api.routes import api_blueprint
+from api.mcp_routes import mcp_blueprint
 from tasks.scheduler import scheduler
 from tasks import init
 
@@ -21,6 +22,7 @@ def serve_ui(path):
     return send_from_directory(app.static_folder, path)
 
 app.register_blueprint(api_blueprint, url_prefix='/api')
+app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
 
 if __name__ == "__main__":
     # Initialise
