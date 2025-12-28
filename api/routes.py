@@ -141,7 +141,6 @@ def delete_event(event_id):
         return jsonify({"status": "deleted"})
     abort(500)
 
-<<<<<<< HEAD
 @api_blueprint.route("/events/<event_id>/links", methods=["DELETE"])
 def remove_event_link(event_id):
     """Remove a specific article link from an event."""

@@ -6,4 +6,4 @@ schedule
 beautifulsoup4
 python-dateutil
 pytest
-mcp
+mcp[cli]

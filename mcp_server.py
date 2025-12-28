@@ -64,32 +64,23 @@ def store_doc(db_name, doc):
         raise RuntimeError(f"Failed to store doc: {res.text}")
 
 def validate_namespace(namespace: str):
-    """Simple validation for namespace (basic UUID check or non-empty string)."""
+    """Simple validation for namespace."""
     if not namespace or not isinstance(namespace, str):
-        raise ValueError("Namespace is required.")
-    # Optional: Enforce UUID format if strictly required
-    # try:
-    #     uuid.UUID(namespace)
-    # except ValueError:
-    #     raise ValueError("Namespace must be a valid UUID.")
+        raise ValueError("Namespace GUID is required for this operation.")
     return True
 
-# --- Feeds Tools ---
+# --- Feeds Tools (Shared) ---
 
 @mcp.tool()
-def add_feed(url: str, namespace: str, category: str = "general") -> str:
-    """Add a new RSS feed to the system under a specific namespace."""
-    validate_namespace(namespace)
-    
+def add_feed(url: str, category: str = "general") -> str:
+    """Add a new RSS feed to the shared global list."""
     feed_doc = {
         "url": url,
         "category": category,
-        "namespace": namespace,
         "added_at": datetime.now().isoformat()
     }
-    # Hash includes namespace to allow same feed in different namespaces
-    unique_string = f"{url}|{namespace}"
-    doc_hash = hashlib.sha256(unique_string.encode('utf-8')).hexdigest()
+    # Use URL hash as ID
+    doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     feed_doc["_id"] = doc_hash
     
     res = db_request("PUT", "feeds", path=f"/{doc_hash}", json_data=feed_doc)
@@ -101,30 +92,25 @@ def add_feed(url: str, namespace: str, category: str = "general") -> str:
         return f"Error adding feed: {res.status_code} {res.text}"
 
 @mcp.tool()
-def list_feeds(namespace: str) -> str:
-    """List all registered RSS feeds for a specific namespace."""
-    validate_namespace(namespace)
-    
-    # Using a selector (CouchDB Mango Query) would be cleaner, but for simplicity
-    # we filter client-side or assume a view exists. Let's do client-side filter for now.
+def list_feeds() -> str:
+    """List all registered RSS feeds (Global)."""
     res = db_request("GET", "feeds", path="/_all_docs", params={"include_docs": "true"})
     if res.status_code != 200:
-        return "Error fetching feeds"
+        return "Error fetching feeds or database empty."
     
     rows = res.json().get("rows", [])
     feeds = []
     for row in rows:
         doc = row["doc"]
-        if doc.get("namespace") == namespace:
-            feeds.append(f"- {doc.get('url')} (Category: {doc.get('category', 'unknown')})")
+        feeds.append(f"- {doc.get('url')} (Category: {doc.get('category', 'unknown')})")
     
-    return "\n".join(feeds) if feeds else f"No feeds found in namespace {namespace}."
+    return "\n".join(feeds) if feeds else "No feeds found."
 
 @mcp.tool()
 def read_feed(url: str, limit: int = 5) -> str:
     """
     Fetch and parse articles from a specific RSS feed URL.
-    Returns a list of the latest articles. (Stateless, no namespace needed)
+    Returns a list of the latest articles.
     """
     try:
         d = feedparser.parse(url)
@@ -143,13 +129,21 @@ def read_feed(url: str, limit: int = 5) -> str:
     except Exception as e:
         return f"Error reading feed: {e}"
 
-# --- Events Tools ---
+# --- Events Tools (Namespaced) ---
 
 @mcp.tool()
-def add_event(name: str, description: str, article_links: list[str], namespace: str) -> str:
-    """Create a new Event grouping multiple articles under a namespace."""
-    validate_namespace(namespace)
-    
+def add_event(name: str, description: str, article_links: list[str], namespace: str = None) -> str:
+    """
+    Create a new Event grouping multiple articles.
+    If namespace is not provided, a new GUID will be generated.
+    If namespace is provided, it will be used (effectively creating it if new).
+    """
+    if not namespace:
+        namespace = str(uuid.uuid4())
+        msg_prefix = f"New namespace generated: {namespace}\n"
+    else:
+        msg_prefix = f"Using namespace: {namespace}\n"
+
     event_doc = {
         "name": name,
         "description": description,
@@ -161,18 +155,18 @@ def add_event(name: str, description: str, article_links: list[str], namespace: 
     
     try:
         doc_id = store_doc("events", event_doc)
-        return f"Event created with ID: {doc_id}"
+        return f"{msg_prefix}Event created with ID: {doc_id}"
     except Exception as e:
         return f"Error creating event: {e}"
 
 @mcp.tool()
 def list_events(namespace: str) -> str:
-    """List all created events for a specific namespace."""
+    """List all created events for a specific namespace GUID (Required)."""
     validate_namespace(namespace)
     
     res = db_request("GET", "events", path="/_all_docs", params={"include_docs": "true"})
     if res.status_code != 200:
-        return "Error fetching events"
+        return "No events data found."
     
     rows = res.json().get("rows", [])
     events = []
@@ -181,29 +175,33 @@ def list_events(namespace: str) -> str:
         if doc.get("type") == "event" and doc.get("namespace") == namespace:
             events.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nArticles: {len(doc.get('article_links', []))}\n")
     
-    return "\n---\n".join(events) if events else f"No events found in namespace {namespace}."
+    return "\n---\n".join(events) if events else f"No data found for namespace {namespace}."
 
 @mcp.tool()
 def read_event(event_id: str, namespace: str) -> str:
-    """Get details of a specific event."""
+    """Get details of a specific event (Namespace GUID Required)."""
     validate_namespace(namespace)
     
     doc = get_doc("events", event_id)
-    if not doc:
-        return "Event not found."
-    
-    if doc.get("namespace") != namespace:
-        return "Event not found in this namespace."
+    if not doc or doc.get("namespace") != namespace:
+        return f"No data found for this event in namespace {namespace}."
     
     return json.dumps(doc, indent=2)
 
-# --- Trends Tools ---
+# --- Trends Tools (Namespaced) ---
 
 @mcp.tool()
-def add_trend(name: str, description: str, event_ids: list[str], namespace: str) -> str:
-    """Create a new Trend grouping multiple events under a namespace."""
-    validate_namespace(namespace)
-    
+def add_trend(name: str, description: str, event_ids: list[str], namespace: str = None) -> str:
+    """
+    Create a new Trend grouping multiple events.
+    If namespace is not provided, a new GUID will be generated.
+    """
+    if not namespace:
+        namespace = str(uuid.uuid4())
+        msg_prefix = f"New namespace generated: {namespace}\n"
+    else:
+        msg_prefix = f"Using namespace: {namespace}\n"
+
     trend_doc = {
         "name": name,
         "description": description,
@@ -218,21 +216,21 @@ def add_trend(name: str, description: str, event_ids: list[str], namespace: str)
             db_request("PUT", "trends")
 
         doc_id = store_doc("trends", trend_doc)
-        return f"Trend created with ID: {doc_id}"
+        return f"{msg_prefix}Trend created with ID: {doc_id}"
     except Exception as e:
         return f"Error creating trend: {e}"
 
 @mcp.tool()
 def list_trends(namespace: str) -> str:
-    """List all created trends for a specific namespace."""
+    """List all created trends for a specific namespace GUID (Required)."""
     validate_namespace(namespace)
     
     if db_request("HEAD", "trends").status_code == 404:
-        return "No trends database found."
+        return "No trends data found."
 
     res = db_request("GET", "trends", path="/_all_docs", params={"include_docs": "true"})
     if res.status_code != 200:
-        return "Error fetching trends"
+        return "No trends data found."
     
     rows = res.json().get("rows", [])
     trends = []
@@ -241,22 +239,18 @@ def list_trends(namespace: str) -> str:
         if doc.get("namespace") == namespace:
             trends.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nEvents: {len(doc.get('event_ids', []))}\n")
     
-    return "\n---\n".join(trends) if trends else f"No trends found in namespace {namespace}."
+    return "\n---\n".join(trends) if trends else f"No data found for namespace {namespace}."
 
 @mcp.tool()
 def read_trend(trend_id: str, namespace: str) -> str:
-    """Get details of a specific trend."""
+    """Get details of a specific trend (Namespace GUID Required)."""
     validate_namespace(namespace)
     
     doc = get_doc("trends", trend_id)
-    if not doc:
-        return "Trend not found."
-    
-    if doc.get("namespace") != namespace:
-        return "Trend not found in this namespace."
+    if not doc or doc.get("namespace") != namespace:
+        return f"No data found for this trend in namespace {namespace}."
     
     return json.dumps(doc, indent=2)
 
 if __name__ == "__main__":
-    # Run the server using SSE transport on port 8090
-    mcp.run(transport="sse", host="0.0.0.0", port=8090)
+    mcp.run()
