@@ -250,7 +250,12 @@ def read_trend(trend_id: str, namespace: str) -> str:
     if not doc or doc.get("namespace") != namespace:
         return f"No data found for this trend in namespace {namespace}."
     
+    
     return json.dumps(doc, indent=2)
 
+# Expose the SSE ASGI app for Uvicorn
+app = mcp.sse_app
+
 if __name__ == "__main__":
-    mcp.run()
+    # Run the server using SSE transport on port 8090
+    mcp.run(transport="sse")
