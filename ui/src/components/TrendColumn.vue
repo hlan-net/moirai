@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+
+const props = defineProps<{ namespace?: string }>()
 
 interface Trend {
   _id: string
@@ -14,7 +16,11 @@ const expandedTrends = ref<Set<string>>(new Set())
 
 const fetchTrends = async () => {
   try {
-    const response = await fetch('/api/trends')
+    let url = '/api/trends'
+    if (props.namespace) {
+      url += `?namespace=${props.namespace}`
+    }
+    const response = await fetch(url)
     if (response.ok) {
       trends.value = await response.json()
     }
@@ -24,6 +30,10 @@ const fetchTrends = async () => {
     loading.value = false
   }
 }
+
+watch(() => props.namespace, () => {
+  fetchTrends()
+})
 
 const deleteTrend = async (id: string) => {
   if (!confirm('Delete this trend?')) return

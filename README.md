@@ -49,6 +49,14 @@ python mcp_server.py
 - **Transport:** SSE (HTTP)
 - **Endpoint:** `http://localhost:8090/sse`
 
+### 3. GenAI Chat (Experimental)
+A built-in Chat interface allows you to interact with an Agent that has access to the MCP tools.
+- **Access:** Click "Chat" in the top navigation bar.
+- **Configuration:** Go to "Settings" to configure the LLM Model (default: `gemma3:1b`, recommend `llama3.1` for tool support).
+- **Requirements:** An OpenAI-compatible LLM endpoint (e.g., Ollama running locally).
+  - By default, it connects to `http://host.docker.internal:11434/v1`.
+  - Ensure you have pulled the model (e.g., `ollama pull llama3.1`).
+
 > **Helm users:** the chart now deploys both the admin API/UI and the MCP SSE server when `mcpServer.enabled` (default). Disable or customize it by overriding the `mcpServer` block in `values.yaml`.
 - **Isolation:** All data tools require a `namespace` (GUID).
 

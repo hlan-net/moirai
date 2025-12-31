@@ -31,7 +31,9 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 - [x] **API Security:** Implemented HTTP Basic Auth for the Flask backend.
 - [x] **UI Overhaul:** Implemented 4-column layout with Event/Trend management.
 - [x] **Data Persistence:** Added `trends` database support and conflict handling.
-- [ ] **Polishing:** Finalize UI styling and add namespace filtering to the dashboard.
+- [x] **Namespace Filtering:** Added namespace selector to the dashboard and API filtering.
+- [x] **Chat Integration:** Implemented GenAI Chat with MCP tools, model configuration, and UI persistence.
+- [ ] **Polishing:** Finalize UI styling.
 
 ## How to Build and Run
 1.  **App & DB:** `docker compose up --build` (Port 8088).

@@ -253,6 +253,27 @@ def read_trend(trend_id: str, namespace: str) -> str:
     
     return json.dumps(doc, indent=2)
 
+@mcp.tool()
+def list_namespaces() -> str:
+    """List all unique namespaces found in Events and Trends."""
+    # Query events and trends DBs
+    events_res = db_request("GET", "events", path="/_all_docs", params={"include_docs": "true"})
+    trends_res = db_request("GET", "trends", path="/_all_docs", params={"include_docs": "true"})
+    
+    namespaces = set()
+    
+    if events_res.status_code == 200:
+        for row in events_res.json().get("rows", []):
+            ns = row["doc"].get("namespace")
+            if ns: namespaces.add(ns)
+            
+    if trends_res.status_code == 200:
+        for row in trends_res.json().get("rows", []):
+            ns = row["doc"].get("namespace")
+            if ns: namespaces.add(ns)
+            
+    return "\n".join(sorted(list(namespaces))) if namespaces else "No namespaces found."
+
 # Expose the SSE ASGI app for Uvicorn
 app = mcp.sse_app
 

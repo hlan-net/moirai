@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+
+const props = defineProps<{ namespace?: string }>()
 
 interface Event {
   _id: string
@@ -32,9 +34,16 @@ const normalizeEvent = (event: any): Event => ({
 const fetchEventsAndTrends = async () => {
   loading.value = true
   try {
+    let eventsUrl = '/api/events'
+    let trendsUrl = '/api/trends'
+    if (props.namespace) {
+      eventsUrl += `?namespace=${props.namespace}`
+      trendsUrl += `?namespace=${props.namespace}`
+    }
+
     const [eventsResponse, trendsResponse] = await Promise.all([
-      fetch('/api/events'),
-      fetch('/api/trends'),
+      fetch(eventsUrl),
+      fetch(trendsUrl),
     ])
 
     if (eventsResponse.ok) {
@@ -58,6 +67,10 @@ const fetchEventsAndTrends = async () => {
     loading.value = false
   }
 }
+
+watch(() => props.namespace, () => {
+  fetchEventsAndTrends()
+})
 
 const deleteEvent = async (id: string) => {
   if (!confirm('Delete this event?')) return

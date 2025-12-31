@@ -3,11 +3,17 @@ services:
     build: .
     ports:
       - "8088:8088"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - COUCHDB_URI=http://admin:password@couchdb:5984/
       - HTTP_PORT=8088
       - PYTHONUNBUFFERED=1
       - ITERATION_INTERVAL=300
+      - MCP_SERVER_URL=http://mcp-server:8090/sse
+      - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+      - OPENAI_API_KEY=sk-ollama
+      - MODEL_NAME=gemma3:1b
     depends_on:
       - couchdb
     volumes:

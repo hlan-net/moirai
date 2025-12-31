@@ -127,9 +127,14 @@ def delete_article(article_id):
 # --- Events ---
 @api_blueprint.route("/events", methods=["GET"])
 def list_events():
+    namespace = request.args.get('namespace')
     events = fetch_from_couchdb("events")
     # Filter only actual events (legacy docs might not have 'type')
     events = [e for e in events if e.get('type', 'event') == 'event']
+    
+    if namespace:
+        events = [e for e in events if e.get('namespace') == namespace]
+        
     return jsonify(events)
 
 @api_blueprint.route("/events/<event_id>", methods=["DELETE"])
@@ -161,8 +166,15 @@ def remove_event_link(event_id):
 # --- Trends ---
 @api_blueprint.route("/trends", methods=["GET"])
 def list_trends():
+    namespace = request.args.get('namespace')
     trends = fetch_from_couchdb("trends")
-    return jsonify(trends or [])
+    if not trends:
+        trends = []
+        
+    if namespace:
+        trends = [t for t in trends if t.get('namespace') == namespace]
+        
+    return jsonify(trends)
 
 @api_blueprint.route("/trends/<trend_id>", methods=["GET"])
 def get_trend(trend_id):
@@ -196,6 +208,25 @@ def remove_trend_event(trend_id):
             return jsonify(trend)
             
     abort(500, description="Failed to update trend")
+
+@api_blueprint.route("/namespaces", methods=["GET"])
+def list_namespaces():
+    # Fetch all events and trends to aggregate namespaces
+    events = fetch_from_couchdb("events")
+    trends = fetch_from_couchdb("trends")
+    
+    namespaces = set()
+    if events:
+        for e in events:
+            if e.get("namespace"):
+                namespaces.add(e.get("namespace"))
+    
+    if trends:
+        for t in trends:
+            if t.get("namespace"):
+                namespaces.add(t.get("namespace"))
+                
+    return jsonify(sorted(list(namespaces)))
 
 def fetch_url(url):
     try:

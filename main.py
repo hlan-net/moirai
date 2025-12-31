@@ -3,6 +3,7 @@ from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
 from api.routes import api_blueprint
 from api.mcp_routes import mcp_blueprint
+from api.chat_routes import chat_blueprint
 from tasks.scheduler import scheduler
 from tasks import init
 
@@ -23,6 +24,7 @@ def serve_ui(path):
 
 app.register_blueprint(api_blueprint, url_prefix='/api')
 app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
+app.register_blueprint(chat_blueprint, url_prefix='/api')
 
 if __name__ == "__main__":
     # Initialise
