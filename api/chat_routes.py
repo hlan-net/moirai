@@ -13,11 +13,21 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-dummy")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
-def run_agent_sync(user_message, history, model=None):
-    return asyncio.run(run_agent(user_message, history, model))
+def run_agent_sync(user_message, history, model=None, namespace=None):
+    return asyncio.run(run_agent(user_message, history, model, namespace))
 
-async def run_agent(user_message, history, model=None):
+async def run_agent(user_message, history, model=None, namespace=None):
     messages = list(history)
+    
+    # Inject namespace context if provided
+    if namespace:
+        system_prompt = f"You are operating within the Namespace GUID: {namespace}. When calling tools that require a namespace (like add_event, list_events), you MUST use this GUID."
+        # Check if there is already a system message, if so append, otherwise insert
+        if messages and messages[0].get("role") == "system":
+            messages[0]["content"] += f"\n\n{system_prompt}"
+        else:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+            
     messages.append({"role": "user", "content": user_message})
 
     client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
@@ -126,6 +136,7 @@ def chat():
     user_message = data.get("message")
     history = data.get("history", [])
     model = data.get("model")
+    namespace = data.get("namespace")
     
-    response = run_agent_sync(user_message, history, model)
+    response = run_agent_sync(user_message, history, model, namespace)
     return jsonify({"response": response})

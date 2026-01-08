@@ -1,28 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import FeedColumn from './FeedColumn.vue'
 import ArticleColumn from './ArticleColumn.vue'
 import EventColumn from './EventColumn.vue'
 import TrendColumn from './TrendColumn.vue'
+import { useNamespace } from '../composables/useNamespace'
 
 defineProps<{ msg: string }>()
 
-const currentNamespace = ref('')
-const namespaces = ref<string[]>([])
-
-const fetchNamespaces = async () => {
-  try {
-    const res = await fetch('/api/namespaces')
-    if (res.ok) {
-      namespaces.value = await res.json()
-    }
-  } catch (e) {
-    console.error('Error fetching namespaces:', e)
-  }
-}
+const { currentNamespace, namespaces, initNamespace } = useNamespace()
 
 onMounted(() => {
-  fetchNamespaces()
+  initNamespace()
 })
 </script>
 

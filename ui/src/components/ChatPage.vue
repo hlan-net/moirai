@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useNamespace } from '../composables/useNamespace'
+
+const { currentNamespace, namespaces, initNamespace } = useNamespace()
 
 interface Message {
   role: 'user' | 'assistant'
@@ -9,6 +12,10 @@ interface Message {
 const messages = ref<Message[]>([])
 const input = ref('')
 const loading = ref(false)
+
+onMounted(() => {
+    initNamespace()
+})
 
 const sendMessage = async () => {
   if (!input.value.trim() || loading.value) return
@@ -30,7 +37,12 @@ const sendMessage = async () => {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userMsg, history, model })
+      body: JSON.stringify({ 
+          message: userMsg, 
+          history, 
+          model,
+          namespace: currentNamespace.value
+      })
     })
     
     if (res.ok) {
@@ -49,6 +61,14 @@ const sendMessage = async () => {
 
 <template>
   <div class="chat-page">
+    <div class="chat-header">
+       <select v-model="currentNamespace" class="ns-select">
+        <option value="">-- No Context (Global) --</option>
+        <option v-for="ns in namespaces" :key="ns" :value="ns">
+          {{ ns }}
+        </option>
+      </select>
+    </div>
     <div class="chat-container">
       <div class="messages">
         <div 
@@ -86,6 +106,16 @@ const sendMessage = async () => {
   flex-direction: column;
   padding: 20px;
   overflow: hidden;
+}
+.chat-header {
+    text-align: center;
+    margin-bottom: 10px;
+}
+.ns-select {
+  padding: 8px;
+  width: 300px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 .chat-container {
   max-width: 800px;
