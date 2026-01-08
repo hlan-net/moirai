@@ -128,7 +128,7 @@ onMounted(() => {
 
 <template>
   <div class="column-container">
-    <h2>Events</h2>
+    <h2>Events ({{ events.length }})</h2>
     <div v-if="loading">Loading events...</div>
     <div v-else-if="events.length" class="event-list">
       <div v-for="event in events" :key="event._id" class="event-card">

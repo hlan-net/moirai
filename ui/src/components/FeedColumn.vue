@@ -46,7 +46,7 @@ onMounted(() => {
 
 <template>
   <div class="column-container">
-    <h2>Feeds</h2>
+    <h2>Feeds ({{ feeds.length }})</h2>
     <div v-if="loading">Loading...</div>
     <ul v-else-if="feeds.length" class="feed-list">
       <li v-for="feed in feeds" :key="feed._id" class="feed-item">

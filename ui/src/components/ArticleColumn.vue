@@ -71,7 +71,7 @@ function getHostname(urlStr: string) {
 
 <template>
   <div class="article-column">
-    <h2>Articles</h2>
+    <h2>Articles ({{ articles.length }})</h2>
     <div v-if="loading">Loading articles...</div>
     <div v-else-if="articles.length" class="article-list">
       <div v-for="article in articles" :key="article._id" class="article-card">

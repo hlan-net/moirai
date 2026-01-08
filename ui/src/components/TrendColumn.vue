@@ -83,7 +83,7 @@ onMounted(() => {
 
 <template>
   <div class="column-container">
-    <h2>Trends</h2>
+    <h2>Trends ({{ trends.length }})</h2>
     <div v-if="loading">Loading trends...</div>
     <div v-else-if="trends.length" class="trend-list">
       <div v-for="trend in trends" :key="trend._id" class="trend-card">
