@@ -16,22 +16,23 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-dummy")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
-def extract_tool_call_from_content(content):
-    if not content: return None
-    try:
-        # Find all JSON-like blocks. 
-        # We look for something starting with { and ending with } that contains "name" and "parameters"
-        matches = re.findall(r'(\{.*"name"\s*:\s*".*?".*"parameters"\s*:\s*\{.*\}\})', content, re.DOTALL)
-        if matches:
-            # Take the last one likely
-            last_match = matches[-1]
-            data = json.loads(last_match)
-            if "name" in data and "parameters" in data:
-                return data
-    except Exception:
-        pass
+def extract_tool_calls_from_content(content):
+    if not content: return []
+    tools = []
+    # Find all JSON-like blocks. 
+    # We look for something starting with { and ending with } that contains "name" and "parameters"
+    # Use non-greedy matching .*? to find multiple separate JSON blocks
+    matches = re.findall(r'(\{[^{}]*?"name"\s*:\s*".*?".*?"parameters"\s*:\s*\{.*?\}.*?\})', content, re.DOTALL)
     
-    return None
+    for match in matches:
+        try:
+            data = json.loads(match)
+            if "name" in data and "parameters" in data:
+                tools.append(data)
+        except Exception:
+            continue
+    
+    return tools
 
 def run_agent_sync(user_message, history, model=None, namespace=None):
     return asyncio.run(run_agent(user_message, history, model, namespace))
@@ -40,13 +41,25 @@ async def run_agent(user_message, history, model=None, namespace=None):
     messages = list(history)
     
     # Inject namespace context if provided
+    system_prompt = "You are Moirai, a GenAI-native press review agent. "
     if namespace:
-        system_prompt = f"You are operating within the Namespace GUID: {namespace}. When calling tools that require a namespace (like add_event, list_events), you MUST use this GUID."
-        # Check if there is already a system message, if so append, otherwise insert
-        if messages and messages[0].get("role") == "system":
-            messages[0]["content"] += f"\n\n{system_prompt}"
-        else:
-            messages.insert(0, {"role": "system", "content": system_prompt})
+        system_prompt += f"You are operating within the Namespace GUID: {namespace}. When calling tools that require a namespace (like add_event, list_events), you MUST use this GUID. "
+    
+    system_prompt += (
+        "You DO NOT have access to real-time information or the internet directly. "
+        "You MUST use the provided tools (like `list_feeds`, `read_feed`) to fetch any news or external data. "
+        "Do not hallucinate headlines. If you need news, CALL A TOOL. "
+        "When asked for news, FIRST check the available feeds using `list_feeds`. "
+        "If no relevant feeds are found, you can try to `read_feed` with a GUESSED URL, but ensure it is a valid RSS/Atom feed URL. "
+        "Some reliable Linux news feeds are: LWN (https://lwn.net/headlines/rss), Phoronix (https://www.phoronix.com/phoronix-rss.php), "
+        "and Kernel.org (https://www.kernel.org/feeds/kall.xml)."
+    )
+    
+    # Check if there is already a system message, if so append, otherwise insert
+    if messages and messages[0].get("role") == "system":
+        messages[0]["content"] += f"\n\n{system_prompt}"
+    else:
+        messages.insert(0, {"role": "system", "content": system_prompt})
             
     messages.append({"role": "user", "content": user_message})
 
@@ -95,6 +108,7 @@ async def run_agent(user_message, history, model=None, namespace=None):
                     )
                     
                     response_message = response.choices[0].message
+                    print(f"DEBUG: Model Raw Response Content: {response_message.content}")
                     
                     # Store message in history
                     msg_dict = {
@@ -108,34 +122,32 @@ async def run_agent(user_message, history, model=None, namespace=None):
                     
                     # Fallback: Check content for leaked JSON tool calls
                     if not tool_calls and response_message.content:
-                        extracted = extract_tool_call_from_content(response_message.content)
+                        extracted = extract_tool_calls_from_content(response_message.content)
                         if extracted:
-                            # Create a mock tool call compatible with the loop below
-                            mock_call = SimpleNamespace(
-                                id=f"call_{uuid.uuid4().hex[:8]}",
-                                function=SimpleNamespace(
-                                    name=extracted["name"],
-                                    arguments=json.dumps(extracted["parameters"])
-                                ),
-                                type="function"
-                            )
-                            tool_calls = [mock_call]
-                            
-                            # We update the last message in history to include this 'fake' tool call
-                            # so the model sees it in the next turn as if it generated it properly.
-                            # However, we can't easily modify 'msg_dict' to have a real tool_calls object that the API likes
-                            # if we send it back.
-                            # But since we strip 'tool_calls' if None, we need to ensure we structure it correctly 
-                            # if we want to send it back.
-                            # Actually, for the API, we need 'tool_calls' to be a list of dicts.
-                            msg_dict["tool_calls"] = [{
-                                "id": mock_call.id,
-                                "type": "function",
-                                "function": {
-                                    "name": mock_call.function.name,
-                                    "arguments": mock_call.function.arguments
-                                }
-                            }]
+                            tool_calls = []
+                            msg_dict["tool_calls"] = []
+                            for ext in extracted:
+                                # Create a mock tool call compatible with the loop below
+                                mock_id = f"call_{uuid.uuid4().hex[:8]}"
+                                mock_call = SimpleNamespace(
+                                    id=mock_id,
+                                    function=SimpleNamespace(
+                                        name=ext["name"],
+                                        arguments=json.dumps(ext["parameters"])
+                                    ),
+                                    type="function"
+                                )
+                                tool_calls.append(mock_call)
+                                
+                                # Update history for API compatibility
+                                msg_dict["tool_calls"].append({
+                                    "id": mock_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": ext["name"],
+                                        "arguments": json.dumps(ext["parameters"])
+                                    }
+                                })
 
                     if tool_calls:
                         for tool_call in tool_calls:
@@ -144,10 +156,13 @@ async def run_agent(user_message, history, model=None, namespace=None):
                             
                             # Execute via MCP
                             try:
+                                print(f"Agent calling tool: {func_name} with args: {func_args}")
                                 result = await session.call_tool(func_name, func_args)
                                 result_text = result.content[0].text if result.content else "Success"
+                                print(f"Tool result (truncated): {result_text[:200]}...")
                             except Exception as tool_err:
                                 result_text = f"Tool Execution Error: {tool_err}"
+                                print(f"Tool Error: {tool_err}")
 
                             messages.append({
                                 "tool_call_id": tool_call.id,

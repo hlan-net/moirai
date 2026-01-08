@@ -49,6 +49,12 @@ def init_db():
         print(f"Error checking/creating database '{db_name}': {e}")
         os._exit(1)
 
+from .cleanup_task import CleanupTask
+
 def run():
   print("Initialising database...")
   init_db()
+  
+  print("Starting cleanup task...")
+  cleanup = CleanupTask()
+  cleanup.start()

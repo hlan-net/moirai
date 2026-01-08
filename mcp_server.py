@@ -114,8 +114,14 @@ def read_feed(url: str, limit: int = 5) -> str:
     """
     try:
         d = feedparser.parse(url)
+        output_prefix = ""
+        
         if d.bozo:
-             return f"Error parsing feed: {d.bozo_exception}"
+             # If parsing failed but we still got entries, just warn.
+             if not d.entries:
+                return f"Error parsing feed: {d.bozo_exception}"
+             else:
+                output_prefix = f"Warning: Feed parsing had issues ({d.bozo_exception}), but some content was recovered.\n\n"
         
         articles = []
         for entry in d.entries[:limit]:
@@ -125,7 +131,7 @@ def read_feed(url: str, limit: int = 5) -> str:
             summary = re.sub('<[^<]+?>', '', summary)
             articles.append(f"Title: {title}\nLink: {link}\nSummary: {summary[:200]}...\n")
             
-        return "\n---\n".join(articles)
+        return output_prefix + "\n---\n".join(articles)
     except Exception as e:
         return f"Error reading feed: {e}"
 
