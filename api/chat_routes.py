@@ -1,3 +1,6 @@
+import re
+import uuid
+from types import SimpleNamespace
 from flask import Blueprint, request, jsonify
 import os
 import json
@@ -12,6 +15,23 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8090/sse")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-dummy")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
+
+def extract_tool_call_from_content(content):
+    if not content: return None
+    try:
+        # Find all JSON-like blocks. 
+        # We look for something starting with { and ending with } that contains "name" and "parameters"
+        matches = re.findall(r'(\{.*"name"\s*:\s*".*?".*"parameters"\s*:\s*\{.*\}\})', content, re.DOTALL)
+        if matches:
+            # Take the last one likely
+            last_match = matches[-1]
+            data = json.loads(last_match)
+            if "name" in data and "parameters" in data:
+                return data
+    except Exception:
+        pass
+    
+    return None
 
 def run_agent_sync(user_message, history, model=None, namespace=None):
     return asyncio.run(run_agent(user_message, history, model, namespace))
@@ -62,6 +82,9 @@ async def run_agent(user_message, history, model=None, namespace=None):
                     for m in messages:
                         # Exclude 'tool_calls' if it's None to avoid validation errors in some clients
                         clean_m = {k: v for k, v in m.items() if v is not None}
+                        # Also handle tool_calls in history correctly if they are SimpleNamespace (mock objects)
+                        # The OpenAI client expects dicts or Pydantic models. 
+                        # We stored them as dicts in history below, so this should be fine.
                         clean_messages.append(clean_m)
 
                     response = client.chat.completions.create(
@@ -81,8 +104,41 @@ async def run_agent(user_message, history, model=None, namespace=None):
                     }
                     messages.append(msg_dict)
                     
-                    if response_message.tool_calls:
-                        for tool_call in response_message.tool_calls:
+                    tool_calls = response_message.tool_calls or []
+                    
+                    # Fallback: Check content for leaked JSON tool calls
+                    if not tool_calls and response_message.content:
+                        extracted = extract_tool_call_from_content(response_message.content)
+                        if extracted:
+                            # Create a mock tool call compatible with the loop below
+                            mock_call = SimpleNamespace(
+                                id=f"call_{uuid.uuid4().hex[:8]}",
+                                function=SimpleNamespace(
+                                    name=extracted["name"],
+                                    arguments=json.dumps(extracted["parameters"])
+                                ),
+                                type="function"
+                            )
+                            tool_calls = [mock_call]
+                            
+                            # We update the last message in history to include this 'fake' tool call
+                            # so the model sees it in the next turn as if it generated it properly.
+                            # However, we can't easily modify 'msg_dict' to have a real tool_calls object that the API likes
+                            # if we send it back.
+                            # But since we strip 'tool_calls' if None, we need to ensure we structure it correctly 
+                            # if we want to send it back.
+                            # Actually, for the API, we need 'tool_calls' to be a list of dicts.
+                            msg_dict["tool_calls"] = [{
+                                "id": mock_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": mock_call.function.name,
+                                    "arguments": mock_call.function.arguments
+                                }
+                            }]
+
+                    if tool_calls:
+                        for tool_call in tool_calls:
                             func_name = tool_call.function.name
                             func_args = json.loads(tool_call.function.arguments)
                             
