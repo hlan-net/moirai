@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 
 const appVersion = ref('0.1.0-alpha')
-const modelName = ref('llama3.1')
+const modelName = ref('llama3.1:latest')
 const availableModels = ref<string[]>([])
 const loadingModels = ref(false)
 

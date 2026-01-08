@@ -32,7 +32,7 @@ const sendMessage = async () => {
       content: m.content
     }))
     
-    const model = localStorage.getItem('moirai_model') || 'llama3.1'
+    const model = localStorage.getItem('moirai_model') || 'llama3.1:latest'
 
     const res = await fetch('/api/chat', {
       method: 'POST',

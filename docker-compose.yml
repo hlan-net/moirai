@@ -13,7 +13,7 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8090/sse
       - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
       - OPENAI_API_KEY=sk-ollama
-      - MODEL_NAME=gemma3:1b
+      - MODEL_NAME=llama3.1:latest
     depends_on:
       - couchdb
     volumes:
