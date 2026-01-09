@@ -14,6 +14,7 @@ services:
       - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
       - OPENAI_API_KEY=sk-ollama
       - MODEL_NAME=llama3.1:latest
+      - ALLOW_PUBLIC_READ=true
     depends_on:
       - couchdb
     volumes:
@@ -26,6 +27,8 @@ services:
       - "8090:8090"
     environment:
       - COUCHDB_URI=http://admin:password@couchdb:5984/
+      - API_USERNAME=username
+      - API_PASSWORD=password
     depends_on:
       - couchdb
 

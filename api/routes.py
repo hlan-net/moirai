@@ -5,12 +5,18 @@ import urllib.parse
 import sys
 import re
 from functools import wraps
+from tasks.fetch_feed_task import FetchFeedTask
 
 api_blueprint = Blueprint('api', __name__)
 
 COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
+if COUCHDB_URI.endswith("/"):
+    COUCHDB_URI = COUCHDB_URI[:-1]
+
 API_USERNAME = os.environ.get("API_USERNAME", "username")
 API_PASSWORD = os.environ.get("API_PASSWORD", "password")
+ALLOW_PUBLIC_READ_ENV = os.environ.get("ALLOW_PUBLIC_READ", "false").lower() == "true"
+ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
 
 def check_auth(username, password):
     """This function is called to check if a username /
@@ -33,18 +39,51 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
+def get_config_doc():
+    """Helper to get the main config doc."""
+    try:
+        return fetch_from_couchdb("config", "main")
+    except Exception:
+        return None
+
+def get_public_read_setting():
+    """Checks DB for config, falls back to env var."""
+    config = get_config_doc()
+    if config and "allow_public_read" in config:
+        return config["allow_public_read"]
+    return ALLOW_PUBLIC_READ_ENV
+
+def get_iteration_interval_setting():
+    """Checks DB for config, falls back to env var."""
+    config = get_config_doc()
+    if config and "iteration_interval" in config:
+        try:
+            return int(config["iteration_interval"])
+        except (ValueError, TypeError):
+            pass
+    return ITERATION_INTERVAL_ENV
+
 # Apply auth to all routes in this blueprint
 @api_blueprint.before_request
 def before_request_auth():
     if request.method == "OPTIONS":
         return # Allow CORS preflight if needed
+    
+    # Optional public read access
+    if request.method == "GET" and request.endpoint == "api.get_config":
+         return None
+
+    if request.method == "GET" and request.endpoint in ["api.list_articles", "api.list_feeds"]:
+         if get_public_read_setting():
+             return None
+
     auth = request.authorization
     if not auth or not check_auth(auth.username, auth.password):
         return authenticate()
 
 def fetch_from_couchdb(db_name, doc_id=None):
     """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
-    allowed_dbs = {"feeds", "articles", "events", "trends"}
+    allowed_dbs = {"feeds", "articles", "events", "trends", "config"}
     if db_name not in allowed_dbs:
         abort(400, description="Invalid database name.")
     
@@ -52,11 +91,11 @@ def fetch_from_couchdb(db_name, doc_id=None):
         if doc_id:
             safe_db_name = urllib.parse.quote(db_name, safe="")
             safe_doc_id = urllib.parse.quote(doc_id, safe="")
-            response = requests.get(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
+            response = requests.get(f"{COUCHDB_URI}/{safe_db_name}/{safe_doc_id}")
         else:
-            # Check if DB exists first (lazy check for 'trends')
-            requests.put(f"{COUCHDB_URI}{db_name}") 
-            response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
+            # Check if DB exists first (lazy check for 'trends', 'config')
+            requests.put(f"{COUCHDB_URI}/{db_name}") 
+            response = requests.get(f"{COUCHDB_URI}/{db_name}/_all_docs", params={"include_docs": "true"})
 
         if response.status_code == 404:
              return None if doc_id else []
@@ -76,7 +115,7 @@ def delete_from_couchdb(db_name, doc_id, rev):
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
-        response = requests.delete(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", params={"rev": rev})
+        response = requests.delete(f"{COUCHDB_URI}/{safe_db_name}/{safe_doc_id}", params={"rev": rev})
         return response.status_code in (200, 202)
     except requests.exceptions.RequestException:
         return False
@@ -85,9 +124,19 @@ def update_couchdb_doc(db_name, doc_id, doc):
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
-        response = requests.put(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", json=doc)
-        return response.status_code in (200, 201)
-    except requests.exceptions.RequestException:
+        # Ensure DB exists
+        create_res = requests.put(f"{COUCHDB_URI}/{safe_db_name}")
+        if create_res.status_code not in (200, 201, 412):
+             print(f"DB Creation Failed: {create_res.status_code} {create_res.text}")
+        
+        response = requests.put(f"{COUCHDB_URI}/{safe_db_name}/{safe_doc_id}", json=doc)
+        if response.status_code in (200, 201):
+            return True
+        else:
+            print(f"DB Update Failed: {response.status_code} {response.text}")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"DB Update Error: {e}")
         return False
 
 # --- Feeds ---
@@ -106,6 +155,24 @@ def delete_feed(feed_id):
         return jsonify({"status": "deleted"})
     else:
         abort(500, description="Failed to delete feed")
+
+@api_blueprint.route("/feeds/refresh", methods=["POST"])
+def refresh_feeds():
+    """Triggers a background refresh of all registered feeds."""
+    feeds = fetch_from_couchdb("feeds")
+    if not feeds:
+        return jsonify({"status": "no feeds found", "count": 0})
+    
+    count = 0
+    for feed in feeds:
+        url = feed.get("url")
+        if url:
+            # Run in background thread (FetchFeedTask inherits from threading.Thread)
+            task = FetchFeedTask(url)
+            task.start()
+            count += 1
+            
+    return jsonify({"status": "started", "count": count})
 
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
@@ -237,3 +304,40 @@ def fetch_url(url):
             return {"url": url, "status": "failed", "code": response.status_code}
     except requests.exceptions.RequestException as e:
         return {"url": url, "status": "error", "message": str(e)}
+
+# --- Config ---
+@api_blueprint.route("/config", methods=["GET"])
+def get_config():
+    # Helper to return the effective config
+    return jsonify({
+        "allow_public_read": get_public_read_setting(),
+        "iteration_interval": get_iteration_interval_setting()
+    })
+
+@api_blueprint.route("/config", methods=["PUT"])
+def update_config():
+    data = request.json
+    
+    # Fetch existing to get rev
+    current_doc = get_config_doc()
+    
+    new_doc = {
+        "_id": "main"
+    }
+    
+    if current_doc:
+        new_doc.update(current_doc)
+        
+    if "allow_public_read" in data:
+        new_doc["allow_public_read"] = bool(data["allow_public_read"])
+        
+    if "iteration_interval" in data:
+        try:
+            new_doc["iteration_interval"] = int(data["iteration_interval"])
+        except (ValueError, TypeError):
+            abort(400, description="Invalid iteration_interval")
+        
+    if update_couchdb_doc("config", "main", new_doc):
+        return jsonify({"status": "updated", "config": new_doc})
+    else:
+        abort(500, description="Failed to update config")

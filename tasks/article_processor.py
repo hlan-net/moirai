@@ -10,11 +10,15 @@ class ArticleProcessor:
         self.couchdb_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/") + "articles"
 
     def process_feed(self, feed_url, feed_content):
-        """Parses the feed content using feedparser and extracts articles."""
+        """Parses the feed content using feedparser and extracts articles.
+           Returns: tuple (feed_title, articles_list)
+        """
         articles = []
+        feed_title = "Unknown Feed"
 
         try:
             parsed_feed = feedparser.parse(feed_content)
+            feed_title = parsed_feed.feed.get("title", "Unknown Feed")
 
             for entry in parsed_feed.entries:
                 content_value = ""
@@ -45,7 +49,7 @@ class ArticleProcessor:
         except Exception as err:
             print(f"Unexpected error parsing feed for {feed_url}: {err}")
 
-        return articles
+        return feed_title, articles
 
     def store_article(self, article):
         """Stores the article in CouchDB if it doesn't already exist."""

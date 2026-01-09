@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { useTheme } from './composables/useTheme'
+
+const { initTheme } = useTheme()
+
+onMounted(() => {
+  initTheme()
+})
 </script>
 
 <template>
@@ -6,7 +14,8 @@
     <nav class="main-nav">
       <div class="brand">Moirai</div>
       <div class="links">
-        <router-link to="/" class="nav-link">Dashboard</router-link>
+        <router-link to="/" class="nav-link">History</router-link>
+        <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
         <router-link to="/chat" class="nav-link">Chat</router-link>
         <router-link to="/settings" class="nav-link">Settings</router-link>
       </div>

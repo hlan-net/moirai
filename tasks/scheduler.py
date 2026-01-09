@@ -1,11 +1,35 @@
 import os
 import threading
 import time
+import requests
+import json
 from .fetch_feed_task import FetchFeedTask
 
-def scheduler_loop(interval):
+def get_dynamic_interval(default_interval):
+    db_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
+    try:
+        res = requests.get(f"{db_url}config/main", timeout=2)
+        if res.status_code == 200:
+            config = res.json()
+            return int(config.get("iteration_interval", default_interval))
+    except Exception:
+        pass
+    return default_interval
+
+def scheduler_loop(initial_interval):
+    current_interval = initial_interval
     # Run tasks once per iteration interval.
     while True:
+        # Check for dynamic interval update
+        current_interval = get_dynamic_interval(initial_interval)
+        
+        if current_interval <= 0:
+            print(f"Scheduler paused (Interval: {current_interval}). Checking again in 60s.")
+            time.sleep(60)
+            continue
+
+        print(f"Scheduler: Starting fetch cycle (Interval: {current_interval}s)")
+        
         # First, fetch new feeds
         feeds_directory = './feeds'
         # Create the feeds directory if it doesn't exist
@@ -21,7 +45,7 @@ def scheduler_loop(interval):
                             # Assuming a delay of 0 for simplicity. Adjust as needed.
                             FetchFeedTask(url, 0).start()
         
-        time.sleep(interval)
+        time.sleep(current_interval)
 
 class SchedulerWrapper:
     def start(self, iteration_interval):

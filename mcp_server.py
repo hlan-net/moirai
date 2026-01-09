@@ -83,11 +83,13 @@ def add_feed(url: str, category: str = "general") -> str:
     doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     feed_doc["_id"] = doc_hash
     
+    # Check if exists first to avoid 409 log
+    if get_doc("feeds", doc_hash):
+        return f"Feed already exists: {url}"
+
     res = db_request("PUT", "feeds", path=f"/{doc_hash}", json_data=feed_doc)
     if res.status_code in (200, 201):
         return f"Feed added: {url} (ID: {doc_hash})"
-    elif res.status_code == 409:
-        return f"Feed already exists: {url}"
     else:
         return f"Error adding feed: {res.status_code} {res.text}"
 
@@ -134,6 +136,56 @@ def read_feed(url: str, limit: int = 5) -> str:
         return output_prefix + "\n---\n".join(articles)
     except Exception as e:
         return f"Error reading feed: {e}"
+
+@mcp.tool()
+def refresh_all_feeds() -> str:
+    """
+    Triggers the system to fetch the latest articles from all registered feeds.
+    This runs in the background. New articles will appear in the system shortly.
+    """
+    # The API service is named 'moirai' in docker-compose, port 8088
+    # We use Basic Auth as configured in env vars or defaults
+    
+    # We need credentials. mcp_server doesn't strictly need them to read DB, but to call API it might.
+    # Actually, the API requires auth.
+    # Let's try to get credentials from env or use defaults.
+    # mcp_server.py doesn't have API_USERNAME/PASSWORD env vars set in docker-compose.
+    # I should add them to docker-compose for mcp-server.
+    
+    # For now, I'll try default "username:password" or assume the user configured it.
+    # But to be robust, I should update docker-compose.
+    
+    api_url = "http://moirai:8088/api/feeds/refresh"
+    # Fallback to localhost if running outside docker for testing?
+    # But this is inside the container usually.
+    
+    # For now, let's just try without auth if public read is on? No, refresh is a POST, likely protected.
+    # Wait, api/routes.py protects everything except specific GETs.
+    
+    try:
+        # We need to get the creds or inject them.
+        # Let's assume standard default or what's in the code for now.
+        # I will update docker-compose in a moment to ensure they are passed.
+        username = os.environ.get("API_USERNAME", "username")
+        password = os.environ.get("API_PASSWORD", "password")
+        
+        res = requests.post(api_url, auth=(username, password), timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            return f"Refresh triggered. Started fetching {data.get('count')} feeds."
+        else:
+            return f"Failed to trigger refresh. API returned {res.status_code}: {res.text}"
+    except Exception as e:
+        # Fallback for local testing if 'moirai' host isn't found
+        if "Name or service not known" in str(e) or "Connection refused" in str(e):
+             try:
+                 res = requests.post("http://localhost:8088/api/feeds/refresh", auth=("username", "password"), timeout=5)
+                 if res.status_code == 200:
+                    data = res.json()
+                    return f"Refresh triggered (Local). Started fetching {data.get('count')} feeds."
+             except:
+                 pass
+        return f"Error calling refresh API: {e}"
 
 # --- Events Tools (Namespaced) ---
 

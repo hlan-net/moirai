@@ -31,6 +31,12 @@ if __name__ == "__main__":
     print("Moirai starting...")
     init.run()
     print("Moirai initialised.")
+    
+    # Start the scheduler
+    interval = os.environ.get("ITERATION_INTERVAL", 600)
+    scheduler.start(interval)
+    print(f"Scheduler started with interval {interval}s")
+
     # Start the application
     port = int(os.environ.get("HTTP_PORT", 8088))
     print(f"Starting Moirai on port {port}")

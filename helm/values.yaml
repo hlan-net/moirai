@@ -1,5 +1,6 @@
 # Default values for GenAI Press Review service
 replicaCount: 1
+allowPublicRead: false
 image:
   repository: slorba/moirai
   tag: "latest"

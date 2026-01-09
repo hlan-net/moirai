@@ -1,13 +1,38 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useTheme, type Theme } from '../composables/useTheme'
 
 const appVersion = ref('0.1.0-alpha')
 const modelName = ref('llama3.1:latest')
 const availableModels = ref<string[]>([])
 const loadingModels = ref(false)
+const allowPublicRead = ref(false)
+const iterationInterval = ref(600)
 
-const saveSettings = () => {
+const { theme, setTheme } = useTheme()
+
+const saveSettings = async () => {
   localStorage.setItem('moirai_model', modelName.value)
+  
+  // Save server config
+  try {
+      const res = await fetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              allow_public_read: allowPublicRead.value,
+              iteration_interval: iterationInterval.value
+          })
+      })
+      if (!res.ok) {
+          throw new Error("Failed to save config")
+      }
+  } catch (e) {
+      console.error(e)
+      alert("Failed to save server configuration.")
+      return
+  }
+
   alert('Settings saved!')
 }
 
@@ -25,12 +50,26 @@ const fetchModels = async () => {
   }
 }
 
+const fetchConfig = async () => {
+    try {
+        const res = await fetch('/api/config')
+        if (res.ok) {
+            const data = await res.json()
+            allowPublicRead.value = data.allow_public_read
+            iterationInterval.value = data.iteration_interval
+        }
+    } catch (e) {
+        console.error("Error fetching config", e)
+    }
+}
+
 onMounted(() => {
   const saved = localStorage.getItem('moirai_model')
   if (saved) {
     modelName.value = saved
   }
   fetchModels()
+  fetchConfig()
 })
 </script>
 
@@ -46,6 +85,30 @@ onMounted(() => {
 
     <div class="settings-section">
       <h2>Configuration</h2>
+      
+      <div class="form-group">
+        <label for="theme">Theme:</label>
+        <select id="theme" :value="theme" @change="setTheme(($event.target as HTMLSelectElement).value as Theme)">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="auto">Auto (System)</option>
+        </select>
+      </div>
+
+      <div class="form-group checkbox-group">
+          <label for="public-read" class="checkbox-label">
+              <input type="checkbox" id="public-read" v-model="allowPublicRead" />
+              Allow Public Read Access (History Page)
+          </label>
+          <small>If enabled, the History page can be viewed without logging in.</small>
+      </div>
+
+      <div class="form-group">
+          <label for="interval">Feed Refresh Interval (seconds):</label>
+          <input type="number" id="interval" v-model="iterationInterval" min="0" step="60" />
+          <small>How often the system checks for new articles. Set to 0 to disable automatic updates.</small>
+      </div>
+
       <div class="form-group">
         <label for="model">LLM Model Name (Ollama):</label>
         
@@ -72,17 +135,17 @@ onMounted(() => {
   margin: 0 auto;
 }
 .settings-section {
-  background: #fff;
-  color: #333;
+  background: var(--card-bg);
+  color: var(--text-color);
   padding: 20px;
   margin-bottom: 20px;
   border-radius: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
 }
 h2 {
   margin-top: 0;
-  color: #333;
-  border-bottom: 1px solid #eee;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 10px;
 }
 .form-group {
@@ -93,22 +156,36 @@ h2 {
   margin-bottom: 5px;
   font-weight: bold;
 }
+.checkbox-group {
+    margin: 20px 0;
+}
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    font-weight: normal !important;
+    cursor: pointer;
+}
+.checkbox-label input {
+    width: auto !important;
+    margin-right: 10px;
+}
 .form-group input, .form-group select {
   padding: 8px;
   width: 100%;
   max-width: 300px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  background-color: white;
-  color: #333;
+  background-color: var(--input-bg);
+  color: var(--input-text);
 }
 .form-group small {
   display: block;
   margin-top: 5px;
-  color: #666;
+  color: var(--text-color);
+  opacity: 0.7;
 }
 button {
-  background: #007acc;
+  background: var(--primary-color);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -116,6 +193,6 @@ button {
   cursor: pointer;
 }
 button:hover {
-  background: #005f9e;
+  background: var(--primary-hover);
 }
 </style>
