@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 
 interface Article {
   _id: string;
@@ -16,6 +16,18 @@ const loading = ref(true)
 const refreshing = ref(false)
 const expandedArticles = ref<Set<string>>(new Set())
 let intervalId: number | undefined
+
+const groupedArticles = computed(() => {
+  const groups: Record<string, Article[]> = {}
+  for (const article of articles.value) {
+    const key = article.feed_title || getHostname(article.feed_url)
+    if (!groups[key]) {
+      groups[key] = []
+    }
+    groups[key].push(article)
+  }
+  return groups
+})
 
 const fetchArticles = async (isManual = false) => {
   if (isManual) refreshing.value = true
@@ -91,31 +103,33 @@ const toggleExpand = (id: string) => {
     <div v-if="loading" class="loading">Loading stream...</div>
     
     <div v-else-if="articles.length" class="stream-container">
-      <div v-for="article in articles" :key="article._id" class="stream-item">
-        <div class="item-meta">
-            <span class="source">{{ article.feed_title || getHostname(article.feed_url) }}</span>
-            <span class="date">{{ formatDate(article.published) }}</span>
-        </div>
-        <h3 class="item-title">
-            <a :href="article.link" target="_blank">{{ article.title }}</a>
-        </h3>
-        <div class="item-summary">
-          <span v-if="!expandedArticles.has(article._id)">
-            {{ stripHtml(article.summary).substring(0, 300) }}
-            <button 
-              v-if="stripHtml(article.summary).length > 300" 
-              @click="toggleExpand(article._id)"
-              class="read-more-btn"
-            >
-              ... Read More
-            </button>
-          </span>
-          <span v-else>
-            {{ stripHtml(article.summary) }}
-            <button @click="toggleExpand(article._id)" class="read-more-btn">
-              Show Less
-            </button>
-          </span>
+      <div v-for="(articleGroup, groupName) in groupedArticles" :key="groupName" class="feed-group">
+        <h3 class="group-title">{{ groupName }}</h3>
+        <div v-for="article in articleGroup" :key="article._id" class="stream-item">
+          <div class="item-meta">
+              <span class="date">{{ formatDate(article.published) }}</span>
+          </div>
+          <h4 class="item-title">
+              <a :href="article.link" target="_blank">{{ article.title }}</a>
+          </h4>
+          <div class="item-summary">
+            <span v-if="!expandedArticles.has(article._id)">
+              {{ stripHtml(article.summary).substring(0, 300) }}
+              <button 
+                v-if="stripHtml(article.summary).length > 300" 
+                @click="toggleExpand(article._id)"
+                class="read-more-btn"
+              >
+                ... Read More
+              </button>
+            </span>
+            <span v-else>
+              {{ stripHtml(article.summary) }}
+              <button @click="toggleExpand(article._id)" class="read-more-btn">
+                Show Less
+              </button>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -187,6 +201,18 @@ const toggleExpand = (id: string) => {
     padding-right: 10px; /* For scrollbar */
 }
 
+.feed-group {
+  margin-bottom: 40px;
+}
+
+.group-title {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
 .stream-item {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -216,7 +242,7 @@ const toggleExpand = (id: string) => {
 
 .item-title {
     margin: 0 0 10px 0;
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     line-height: 1.3;
 }
 
