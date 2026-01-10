@@ -128,9 +128,6 @@ const toggleExpand = (id: string) => {
       <div v-for="(group, index) in groupedArticles" :key="index" class="feed-group">
         <h3 class="group-title">{{ group.title }}</h3>
         <div v-for="article in group.articles" :key="article._id" class="stream-item">
-          <div class="item-meta">
-              <span class="date">{{ formatDate(article.published) }}</span>
-          </div>
           <h4 class="item-title">
               <a :href="article.link" target="_blank">{{ article.title }}</a>
           </h4>
@@ -151,6 +148,9 @@ const toggleExpand = (id: string) => {
                 Show Less
               </button>
             </span>
+          </div>
+          <div class="item-meta">
+              <span class="date">{{ formatDate(article.published) }}</span>
           </div>
         </div>
         <hr v-if="index < groupedArticles.length - 1" class="group-divider">
@@ -229,8 +229,9 @@ const toggleExpand = (id: string) => {
 }
 
 .group-title {
-  font-size: 1.5rem;
-  color: var(--primary-color);
+  font-size: 1.2rem;
+  color: var(--text-color);
+  font-weight: 600;
   padding-bottom: 10px;
   margin-bottom: 20px;
 }
@@ -242,11 +243,10 @@ const toggleExpand = (id: string) => {
 }
 
 .item-meta {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #95a5a6;
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
+    margin-top: 10px;
+    text-align: right;
 }
 
 .source {
