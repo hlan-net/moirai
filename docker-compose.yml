@@ -39,8 +39,8 @@ services:
       - "5984:5984"
     environment:
       - COUCHDB_USER=admin
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
-      - COUCHDB_SECRET=${COUCHDB_SECRET}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password}
+      - COUCHDB_SECRET=${COUCHDB_SECRET:-secret}
     volumes:
       - couchdb_data:/opt/couchdb/data
 
