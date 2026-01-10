@@ -22,6 +22,18 @@ def index():
 def serve_ui(path):
     return send_from_directory(app.static_folder, path)
 
+# Catch-all route for SPA client-side routing
+@app.route('/<path:path>')
+def catch_all(path):
+    # If the path has a file extension, try to serve it as a static file
+    if '.' in path.split('/')[-1]:
+        try:
+            return send_from_directory(app.static_folder, path)
+        except:
+            pass
+    # Otherwise serve index.html for client-side routing
+    return send_from_directory(app.static_folder, 'index.html')
+
 app.register_blueprint(api_blueprint, url_prefix='/api')
 app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
 app.register_blueprint(chat_blueprint, url_prefix='/api')
