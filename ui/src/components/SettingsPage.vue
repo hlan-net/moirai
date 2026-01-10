@@ -161,11 +161,10 @@ onMounted(() => {
     </div>
 
     <div class="settings-section">
-      <h2 @click="toggleSection('llmConfig')">
+      <h2>
         LLM Endpoint Configuration
-        <span class="toggle-icon">{{ collapsedSections.has('llmConfig') ? '▶' : '▼' }}</span>
       </h2>
-      <div v-if="!collapsedSections.has('llmConfig')">
+      <div>
         <div class="sub-section">
           <h3 @click="toggleSection('ollama')">
             Ollama
@@ -235,11 +234,10 @@ onMounted(() => {
     </div>
 
     <div class="settings-section">
-      <h2 @click="toggleSection('general')">
+      <h2>
         General Settings
-        <span class="toggle-icon">{{ collapsedSections.has('general') ? '▶' : '▼' }}</span>
       </h2>
-      <div v-if="!collapsedSections.has('general')">
+      <div>
         <div class="form-group">
           <label for="theme">Theme:</label>
           <select id="theme" :value="theme" @change="setTheme(($event.target as HTMLSelectElement).value as Theme)">
