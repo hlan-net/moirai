@@ -8,6 +8,7 @@ interface Article {
   link: string;
   published: string;
   feed_url: string;
+  feed_title?: string;
 }
 
 const articles = ref<Article[]>([])
@@ -92,7 +93,7 @@ const toggleExpand = (id: string) => {
     <div v-else-if="articles.length" class="stream-container">
       <div v-for="article in articles" :key="article._id" class="stream-item">
         <div class="item-meta">
-            <span class="source">{{ getHostname(article.feed_url) }}</span>
+            <span class="source">{{ article.feed_title || getHostname(article.feed_url) }}</span>
             <span class="date">{{ formatDate(article.published) }}</span>
         </div>
         <h3 class="item-title">
