@@ -60,7 +60,7 @@ class FetchFeedTask(threading.Thread):
                     reg_doc = res.json()
                     needs_update = False
                     
-                    if feed_title and reg_doc.get("title") != feed_title:
+                    if feed_title and not reg_doc.get("title"):
                         reg_doc["title"] = feed_title
                         needs_update = True
                     
