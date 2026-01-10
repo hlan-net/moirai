@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useNamespace } from '../composables/useNamespace'
+import { marked } from 'marked'
 
 const { currentNamespace, namespaces, initNamespace } = useNamespace()
 
@@ -16,6 +17,10 @@ const loading = ref(false)
 onMounted(() => {
     initNamespace()
 })
+
+const parsedContent = (content: string) => {
+  return marked(content)
+}
 
 const sendMessage = async () => {
   if (!input.value.trim() || loading.value) return
@@ -98,7 +103,7 @@ const sendMessage = async () => {
         >
           <div class="bubble">
             <strong>{{ msg.role === 'user' ? 'You' : 'GenAI' }}:</strong>
-            <pre class="msg-content">{{ msg.content }}</pre>
+            <div class="msg-content" v-html="parsedContent(msg.content)"></div>
           </div>
         </div>
         <div v-if="loading" class="message assistant">
