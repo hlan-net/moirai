@@ -132,10 +132,10 @@ const openFeedInNewTab = (url: string) => {
         </div>
         <div v-else class="feed-info">
           <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
-          <button @click="openFeedInNewTab(feed.url)" class="open-link-btn" title="Open Feed">🔗</button>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions">
+          <button @click="openFeedInNewTab(feed.url)" class="open-link-btn" title="Open Feed">🔗</button>
           <button @click="startRename(feed)" class="rename-btn" title="Rename Feed">✏️</button>
           <button @click="deleteFeed(feed._id)" class="delete-btn" title="Delete Feed">×</button>
         </div>
@@ -224,12 +224,18 @@ h2 {
   display: flex;
   gap: 5px;
 }
-.rename-btn, .delete-btn {
+.open-link-btn, .rename-btn, .delete-btn {
   background: none;
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 5px;
+}
+.open-link-btn {
+  color: #999;
+}
+.open-link-btn:hover {
+  color: #000;
 }
 .rename-btn {
   color: #999;
