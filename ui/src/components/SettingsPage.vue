@@ -25,6 +25,12 @@ watch(llmEndpoint, (newEndpoint) => {
   }
 })
 
+watch(openaiApiKey, (newKey) => {
+  if (!newKey) {
+    availableOpenAiModels.value = []
+  }
+})
+
 const toggleSection = (section: string) => {
   if (collapsedSections.value.has(section)) {
     collapsedSections.value.delete(section)
@@ -207,8 +213,8 @@ onMounted(() => {
                   {{ model }}
                 </option>
               </select>
-              <input v-else id="openai-model" v-model="openaiModelName" placeholder="e.g. gpt-4-turbo" />
               <small v-if="loadingModels">Loading available models...</small>
+              <small v-if="!openaiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
             </div>
           </div>
         </div>
