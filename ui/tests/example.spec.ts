@@ -10,6 +10,6 @@ test('has title', async ({ page }) => {
 test('feeds column loads', async ({ page }) => {
   await page.goto('/');
   
-  // Check if the Feeds header exists
-  await expect(page.getByRole('heading', { name: 'Feeds' })).toBeVisible();
+  // Check if the Feeds header exists (with count)
+  await expect(page.getByRole('heading', { name: /Feeds \(\d+\)/ })).toBeVisible({ timeout: 10000 });
 });
