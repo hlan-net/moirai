@@ -1,3 +1,4 @@
+import os
 from .ollama import OllamaProvider
 from .openai import OpenAIProvider
 
