@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import FeedColumn from './FeedColumn.vue'
 import ArticleColumn from './ArticleColumn.vue'
 import EventColumn from './EventColumn.vue'
@@ -9,6 +9,11 @@ import { useNamespace } from '../composables/useNamespace'
 defineProps<{ msg: string }>()
 
 const { currentNamespace, namespaces, initNamespace } = useNamespace()
+const focusedColumn = ref<string | null>(null)
+
+const setFocus = (column: string | null) => {
+  focusedColumn.value = column
+}
 
 onMounted(() => {
   initNamespace()
@@ -32,19 +37,32 @@ onMounted(() => {
         </option>
       </select>
       <span v-if="currentNamespace" class="active-badge">Filtered</span>
+      <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">Clear Focus</button>
     </div>
 
     <div class="columns-container">
-      <div class="column">
+      <div 
+        :class="['column', { focused: focusedColumn === 'feeds', unfocused: focusedColumn && focusedColumn !== 'feeds' }]"
+        @click="setFocus('feeds')"
+      >
         <FeedColumn />
       </div>
-      <div class="column">
+      <div 
+        :class="['column', { focused: focusedColumn === 'articles', unfocused: focusedColumn && focusedColumn !== 'articles' }]"
+        @click="setFocus('articles')"
+      >
         <ArticleColumn />
       </div>
-      <div class="column">
+      <div 
+        :class="['column', { focused: focusedColumn === 'events', unfocused: focusedColumn && focusedColumn !== 'events' }]"
+        @click="setFocus('events')"
+      >
         <EventColumn :namespace="currentNamespace" />
       </div>
-      <div class="column">
+      <div 
+        :class="['column', { focused: focusedColumn === 'trends', unfocused: focusedColumn && focusedColumn !== 'trends' }]"
+        @click="setFocus('trends')"
+      >
         <TrendColumn :namespace="currentNamespace" />
       </div>
     </div>
@@ -85,6 +103,9 @@ h1 {
   margin-left: 10px;
   vertical-align: middle;
 }
+.clear-focus-btn {
+  margin-left: 10px;
+}
 .columns-container {
   display: flex;
   justify-content: space-between;
@@ -101,5 +122,13 @@ h1 {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: all 0.3s ease;
+}
+.column.focused {
+  flex-grow: 2;
+}
+.column.unfocused {
+  flex-grow: 0.5;
+  opacity: 0.5;
 }
 </style>
