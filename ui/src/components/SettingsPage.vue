@@ -12,12 +12,13 @@ const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
 const openaiApiKey = ref('')
 const openaiModelName = ref('gpt-4-turbo')
 const availableOpenAiModels = ref<string[]>([])
-const collapsedSections = ref<Set<string>>(new Set(['general', 'ollama', 'openai']))
+const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
+const collapsedSections = ref<Set<string>>(new Set(['about', 'general', 'ollama', 'openai']))
 
 const { theme, setTheme } = useTheme()
 
 watch(llmEndpoint, (newEndpoint) => {
-  if (newEndpoint === 'openai' && availableOpenAiModels.value.length === 0) {
+  if (newEndpoint === 'openai' && availableOpenAiModels.value.length === 0 && openaiApiKey.value) {
     fetchOpenAiModels()
   } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
     fetchOllamaModels()
@@ -37,6 +38,7 @@ const saveSettings = async () => {
   localStorage.setItem('moirai_llm_endpoint', llmEndpoint.value)
   localStorage.setItem('moirai_openai_api_key', openaiApiKey.value)
   localStorage.setItem('moirai_openai_model', openaiModelName.value)
+  localStorage.setItem('moirai_ollama_endpoint_url', ollamaEndpointUrl.value)
 
   // Save server config
   try {
@@ -75,9 +77,17 @@ const fetchOllamaModels = async () => {
 }
 
 const fetchOpenAiModels = async () => {
+  if (!openaiApiKey.value) {
+    alert('Please provide an OpenAI API key.')
+    return
+  }
   loadingModels.value = true
   try {
-    const res = await fetch('/api/models?llm_endpoint=openai')
+    const res = await fetch('/api/models?llm_endpoint=openai', {
+      headers: {
+        'x-openai-api-key': openaiApiKey.value
+      }
+    })
     if (res.ok) {
       availableOpenAiModels.value = await res.json()
     }
@@ -118,10 +128,14 @@ onMounted(() => {
   if (savedOpenaiModel) {
     openaiModelName.value = savedOpenaiModel
   }
+  const savedOllamaUrl = localStorage.getItem('moirai_ollama_endpoint_url')
+  if (savedOllamaUrl) {
+    ollamaEndpointUrl.value = savedOllamaUrl
+  }
 
   if (llmEndpoint.value === 'ollama') {
     fetchOllamaModels()
-  } else {
+  } else if (llmEndpoint.value === 'openai' && openaiApiKey.value) {
     fetchOpenAiModels()
   }
   fetchConfig()
@@ -156,6 +170,10 @@ onMounted(() => {
           </h3>
           <div v-if="!collapsedSections.has('ollama')">
             <div class="form-group">
+              <label for="ollama-url">Ollama Endpoint URL:</label>
+              <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" />
+            </div>
+            <div class="form-group">
               <label for="model">LLM Model Name (Ollama):</label>
               <select v-if="availableModels.length" id="model" v-model="modelName">
                 <option v-for="model in availableModels" :key="model" :value="model">
@@ -181,6 +199,9 @@ onMounted(() => {
             </div>
             <div class="form-group">
               <label for="openai-model">OpenAI Model Name:</label>
+              <button @click="fetchOpenAiModels" :disabled="!openaiApiKey || loadingModels">
+                {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+              </button>
               <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName">
                 <option v-for="model in availableOpenAiModels" :key="model" :value="model">
                   {{ model }}
