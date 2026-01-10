@@ -46,10 +46,19 @@ jobs:
       - name: Install Playwright Browsers
         working-directory: ui
         run: npx playwright install --with-deps chromium
+
+      - name: Start backend services
+        run: docker compose up -d
+
+      - name: Wait for services to be ready
+        run: sleep 30
         
       - name: Run Playwright tests
         working-directory: ui
         run: yarn playwright test
+        
+      - name: Stop backend services
+        run: docker compose down
 
   build:
     needs: test
