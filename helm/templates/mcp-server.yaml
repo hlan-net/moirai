@@ -41,7 +41,14 @@ spec:
             - name: COUCHDB_PASSWORD
               value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminPassword ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminPassword | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminPassword | default "adminPass" -}}{{- end }}"
             - name: COUCHDB_URI
-              value: "http://$COUCHDB_USER:$COUCHDB_PASSWORD@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
+              value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
+            - name: API_USERNAME
+              value: {{ .Values.moirai.apiUsername | quote }}
+            - name: API_PASSWORD
+              value: {{ .Values.moirai.apiPassword | quote }}
+            - name: COUCHDB_SECRET
+              value: {{ .Values.couchdb.cookieAuthSecret | quote }}
+---
 ---
 apiVersion: v1
 kind: Service

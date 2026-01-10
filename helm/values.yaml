@@ -32,6 +32,10 @@ deployment:
   name: moirai-deployment
   replicas: 1
 
+moirai:
+  apiUsername: "username"
+  apiPassword: "password"
+
 dns:
   clusterDomainSuffix: cluster.local
 

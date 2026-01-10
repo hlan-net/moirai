@@ -103,6 +103,12 @@ spec:
             value: {{ .Values.allowPublicRead | quote }}
           - name: OPENAI_API_KEY
             value: {{ .Values.openai.apiKey | quote }}
+          - name: API_USERNAME
+            value: {{ .Values.moirai.apiUsername | quote }}
+          - name: API_PASSWORD
+            value: {{ .Values.moirai.apiPassword | quote }}
+          - name: COUCHDB_SECRET
+            value: {{ .Values.couchdb.cookieAuthSecret | quote }}
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
