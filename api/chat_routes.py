@@ -16,7 +16,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
-llm_provider_factory = LLMProviderFactory(ollama_base_url=OLLAMA_BASE_URL)
+llm_provider_factory = LLMProviderFactory()
 
 def extract_tool_calls_from_content(content):
     if not content: return []
@@ -36,10 +36,10 @@ def extract_tool_calls_from_content(content):
     
     return tools
 
-def run_agent_sync(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None):
-    return asyncio.run(run_agent(user_message, history, model, namespace, llm_endpoint, api_key))
+def run_agent_sync(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
+    return asyncio.run(run_agent(user_message, history, model, namespace, llm_endpoint, api_key, ollama_base_url))
 
-async def run_agent(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None):
+async def run_agent(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
     messages = list(history)
     
     # Inject namespace context if provided
@@ -65,7 +65,7 @@ async def run_agent(user_message, history, model=None, namespace=None, llm_endpo
             
     messages.append({"role": "user", "content": user_message})
 
-    llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key or OPENAI_API_KEY)
+    llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key or OPENAI_API_KEY, ollama_base_url or OLLAMA_BASE_URL)
     
     target_model = model or MODEL_NAME
 
@@ -195,7 +195,8 @@ async def run_agent(user_message, history, model=None, namespace=None, llm_endpo
 def list_models():
     llm_endpoint = request.args.get('llm_endpoint')
     api_key = request.headers.get('x-openai-api-key')
-    llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key)
+    ollama_base_url = request.headers.get('x-ollama-base-url')
+    llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key, ollama_base_url or OLLAMA_BASE_URL)
     try:
         model_names = llm_provider.list_models()
         return jsonify(model_names)
@@ -212,6 +213,7 @@ def chat():
     namespace = data.get("namespace")
     llm_endpoint = data.get("llm_endpoint")
     api_key = request.headers.get('x-openai-api-key')
+    ollama_base_url = request.headers.get('x-ollama-base-url')
 
-    response = run_agent_sync(user_message, history, model, namespace, llm_endpoint, api_key)
+    response = run_agent_sync(user_message, history, model, namespace, llm_endpoint, api_key, ollama_base_url)
     return jsonify({"response": response})

@@ -46,6 +46,11 @@ const sendMessage = async () => {
       if (openaiApiKey) {
         headers['x-openai-api-key'] = openaiApiKey
       }
+    } else {
+      const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
+      if (ollamaEndpointUrl) {
+        headers['x-ollama-base-url'] = ollamaEndpointUrl
+      }
     }
 
     const res = await fetch('/api/chat', {
