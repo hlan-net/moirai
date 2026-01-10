@@ -196,13 +196,25 @@ def refresh_feeds():
 def list_articles():
     feeds = fetch_from_couchdb("feeds")
     articles = fetch_from_couchdb("articles")
+    events = fetch_from_couchdb("events")
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
     
+    article_event_map = {}
+    for event in events:
+        for link in event.get("article_links", []):
+            if link not in article_event_map:
+                article_event_map[link] = []
+            article_event_map[link].append(event.get("name"))
+            
     for article in articles:
         feed_url = article.get("feed_url")
         if feed_url in feed_title_map:
             article["feed_title"] = feed_title_map[feed_url]
+        
+        article_link = article.get("link")
+        if article_link in article_event_map:
+            article["events"] = article_event_map[article_link]
             
     return jsonify(articles)
 

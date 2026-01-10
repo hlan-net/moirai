@@ -8,6 +8,7 @@ interface Article {
   link: string;
   published: string;
   feed_url: string;
+  events?: string[];
 }
 
 const articles = ref<Article[]>([])
@@ -81,6 +82,9 @@ function getHostname(urlStr: string) {
         </div>
         <p class="meta">{{ formatDate(article.published) }} | {{ getHostname(article.feed_url) }}</p>
         <p class="summary">{{ stripHtml(article.summary).substring(0, 200) }}...</p>
+        <div v-if="article.events" class="event-tags">
+          <span v-for="event in article.events" :key="event" class="tag">{{ event }}</span>
+        </div>
       </div>
     </div>
     <div v-else>No articles found yet.</div>
@@ -136,6 +140,18 @@ h2 {
   font-size: 0.9rem;
   color: #333;
   line-height: 1.4;
+}
+.event-tags {
+  margin-top: 10px;
+}
+.tag {
+  display: inline-block;
+  background: #eee;
+  color: #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 5px;
+  font-size: 0.8rem;
 }
 .delete-btn {
   background: none;
