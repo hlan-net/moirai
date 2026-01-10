@@ -10,9 +10,13 @@ async def verify_filtering():
     mcp_url = "http://localhost:8090/sse"
     api_url = "http://localhost:8088/api/events"
     
-    username = os.environ.get("API_USERNAME", "username")
-    password = os.environ.get("API_PASSWORD", "password")
+    username = os.environ.get("API_USERNAME")
+    password = os.environ.get("API_PASSWORD")
     
+    if not username or not password:
+        print("API_USERNAME and API_PASSWORD environment variables must be set")
+        sys.exit(1)
+        
     ns1 = str(uuid.uuid4())
     ns2 = str(uuid.uuid4())
     

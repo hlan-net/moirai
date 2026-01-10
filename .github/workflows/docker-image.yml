@@ -26,6 +26,9 @@ jobs:
           pip install -r requirements.txt
           
       - name: Run backend tests
+        env:
+          API_USERNAME: testuser
+          API_PASSWORD: testpassword
         run: |
           PYTHONPATH=. pytest
           

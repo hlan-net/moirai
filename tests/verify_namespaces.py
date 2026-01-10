@@ -6,8 +6,12 @@ def verify_namespaces():
     url = "http://localhost:8088/api/namespaces"
     print(f"Fetching namespaces from {url}...")
     
-    username = os.environ.get("API_USERNAME", "username")
-    password = os.environ.get("API_PASSWORD", "password")
+    username = os.environ.get("API_USERNAME")
+    password = os.environ.get("API_PASSWORD")
+    
+    if not username or not password:
+        print("API_USERNAME and API_PASSWORD environment variables must be set")
+        sys.exit(1)
     
     try:
         res = requests.get(url, auth=(username, password))
