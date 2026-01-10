@@ -105,6 +105,10 @@ function getHostname(urlStr: string) {
     return urlStr
   }
 }
+
+const openFeedInNewTab = (url: string) => {
+  window.open(url, '_blank')
+}
 </script>
 
 <template>
@@ -128,6 +132,7 @@ function getHostname(urlStr: string) {
         </div>
         <div v-else class="feed-info">
           <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
+          <button @click="openFeedInNewTab(feed.url)" class="open-link-btn" title="Open Feed">🔗</button>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions">
