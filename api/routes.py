@@ -156,6 +156,23 @@ def delete_feed(feed_id):
     else:
         abort(500, description="Failed to delete feed")
 
+@api_blueprint.route("/feeds/<feed_id>", methods=["PUT"])
+def update_feed(feed_id):
+    feed = fetch_from_couchdb("feeds", feed_id)
+    if not feed:
+        abort(404, description="Feed not found")
+    
+    data = request.json
+    if "title" not in data:
+        abort(400, description="Title is required")
+        
+    feed["title"] = data["title"]
+    
+    if update_couchdb_doc("feeds", feed_id, feed):
+        return jsonify(feed)
+    else:
+        abort(500, description="Failed to update feed")
+
 @api_blueprint.route("/feeds/refresh", methods=["POST"])
 def refresh_feeds():
     """Triggers a background refresh of all registered feeds."""

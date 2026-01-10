@@ -11,6 +11,8 @@ interface Feed {
 const feeds = ref<Feed[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
+const renamingFeedId = ref<string | null>(null)
+const newFeedTitle = ref('')
 
 const fetchFeeds = async () => {
   try {
@@ -59,6 +61,39 @@ const deleteFeed = async (id: string) => {
   }
 }
 
+const startRename = (feed: Feed) => {
+  renamingFeedId.value = feed._id
+  newFeedTitle.value = feed.title || ''
+}
+
+const cancelRename = () => {
+  renamingFeedId.value = null
+  newFeedTitle.value = ''
+}
+
+const renameFeed = async (feed: Feed) => {
+  try {
+    const res = await fetch(`/api/feeds/${feed._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newFeedTitle.value })
+    })
+    if (res.ok) {
+      const updatedFeed = await res.json()
+      const index = feeds.value.findIndex(f => f._id === updatedFeed._id)
+      if (index !== -1) {
+        feeds.value[index] = updatedFeed
+      }
+      cancelRename()
+    } else {
+      alert("Failed to rename feed")
+    }
+  } catch (e) {
+    console.error(e)
+    alert("Error renaming feed")
+  }
+}
+
 onMounted(() => {
   fetchFeeds()
 })
@@ -84,11 +119,21 @@ function getHostname(urlStr: string) {
     <div v-if="loading">Loading...</div>
     <ul v-else-if="feeds.length" class="feed-list">
       <li v-for="feed in feeds" :key="feed._id" class="feed-item">
-        <div class="feed-info">
+        <div v-if="renamingFeedId === feed._id" class="feed-info">
+          <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
+          <div class="rename-actions">
+            <button @click="renameFeed(feed)">Save</button>
+            <button @click="cancelRename">Cancel</button>
+          </div>
+        </div>
+        <div v-else class="feed-info">
           <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
-        <button @click="deleteFeed(feed._id)" class="delete-btn" title="Delete Feed">×</button>
+        <div class="feed-actions">
+          <button @click="startRename(feed)" class="rename-btn" title="Rename Feed">✏️</button>
+          <button @click="deleteFeed(feed._id)" class="delete-btn" title="Delete Feed">×</button>
+        </div>
       </li>
     </ul>
     <div v-else>No feeds found.</div>
@@ -170,16 +215,33 @@ h2 {
   border-radius: 4px;
   align-self: flex-start;
 }
-.delete-btn {
+.feed-actions {
+  display: flex;
+  gap: 5px;
+}
+.rename-btn, .delete-btn {
   background: none;
   border: none;
-  color: #cc0000;
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 5px;
 }
+.rename-btn {
+  color: #999;
+}
+.rename-btn:hover {
+  color: #000;
+}
+.delete-btn {
+  color: #cc0000;
+}
 .delete-btn:hover {
   color: #ff0000;
   font-weight: bold;
+}
+.rename-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
 }
 </style>
