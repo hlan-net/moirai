@@ -5,14 +5,14 @@ from flask import Blueprint, request, jsonify
 import os
 import json
 import asyncio
-from openai import OpenAI
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+from .llm.factory import get_llm_provider
 
 chat_blueprint = Blueprint('chat', __name__)
 
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8090/sse")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-dummy")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
@@ -34,10 +34,10 @@ def extract_tool_calls_from_content(content):
     
     return tools
 
-def run_agent_sync(user_message, history, model=None, namespace=None):
-    return asyncio.run(run_agent(user_message, history, model, namespace))
+def run_agent_sync(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None):
+    return asyncio.run(run_agent(user_message, history, model, namespace, llm_endpoint, api_key))
 
-async def run_agent(user_message, history, model=None, namespace=None):
+async def run_agent(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None):
     messages = list(history)
     
     # Inject namespace context if provided
@@ -63,7 +63,7 @@ async def run_agent(user_message, history, model=None, namespace=None):
             
     messages.append({"role": "user", "content": user_message})
 
-    client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
+    llm_provider = get_llm_provider(llm_endpoint, api_key or OPENAI_API_KEY, OPENAI_BASE_URL)
     
     target_model = model or MODEL_NAME
 
@@ -100,9 +100,9 @@ async def run_agent(user_message, history, model=None, namespace=None):
                         # We stored them as dicts in history below, so this should be fine.
                         clean_messages.append(clean_m)
 
-                    response = client.chat.completions.create(
-                        model=target_model,
+                    response = llm_provider.create_chat_completion(
                         messages=clean_messages,
+                        model=target_model,
                         tools=openai_tools if openai_tools else None,
                         tool_choice="auto" if openai_tools else None
                     )
@@ -191,11 +191,11 @@ async def run_agent(user_message, history, model=None, namespace=None):
 
 @chat_blueprint.route("/models", methods=["GET"])
 def list_models():
-    client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
+    llm_endpoint = request.args.get('llm_endpoint')
+    api_key = request.headers.get('x-openai-api-key')
+    llm_provider = get_llm_provider(llm_endpoint, api_key or OPENAI_API_KEY, OPENAI_BASE_URL)
     try:
-        models_response = client.models.list()
-        # models_response.data is a list of Model objects
-        model_names = [m.id for m in models_response.data]
+        model_names = llm_provider.list_models()
         return jsonify(model_names)
     except Exception as e:
         print(f"Error fetching models: {e}")
@@ -208,6 +208,8 @@ def chat():
     history = data.get("history", [])
     model = data.get("model")
     namespace = data.get("namespace")
-    
-    response = run_agent_sync(user_message, history, model, namespace)
+    llm_endpoint = data.get("llm_endpoint")
+    api_key = request.headers.get('x-openai-api-key')
+
+    response = run_agent_sync(user_message, history, model, namespace, llm_endpoint, api_key)
     return jsonify({"response": response})

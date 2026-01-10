@@ -59,6 +59,9 @@ couchdb:
       events:
         partitioned: true
 
+openai:
+  apiKey: "your-openai-api-key"
+
 ollama:
   endpoint: "https://ollama.example.com"
 

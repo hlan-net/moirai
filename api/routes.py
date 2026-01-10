@@ -177,7 +177,16 @@ def refresh_feeds():
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
+    feeds = fetch_from_couchdb("feeds")
     articles = fetch_from_couchdb("articles")
+    
+    feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
+    
+    for article in articles:
+        feed_url = article.get("feed_url")
+        if feed_url in feed_title_map:
+            article["feed_title"] = feed_title_map[feed_url]
+            
     return jsonify(articles)
 
 @api_blueprint.route("/articles/<article_id>", methods=["DELETE"])

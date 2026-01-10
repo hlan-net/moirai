@@ -101,6 +101,8 @@ spec:
             value: {{ .Values.service.targetPort | quote }}
           - name: ALLOW_PUBLIC_READ
             value: {{ .Values.allowPublicRead | quote }}
+          - name: OPENAI_API_KEY
+            value: {{ .Values.openai.apiKey | quote }}
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
