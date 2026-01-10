@@ -13,7 +13,7 @@ class TestLiveLWNFeed(unittest.TestCase):
 
         processor = ArticleProcessor()
         # Pass the real content to the processor
-        articles = processor.process_feed(url, response.text)
+        feed_title, articles = processor.process_feed(url, response.text)
         
         # Basic validation to ensure parsing worked
         self.assertGreater(len(articles), 0, "Should find at least one article in LWN feed")
