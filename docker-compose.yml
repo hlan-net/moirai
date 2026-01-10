@@ -6,8 +6,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD}@couchdb:5984/
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password}
+      - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD:-password}@couchdb:5984/
       - HTTP_PORT=8088
       - PYTHONUNBUFFERED=1
       - ITERATION_INTERVAL=300
@@ -28,7 +27,7 @@ services:
     ports:
       - "8090:8090"
     environment:
-      - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD}@couchdb:5984/
+      - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD:-password}@couchdb:5984/
       - API_USERNAME=username
       - API_PASSWORD=${API_PASSWORD}
     depends_on:
