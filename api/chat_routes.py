@@ -233,9 +233,12 @@ def get_chat_session(session_id):
 
 @chat_blueprint.route("/chat/history", methods=["POST"])
 def create_chat_session():
+    data = request.json
+    title = data.get("title", "New Chat")
     session_id = str(uuid.uuid4())
     session = {
         "_id": session_id,
+        "title": title,
         "messages": []
     }
     if update_couchdb_doc("chat_history", session_id, session):

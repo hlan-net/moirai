@@ -10,17 +10,49 @@ interface Message {
   content: string
 }
 
+interface ChatSession {
+  _id: string;
+  title: string;
+  messages: Message[];
+}
+
 const messages = ref<Message[]>([])
 const input = ref('')
 const loading = ref(false)
 const sessionId = ref<string | null>(null)
+const sessions = ref<ChatSession[]>([])
+const loadingSessions = ref(true)
 
 onMounted(() => {
     initNamespace()
+    fetchSessions()
 })
 
 const parsedContent = (content: string) => {
   return marked(content)
+}
+
+const fetchSessions = async () => {
+  try {
+    const response = await fetch('/api/chat/history')
+    if (response.ok) {
+      sessions.value = await response.json()
+    }
+  } catch (error) {
+    console.error('Error fetching chat sessions:', error)
+  } finally {
+    loadingSessions.value = false
+  }
+}
+
+const loadSession = (session: ChatSession) => {
+  sessionId.value = session._id
+  messages.value = session.messages
+}
+
+const newChat = () => {
+  sessionId.value = null
+  messages.value = []
 }
 
 const sendMessage = async () => {
@@ -34,10 +66,15 @@ const sendMessage = async () => {
   
   try {
     if (!sessionId.value) {
-      const res = await fetch('/api/chat/history', { method: 'POST' })
+      const res = await fetch('/api/chat/history', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: userMsg })
+      })
       if (res.ok) {
         const data = await res.json()
         sessionId.value = data._id
+        sessions.value.unshift(data)
       }
     }
 
@@ -103,39 +140,55 @@ const sendMessage = async () => {
 
 <template>
   <div class="chat-page">
-    <div class="chat-header">
-       <select v-model="currentNamespace" class="ns-select">
-        <option value="">-- No Context (Global) --</option>
-        <option v-for="ns in namespaces" :key="ns" :value="ns">
-          {{ ns }}
-        </option>
-      </select>
-    </div>
-    <div class="chat-container">
-      <div class="messages">
+    <div class="sidebar">
+      <button @click="newChat" class="new-chat-btn">New Chat</button>
+      <div v-if="loadingSessions">Loading...</div>
+      <div v-else-if="sessions.length" class="session-list">
         <div 
-          v-for="(msg, idx) in messages" 
-          :key="idx" 
-          :class="['message', msg.role]"
+          v-for="session in sessions" 
+          :key="session._id" 
+          @click="loadSession(session)"
+          :class="['session-item', { active: sessionId === session._id }]"
         >
-          <div class="bubble">
-            <strong>{{ msg.role === 'user' ? 'You' : 'GenAI' }}:</strong>
-            <div class="msg-content" v-html="parsedContent(msg.content)"></div>
-          </div>
-        </div>
-        <div v-if="loading" class="message assistant">
-          <div class="bubble loading">Thinking...</div>
+          {{ session.title }}
         </div>
       </div>
-      
-      <div class="input-area">
-        <input 
-          v-model="input" 
-          @keyup.enter="sendMessage" 
-          placeholder="Ask Moirai..." 
-          :disabled="loading"
-        />
-        <button @click="sendMessage" :disabled="loading">Send</button>
+    </div>
+    <div class="chat-main">
+      <div class="chat-header">
+         <select v-model="currentNamespace" class="ns-select">
+          <option value="">-- No Context (Global) --</option>
+          <option v-for="ns in namespaces" :key="ns" :value="ns">
+            {{ ns }}
+          </option>
+        </select>
+      </div>
+      <div class="chat-container">
+        <div class="messages">
+          <div 
+            v-for="(msg, idx) in messages" 
+            :key="idx" 
+            :class="['message', msg.role]"
+          >
+            <div class="bubble">
+              <strong>{{ msg.role === 'user' ? 'You' : 'GenAI' }}:</strong>
+              <div class="msg-content" v-html="parsedContent(msg.content)"></div>
+            </div>
+          </div>
+          <div v-if="loading" class="message assistant">
+            <div class="bubble loading">Thinking...</div>
+          </div>
+        </div>
+        
+        <div class="input-area">
+          <input 
+            v-model="input" 
+            @keyup.enter="sendMessage" 
+            placeholder="Ask Moirai..." 
+            :disabled="loading"
+          />
+          <button @click="sendMessage" :disabled="loading">Send</button>
+        </div>
       </div>
     </div>
   </div>
@@ -143,6 +196,34 @@ const sendMessage = async () => {
 
 <style scoped>
 .chat-page {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+.sidebar {
+  width: 250px;
+  background: #f0f0f0;
+  padding: 10px;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: column;
+}
+.new-chat-btn {
+  margin-bottom: 10px;
+}
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.session-item {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #ddd;
+}
+.session-item:hover, .session-item.active {
+  background: #e0e0e0;
+}
+.chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
