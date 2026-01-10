@@ -13,6 +13,7 @@ interface Article {
 const articles = ref<Article[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
+const expandedArticles = ref<Set<string>>(new Set())
 let intervalId: number | undefined
 
 const fetchArticles = async (isManual = false) => {
@@ -57,11 +58,19 @@ function stripHtml(html: string) {
    return doc.body.textContent || "";
 }
 
-function getHostname(urlStr: string) {
+function getHostname(urlStr:string) {
   try {
     return new URL(urlStr).hostname
   } catch (e) {
     return urlStr
+  }
+}
+
+const toggleExpand = (id: string) => {
+  if (expandedArticles.value.has(id)) {
+    expandedArticles.value.delete(id)
+  } else {
+    expandedArticles.value.add(id)
   }
 }
 </script>
@@ -89,7 +98,24 @@ function getHostname(urlStr: string) {
         <h3 class="item-title">
             <a :href="article.link" target="_blank">{{ article.title }}</a>
         </h3>
-        <div class="item-summary">{{ stripHtml(article.summary) }}</div>
+        <div class="item-summary">
+          <span v-if="!expandedArticles.has(article._id)">
+            {{ stripHtml(article.summary).substring(0, 300) }}
+            <button 
+              v-if="stripHtml(article.summary).length > 300" 
+              @click="toggleExpand(article._id)"
+              class="read-more-btn"
+            >
+              ... Read More
+            </button>
+          </span>
+          <span v-else>
+            {{ stripHtml(article.summary) }}
+            <button @click="toggleExpand(article._id)" class="read-more-btn">
+              Show Less
+            </button>
+          </span>
+        </div>
       </div>
     </div>
     
@@ -208,6 +234,20 @@ function getHostname(urlStr: string) {
     opacity: 0.9;
     line-height: 1.6;
     font-size: 1rem;
+}
+
+.read-more-btn {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  margin-left: 5px;
+}
+
+.read-more-btn:hover {
+  text-decoration: underline;
 }
 
 .loading, .empty-state {

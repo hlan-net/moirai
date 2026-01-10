@@ -108,7 +108,7 @@ function getHostname(urlStr: string) {
     border-bottom: 1px solid #eee;
     padding-bottom: 10px;
     margin-bottom: 10px;
-    margin-top: 30px;
+    margin-top: 0;
 }
 h2 {
   margin: 0;
@@ -158,7 +158,6 @@ h2 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 250px;
 }
 .feed-link:hover {
   text-decoration: underline;

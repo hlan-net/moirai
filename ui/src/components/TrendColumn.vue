@@ -125,7 +125,7 @@ onMounted(() => {
 }
 h2 {
   color: #6a0dad;
-  margin-top: 30px;
+  margin-top: 0;
 }
 .trend-list {
   overflow-y: auto;

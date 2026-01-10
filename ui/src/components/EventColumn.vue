@@ -174,7 +174,7 @@ onMounted(() => {
 }
 h2 {
   color: #d83b01;
-  margin-top: 30px;
+  margin-top: 0;
 }
 .event-list {
   overflow-y: auto;
@@ -259,7 +259,6 @@ h3 {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  max-width: 200px;
   color: #007acc;
 }
 .remove-link-btn {
