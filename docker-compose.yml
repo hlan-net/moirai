@@ -15,6 +15,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - MODEL_NAME=llama3.1:latest
       - ALLOW_PUBLIC_READ=true
+      - ARTICLE_EXPIRATION_DAYS=30
     depends_on:
       - couchdb
     volumes:

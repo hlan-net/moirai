@@ -3,11 +3,12 @@ import hashlib
 import json
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class ArticleProcessor:
     def __init__(self):
         self.couchdb_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/") + "articles"
+        self.expiration_days = int(os.environ.get("ARTICLE_EXPIRATION_DAYS", 30))
 
     def process_feed(self, feed_url, feed_content):
         """Parses the feed content using feedparser and extracts articles.
@@ -21,6 +22,16 @@ class ArticleProcessor:
             feed_title = parsed_feed.feed.get("title", "Unknown Feed")
 
             for entry in parsed_feed.entries:
+                published_date = None
+                if hasattr(entry, "published_parsed") and entry.published_parsed:
+                    try:
+                        published_date = datetime(*entry.published_parsed[:6])
+                    except (ValueError, TypeError) as err:
+                        print(f"Warning: Could not parse date for article '{entry.get('title', 'No Title')}': {err}")
+
+                if published_date and (datetime.now() - published_date) > timedelta(days=self.expiration_days):
+                    continue
+
                 content_value = ""
                 if "content" in entry:
                     content_value = entry.content[0].value
@@ -31,17 +42,10 @@ class ArticleProcessor:
                     "feed_url": feed_url,
                     "title": entry.get("title", "No Title"),
                     "link": entry.get("link", ""),
-                    "published": entry.get("published", datetime.now().isoformat()),
+                    "published": published_date.isoformat() + "Z" if published_date else datetime.now().isoformat(),
                     "summary": entry.get("summary", ""),
                     "content": content_value,
                 }
-
-                if hasattr(entry, "published_parsed") and entry.published_parsed:
-                    try:
-                        dt = datetime(*entry.published_parsed[:6])
-                        article["published"] = dt.isoformat() + "Z"
-                    except (ValueError, TypeError) as err:
-                        print(f"Warning: Could not parse date for article '{article['title']}': {err}")
 
                 articles.append(article)
         except (ValueError, TypeError) as err:
