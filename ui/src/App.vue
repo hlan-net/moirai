@@ -17,7 +17,6 @@ onMounted(() => {
         <router-link to="/" class="nav-link">History</router-link>
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
         <router-link to="/chat" class="nav-link">Chat</router-link>
-        <router-link to="/chat/history" class="nav-link">Chat History</router-link>
         <router-link to="/settings" class="nav-link">Settings</router-link>
       </div>
     </nav>
