@@ -13,6 +13,7 @@ interface Message {
 const messages = ref<Message[]>([])
 const input = ref('')
 const loading = ref(false)
+const sessionId = ref<string | null>(null)
 
 onMounted(() => {
     initNamespace()
@@ -32,6 +33,14 @@ const sendMessage = async () => {
   loading.value = true
   
   try {
+    if (!sessionId.value) {
+      const res = await fetch('/api/chat/history', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        sessionId.value = data._id
+      }
+    }
+
     const history = messages.value.slice(0, -1).map(m => ({
       role: m.role,
       content: m.content
@@ -73,6 +82,14 @@ const sendMessage = async () => {
     if (res.ok) {
       const data = await res.json()
       messages.value.push({ role: 'assistant', content: data.response })
+
+      if (sessionId.value) {
+        await fetch(`/api/chat/history/${sessionId.value}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: messages.value })
+        })
+      }
     } else {
       messages.value.push({ role: 'assistant', content: `Error: ${res.statusText}` })
     }

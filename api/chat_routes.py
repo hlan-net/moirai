@@ -8,6 +8,7 @@ import asyncio
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from .llm.factory import LLMProviderFactory
+from .db import fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb
 
 chat_blueprint = Blueprint('chat', __name__)
 
@@ -217,3 +218,55 @@ def chat():
 
     response = run_agent_sync(user_message, history, model, namespace, llm_endpoint, api_key, ollama_base_url)
     return jsonify({"response": response})
+
+@chat_blueprint.route("/chat/history", methods=["GET"])
+def list_chat_history():
+    history = fetch_from_couchdb("chat_history")
+    return jsonify(history)
+
+@chat_blueprint.route("/chat/history/<session_id>", methods=["GET"])
+def get_chat_session(session_id):
+    session = fetch_from_couchdb("chat_history", session_id)
+    if not session:
+        abort(404, description="Chat session not found")
+    return jsonify(session)
+
+@chat_blueprint.route("/chat/history", methods=["POST"])
+def create_chat_session():
+    session_id = str(uuid.uuid4())
+    session = {
+        "_id": session_id,
+        "messages": []
+    }
+    if update_couchdb_doc("chat_history", session_id, session):
+        return jsonify(session)
+    else:
+        abort(500, description="Failed to create chat session")
+
+@chat_blueprint.route("/chat/history/<session_id>", methods=["PUT"])
+def update_chat_session(session_id):
+    session = fetch_from_couchdb("chat_history", session_id)
+    if not session:
+        abort(404, description="Chat session not found")
+    
+    data = request.json
+    if "messages" not in data:
+        abort(400, description="Messages are required")
+        
+    session["messages"] = data["messages"]
+    
+    if update_couchdb_doc("chat_history", session_id, session):
+        return jsonify(session)
+    else:
+        abort(500, description="Failed to update chat session")
+
+@chat_blueprint.route("/chat/history/<session_id>", methods=["DELETE"])
+def delete_chat_session(session_id):
+    session = fetch_from_couchdb("chat_history", session_id)
+    if not session:
+        abort(404, description="Chat session not found")
+    
+    if delete_from_couchdb("chat_history", session_id, session["_rev"]):
+        return jsonify({"status": "deleted"})
+    else:
+        abort(500, description="Failed to delete chat session")
