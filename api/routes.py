@@ -6,8 +6,8 @@ from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
 
 api_blueprint = Blueprint('api', __name__)
 
-API_USERNAME = os.environ.get("API_USERNAME", "username")
-API_PASSWORD = os.environ.get("API_PASSWORD", "password")
+API_USERNAME = os.environ.get("API_USERNAME")
+API_PASSWORD = os.environ.get("API_PASSWORD")
 ALLOW_PUBLIC_READ_ENV = os.environ.get("ALLOW_PUBLIC_READ", "false").lower() == "true"
 ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
 

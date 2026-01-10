@@ -35,7 +35,7 @@ docker compose up --build
 - **Admin UI:** `http://localhost:8088`
 - **REST API:** `http://localhost:8088/api`
 - **MCP Server:** `http://localhost:8090/sse`
-- **Default Credentials:** `username` / `password` (Configurable via `API_USERNAME`/`API_PASSWORD` env vars).
+- **Credentials:** Configurable via `API_USERNAME`/`API_PASSWORD` env vars.
 
 ### 2. Run the MCP Server (Optional Local Run)
 The MCP server is already included in `docker compose up`. To run it manually (for local debugging outside Docker):

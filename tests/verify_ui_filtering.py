@@ -2,12 +2,16 @@ import asyncio
 import uuid
 import requests
 import json
+import os
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 async def verify_filtering():
     mcp_url = "http://localhost:8090/sse"
     api_url = "http://localhost:8088/api/events"
+    
+    username = os.environ.get("API_USERNAME", "username")
+    password = os.environ.get("API_PASSWORD", "password")
     
     ns1 = str(uuid.uuid4())
     ns2 = str(uuid.uuid4())
@@ -45,7 +49,7 @@ async def verify_filtering():
     print("\n--- Verifying API Filtering ---")
     
     # 1. Fetch NS1
-    res1 = requests.get(f"{api_url}?namespace={ns1}", auth=('username', 'password'))
+    res1 = requests.get(f"{api_url}?namespace={ns1}", auth=(username, password))
     if res1.status_code != 200:
         print(f"API Error: {res1.status_code} {res1.text}")
         return
@@ -58,7 +62,7 @@ async def verify_filtering():
         print(f"FAILURE: Expected 1 event for NS1, got {len(data1)}: {data1}")
 
     # 2. Fetch NS2
-    res2 = requests.get(f"{api_url}?namespace={ns2}", auth=('username', 'password'))
+    res2 = requests.get(f"{api_url}?namespace={ns2}", auth=(username, password))
     data2 = res2.json()
     print(f"NS2 Events Count: {len(data2)}")
     if len(data2) == 1 and data2[0]['namespace'] == ns2:
@@ -68,7 +72,7 @@ async def verify_filtering():
 
     # 3. Fetch All (or at least check it returns multiple)
     # Note: Fetching all might be large, but we check if it contains both
-    res_all = requests.get(api_url, auth=('username', 'password'))
+    res_all = requests.get(api_url, auth=(username, password))
     data_all = res_all.json()
     ids = [e.get('_id') for e in data_all]
     

@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP, Context
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
 
 # Database Configuration
-COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://admin:password@localhost:5984/")
+COUCHDB_URI = os.environ.get("COUCHDB_URI")
 if not COUCHDB_URI.endswith("/"):
     COUCHDB_URI += "/"
 
@@ -166,8 +166,8 @@ def refresh_all_feeds() -> str:
         # We need to get the creds or inject them.
         # Let's assume standard default or what's in the code for now.
         # I will update docker-compose in a moment to ensure they are passed.
-        username = os.environ.get("API_USERNAME", "username")
-        password = os.environ.get("API_PASSWORD", "password")
+        username = os.environ.get("API_USERNAME")
+        password = os.environ.get("API_PASSWORD")
         
         res = requests.post(api_url, auth=(username, password), timeout=5)
         if res.status_code == 200:
@@ -179,7 +179,7 @@ def refresh_all_feeds() -> str:
         # Fallback for local testing if 'moirai' host isn't found
         if "Name or service not known" in str(e) or "Connection refused" in str(e):
              try:
-                 res = requests.post("http://localhost:8088/api/feeds/refresh", auth=("username", "password"), timeout=5)
+                 res = requests.post("http://localhost:8088/api/feeds/refresh", auth=(username, password), timeout=5)
                  if res.status_code == 200:
                     data = res.json()
                     return f"Refresh triggered (Local). Started fetching {data.get('count')} feeds."

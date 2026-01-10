@@ -1,12 +1,16 @@
 import requests
 import sys
+import os
 
 def verify_namespaces():
     url = "http://localhost:8088/api/namespaces"
     print(f"Fetching namespaces from {url}...")
     
+    username = os.environ.get("API_USERNAME", "username")
+    password = os.environ.get("API_PASSWORD", "password")
+    
     try:
-        res = requests.get(url, auth=('username', 'password'))
+        res = requests.get(url, auth=(username, password))
         if res.status_code == 200:
             namespaces = res.json()
             print(f"Namespaces found: {len(namespaces)}")

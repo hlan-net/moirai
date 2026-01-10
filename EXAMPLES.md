@@ -4,21 +4,21 @@ This guide provides practical examples for interacting with Moirai's API and MCP
 
 ## 1. Manual API Testing (Administrative)
 
-The Flask API (port 8088) requires **HTTP Basic Auth**. Default credentials are `username:password`.
+The Flask API (port 8088) requires **HTTP Basic Auth**.
 
 ### List Feeds
 ```bash
-curl -u username:password http://localhost:8088/api/feeds
+curl -u <YOUR_USERNAME>:<YOUR_PASSWORD> http://localhost:8088/api/feeds
 ```
 
 ### Delete an Article
 ```bash
-curl -X DELETE -u username:password http://localhost:8088/api/articles/<ARTICLE_ID>
+curl -X DELETE -u <YOUR_USERNAME>:<YOUR_PASSWORD> http://localhost:8088/api/articles/<ARTICLE_ID>
 ```
 
 ### Remove a Link from an Event
 ```bash
-curl -X DELETE -u username:password \
+curl -X DELETE -u <YOUR_USERNAME>:<YOUR_PASSWORD> \
      -H "Content-Type: application/json" \
      -d '{"link": "https://example.com/noisy-article"}' \
      http://localhost:8088/api/events/<EVENT_ID>/links
@@ -86,9 +86,9 @@ yarnpkg playwright test
 ### CouchDB System Databases
 If CouchDB logs errors about `_users` not existing on a fresh install:
 ```bash
-curl -X PUT http://admin:password@localhost:5984/_users
-curl -X PUT http://admin:password@localhost:5984/_replicator
-curl -X PUT http://admin:password@localhost:5984/_global_changes
+curl -X PUT http://<YOUR_USERNAME>:<YOUR_PASSWORD>@localhost:5984/_users
+curl -X PUT http://<YOUR_USERNAME>:<YOUR_PASSWORD>@localhost:5984/_replicator
+curl -X PUT http://<YOUR_USERNAME>:<YOUR_PASSWORD>@localhost:5984/_global_changes
 ```
 
 ### Docker Logs
