@@ -8,8 +8,12 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.CI ? 'http://localhost:8088' : 'http://localhost:5173',
     trace: 'on-first-retry',
+    httpCredentials: process.env.CI ? {
+      username: 'testuser',
+      password: 'testpassword',
+    } : undefined,
   },
   projects: [
     {
@@ -17,7 +21,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
+  webServer: process.env.CI ? undefined : {
     command: 'yarnpkg dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
