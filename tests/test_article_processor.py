@@ -1,11 +1,14 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from tasks.article_processor import ArticleProcessor
 
 class TestArticleProcessor(unittest.TestCase):
     def test_process_feed(self):
         # Mock feed content
-        feed_content = """
+        now = datetime.now(timezone.utc)
+        pub_date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        
+        feed_content = f"""
         <rss version="2.0">
             <channel>
                 <title>Test Feed</title>
@@ -13,14 +16,14 @@ class TestArticleProcessor(unittest.TestCase):
                     <title>Test Article</title>
                     <link>http://example.com/article</link>
                     <description>This is a summary.</description>
-                    <pubDate>Fri, 26 Dec 2025 12:00:00 GMT</pubDate>
+                    <pubDate>{pub_date}</pubDate>
                 </item>
             </channel>
         </rss>
         """
         
         processor = ArticleProcessor()
-        articles = processor.process_feed("http://example.com/feed", feed_content)
+        feed_title, articles = processor.process_feed("http://example.com/feed", feed_content)
         
         self.assertEqual(len(articles), 1)
         self.assertEqual(articles[0]['title'], "Test Article")

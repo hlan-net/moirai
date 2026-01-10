@@ -9,9 +9,8 @@ def verify_namespaces():
     username = os.environ.get("API_USERNAME")
     password = os.environ.get("API_PASSWORD")
     
-    if not username or not password:
-        print("API_USERNAME and API_PASSWORD environment variables must be set")
-        sys.exit(1)
+    assert username, "API_USERNAME environment variable must be set"
+    assert password, "API_PASSWORD environment variable must be set"
     
     try:
         res = requests.get(url, auth=(username, password))
