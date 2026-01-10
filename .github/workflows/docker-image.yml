@@ -48,6 +48,9 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Start backend services
+        env:
+          API_USERNAME: testuser
+          API_PASSWORD: testpassword
         run: docker compose up -d
 
       - name: Wait for services to be ready
