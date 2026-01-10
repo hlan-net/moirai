@@ -13,7 +13,7 @@ const openaiApiKey = ref('')
 const openaiModelName = ref('gpt-4-turbo')
 const availableOpenAiModels = ref<string[]>([])
 const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
-const collapsedSections = ref<Set<string>>(new Set(['about', 'general', 'ollama', 'openai']))
+const collapsedSections = ref<Set<string>>(new Set(['general', 'ollama', 'openai']))
 
 const { theme, setTheme } = useTheme()
 
@@ -153,11 +153,8 @@ onMounted(() => {
     <h1>Settings</h1>
     
     <div class="settings-section">
-      <h2 @click="toggleSection('about')">
-        About Moirai
-        <span class="toggle-icon">{{ collapsedSections.has('about') ? '▶' : '▼' }}</span>
-      </h2>
-      <div v-if="!collapsedSections.has('about')">
+      <h2>About Moirai</h2>
+      <div>
         <p><strong>Version:</strong> {{ appVersion }}</p>
         <p>Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).</p>
       </div>
