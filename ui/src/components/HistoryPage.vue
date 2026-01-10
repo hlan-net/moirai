@@ -11,6 +11,11 @@ interface Article {
   feed_title?: string;
 }
 
+interface ArticleGroup {
+  title: string;
+  articles: Article[];
+}
+
 const articles = ref<Article[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
@@ -18,14 +23,31 @@ const expandedArticles = ref<Set<string>>(new Set())
 let intervalId: number | undefined
 
 const groupedArticles = computed(() => {
-  const groups: Record<string, Article[]> = {}
-  for (const article of articles.value) {
-    const key = article.feed_title || getHostname(article.feed_url)
-    if (!groups[key]) {
-      groups[key] = []
-    }
-    groups[key].push(article)
+  if (articles.value.length === 0) {
+    return []
   }
+
+  const groups: ArticleGroup[] = []
+  let currentGroup: ArticleGroup = {
+    title: articles.value[0].feed_title || getHostname(articles.value[0].feed_url),
+    articles: [articles.value[0]]
+  }
+
+  for (let i = 1; i < articles.value.length; i++) {
+    const article = articles.value[i]
+    const articleFeedTitle = article.feed_title || getHostname(article.feed_url)
+    if (articleFeedTitle === currentGroup.title) {
+      currentGroup.articles.push(article)
+    } else {
+      groups.push(currentGroup)
+      currentGroup = {
+        title: articleFeedTitle,
+        articles: [article]
+      }
+    }
+  }
+  groups.push(currentGroup)
+
   return groups
 })
 
@@ -103,9 +125,9 @@ const toggleExpand = (id: string) => {
     <div v-if="loading" class="loading">Loading stream...</div>
     
     <div v-else-if="articles.length" class="stream-container">
-      <div v-for="(articleGroup, groupName) in groupedArticles" :key="groupName" class="feed-group">
-        <h3 class="group-title">{{ groupName }}</h3>
-        <div v-for="article in articleGroup" :key="article._id" class="stream-item">
+      <div v-for="(group, index) in groupedArticles" :key="index" class="feed-group">
+        <h3 class="group-title">{{ group.title }}</h3>
+        <div v-for="article in group.articles" :key="article._id" class="stream-item">
           <div class="item-meta">
               <span class="date">{{ formatDate(article.published) }}</span>
           </div>
@@ -131,6 +153,7 @@ const toggleExpand = (id: string) => {
             </span>
           </div>
         </div>
+        <hr v-if="index < groupedArticles.length - 1" class="group-divider">
       </div>
     </div>
     
@@ -202,28 +225,20 @@ const toggleExpand = (id: string) => {
 }
 
 .feed-group {
-  margin-bottom: 40px;
+  margin-bottom: 20px;
 }
 
 .group-title {
   font-size: 1.5rem;
   color: var(--primary-color);
-  border-bottom: 2px solid var(--primary-color);
   padding-bottom: 10px;
   margin-bottom: 20px;
 }
 
 .stream-item {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-    transition: box-shadow 0.2s;
-}
-
-.stream-item:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    padding: 10px 0;
+    margin-bottom: 10px;
 }
 
 .item-meta {
@@ -275,6 +290,12 @@ const toggleExpand = (id: string) => {
 
 .read-more-btn:hover {
   text-decoration: underline;
+}
+
+.group-divider {
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  margin: 20px 0;
 }
 
 .loading, .empty-state {
