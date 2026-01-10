@@ -32,7 +32,11 @@ const sendMessage = async () => {
       content: m.content
     }))
     
-    const model = localStorage.getItem('moirai_model') || 'llama3.1:latest'
+    const llmEndpoint = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
+    let model = localStorage.getItem('moirai_model') || 'llama3.1:latest'
+    if (llmEndpoint === 'openai') {
+      model = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
+    }
 
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -41,7 +45,8 @@ const sendMessage = async () => {
           message: userMsg, 
           history, 
           model,
-          namespace: currentNamespace.value
+          namespace: currentNamespace.value,
+          llm_endpoint: llmEndpoint
       })
     })
     

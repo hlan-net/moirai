@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useTheme, type Theme } from '../composables/useTheme'
 
 const appVersion = ref('0.1.0-alpha')
@@ -8,18 +8,33 @@ const availableModels = ref<string[]>([])
 const loadingModels = ref(false)
 const allowPublicRead = ref(false)
 const iterationInterval = ref(600)
+const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
+const openaiApiKey = ref('')
+const openaiModelName = ref('gpt-4-turbo')
+const availableOpenAiModels = ref<string[]>([])
 
 const { theme, setTheme } = useTheme()
 
+watch(llmEndpoint, (newEndpoint) => {
+  if (newEndpoint === 'openai' && availableOpenAiModels.value.length === 0) {
+    fetchOpenAiModels()
+  } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
+    fetchOllamaModels()
+  }
+})
+
 const saveSettings = async () => {
   localStorage.setItem('moirai_model', modelName.value)
-  
+  localStorage.setItem('moirai_llm_endpoint', llmEndpoint.value)
+  localStorage.setItem('moirai_openai_api_key', openaiApiKey.value)
+  localStorage.setItem('moirai_openai_model', openaiModelName.value)
+
   // Save server config
   try {
       const res = await fetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
               allow_public_read: allowPublicRead.value,
               iteration_interval: iterationInterval.value
           })
@@ -36,12 +51,26 @@ const saveSettings = async () => {
   alert('Settings saved!')
 }
 
-const fetchModels = async () => {
+const fetchOllamaModels = async () => {
   loadingModels.value = true
   try {
     const res = await fetch('/api/models')
     if (res.ok) {
       availableModels.value = await res.json()
+    }
+  } catch (e) {
+    console.error('Error fetching models:', e)
+  } finally {
+    loadingModels.value = false
+  }
+}
+
+const fetchOpenAiModels = async () => {
+  loadingModels.value = true
+  try {
+    const res = await fetch('/api/models?llm_endpoint=openai')
+    if (res.ok) {
+      availableOpenAiModels.value = await res.json()
     }
   } catch (e) {
     console.error('Error fetching models:', e)
@@ -68,7 +97,24 @@ onMounted(() => {
   if (saved) {
     modelName.value = saved
   }
-  fetchModels()
+  const savedEndpoint = localStorage.getItem('moirai_llm_endpoint')
+  if (savedEndpoint) {
+    llmEndpoint.value = savedEndpoint
+  }
+  const savedApiKey = localStorage.getItem('moirai_openai_api_key')
+  if (savedApiKey) {
+    openaiApiKey.value = savedApiKey
+  }
+  const savedOpenaiModel = localStorage.getItem('moirai_openai_model')
+  if (savedOpenaiModel) {
+    openaiModelName.value = savedOpenaiModel
+  }
+
+  if (llmEndpoint.value === 'ollama') {
+    fetchOllamaModels()
+  } else {
+    fetchOpenAiModels()
+  }
   fetchConfig()
 })
 </script>
@@ -110,19 +156,54 @@ onMounted(() => {
       </div>
 
       <div class="form-group">
-        <label for="model">LLM Model Name (Ollama):</label>
-        
-        <select v-if="availableModels.length" id="model" v-model="modelName">
-           <option v-for="model in availableModels" :key="model" :value="model">
-             {{ model }}
-           </option>
-        </select>
-        <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" />
-
-        <small v-if="loadingModels">Loading available models...</small>
-        <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
-        <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>
+        <label>LLM Endpoint:</label>
+        <div class="radio-group">
+          <label>
+            <input type="radio" value="ollama" v-model="llmEndpoint">
+            Ollama
+          </label>
+          <label>
+            <input type="radio" value="openai" v-model="llmEndpoint">
+            OpenAI
+          </label>
+        </div>
       </div>
+
+      <div v-if="llmEndpoint === 'ollama'">
+        <div class="form-group">
+          <label for="model">LLM Model Name (Ollama):</label>
+          
+          <select v-if="availableModels.length" id="model" v-model="modelName">
+            <option v-for="model in availableModels" :key="model" :value="model">
+              {{ model }}
+            </option>
+          </select>
+          <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" />
+
+          <small v-if="loadingModels">Loading available models...</small>
+          <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
+          <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>
+        </div>
+      </div>
+
+      <div v-if="llmEndpoint === 'openai'">
+        <div class="form-group">
+          <label for="openai-api-key">OpenAI API Key:</label>
+          <input type="password" id="openai-api-key" v-model="openaiApiKey" />
+        </div>
+        <div class="form-group">
+          <label for="openai-model">OpenAI Model Name:</label>
+          <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName">
+            <option v-for="model in availableOpenAiModels" :key="model" :value="model">
+              {{ model }}
+            </option>
+          </select>
+          <input v-else id="openai-model" v-model="openaiModelName" placeholder="e.g. gpt-4-turbo" />
+          <small v-if="loadingModels">Loading available models...</small>
+        </div>
+      </div>
+
+
       <button @click="saveSettings">Save</button>
     </div>
   </div>
@@ -184,6 +265,16 @@ h2 {
   color: var(--text-color);
   opacity: 0.7;
 }
+
+.radio-group {
+  display: flex;
+  gap: 15px;
+}
+
+.radio-group label {
+  font-weight: normal;
+}
+
 button {
   background: var(--primary-color);
   color: white;
