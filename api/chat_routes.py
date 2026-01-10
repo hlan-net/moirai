@@ -7,14 +7,16 @@ import json
 import asyncio
 from mcp import ClientSession
 from mcp.client.sse import sse_client
-from .llm.factory import get_llm_provider
+from .llm.factory import LLMProviderFactory
 
 chat_blueprint = Blueprint('chat', __name__)
 
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8090/sse")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "http://host.docker.internal:11434/v1")
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
+
+llm_provider_factory = LLMProviderFactory(ollama_base_url=OLLAMA_BASE_URL)
 
 def extract_tool_calls_from_content(content):
     if not content: return []
@@ -63,7 +65,7 @@ async def run_agent(user_message, history, model=None, namespace=None, llm_endpo
             
     messages.append({"role": "user", "content": user_message})
 
-    llm_provider = get_llm_provider(llm_endpoint, api_key or OPENAI_API_KEY, OPENAI_BASE_URL)
+    llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key or OPENAI_API_KEY)
     
     target_model = model or MODEL_NAME
 
@@ -193,7 +195,7 @@ async def run_agent(user_message, history, model=None, namespace=None, llm_endpo
 def list_models():
     llm_endpoint = request.args.get('llm_endpoint')
     api_key = request.headers.get('x-openai-api-key')
-    llm_provider = get_llm_provider(llm_endpoint, api_key or OPENAI_API_KEY, OPENAI_BASE_URL)
+    llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key)
     try:
         model_names = llm_provider.list_models()
         return jsonify(model_names)

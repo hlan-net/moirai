@@ -38,9 +38,19 @@ const sendMessage = async () => {
       model = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
     }
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (llmEndpoint === 'openai') {
+      const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
+      if (openaiApiKey) {
+        headers['x-openai-api-key'] = openaiApiKey
+      }
+    }
+
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ 
           message: userMsg, 
           history, 
