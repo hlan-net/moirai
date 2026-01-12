@@ -20,7 +20,7 @@ ingress:
   # -- Enable ingress
   enabled: true
   # -- Ingress host
-  host: moirai.example.com
+  host: moirai.hlan.net
   # -- Ingress annotations
   annotations: {}
   # -- Ingress TLS configuration
