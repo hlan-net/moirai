@@ -5,7 +5,7 @@ import random
 import threading
 import time
 import requests
-from urllib.parse import quote_plus
+from urllib.parse import quote
 from datetime import datetime
 from .article_processor import ArticleProcessor
 
@@ -22,7 +22,7 @@ class FetchFeedTask(threading.Thread):
                 scheme, host = uri.split("://", 1)
             else:
                 scheme, host = "http", uri
-            uri = f"{scheme}://{quote_plus(user)}:{quote_plus(password)}@{host}"
+            uri = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
 
         base_url = uri + "/"
         self.registry_url = base_url + "feeds"

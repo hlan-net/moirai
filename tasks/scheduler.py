@@ -3,7 +3,7 @@ import threading
 import time
 import requests
 import json
-from urllib.parse import quote_plus
+from urllib.parse import quote
 from .fetch_feed_task import FetchFeedTask
 
 def get_dynamic_interval(default_interval):
@@ -15,7 +15,7 @@ def get_dynamic_interval(default_interval):
             scheme, host = uri.split("://", 1)
         else:
             scheme, host = "http", uri
-        uri = f"{scheme}://{quote_plus(user)}:{quote_plus(password)}@{host}"
+        uri = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
     
     db_url = uri + "/"
     try:
