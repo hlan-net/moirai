@@ -90,6 +90,10 @@ spec:
         - name: {{ include "moirai.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.moirai.command }}
+          command:
+{{ toYaml . | indent 12 }}
+          {{- end }}
           ports:
             - containerPort: {{ .Values.service.targetPort }}
           readinessProbe:
@@ -154,6 +158,8 @@ spec:
               secretKeyRef:
                 name: {{ .Release.Name }}-couchdb
                 key: cookieAuthSecret
+          - name: ENABLE_PROD_STARTUP
+            value: {{ .Values.moirai.enableProdStartup | quote }}
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds

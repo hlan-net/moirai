@@ -91,6 +91,18 @@ couchdb:
 moirai:
   apiUsername: ""
   apiPassword: ""
+  # -- Command to run the application (overrides Dockerfile CMD)
+  command:
+    - uvicorn
+    - main:app
+    - --interface
+    - wsgi
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8088"
+  # -- Enable production startup logic (scheduler, init)
+  enableProdStartup: "true"
 
 # -- OpenAI API key
 openai:
