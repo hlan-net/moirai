@@ -338,4 +338,4 @@ app = mcp.sse_app
 if __name__ == "__main__":
     # Run the server using SSE transport on port 8090
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8090)
+    uvicorn.run("mcp_server:app", host="0.0.0.0", port=8090, reload=False)
