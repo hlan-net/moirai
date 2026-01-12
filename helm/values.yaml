@@ -9,7 +9,7 @@ allowPublicRead: false
 # -- Image configuration
 image:
   # -- Image repository
-  repository: slorba/moirai
+  repository: ghcr.io/hlan-net/moirai
   # -- Image tag
   tag: "latest"
   # -- Image pull policy

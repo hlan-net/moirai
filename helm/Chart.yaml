@@ -4,10 +4,10 @@ description: A Helm chart for the Morai - GenAI Press Review service
 type: application
 version: 0.2.3
 appVersion: "1.0.0"
-home: https://github.com/slorba/moirai
-icon: https://raw.githubusercontent.com/slorba/moirai/main/ui/public/favicon.ico
+home: https://github.com/hlan-net/moirai
+icon: https://raw.githubusercontent.com/hlan-net/moirai/main/ui/public/favicon.ico
 sources:
-  - https://github.com/slorba/moirai
+  - https://github.com/hlan-net/moirai
 
 # Define the dependencies for this chart
 dependencies:
