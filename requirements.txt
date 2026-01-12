@@ -7,4 +7,5 @@ beautifulsoup4
 python-dateutil
 pytest
 mcp[cli]
-openaiuvicorn
+openai
+uvicorn
