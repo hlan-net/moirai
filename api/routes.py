@@ -56,12 +56,20 @@ def get_iteration_interval_setting():
             pass
     return ITERATION_INTERVAL_ENV
 
+@api_blueprint.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy"})
+
 # Apply auth to all routes in this blueprint
 @api_blueprint.before_request
 def before_request_auth():
     if request.method == "OPTIONS":
         return # Allow CORS preflight if needed
     
+    # Allow health check without auth
+    if request.endpoint == "api.health_check":
+        return None
+
     # Optional public read access for articles and feeds only
     if request.method == "GET" and request.endpoint in ["api.list_articles", "api.list_feeds"]:
          if get_public_read_setting():
