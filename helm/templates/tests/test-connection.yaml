@@ -2,18 +2,20 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ .Release.Name }}-test-connection"
+  name: "{{ include "moirai.fullname" . }}-test-connection"
   labels:
-    {{- include "common.labels" . | nindent 4 }}
-    helm.sh/hook: test
+    {{- include "moirai.labels" . | nindent 4 }}
   annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-weight": "-5"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook": test-success
+    "helm.sh/hook-weight": "0"
 spec:
+  initContainers:
+    - name: wait-for-service
+      image: busybox
+      command: ['sh', '-c', 'until nc -z -v -w30 {{ include "moirai.fullname" . }} {{ .Values.service.port }}; do echo "Waiting for service..."; sleep 5; done']
   containers:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ .Release.Name }}-{{ .Values.service.name }}:{{ .Values.service.port }}']
+      args: ['{{ include "moirai.fullname" . }}:{{ .Values.service.port }}']
   restartPolicy: Never

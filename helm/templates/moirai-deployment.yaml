@@ -1,20 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "{{ .Release.Name }}-{{ .Values.deployment.name }}"
+  name: {{ include "moirai.fullname" . }}
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.deployment.replicas }}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: "{{ .Release.Name }}-{{ .Values.app.name }}"
+      {{- include "moirai.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: "{{ .Release.Name }}-{{ .Values.app.name }}"
-        {{- include "common.labels" . | nindent 8 }}
-        app.kubernetes.io/component: moirai
+        {{- include "moirai.selectorLabels" . | nindent 8 }}
+
     spec:
-      serviceAccountName: {{ .Release.Name }}-{{ .Values.service.name }}
+      serviceAccountName: {{ include "moirai.serviceAccountName" . }}
       {{- if .Values.securityContext }}
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}
@@ -30,9 +31,15 @@ spec:
           - name: OPEN_WEBUI_ENDPOINT
             value: {{ .Values.openWebui.endpoint | quote }}
           - name: COUCHDB_USER
-            value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminUsername ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminUsername | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminUsername | default "admin" -}}{{- end }}"
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb-secret
+                key: adminUsername
           - name: COUCHDB_PASSWORD
-            value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminPassword ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminPassword | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminPassword | default "adminPass" -}}{{- end }}"
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb-secret
+                key: adminPassword
           - name: COUCHDB_URI
             value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@{{ .Release.Name }}-{{ .Values.couchdb.name }}-headless:5984/"
           - name: HTTP_PORT
@@ -80,10 +87,30 @@ spec:
               cluster_status=$(curl -s -u "$COUCHDB_USER:$COUCHDB_PASSWORD" http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/_membership)
               echo "CouchDB Cluster Status: $cluster_status"
       containers:
-        - name: "{{ .Release.Name }}-{{ .Values.app.name }}"
+        - name: {{ include "moirai.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.service.targetPort }}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           env:
           - name: ENVIRONMENT
             value: {{ .Values.environment | quote }}
@@ -92,9 +119,15 @@ spec:
           - name: OPEN_WEBUI_ENDPOINT
             value: {{ .Values.openWebui.endpoint | quote }}
           - name: COUCHDB_USER
-            value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminUsername ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminUsername | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminUsername | default "admin" -}}{{- end }}"
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb-secret
+                key: adminUsername
           - name: COUCHDB_PASSWORD
-            value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminPassword ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminPassword | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminPassword | default "adminPass" -}}{{- end }}"
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb-secret
+                key: adminPassword
           - name: COUCHDB_URI
             value: "http://$COUCHDB_USER:$COUCHDB_PASSWORD@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
           - name: HTTP_PORT
@@ -102,17 +135,29 @@ spec:
           - name: ALLOW_PUBLIC_READ
             value: {{ .Values.allowPublicRead | quote }}
           - name: OPENAI_API_KEY
-            value: {{ .Values.openai.apiKey | quote }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-openai-secret
+                key: apiKey
           - name: API_USERNAME
-            value: {{ .Values.moirai.apiUsername | quote }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: apiUsername
           - name: API_PASSWORD
-            value: {{ .Values.moirai.apiPassword | quote }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: apiPassword
           - name: COUCHDB_SECRET
-            value: {{ .Values.couchdb.cookieAuthSecret | quote }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb-secret
+                key: cookieAuthSecret
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
       volumes:
         - name: feeds-volume
           configMap:
-            name: feed-lists
+            name: {{ include "moirai.fullname" . }}-feed-lists
