@@ -13,7 +13,7 @@ image:
   # -- Image tag
   tag: "latest"
   # -- Image pull policy
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 # -- Ingress configuration
 ingress:
