@@ -62,10 +62,7 @@ def before_request_auth():
     if request.method == "OPTIONS":
         return # Allow CORS preflight if needed
     
-    # Optional public read access
-    if request.method == "GET" and request.endpoint == "api.get_config":
-         return None
-
+    # Optional public read access for articles and feeds only
     if request.method == "GET" and request.endpoint in ["api.list_articles", "api.list_feeds"]:
          if get_public_read_setting():
              return None
