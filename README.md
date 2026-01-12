@@ -58,6 +58,23 @@ A built-in Chat interface allows you to interact with an Agent that has access t
   - Ensure you have pulled the model (e.g., `ollama pull llama3.1`).
 
 > **Helm users:** the chart now deploys both the admin API/UI and the MCP SSE server when `mcpServer.enabled` (default). Disable or customize it by overriding the `mcpServer` block in `values.yaml`.
+
+### 4. Deploying with Helm
+
+You can install the chart directly from our OCI registry:
+
+```bash
+helm install moirai oci://ghcr.io/hlan-net/charts/moirai --version 0.2.23
+```
+
+Or add dependencies manually if building locally:
+
+```bash
+helm repo add couchdb https://apache.github.io/couchdb-helm
+helm dependency update helm/
+helm install moirai helm/
+```
+
 - **Isolation:** All data tools require a `namespace` (GUID).
 
 ## Agent Synthesis Flow
