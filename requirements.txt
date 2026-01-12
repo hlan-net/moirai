@@ -8,3 +8,7 @@ python-dateutil
 pytest
 mcp[cli]
 openai
+flask-limiter
+pydantic
+validators
+bleach
