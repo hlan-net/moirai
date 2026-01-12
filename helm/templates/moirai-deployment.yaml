@@ -11,6 +11,11 @@ spec:
       {{- include "moirai.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/couchdb-secret: {{ include (print $.Template.BasePath "/couchdb-secret.yaml") . | sha256sum }}
+        checksum/moirai-secret: {{ include (print $.Template.BasePath "/moirai-secret.yaml") . | sha256sum }}
+        checksum/openai-secret: {{ include (print $.Template.BasePath "/openai-secret.yaml") . | sha256sum }}
+        checksum/feed-configmap: {{ include (print $.Template.BasePath "/feed-list-configmap.yaml") . | sha256sum }}
       labels:
         {{- include "moirai.selectorLabels" . | nindent 8 }}
 

@@ -14,6 +14,9 @@ spec:
       app.kubernetes.io/component: mcp-server
   template:
     metadata:
+      annotations:
+        checksum/couchdb-secret: {{ include (print $.Template.BasePath "/couchdb-secret.yaml") . | sha256sum }}
+        checksum/moirai-secret: {{ include (print $.Template.BasePath "/moirai-secret.yaml") . | sha256sum }}
       labels:
         {{- include "moirai.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mcp-server
