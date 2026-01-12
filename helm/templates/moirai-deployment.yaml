@@ -171,6 +171,8 @@ spec:
                 key: cookieAuthSecret
           - name: ENABLE_PROD_STARTUP
             value: {{ .Values.moirai.enableProdStartup | quote }}
+          - name: MCP_SERVER_URL
+            value: "http://{{ include "moirai.fullname" . }}-mcp-server:{{ .Values.mcpServer.service.port }}/sse"
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
