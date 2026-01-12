@@ -33,7 +33,7 @@ service:
   # -- Service port
   port: 8088
   # -- Service target port
-  targetPort: 8080
+  targetPort: 8088
 
 # -- MCP server configuration
 mcpServer:
