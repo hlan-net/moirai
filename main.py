@@ -39,8 +39,12 @@ app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
 app.register_blueprint(chat_blueprint, url_prefix='/api')
 
 if __name__ == "__main__":
+    # Force unbuffered output
+    import sys
+    sys.stdout.reconfigure(line_buffering=True)
+    
     # Initialise
-    print("Moirai starting...")
+    print("Moirai starting...", flush=True)
     init.run()
     print("Moirai initialised.")
     
