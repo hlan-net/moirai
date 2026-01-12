@@ -42,7 +42,7 @@ mcpServer:
   # -- MCP server command
   command:
     - python
-    - mcp_server.py
+    - /app/mcp_server.py
   # -- MCP server service configuration
   service:
     # -- MCP server service type
