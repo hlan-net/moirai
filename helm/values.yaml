@@ -41,9 +41,12 @@ mcpServer:
   enabled: true
   # -- MCP server command
   command:
-    - sh
-    - -c
-    - python /app/mcp_server.py
+    - uvicorn
+    - mcp_server:app
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8090"
   # -- MCP server service configuration
   service:
     # -- MCP server service type
