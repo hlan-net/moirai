@@ -41,7 +41,7 @@ spec:
                 name: {{ .Release.Name }}-couchdb
                 key: adminPassword
           - name: COUCHDB_URI
-            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
+            value: "http://$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
           - name: HTTP_PORT
             value: {{ .Values.service.targetPort | quote }}
           
@@ -129,7 +129,7 @@ spec:
                 name: {{ .Release.Name }}-couchdb
                 key: adminPassword
           - name: COUCHDB_URI
-            value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
+            value: "http://$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
           - name: HTTP_PORT
             value: {{ .Values.service.targetPort | quote }}
           - name: ALLOW_PUBLIC_READ

@@ -3,10 +3,21 @@ import threading
 import time
 import requests
 import json
+from urllib.parse import quote_plus
 from .fetch_feed_task import FetchFeedTask
 
 def get_dynamic_interval(default_interval):
-    db_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
+    uri = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
+    user = os.environ.get("COUCHDB_USER")
+    password = os.environ.get("COUCHDB_PASSWORD")
+    if user and password and "@" not in uri:
+        if "://" in uri:
+            scheme, host = uri.split("://", 1)
+        else:
+            scheme, host = "http", uri
+        uri = f"{scheme}://{quote_plus(user)}:{quote_plus(password)}@{host}"
+    
+    db_url = uri + "/"
     try:
         res = requests.get(f"{db_url}config/main", timeout=2)
         if res.status_code == 200:

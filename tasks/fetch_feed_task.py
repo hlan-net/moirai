@@ -5,6 +5,7 @@ import random
 import threading
 import time
 import requests
+from urllib.parse import quote_plus
 from datetime import datetime
 from .article_processor import ArticleProcessor
 
@@ -13,7 +14,17 @@ class FetchFeedTask(threading.Thread):
         threading.Thread.__init__(self)
         self.url = url
         # Use the COUCHDB_URI environment variable if available
-        base_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/")
+        uri = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
+        user = os.environ.get("COUCHDB_USER")
+        password = os.environ.get("COUCHDB_PASSWORD")
+        if user and password and "@" not in uri:
+            if "://" in uri:
+                scheme, host = uri.split("://", 1)
+            else:
+                scheme, host = "http", uri
+            uri = f"{scheme}://{quote_plus(user)}:{quote_plus(password)}@{host}"
+
+        base_url = uri + "/"
         self.registry_url = base_url + "feeds"
         self.content_url = base_url + "feed_content"
         self.user_agent = "MoiraiBot/1.0 (+https://github.com/hlan-net/moirai)"

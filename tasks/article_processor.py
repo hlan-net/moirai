@@ -3,11 +3,22 @@ import hashlib
 import json
 import os
 import requests
+from urllib.parse import quote_plus
 from datetime import datetime, timedelta
 
 class ArticleProcessor:
     def __init__(self):
-        self.couchdb_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/") + "articles"
+        uri = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
+        user = os.environ.get("COUCHDB_USER")
+        password = os.environ.get("COUCHDB_PASSWORD")
+        if user and password and "@" not in uri:
+            if "://" in uri:
+                scheme, host = uri.split("://", 1)
+            else:
+                scheme, host = "http", uri
+            uri = f"{scheme}://{quote_plus(user)}:{quote_plus(password)}@{host}"
+        
+        self.couchdb_url = uri + "/articles"
         self.expiration_days = int(os.environ.get("ARTICLE_EXPIRATION_DAYS", 30))
 
     def process_feed(self, feed_url, feed_content):
