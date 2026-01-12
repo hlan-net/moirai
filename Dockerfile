@@ -44,4 +44,4 @@ COPY --from=build-stage /app/dist/ ./ui/dist/
 EXPOSE 8088
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "python mcp_server.py & exec python main.py"]

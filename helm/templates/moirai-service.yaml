@@ -1,23 +1,22 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.service.name }}
+  name: {{ include "moirai.serviceAccountName" . }}
   labels:
-    {{- include "common.labels" . | nindent 4 }}
+    {{- include "moirai.labels" . | nindent 4 }}
 
 ---
 
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.service.name }}
+  name: {{ include "moirai.fullname" . }}
   labels:
-    app: {{ .Release.Name }}-{{ .Values.app.name }}
-    {{- include "common.labels" . | nindent 4 }}
-    app.kubernetes.io/component: moirai
+    {{- include "moirai.labels" . | nindent 4 }}
 spec:
+  type: {{ .Values.service.type }}
   selector:
-    app: {{ .Release.Name }}-{{ .Values.app.name }}
+    {{- include "moirai.selectorLabels" . | nindent 4 }}
   ports:
     - protocol: TCP
       port: {{ .Values.service.port }}

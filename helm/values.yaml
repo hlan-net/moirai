@@ -1,57 +1,77 @@
 # Default values for GenAI Press Review service
+
+# -- Number of replicas to deploy
 replicaCount: 1
+
+# -- Allow public read access to the API
 allowPublicRead: false
+
+# -- Image configuration
 image:
+  # -- Image repository
   repository: slorba/moirai
+  # -- Image tag
   tag: "latest"
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
 
+# -- Ingress configuration
 ingress:
-  host: moirai.example.com 
+  # -- Enable ingress
+  enabled: true
+  # -- Ingress host
+  host: moirai.example.com
+  # -- Ingress annotations
+  annotations: {}
+  # -- Ingress TLS configuration
+  tls: []
 
+# -- Service configuration
 service:
-  name: moirai-service
+  # -- Service type
+  type: ClusterIP
+  # -- Service port
   port: 8088
+  # -- Service target port
   targetPort: 8080
 
+# -- MCP server configuration
 mcpServer:
+  # -- Enable MCP server
   enabled: true
-  name: mcp-server
-  replicas: 1
+  # -- MCP server command
   command:
     - python
     - mcp_server.py
+  # -- MCP server service configuration
   service:
-    name: mcp-server
+    # -- MCP server service type
+    type: ClusterIP
+    # -- MCP server service port
     port: 8090
+    # -- MCP server service target port
     targetPort: 8090
 
-app:
-  name: moirai-app
-
-deployment:
-  name: moirai-deployment
-  replicas: 1
-
-moirai:
-  apiUsername: "username"
-  apiPassword: "password"
-
-dns:
-  clusterDomainSuffix: cluster.local
-
+# -- Environment to run the application in
 environment: production
 
+# -- CouchDB configuration
 couchdb:
-  name: couchdb
-  replicas: 1 # Renamed from replicaCount
+  # -- CouchDB persistent volume configuration
   persistentVolume:
+    # -- Enable persistent volume
     enabled: true
+    # -- Persistent volume size
     size: 10Gi
+    # -- Persistent volume storage class
     storageClass: "your-storage-class"
-  createAdminSecret: true
-  adminUsername: "admin"
-  adminPassword: "your-password"
-  cookieAuthSecret: "your-cookie-secret"
+  # -- CouchDB admin username
+  adminUsername: ""
+  # -- CouchDB admin password
+  adminPassword: ""
+  # -- CouchDB cookie auth secret
+  cookieAuthSecret: "changeme"
+  # -- CouchDB configuration
   couchdbConfig:
     couchdb:
       uuid: "00000000-0000-0000-0000-000000000000"
@@ -63,49 +83,29 @@ couchdb:
       events:
         partitioned: true
 
-openai:
-  apiKey: "your-openai-api-key"
+# -- Moirai configuration
+moirai:
+  apiUsername: ""
+  apiPassword: ""
 
+# -- OpenAI API key
+openai:
+  apiKey: ""
+
+# -- Ollama endpoint
 ollama:
   endpoint: "https://ollama.example.com"
 
+# -- Service account configuration
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# -- Open WebUI endpoint
 openWebui:
   endpoint: "https://open-webui.example.com"
-
-feeds:
-  linux.txt: |
-    https://www.linux.com/feed/
-    https://www.linuxtoday.com/feed/
-    https://www.linuxjournal.com/feed
-  python.txt: |
-    https://planetpython.org/rss20.xml
-    https://www.python.org/blogs/feed/
-    https://realpython.com/atom.xml
-  java.txt: |
-    https://www.baeldung.com/feed/
-    https://www.infoq.com/java/feed/
-    https://www.javaworld.com/index.rss
-  devops.txt: |
-    https://devops.com/feed/
-    https://www.infoq.com/devops/feed/
-    https://www.docker.com/blog/feed/
-  security.txt: |
-    https://www.darkreading.com/rss_simple.asp
-    https://www.schneier.com/blog/index.rdf
-    https://www.csoonline.com/feed/
-  ai.txt: |
-    https://www.kdnuggets.com/feed/
-    https://www.infoq.com/ai-ml-data-eng/feed/
-    https://www.technologyreview.com/artificial-intelligence/feed/
-  blockchain.txt: |
-    https://www.coindesk.com/feed
-    https://cointelegraph.com/feed
-    https://www.blockchain.com/rss
-  news.txt: |
-    https://www.bbc.co.uk/news/10628494
-    https://www.theguardian.com/uk/rss
-    https://www.aljazeera.com/xml/rss/all.xml
-  tech.txt: |    
-    https://www.wired.com/feed/rss
-    https://techcrunch.com/feed/
-    https://www.theverge.com/rss/index.xml

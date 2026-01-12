@@ -2,33 +2,51 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+  name: {{ include "moirai.fullname" . }}-mcp-server
   labels:
-    app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
-    {{- include "common.labels" . | nindent 4 }}
+    {{- include "moirai.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp-server
 spec:
-  replicas: {{ .Values.mcpServer.replicas | default 1 }}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+      {{- include "moirai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp-server
   template:
     metadata:
       labels:
-        app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
-        {{- include "common.labels" . | nindent 8 }}
+        {{- include "moirai.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mcp-server
+
     spec:
-      serviceAccountName: {{ .Release.Name }}-{{ .Values.service.name }}
+      serviceAccountName: {{ include "moirai.serviceAccountName" . }}
       containers:
-        - name: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+        - name: {{ include "moirai.name" . }}-mcp-server
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.mcpServer.command }}
           command:
 {{ toYaml . | indent 12 }}
           {{- end }}
           ports:
             - containerPort: {{ .Values.mcpServer.service.targetPort }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.mcpServer.service.targetPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.mcpServer.service.targetPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           env:
             - name: ENVIRONMENT
               value: {{ .Values.environment | quote }}
@@ -37,30 +55,46 @@ spec:
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
             - name: COUCHDB_USER
-              value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminUsername ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminUsername | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminUsername | default "admin" -}}{{- end }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: adminUsername
             - name: COUCHDB_PASSWORD
-              value: "{{- if (lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)) -}}{{ default .Values.couchdb.adminPassword ((lookup "v1" "Secret" .Release.Namespace (include "moirai.couchdbSecretName" .)).data.adminPassword | b64dec) -}}{{- else -}}{{ .Values.couchdb.adminPassword | default "adminPass" -}}{{- end }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: adminPassword
             - name: COUCHDB_URI
               value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
             - name: API_USERNAME
-              value: {{ .Values.moirai.apiUsername | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-moirai-secret
+                  key: apiUsername
             - name: API_PASSWORD
-              value: {{ .Values.moirai.apiPassword | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-moirai-secret
+                  key: apiPassword
             - name: COUCHDB_SECRET
-              value: {{ .Values.couchdb.cookieAuthSecret | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-couchdb-secret
+                  key: cookieAuthSecret
 ---
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Release.Name }}-{{ .Values.mcpServer.service.name }}"
+  name: {{ include "moirai.fullname" . }}-mcp-server
   labels:
-    app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
-    {{- include "common.labels" . | nindent 4 }}
+    {{- include "moirai.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp-server
 spec:
+  type: {{ .Values.mcpServer.service.type }}
   selector:
-    app: "{{ .Release.Name }}-{{ .Values.mcpServer.name }}"
+    {{- include "moirai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-server
   ports:
     - protocol: TCP
       port: {{ .Values.mcpServer.service.port }}
