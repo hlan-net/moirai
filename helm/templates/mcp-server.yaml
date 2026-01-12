@@ -57,15 +57,15 @@ spec:
             - name: COUCHDB_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
+                  name: {{ .Release.Name }}-couchdb
                   key: adminUsername
             - name: COUCHDB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
+                  name: {{ .Release.Name }}-couchdb
                   key: adminPassword
             - name: COUCHDB_URI
-              value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/"
+              value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
             - name: API_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -79,7 +79,7 @@ spec:
             - name: COUCHDB_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-couchdb-secret
+                  name: {{ .Release.Name }}-couchdb
                   key: cookieAuthSecret
 ---
 ---
