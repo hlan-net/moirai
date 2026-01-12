@@ -162,4 +162,4 @@ cython_debug/
 #.idea/
 
 # Chart.lock provides the same functionality
-helm/charts/
+helm/charts/tests/k6/load_test.js
