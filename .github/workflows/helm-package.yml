@@ -38,5 +38,5 @@ jobs:
         run: |
           mkdir -p $HELM_HOME/plugins
           helm plugin install https://github.com/chartmuseum/helm-push.git
-          helm repo add hlan-repo $HELM_REPOSITORY_URL --username $HELM_USERNAME --password $HELM_PASSWORD
+          helm repo add hlan-repo $HELM_REPOSITORY_URL --username $HELM_USERNAME --password $HELM_PASSWORD --verify=false
           helm cm-push moirai-*.tgz hlan-repo
