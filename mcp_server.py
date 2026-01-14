@@ -73,6 +73,36 @@ def store_doc(db_name, doc):
     else:
         raise RuntimeError(f"Failed to store doc: {res.text}")
 
+def update_doc(db_name, doc_id, updates):
+    """
+    Updates a document by fetching it, applying updates, and saving it back.
+    Handles revision matching.
+    """
+    doc = get_doc(db_name, doc_id)
+    if not doc:
+        return None, "Document not found."
+    
+    doc.update(updates)
+    res = db_request("PUT", db_name, path=f"/{doc_id}", json_data=doc)
+    if res.status_code in (200, 201):
+        return doc_id, None
+    else:
+        return None, f"Failed to update doc: {res.text}"
+
+def delete_doc(db_name, doc_id):
+    """
+    Deletes a document. Requires fetching first to get the revision.
+    """
+    doc = get_doc(db_name, doc_id)
+    if not doc:
+        return False, "Document not found."
+    
+    res = db_request("DELETE", db_name, path=f"/{doc_id}", params={"rev": doc["_rev"]})
+    if res.status_code in (200, 202):
+        return True, None
+    else:
+        return False, f"Failed to delete doc: {res.text}"
+
 def validate_namespace(namespace: str):
     """Simple validation for namespace."""
     if not namespace or not isinstance(namespace, str):
@@ -102,6 +132,26 @@ def add_feed(url: str, category: str = "general") -> str:
         return f"Feed added: {url} (ID: {doc_hash})"
     else:
         return f"Error adding feed: {res.status_code} {res.text}"
+
+@mcp.tool()
+def delete_feed(url: str) -> str:
+    """Delete a feed by its URL."""
+    doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
+    success, msg = delete_doc("feeds", doc_hash)
+    if success:
+        return f"Feed deleted: {url}"
+    else:
+        return f"Error deleting feed: {msg}"
+
+@mcp.tool()
+def update_feed_category(url: str, new_category: str) -> str:
+    """Update the category of an existing feed."""
+    doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
+    success, msg = update_doc("feeds", doc_hash, {"category": new_category})
+    if success:
+        return f"Feed category updated to '{new_category}' for: {url}"
+    else:
+        return f"Error updating feed: {msg}"
 
 @mcp.tool()
 def list_feeds() -> str:
@@ -256,6 +306,43 @@ def read_event(event_id: str, namespace: str) -> str:
     
     return json.dumps(doc, indent=2)
 
+@mcp.tool()
+def update_event(event_id: str, namespace: str, name: str = None, description: str = None, article_links: list[str] = None) -> str:
+    """Update an existing event. Only provided fields are updated. (Namespace GUID Required)"""
+    validate_namespace(namespace)
+    
+    # Verify ownership
+    existing = get_doc("events", event_id)
+    if not existing or existing.get("namespace") != namespace:
+        return f"Event not found in namespace {namespace}."
+
+    updates = {}
+    if name: updates["name"] = name
+    if description: updates["description"] = description
+    if article_links is not None: updates["article_links"] = article_links
+    
+    success, msg = update_doc("events", event_id, updates)
+    if success:
+        return f"Event {event_id} updated successfully."
+    else:
+        return f"Error updating event: {msg}"
+
+@mcp.tool()
+def delete_event(event_id: str, namespace: str) -> str:
+    """Delete an event. (Namespace GUID Required)"""
+    validate_namespace(namespace)
+    
+    # Verify ownership
+    existing = get_doc("events", event_id)
+    if not existing or existing.get("namespace") != namespace:
+        return f"Event not found in namespace {namespace}."
+    
+    success, msg = delete_doc("events", event_id)
+    if success:
+        return f"Event {event_id} deleted successfully."
+    else:
+        return f"Error deleting event: {msg}"
+
 # --- Trends Tools (Namespaced) ---
 
 @mcp.tool()
@@ -320,6 +407,43 @@ def read_trend(trend_id: str, namespace: str) -> str:
     
     
     return json.dumps(doc, indent=2)
+
+@mcp.tool()
+def update_trend(trend_id: str, namespace: str, name: str = None, description: str = None, event_ids: list[str] = None) -> str:
+    """Update an existing trend. Only provided fields are updated. (Namespace GUID Required)"""
+    validate_namespace(namespace)
+    
+    # Verify ownership
+    existing = get_doc("trends", trend_id)
+    if not existing or existing.get("namespace") != namespace:
+        return f"Trend not found in namespace {namespace}."
+
+    updates = {}
+    if name: updates["name"] = name
+    if description: updates["description"] = description
+    if event_ids is not None: updates["event_ids"] = event_ids
+    
+    success, msg = update_doc("trends", trend_id, updates)
+    if success:
+        return f"Trend {trend_id} updated successfully."
+    else:
+        return f"Error updating trend: {msg}"
+
+@mcp.tool()
+def delete_trend(trend_id: str, namespace: str) -> str:
+    """Delete a trend. (Namespace GUID Required)"""
+    validate_namespace(namespace)
+    
+    # Verify ownership
+    existing = get_doc("trends", trend_id)
+    if not existing or existing.get("namespace") != namespace:
+        return f"Trend not found in namespace {namespace}."
+    
+    success, msg = delete_doc("trends", trend_id)
+    if success:
+        return f"Trend {trend_id} deleted successfully."
+    else:
+        return f"Error deleting trend: {msg}"
 
 @mcp.tool()
 def list_namespaces() -> str:
