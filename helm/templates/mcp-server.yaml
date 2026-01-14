@@ -99,14 +99,14 @@ spec:
     {{- include "moirai.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: mcp-server
   ports:
-                - protocol: TCP
-                  name: http
-                  port: {{ .Values.mcpServer.service.port }}
-                  targetPort: {{ .Values.mcpServer.service.targetPort }}
-                - protocol: TCP
-                  name: metrics
-                  port: {{ .Values.mcpServer.service.metricsPort }}
-                  targetPort: {{ .Values.mcpServer.service.metricsTargetPort }}
+    - protocol: TCP
+      name: http
+      port: {{ .Values.mcpServer.service.port }}
+      targetPort: {{ .Values.mcpServer.service.targetPort }}
+    - protocol: TCP
+      name: metrics
+      port: {{ .Values.mcpServer.service.metricsPort }}
+      targetPort: {{ .Values.mcpServer.service.metricsTargetPort }}
     ---
     {{- if .Values.prometheus.serviceMonitor.enabled }}
     apiVersion: monitoring.coreos.com/v1
