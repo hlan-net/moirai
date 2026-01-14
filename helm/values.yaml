@@ -103,6 +103,8 @@ moirai:
     - "8088"
   # -- Enable production startup logic (scheduler, init)
   enableProdStartup: "true"
+  # -- Number of days after which an article is considered expired
+  articleExpirationDays: 30
 
 # -- OpenAI API key
 openai:
