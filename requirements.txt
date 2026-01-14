@@ -10,6 +10,7 @@ mcp[cli]
 openai
 uvicorn
 flask-limiter
+prometheus-flask-exporter
 pydantic
 validators
 bleach

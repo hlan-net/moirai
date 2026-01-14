@@ -1,7 +1,7 @@
 import os
 from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
-from api.extensions import limiter
+from api.extensions import limiter, metrics
 from api.routes import api_blueprint
 from api.mcp_routes import mcp_blueprint
 from api.chat_routes import chat_blueprint
@@ -17,6 +17,10 @@ app.config['WTF_CSRF_ENABLED'] = False
 
 # Configure rate limiting
 limiter.init_app(app)
+
+# Configure metrics
+metrics.init_app(app)
+metrics.info('app_info', 'Application info', version='1.0.0')
 
 @app.route("/")
 def index():
