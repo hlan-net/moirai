@@ -1,6 +1,9 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
+import hashlib
+from datetime import datetime
 from functools import wraps
+from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
 from pydantic import ValidationError
@@ -80,7 +83,32 @@ def before_request_auth():
         return authenticate()
 
 # --- Feeds ---
+@api_blueprint.route("/feeds", methods=["POST"])
+def create_feed():
+    try:
+        validated = FeedCreateRequest(**request.json)
+    except ValidationError as e:
+        abort(400, description=str(e))
+        
+    feed_url = str(validated.url)
+    # Generate ID
+    feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
+    
+    feed_doc = {
+        "_id": feed_id,
+        "url": feed_url,
+        "title": validated.title,
+        "category": validated.category or "general",
+        "added_at": datetime.now().isoformat()
+    }
+    
+    if update_couchdb_doc("feeds", feed_id, feed_doc):
+        return jsonify(feed_doc), 201
+    else:
+        abort(500, description="Failed to create feed")
+
 @api_blueprint.route("/feeds", methods=["GET"])
+@limiter.limit("10 per minute")
 def list_feeds():
     feeds = fetch_from_couchdb("feeds")
     return jsonify(feeds)

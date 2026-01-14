@@ -1,8 +1,7 @@
 import os
 from flask import Flask, send_from_directory
 from flask_wtf import CSRFProtect
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from api.extensions import limiter
 from api.routes import api_blueprint
 from api.mcp_routes import mcp_blueprint
 from api.chat_routes import chat_blueprint
@@ -17,13 +16,7 @@ csrf.init_app(app)
 app.config['WTF_CSRF_ENABLED'] = False
 
 # Configure rate limiting
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://",  # Use Redis in production: "redis://localhost:6379"
-    strategy="fixed-window"
-)
+limiter.init_app(app)
 
 @app.route("/")
 def index():
@@ -48,10 +41,6 @@ def catch_all(path):
 app.register_blueprint(api_blueprint, url_prefix='/api')
 app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
 app.register_blueprint(chat_blueprint, url_prefix='/api')
-
-# Apply rate limits to specific endpoints
-limiter.limit("100 per hour")(api_blueprint)  # General API limit
-limiter.limit("5 per minute", methods=["POST"])(api_blueprint)  # Stricter for writes
 
 if __name__ == "__main__":
     # Initialise
