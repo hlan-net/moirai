@@ -99,7 +99,35 @@ spec:
     {{- include "moirai.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: mcp-server
   ports:
-    - protocol: TCP
-      port: {{ .Values.mcpServer.service.port }}
-      targetPort: {{ .Values.mcpServer.service.targetPort }}
-{{- end }}
+                - protocol: TCP
+                  name: http
+                  port: {{ .Values.mcpServer.service.port }}
+                  targetPort: {{ .Values.mcpServer.service.targetPort }}
+                - protocol: TCP
+                  name: metrics
+                  port: {{ .Values.mcpServer.service.metricsPort }}
+                  targetPort: {{ .Values.mcpServer.service.metricsTargetPort }}
+    ---
+    {{- if .Values.prometheus.serviceMonitor.enabled }}
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      name: {{ include "moirai.fullname" . }}-mcp-server
+      labels:
+        {{- include "moirai.labels" . | nindent 4 }}
+        app.kubernetes.io/component: mcp-server
+        {{- with .Values.prometheus.serviceMonitor.labels }}
+        {{- toYaml . | nindent 4 }}
+        {{- end }}
+    spec:
+      selector:
+        matchLabels:
+          {{- include "moirai.selectorLabels" . | nindent 6 }}
+          app.kubernetes.io/component: mcp-server
+      endpoints:
+        - port: metrics
+          path: /metrics
+          interval: {{ .Values.prometheus.serviceMonitor.interval }}
+          scrapeTimeout: {{ .Values.prometheus.serviceMonitor.scrapeTimeout }}
+    {{- end }}
+    {{- end }}

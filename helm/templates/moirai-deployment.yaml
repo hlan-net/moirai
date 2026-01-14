@@ -102,11 +102,14 @@ spec:
 {{ toYaml . | indent 12 }}
           {{- end }}
           ports:
-            - containerPort: {{ .Values.service.targetPort }}
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+            - name: metrics
+              containerPort: {{ .Values.service.metricsTargetPort }}
           readinessProbe:
             httpGet:
               path: /api/health
-              port: {{ .Values.service.targetPort }}
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
@@ -114,7 +117,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /api/health
-              port: {{ .Values.service.targetPort }}
+              port: http
             initialDelaySeconds: 30
             periodSeconds: 20
             timeoutSeconds: 5
@@ -182,3 +185,48 @@ spec:
         - name: feeds-volume
           configMap:
             name: {{ include "moirai.fullname" . }}-feed-lists
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "moirai.fullname" . }}
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "moirai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+  ports:
+    - protocol: TCP
+      name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+    - protocol: TCP
+      name: metrics
+      port: {{ .Values.service.metricsPort }}
+      targetPort: {{ .Values.service.metricsTargetPort }}
+---
+{{- if .Values.prometheus.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "moirai.fullname" . }}
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+    {{- with .Values.prometheus.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "moirai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.prometheus.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.prometheus.serviceMonitor.scrapeTimeout }}
+{{- end }}

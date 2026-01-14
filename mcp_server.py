@@ -7,9 +7,12 @@ import re
 import uuid
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP, Context
+from starlette_prometheus import PrometheusMiddleware, metrics
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
+mcp.sse_app.add_middleware(PrometheusMiddleware)
+mcp.sse_app.add_route("/metrics", metrics)
 
 # Database Configuration
 COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")

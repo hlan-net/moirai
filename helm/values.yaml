@@ -34,6 +34,10 @@ service:
   port: 8088
   # -- Service target port
   targetPort: 8088
+  # -- Metrics port
+  metricsPort: 9000
+  # -- Metrics target port
+  metricsTargetPort: 9000
 
 # -- MCP server configuration
 mcpServer:
@@ -55,6 +59,10 @@ mcpServer:
     port: 8090
     # -- MCP server service target port
     targetPort: 8090
+    # -- MCP server metrics port
+    metricsPort: 9000
+    # -- MCP server metrics target port
+    metricsTargetPort: 9000
 
 # -- Environment to run the application in
 environment: production
@@ -123,6 +131,13 @@ serviceAccount:
   # -- The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
+
+prometheus:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
 
 # -- Open WebUI endpoint
 openWebui:
