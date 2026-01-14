@@ -9,3 +9,7 @@ pytest
 mcp[cli]
 openai
 uvicorn
+flask-limiter
+pydantic
+validators
+bleach

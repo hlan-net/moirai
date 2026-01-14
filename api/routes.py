@@ -1,8 +1,19 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
+import hashlib
+from datetime import datetime
 from functools import wraps
+from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
+from pydantic import ValidationError
+from .validation import (
+    FeedCreateRequest, FeedUpdateRequest,
+    EventCreateRequest, EventUpdateRequest,
+    TrendCreateRequest, TrendUpdateRequest,
+    ConfigUpdateRequest,
+    validate_namespace_param
+)
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -80,7 +91,32 @@ def before_request_auth():
         return authenticate()
 
 # --- Feeds ---
+@api_blueprint.route("/feeds", methods=["POST"])
+def create_feed():
+    try:
+        validated = FeedCreateRequest(**request.json)
+    except ValidationError as e:
+        abort(400, description=str(e))
+        
+    feed_url = str(validated.url)
+    # Generate ID
+    feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
+    
+    feed_doc = {
+        "_id": feed_id,
+        "url": feed_url,
+        "title": validated.title,
+        "category": validated.category or "general",
+        "added_at": datetime.now().isoformat()
+    }
+    
+    if update_couchdb_doc("feeds", feed_id, feed_doc):
+        return jsonify(feed_doc), 201
+    else:
+        abort(500, description="Failed to create feed")
+
 @api_blueprint.route("/feeds", methods=["GET"])
+@limiter.limit("10 per minute")
 def list_feeds():
     feeds = fetch_from_couchdb("feeds")
     return jsonify(feeds)
@@ -102,11 +138,13 @@ def update_feed(feed_id):
     if not feed:
         abort(404, description="Feed not found")
     
-    data = request.json
-    if "title" not in data:
-        abort(400, description="Title is required")
-        
-    feed["title"] = data["title"]
+    # Validate input
+    try:
+        validated = FeedUpdateRequest(**request.json)
+    except ValidationError as e:
+        abort(400, description=str(e))
+    
+    feed["title"] = validated.title
     
     if update_couchdb_doc("feeds", feed_id, feed):
         return jsonify(feed)
@@ -173,6 +211,14 @@ def delete_article(article_id):
 @api_blueprint.route("/events", methods=["GET"])
 def list_events():
     namespace = request.args.get('namespace')
+    
+    # Validate namespace if provided
+    if namespace:
+        try:
+            namespace = validate_namespace_param(namespace)
+        except ValueError as e:
+            abort(400, description=str(e))
+    
     events = fetch_from_couchdb("events")
     # Filter only actual events (legacy docs might not have 'type')
     events = [e for e in events if e.get('type', 'event') == 'event']
@@ -212,6 +258,14 @@ def remove_event_link(event_id):
 @api_blueprint.route("/trends", methods=["GET"])
 def list_trends():
     namespace = request.args.get('namespace')
+    
+    # Validate namespace if provided
+    if namespace:
+        try:
+            namespace = validate_namespace_param(namespace)
+        except ValueError as e:
+            abort(400, description=str(e))
+    
     trends = fetch_from_couchdb("trends")
     if not trends:
         trends = []
@@ -294,7 +348,11 @@ def get_config():
 
 @api_blueprint.route("/config", methods=["PUT"])
 def update_config():
-    data = request.json
+    # Validate input
+    try:
+        validated = ConfigUpdateRequest(**request.json)
+    except ValidationError as e:
+        abort(400, description=str(e))
     
     # Fetch existing to get rev
     current_doc = get_config_doc()
@@ -306,14 +364,11 @@ def update_config():
     if current_doc:
         new_doc.update(current_doc)
         
-    if "allow_public_read" in data:
-        new_doc["allow_public_read"] = bool(data["allow_public_read"])
+    if validated.allow_public_read is not None:
+        new_doc["allow_public_read"] = validated.allow_public_read
         
-    if "iteration_interval" in data:
-        try:
-            new_doc["iteration_interval"] = int(data["iteration_interval"])
-        except (ValueError, TypeError):
-            abort(400, description="Invalid iteration_interval")
+    if validated.iteration_interval is not None:
+        new_doc["iteration_interval"] = validated.iteration_interval
         
     if update_couchdb_doc("config", "main", new_doc):
         return jsonify({"status": "updated", "config": new_doc})
