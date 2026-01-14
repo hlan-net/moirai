@@ -27,8 +27,14 @@ jobs:
           cd helm
           helm dependency update
 
-      - name: Build Helm package
-        run: helm package helm
+      - name: Package Helm chart
+        id: package_chart
+        run: |
+          CHART_NAME=$(helm show chart ./helm | grep '^name:' | awk '{print $2}')
+          CHART_VERSION=$(helm show chart ./helm | grep '^version:' | awk '{print $2}')
+          helm package ./helm
+          echo "chart_name=$CHART_NAME" >> $GITHUB_OUTPUT
+          echo "chart_version=$CHART_VERSION" >> $GITHUB_OUTPUT
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -39,4 +45,4 @@ jobs:
 
       - name: Upload Helm package
         run: |
-          helm push moirai-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+          helm push ${{ steps.package_chart.outputs.chart_name }}-${{ steps.package_chart.outputs.chart_version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
