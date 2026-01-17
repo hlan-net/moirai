@@ -189,25 +189,28 @@ def list_articles():
         if event_id and event_name:
             event_id_to_name[event_id] = event_name
         
-        for link in event.get("article_links", []):
-            if link not in article_event_map:
-                article_event_map[link] = []
-            article_event_map[link].append(event_name)
-            
-            if link not in article_link_to_event_ids:
-                article_link_to_event_ids[link] = []
-            if event_id:
-                article_link_to_event_ids[link].append(event_id)
+        # Only process events with a valid name
+        if event_name:
+            for link in event.get("article_links", []):
+                if link not in article_event_map:
+                    article_event_map[link] = []
+                article_event_map[link].append(event_name)
+                
+                if link not in article_link_to_event_ids:
+                    article_link_to_event_ids[link] = []
+                if event_id:
+                    article_link_to_event_ids[link].append(event_id)
     
     # Build event ID to trend names mapping
     event_id_to_trends = {}
-    for trend in trends or []:
-        trend_name = trend.get("name")
-        for event_id in trend.get("event_ids", []):
-            if event_id not in event_id_to_trends:
-                event_id_to_trends[event_id] = []
-            if trend_name:
-                event_id_to_trends[event_id].append(trend_name)
+    if trends:  # Handle None or empty list
+        for trend in trends:
+            trend_name = trend.get("name")
+            for event_id in trend.get("event_ids", []):
+                if event_id not in event_id_to_trends:
+                    event_id_to_trends[event_id] = []
+                if trend_name:
+                    event_id_to_trends[event_id].append(trend_name)
     
     # Build article link to trend names mapping
     article_link_to_trends = {}
