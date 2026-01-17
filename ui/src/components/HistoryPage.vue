@@ -9,6 +9,8 @@ interface Article {
   published: string;
   feed_url: string;
   feed_title?: string;
+  events?: string[];
+  trends?: string[];
 }
 
 interface ArticleGroup {
@@ -148,6 +150,16 @@ const toggleExpand = (id: string) => {
                 Show Less
               </button>
             </span>
+          </div>
+          <div v-if="article.events || article.trends" class="item-tags">
+            <div v-if="article.events && article.events.length > 0" class="tag-group">
+              <span class="tag-label">Events:</span>
+              <span v-for="event in article.events" :key="event" class="tag tag-event">{{ event }}</span>
+            </div>
+            <div v-if="article.trends && article.trends.length > 0" class="tag-group">
+              <span class="tag-label">Trends:</span>
+              <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+            </div>
           </div>
           <div class="item-meta">
               <span class="date">{{ formatDate(article.published) }}</span>
@@ -290,6 +302,47 @@ const toggleExpand = (id: string) => {
 
 .read-more-btn:hover {
   text-decoration: underline;
+}
+
+.item-tags {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.tag-event {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+}
+
+.tag-trend {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #ce93d8;
 }
 
 .group-divider {

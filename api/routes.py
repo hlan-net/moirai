@@ -175,15 +175,50 @@ def list_articles():
     feeds = fetch_from_couchdb("feeds")
     articles = fetch_from_couchdb("articles")
     events = fetch_from_couchdb("events")
+    trends = fetch_from_couchdb("trends")
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
     
+    # Build event ID to event name mapping and article link to event ID mapping
+    event_id_to_name = {}
+    article_link_to_event_ids = {}
     article_event_map = {}
     for event in events:
+        event_id = event.get("_id")
+        event_name = event.get("name")
+        if event_id and event_name:
+            event_id_to_name[event_id] = event_name
+        
         for link in event.get("article_links", []):
             if link not in article_event_map:
                 article_event_map[link] = []
-            article_event_map[link].append(event.get("name"))
+            article_event_map[link].append(event_name)
+            
+            if link not in article_link_to_event_ids:
+                article_link_to_event_ids[link] = []
+            if event_id:
+                article_link_to_event_ids[link].append(event_id)
+    
+    # Build event ID to trend names mapping
+    event_id_to_trends = {}
+    for trend in trends or []:
+        trend_name = trend.get("name")
+        for event_id in trend.get("event_ids", []):
+            if event_id not in event_id_to_trends:
+                event_id_to_trends[event_id] = []
+            if trend_name:
+                event_id_to_trends[event_id].append(trend_name)
+    
+    # Build article link to trend names mapping
+    article_link_to_trends = {}
+    for link, event_ids in article_link_to_event_ids.items():
+        trend_names = set()
+        for event_id in event_ids:
+            if event_id in event_id_to_trends:
+                for trend_name in event_id_to_trends[event_id]:
+                    trend_names.add(trend_name)
+        if trend_names:
+            article_link_to_trends[link] = sorted(list(trend_names))
             
     for article in articles:
         feed_url = article.get("feed_url")
@@ -193,6 +228,9 @@ def list_articles():
         article_link = article.get("link")
         if article_link in article_event_map:
             article["events"] = article_event_map[article_link]
+        
+        if article_link in article_link_to_trends:
+            article["trends"] = article_link_to_trends[article_link]
             
     return jsonify(articles)
 
