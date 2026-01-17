@@ -179,15 +179,12 @@ def list_articles():
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
     
-    # Build event ID to event name mapping and article link to event ID mapping
-    event_id_to_name = {}
+    # Build article link to event IDs and event names mappings
     article_link_to_event_ids = {}
     article_event_map = {}
     for event in events:
         event_id = event.get("_id")
         event_name = event.get("name")
-        if event_id and event_name:
-            event_id_to_name[event_id] = event_name
         
         # Only process events with a valid name
         if event_name:
@@ -203,14 +200,13 @@ def list_articles():
     
     # Build event ID to trend names mapping
     event_id_to_trends = {}
-    if trends:  # Handle None or empty list
-        for trend in trends:
-            trend_name = trend.get("name")
+    for trend in trends or []:
+        trend_name = trend.get("name")
+        if trend_name:  # Only process trends with valid names
             for event_id in trend.get("event_ids", []):
                 if event_id not in event_id_to_trends:
                     event_id_to_trends[event_id] = []
-                if trend_name:
-                    event_id_to_trends[event_id].append(trend_name)
+                event_id_to_trends[event_id].append(trend_name)
     
     # Build article link to trend names mapping
     article_link_to_trends = {}
