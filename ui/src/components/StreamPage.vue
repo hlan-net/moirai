@@ -1,17 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
-
-interface Article {
-  _id: string;
-  title: string;
-  summary: string;
-  link: string;
-  published: string;
-  feed_url: string;
-  feed_title?: string;
-  events?: string[];
-  trends?: string[];
-}
+import { articleCache, type Article } from '../utils/articleCache'
 
 interface ArticleGroup {
   title: string;
@@ -20,9 +9,17 @@ interface ArticleGroup {
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
-const refreshing = ref(false)
+const loadingMore = ref(false)
+const fetchingUpdates = ref(false)
+const hasMore = ref(true)
+const totalCount = ref(0)
+const sentinelEl = ref<HTMLElement | null>(null)
 const expandedArticles = ref<Set<string>>(new Set())
-let intervalId: number | undefined
+
+let observer: IntersectionObserver | null = null
+let refreshInterval: number | null = null
+
+const PAGE_SIZE = 50
 
 const groupedArticles = computed(() => {
   if (articles.value.length === 0) {
@@ -53,33 +50,140 @@ const groupedArticles = computed(() => {
   return groups
 })
 
-const fetchArticles = async (isManual = false) => {
-  if (isManual) refreshing.value = true
+const fetchArticles = async (skip = 0, since?: string) => {
   try {
-    const response = await fetch('/api/articles')
+    const params = new URLSearchParams({
+      limit: PAGE_SIZE.toString(),
+      skip: skip.toString()
+    })
+    if (since) {
+      params.append('since', since)
+    }
+
+    const response = await fetch(`/api/articles?${params}`)
     if (response.ok) {
-        const data = await response.json()
-        articles.value = data.sort((a: Article, b: Article) => {
-            return new Date(b.published).getTime() - new Date(a.published).getTime()
-        })
-    } else {
-      console.error("Failed to fetch articles", response.status)
+      const data = await response.json()
+      return {
+        articles: data.articles || [],
+        hasMore: data.has_more || false,
+        totalCount: data.total_count || 0
+      }
     }
   } catch (error) {
     console.error('Error fetching articles:', error)
-  } finally {
-    loading.value = false
-    if (isManual) refreshing.value = false
+  }
+  return { articles: [], hasMore: false, totalCount: 0 }
+}
+
+const loadFromCache = async () => {
+  try {
+    const cached = await articleCache.getArticles()
+    if (cached.length > 0) {
+      articles.value = cached
+      loading.value = false
+      console.log(`Loaded ${cached.length} articles from cache`)
+    }
+  } catch (error) {
+    console.error('Error loading from cache:', error)
   }
 }
 
-onMounted(() => {
-  fetchArticles()
-  intervalId = setInterval(fetchArticles, 60000)
+const fetchLatestUpdates = async () => {
+  fetchingUpdates.value = true
+  try {
+    const newestTimestamp = await articleCache.getNewestTimestamp()
+    const result = await fetchArticles(0, newestTimestamp || undefined)
+    
+    if (result.articles.length > 0) {
+      const existingIds = new Set(articles.value.map((a: Article) => a._id))
+      const newArticles = result.articles.filter((a: Article) => !existingIds.has(a._id))
+      
+      if (newArticles.length > 0) {
+        articles.value = [...newArticles, ...articles.value]
+        await articleCache.saveArticles(result.articles)
+        console.log(`Fetched ${newArticles.length} new articles`)
+      }
+    }
+    
+    totalCount.value = result.totalCount
+  } catch (error) {
+    console.error('Error fetching updates:', error)
+  } finally {
+    fetchingUpdates.value = false
+  }
+}
+
+const loadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return
+  
+  loadingMore.value = true
+  try {
+    const result = await fetchArticles(articles.value.length)
+    
+    if (result.articles.length > 0) {
+      articles.value = [...articles.value, ...result.articles]
+      await articleCache.saveArticles(result.articles)
+    }
+    
+    hasMore.value = result.hasMore
+    totalCount.value = result.totalCount
+  } catch (error) {
+    console.error('Error loading more articles:', error)
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+const setupIntersectionObserver = () => {
+  if (!sentinelEl.value) return
+  
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && hasMore.value && !loadingMore.value) {
+        loadMore()
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  
+  observer.observe(sentinelEl.value)
+}
+
+onMounted(async () => {
+  // 1. Load cached articles immediately
+  await loadFromCache()
+  
+  // 2. Fetch latest updates
+  await fetchLatestUpdates()
+  
+  // 3. If no cached articles, do initial fetch
+  if (articles.value.length === 0) {
+    const result = await fetchArticles(0)
+    articles.value = result.articles
+    hasMore.value = result.hasMore
+    totalCount.value = result.totalCount
+    await articleCache.saveArticles(result.articles)
+  }
+  
+  loading.value = false
+  
+  // 4. Set up infinite scroll
+  setupIntersectionObserver()
+  
+  // 5. Clean old cache
+  articleCache.clearOldArticles().catch(console.error)
+  
+  // 6. Periodic refresh (every 2 minutes)
+  refreshInterval = window.setInterval(fetchLatestUpdates, 120000)
 })
 
 onUnmounted(() => {
-  if (intervalId) clearInterval(intervalId)
+  if (observer) {
+    observer.disconnect()
+  }
+  if (refreshInterval !== null) {
+    clearInterval(refreshInterval)
+  }
 })
 
 function formatDate(dateStr: string) {
@@ -117,10 +221,15 @@ const toggleExpand = (id: string) => {
     <header class="page-header">
         <div class="header-left">
             <h2>Aggregated Stream</h2>
-            <span class="count">{{ articles.length }} Articles</span>
+            <span class="count">
+              <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
+              <span v-else-if="!loading">{{ articles.length }}</span>
+              Articles
+            </span>
+            <span v-if="fetchingUpdates" class="update-badge">↻</span>
         </div>
-        <button @click="fetchArticles(true)" :disabled="refreshing" class="refresh-btn" title="Check for updates">
-            {{ refreshing ? 'Checking...' : '↻ Refresh' }}
+        <button @click="fetchLatestUpdates" :disabled="fetchingUpdates" class="refresh-btn" title="Check for updates">
+            {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
         </button>
     </header>
 
@@ -167,6 +276,12 @@ const toggleExpand = (id: string) => {
         </div>
         <hr v-if="index < groupedArticles.length - 1" class="group-divider">
       </div>
+      
+      <!-- Sentinel element for infinite scroll -->
+      <div ref="sentinelEl" class="sentinel">
+        <div v-if="loadingMore" class="loading-more">Loading more articles...</div>
+        <div v-else-if="!hasMore" class="end-message">No more articles</div>
+      </div>
     </div>
     
     <div v-else class="empty-state">No articles found in the stream.</div>
@@ -206,6 +321,17 @@ const toggleExpand = (id: string) => {
 .count {
     color: #7f8c8d;
     font-size: 0.9rem;
+}
+
+.update-badge {
+  font-size: 0.9rem;
+  color: #666;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .refresh-btn {
@@ -353,6 +479,21 @@ const toggleExpand = (id: string) => {
   border: 0;
   border-top: 1px solid var(--border-color);
   margin: 20px 0;
+}
+
+.sentinel {
+  padding: 20px;
+  text-align: center;
+}
+
+.loading-more {
+  color: #666;
+  font-style: italic;
+}
+
+.end-message {
+  color: #999;
+  font-size: 0.9rem;
 }
 
 .loading, .empty-state {
