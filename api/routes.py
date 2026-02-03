@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
@@ -21,6 +21,18 @@ API_USERNAME = os.environ.get("API_USERNAME")
 API_PASSWORD = os.environ.get("API_PASSWORD")
 ALLOW_PUBLIC_READ_ENV = os.environ.get("ALLOW_PUBLIC_READ", "false").lower() == "true"
 ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
+
+def parse_datetime_safe(date_str):
+    """Parse datetime and ensure it's timezone-aware for comparison."""
+    try:
+        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        # If naive (no timezone), assume UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, AttributeError):
+        # Return a very old date for invalid dates so they sort last
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 def check_auth(username, password):
     """This function is called to check if a username /
@@ -192,7 +204,7 @@ def list_articles():
             since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
             all_articles = [
                 a for a in all_articles 
-                if a.get("published") and datetime.fromisoformat(a["published"].replace('Z', '+00:00')) > since_dt
+                if a.get("published") and parse_datetime_safe(a["published"]) > since_dt
             ]
         except (ValueError, AttributeError):
             pass  # Invalid since parameter, ignore
