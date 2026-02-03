@@ -339,7 +339,7 @@ const toggleExpand = (id: string) => {
 
 .tag-event {
   background-color: #e3f2fd;
-  color: #1976d2;
+  color: #1565c0;
   border: 1px solid #90caf9;
 }
 
