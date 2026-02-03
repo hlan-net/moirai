@@ -172,10 +172,35 @@ def refresh_feeds():
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
+    # Pagination parameters
+    limit = int(request.args.get('limit', 50))
+    skip = int(request.args.get('skip', 0))
+    since = request.args.get('since')  # ISO timestamp to fetch only newer articles
+    
+    # Validate pagination params
+    limit = min(max(limit, 1), 200)  # Clamp between 1-200
+    skip = max(skip, 0)
+    
     feeds = fetch_from_couchdb("feeds")
-    articles = fetch_from_couchdb("articles")
+    all_articles = fetch_from_couchdb("articles")
     events = fetch_from_couchdb("events")
     trends = fetch_from_couchdb("trends")
+    
+    # Filter by 'since' if provided
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
+            all_articles = [
+                a for a in all_articles 
+                if a.get("published") and datetime.fromisoformat(a["published"].replace('Z', '+00:00')) > since_dt
+            ]
+        except (ValueError, AttributeError):
+            pass  # Invalid since parameter, ignore
+    
+    # Sort by published date (newest first)
+    all_articles.sort(key=lambda a: a.get("published", ""), reverse=True)
+    
+    total_count = len(all_articles)
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
     
@@ -218,8 +243,11 @@ def list_articles():
                     trend_names.add(trend_name)
         if trend_names:
             article_link_to_trends[link] = sorted(list(trend_names))
-            
-    for article in articles:
+    
+    # Apply pagination
+    paginated_articles = all_articles[skip:skip + limit]
+    
+    for article in paginated_articles:
         feed_url = article.get("feed_url")
         if feed_url in feed_title_map:
             article["feed_title"] = feed_title_map[feed_url]
@@ -230,8 +258,14 @@ def list_articles():
         
         if article_link in article_link_to_trends:
             article["trends"] = article_link_to_trends[article_link]
-            
-    return jsonify(articles)
+    
+    return jsonify({
+        "articles": paginated_articles,
+        "total_count": total_count,
+        "has_more": (skip + limit) < total_count,
+        "limit": limit,
+        "skip": skip
+    })
 
 @api_blueprint.route("/articles/<article_id>", methods=["DELETE"])
 def delete_article(article_id):
