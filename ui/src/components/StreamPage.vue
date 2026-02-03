@@ -246,12 +246,14 @@ const toggleExpand = (id: string) => {
   font-weight: 600;
   padding-bottom: 10px;
   margin-bottom: 20px;
+  text-align: left;
 }
 
 .stream-item {
     background: var(--card-bg);
     padding: 10px 0;
     margin-bottom: 10px;
+    text-align: left; /* Ensure stream items are left-aligned */
 }
 
 .item-meta {
@@ -271,6 +273,7 @@ const toggleExpand = (id: string) => {
     margin: 0 0 10px 0;
     font-size: 1.2rem;
     line-height: 1.3;
+    text-align: left;
 }
 
 .item-title a {
@@ -288,6 +291,7 @@ const toggleExpand = (id: string) => {
     opacity: 0.9;
     line-height: 1.6;
     font-size: 1rem;
+    text-align: justify;
 }
 
 .read-more-btn {
