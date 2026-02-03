@@ -4,6 +4,7 @@ metadata:
   name: {{ include "moirai.serviceAccountName" . }}
   labels:
     {{- include "moirai.labels" . | nindent 4 }}
+automountServiceAccountToken: false
 
 ---
 
