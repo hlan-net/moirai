@@ -113,10 +113,10 @@ const toggleExpand = (id: string) => {
 </script>
 
 <template>
-  <div class="history-page">
+  <div class="stream-page">
     <header class="page-header">
         <div class="header-left">
-            <h2>History Stream</h2>
+            <h2>Aggregated Stream</h2>
             <span class="count">{{ articles.length }} Articles</span>
         </div>
         <button @click="fetchArticles(true)" :disabled="refreshing" class="refresh-btn" title="Check for updates">
@@ -174,7 +174,7 @@ const toggleExpand = (id: string) => {
 </template>
 
 <style scoped>
-.history-page {
+.stream-page {
   padding: 20px;
   max-width: 900px;
   margin: 0 auto;
@@ -246,12 +246,14 @@ const toggleExpand = (id: string) => {
   font-weight: 600;
   padding-bottom: 10px;
   margin-bottom: 20px;
+  text-align: left;
 }
 
 .stream-item {
     background: var(--card-bg);
     padding: 10px 0;
     margin-bottom: 10px;
+    text-align: left; /* Ensure stream items are left-aligned */
 }
 
 .item-meta {
@@ -271,6 +273,7 @@ const toggleExpand = (id: string) => {
     margin: 0 0 10px 0;
     font-size: 1.2rem;
     line-height: 1.3;
+    text-align: left;
 }
 
 .item-title a {
@@ -288,6 +291,7 @@ const toggleExpand = (id: string) => {
     opacity: 0.9;
     line-height: 1.6;
     font-size: 1rem;
+    text-align: justify;
 }
 
 .read-more-btn {
