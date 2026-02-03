@@ -13,9 +13,19 @@ spec:
     - name: wait-for-service
       image: busybox
       command: ['sh', '-c', 'until nc -z -v -w30 {{ include "moirai.fullname" . }} {{ .Values.service.port }}; do echo "Waiting for service..."; sleep 5; done']
+      resources:
+        requests:
+          memory: 64Mi
+        limits:
+          memory: 128Mi
   containers:
     - name: wget
       image: busybox
       command: ['wget']
       args: ['{{ include "moirai.fullname" . }}:{{ .Values.service.port }}']
+      resources:
+        requests:
+          memory: 64Mi
+        limits:
+          memory: 128Mi
   restartPolicy: Never
