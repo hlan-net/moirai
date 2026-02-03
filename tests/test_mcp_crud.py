@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import time
+import pytest
 
 # Configuration
 MCP_URL = "http://localhost:8090/sse"
@@ -23,6 +24,7 @@ def call_mcp_tool(tool_name, arguments):
     # We saw 'mcp' installed in the container environment.
     pass
 
+@pytest.mark.asyncio
 async def test_crud_flow():
     from mcp.client.sse import sse_client
     from mcp import ClientSession
