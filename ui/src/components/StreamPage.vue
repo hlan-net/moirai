@@ -113,10 +113,10 @@ const toggleExpand = (id: string) => {
 </script>
 
 <template>
-  <div class="history-page">
+  <div class="stream-page">
     <header class="page-header">
         <div class="header-left">
-            <h2>History Stream</h2>
+            <h2>Aggregated Stream</h2>
             <span class="count">{{ articles.length }} Articles</span>
         </div>
         <button @click="fetchArticles(true)" :disabled="refreshing" class="refresh-btn" title="Check for updates">
@@ -174,7 +174,7 @@ const toggleExpand = (id: string) => {
 </template>
 
 <style scoped>
-.history-page {
+.stream-page {
   padding: 20px;
   max-width: 900px;
   margin: 0 auto;

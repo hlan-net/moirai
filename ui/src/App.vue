@@ -14,7 +14,7 @@ onMounted(() => {
     <nav class="main-nav">
       <div class="brand">Moirai</div>
       <div class="links">
-        <router-link to="/" class="nav-link">History</router-link>
+        <router-link to="/stream" class="nav-link">Stream</router-link>
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
         <router-link to="/chat" class="nav-link">Chat</router-link>
         <router-link to="/settings" class="nav-link">Settings</router-link>
