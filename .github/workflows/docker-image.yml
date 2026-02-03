@@ -25,12 +25,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
-      - name: Run backend tests
+      - name: Run unit tests (no services required)
         env:
           API_USERNAME: testuser
           API_PASSWORD: testpassword
         run: |
-          PYTHONPATH=. pytest
+          PYTHONPATH=. pytest tests/test_article_processor.py tests/test_live_lwn.py
           
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -65,6 +65,13 @@ jobs:
             sleep 2
           done
           sleep 5
+          
+      - name: Run integration tests (requires services)
+        env:
+          API_USERNAME: testuser
+          API_PASSWORD: testpassword
+        run: |
+          PYTHONPATH=. pytest tests/test_security_api.py tests/test_mcp_crud.py
         
       - name: Run Playwright tests
         working-directory: ui
