@@ -12,7 +12,7 @@ onMounted(() => {
 <template>
   <div class="app-container">
     <nav class="main-nav">
-      <div class="brand">Moirai</div>
+      <a href="https://github.com/hlan-net/moirai" target="_blank" class="brand">Moirai</a>
       <div class="links">
         <router-link to="/stream" class="nav-link">Stream</router-link>
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
@@ -57,6 +57,11 @@ body, html, #app {
 .brand {
   font-weight: bold;
   font-size: 1.2rem;
+  color: white;
+  text-decoration: none;
+}
+.brand:hover {
+  text-decoration: underline;
 }
 .links {
   display: flex;
