@@ -11,8 +11,11 @@ from starlette_prometheus import PrometheusMiddleware, metrics
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
-mcp.sse_app.add_middleware(PrometheusMiddleware)
-mcp.sse_app.add_route("/metrics", metrics)
+
+# Get the ASGI app and add middleware
+app = mcp.sse_app()  # Call the method to get the app
+app.add_middleware(PrometheusMiddleware)
+app.add_route("/metrics", metrics)
 
 # Database Configuration
 COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
@@ -469,8 +472,8 @@ def list_namespaces() -> str:
             
     return "\n".join(sorted(list(namespaces))) if namespaces else "No namespaces found."
 
-# Expose the SSE ASGI app for Uvicorn
-app = mcp.sse_app
+# Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
+# app = mcp.sse_app is already set above
 
 if __name__ == "__main__":
     # Run the server using SSE transport on port 8090
