@@ -6,6 +6,7 @@ schedule
 beautifulsoup4
 python-dateutil
 pytest
+pytest-asyncio
 mcp[cli]
 openai
 uvicorn

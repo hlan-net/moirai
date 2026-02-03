@@ -54,7 +54,17 @@ jobs:
         run: docker compose up -d
 
       - name: Wait for services to be ready
-        run: sleep 30
+        run: |
+          echo "Waiting for services to start..."
+          for i in {1..60}; do
+            if curl -f http://localhost:8088/api/feeds --user testuser:testpassword > /dev/null 2>&1; then
+              echo "Backend is ready!"
+              break
+            fi
+            echo "Waiting... ($i/60)"
+            sleep 2
+          done
+          sleep 5
         
       - name: Run Playwright tests
         working-directory: ui
