@@ -192,7 +192,7 @@ const bulkImportFeeds = async () => {
   }
   
   // Client-side validation: match server limit
-  const MAX_BULK_IMPORT_SIZE = 50
+  const MAX_BULK_IMPORT_SIZE = 100
   if (urls.length > MAX_BULK_IMPORT_SIZE) {
     showNotification(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`, 'warning')
     return
