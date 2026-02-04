@@ -14,6 +14,10 @@ const loading = ref(true)
 const refreshing = ref(false)
 const renamingFeedId = ref<string | null>(null)
 const newFeedTitle = ref('')
+const showBulkImportModal = ref(false)
+const bulkImportText = ref('')
+const bulkImporting = ref(false)
+const bulkImportResults = ref<any>(null)
 
 const fetchFeeds = async () => {
   try {
@@ -116,15 +120,80 @@ const handleFaviconError = (event: Event) => {
   const img = event.target as HTMLImageElement
   img.style.display = 'none'
 }
+
+const openBulkImportModal = () => {
+  showBulkImportModal.value = true
+  bulkImportText.value = ''
+  bulkImportResults.value = null
+}
+
+const closeBulkImportModal = () => {
+  showBulkImportModal.value = false
+  bulkImportText.value = ''
+  bulkImportResults.value = null
+}
+
+const handleFileUpload = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    bulkImportText.value = e.target?.result as string
+  }
+  reader.readAsText(file)
+}
+
+const bulkImportFeeds = async () => {
+  const urls = bulkImportText.value
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && line.startsWith('http'))
+  
+  if (urls.length === 0) {
+    alert('No valid URLs found. Please enter URLs starting with http:// or https://')
+    return
+  }
+  
+  bulkImporting.value = true
+  try {
+    const res = await fetch('/api/feeds/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls })
+    })
+    
+    if (res.ok) {
+      const results = await res.json()
+      bulkImportResults.value = results
+      
+      // Refresh feed list
+      if (results.success > 0) {
+        await fetchFeeds()
+      }
+    } else {
+      alert('Failed to import feeds')
+    }
+  } catch (e) {
+    console.error(e)
+    alert('Error importing feeds')
+  } finally {
+    bulkImporting.value = false
+  }
+}
 </script>
 
 <template>
   <div class="column-container">
     <div class="column-header">
         <h2>Feeds ({{ feeds.length }})</h2>
-        <button @click="triggerRefresh" :disabled="refreshing" class="refresh-btn" title="Refresh All Feeds">
-            {{ refreshing ? '...' : '↻' }}
-        </button>
+        <div class="header-actions">
+          <button @click="openBulkImportModal" class="bulk-import-btn" title="Bulk Import Feeds">📥</button>
+          <button @click="triggerRefresh" :disabled="refreshing" class="refresh-btn" title="Refresh All Feeds">
+              {{ refreshing ? '...' : '↻' }}
+          </button>
+        </div>
     </div>
 
     <div v-if="loading">Loading...</div>
@@ -153,6 +222,61 @@ const handleFaviconError = (event: Event) => {
       </li>
     </ul>
     <div v-else>No feeds found.</div>
+    
+    <!-- Bulk Import Modal -->
+    <div v-if="showBulkImportModal" class="modal-overlay" @click="closeBulkImportModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Bulk Import Feeds</h3>
+          <button @click="closeBulkImportModal" class="modal-close">×</button>
+        </div>
+        
+        <div v-if="!bulkImportResults" class="modal-body">
+          <p>Paste feed URLs below (one per line) or upload a text file:</p>
+          
+          <div class="file-upload-section">
+            <input type="file" accept=".txt,.opml" @change="handleFileUpload" />
+          </div>
+          
+          <textarea 
+            v-model="bulkImportText" 
+            placeholder="https://example.com/feed.xml&#10;https://another.com/rss&#10;..."
+            rows="10"
+            class="bulk-import-textarea"
+          ></textarea>
+          
+          <div class="modal-actions">
+            <button @click="bulkImportFeeds" :disabled="bulkImporting || !bulkImportText.trim()" class="import-btn">
+              {{ bulkImporting ? 'Importing...' : 'Import Feeds' }}
+            </button>
+            <button @click="closeBulkImportModal" class="cancel-btn">Cancel</button>
+          </div>
+        </div>
+        
+        <div v-else class="modal-body">
+          <h4>Import Results</h4>
+          <div class="import-results">
+            <p><strong>Total URLs:</strong> {{ bulkImportResults.total }}</p>
+            <p class="success-text"><strong>Successfully imported:</strong> {{ bulkImportResults.success }}</p>
+            <p v-if="bulkImportResults.skipped > 0" class="warning-text"><strong>Skipped (already exist):</strong> {{ bulkImportResults.skipped }}</p>
+            <p v-if="bulkImportResults.failed > 0" class="error-text"><strong>Failed:</strong> {{ bulkImportResults.failed }}</p>
+            
+            <div v-if="bulkImportResults.errors && bulkImportResults.errors.length > 0" class="error-details">
+              <h5>Errors:</h5>
+              <ul>
+                <li v-for="(err, idx) in bulkImportResults.errors" :key="idx">
+                  <strong>{{ err.url }}</strong>: {{ err.error }}
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="modal-actions">
+            <button @click="closeBulkImportModal" class="close-btn">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -175,7 +299,11 @@ h2 {
   margin: 0;
   color: #42b983;
 }
-.refresh-btn {
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+.bulk-import-btn, .refresh-btn {
     background: none;
     border: 1px solid #ccc;
     padding: 2px 8px;
@@ -184,7 +312,7 @@ h2 {
     font-size: 1.2rem;
     color: var(--text-color);
 }
-.refresh-btn:hover:not(:disabled) {
+.bulk-import-btn:hover, .refresh-btn:hover:not(:disabled) {
     background: var(--button-bg);
     color: var(--primary-color);
     border-color: var(--primary-color);
@@ -284,5 +412,139 @@ h2 {
   display: flex;
   gap: 5px;
   margin-top: 5px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+.modal-header h3 {
+  margin: 0;
+  color: #42b983;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #999;
+}
+.modal-close:hover {
+  color: #000;
+}
+.modal-body {
+  padding: 20px;
+}
+.file-upload-section {
+  margin-bottom: 15px;
+}
+.bulk-import-textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.import-btn, .cancel-btn, .close-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.import-btn {
+  background: #42b983;
+  color: white;
+}
+.import-btn:hover:not(:disabled) {
+  background: #359268;
+}
+.import-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+.cancel-btn {
+  background: #f5f5f5;
+  color: #333;
+}
+.cancel-btn:hover {
+  background: #e0e0e0;
+}
+.close-btn {
+  background: #42b983;
+  color: white;
+}
+.close-btn:hover {
+  background: #359268;
+}
+.import-results {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+.import-results p {
+  margin: 5px 0;
+}
+.success-text {
+  color: #42b983;
+}
+.warning-text {
+  color: #ff9800;
+}
+.error-text {
+  color: #cc0000;
+}
+.error-details {
+  margin-top: 15px;
+  padding: 10px;
+  background: #fff;
+  border-left: 3px solid #cc0000;
+}
+.error-details h5 {
+  margin-top: 0;
+  color: #cc0000;
+}
+.error-details ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+.error-details li {
+  margin: 5px 0;
+  font-size: 0.9rem;
 }
 </style>

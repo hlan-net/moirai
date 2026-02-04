@@ -186,6 +186,71 @@ def refresh_feeds():
             
     return jsonify({"status": "started", "count": count})
 
+@api_blueprint.route("/feeds/bulk", methods=["POST"])
+def bulk_import_feeds():
+    """Import multiple feeds from a list of URLs."""
+    try:
+        data = request.json
+        urls = data.get("urls", [])
+        
+        if not urls or not isinstance(urls, list):
+            abort(400, description="Expected 'urls' as an array")
+        
+        results = {
+            "total": len(urls),
+            "success": 0,
+            "failed": 0,
+            "skipped": 0,
+            "errors": []
+        }
+        
+        for url_str in urls:
+            url_str = url_str.strip()
+            if not url_str:
+                continue
+            
+            try:
+                # Validate URL using Pydantic
+                from pydantic import HttpUrl
+                validated_url = HttpUrl(url_str)
+                feed_url = str(validated_url)
+                
+                # Generate ID
+                feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
+                
+                # Check if feed already exists
+                existing = fetch_from_couchdb("feeds", feed_id)
+                if existing:
+                    results["skipped"] += 1
+                    continue
+                
+                # Fetch favicon for the feed
+                favicon_url = fetch_favicon_url(feed_url)
+                
+                feed_doc = {
+                    "_id": feed_id,
+                    "url": feed_url,
+                    "title": "",  # Will be filled by first fetch
+                    "category": "imported",
+                    "added_at": datetime.now().isoformat(),
+                    "favicon_url": favicon_url
+                }
+                
+                if update_couchdb_doc("feeds", feed_id, feed_doc):
+                    results["success"] += 1
+                else:
+                    results["failed"] += 1
+                    results["errors"].append({"url": url_str, "error": "Failed to store in database"})
+                    
+            except Exception as e:
+                results["failed"] += 1
+                results["errors"].append({"url": url_str, "error": str(e)})
+        
+        return jsonify(results), 200
+        
+    except Exception as e:
+        abort(500, description=f"Bulk import failed: {str(e)}")
+
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
