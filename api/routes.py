@@ -57,10 +57,12 @@ def requires_auth(f):
     return decorated
 
 def get_config_doc():
-    """Helper to get the main config doc."""
+    """Helper to get the main config doc. Returns None if config doesn't exist or DB is unavailable."""
     try:
         return fetch_from_couchdb("config", "main")
-    except Exception:
+    except (ConnectionError, TimeoutError, OSError) as e:
+        # Expected: Database connectivity issues
+        print(f"Warning: Could not fetch config from database: {e}")
         return None
 
 def get_public_read_setting():
@@ -190,74 +192,76 @@ def refresh_feeds():
 @limiter.limit("5 per hour")  # Strict rate limit for bulk operations
 def bulk_import_feeds():
     """Import multiple feeds from a list of URLs. Limited to 50 URLs per request."""
-    try:
-        data = request.json
-        urls = data.get("urls", [])
+    # Validate request body
+    if not request.json:
+        abort(400, description="Request body must be JSON")
+    
+    data = request.json
+    urls = data.get("urls", [])
+    
+    if not urls or not isinstance(urls, list):
+        abort(400, description="Expected 'urls' as an array")
+    
+    # Security: Limit bulk import size to prevent DoS
+    MAX_BULK_IMPORT_SIZE = 50
+    if len(urls) > MAX_BULK_IMPORT_SIZE:
+        abort(400, description=f"Too many URLs. Maximum {MAX_BULK_IMPORT_SIZE} URLs per request.")
+    
+    results = {
+        "total": len(urls),
+        "success": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errors": []
+    }
+    
+    for url_str in urls:
+        url_str = url_str.strip()
+        if not url_str:
+            continue
         
-        if not urls or not isinstance(urls, list):
-            abort(400, description="Expected 'urls' as an array")
-        
-        # Security: Limit bulk import size to prevent DoS
-        MAX_BULK_IMPORT_SIZE = 50
-        if len(urls) > MAX_BULK_IMPORT_SIZE:
-            abort(400, description=f"Too many URLs. Maximum {MAX_BULK_IMPORT_SIZE} URLs per request.")
-        
-        results = {
-            "total": len(urls),
-            "success": 0,
-            "failed": 0,
-            "skipped": 0,
-            "errors": []
-        }
-        
-        for url_str in urls:
-            url_str = url_str.strip()
-            if not url_str:
+        try:
+            # Validate URL using Pydantic
+            from pydantic import HttpUrl
+            validated_url = HttpUrl(url_str)
+            feed_url = str(validated_url)
+            
+            # Generate ID
+            feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
+            
+            # Check if feed already exists
+            existing = fetch_from_couchdb("feeds", feed_id)
+            if existing:
+                results["skipped"] += 1
                 continue
             
-            try:
-                # Validate URL using Pydantic
-                from pydantic import HttpUrl
-                validated_url = HttpUrl(url_str)
-                feed_url = str(validated_url)
-                
-                # Generate ID
-                feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
-                
-                # Check if feed already exists
-                existing = fetch_from_couchdb("feeds", feed_id)
-                if existing:
-                    results["skipped"] += 1
-                    continue
-                
-                # Security: Skip favicon fetching during bulk import to prevent DoS
-                # Favicon will be fetched on first feed refresh
-                feed_doc = {
-                    "_id": feed_id,
-                    "url": feed_url,
-                    "title": "",  # Will be filled by first fetch
-                    "category": "imported",
-                    "added_at": datetime.now().isoformat(),
-                    "favicon_url": None  # Will be fetched on first feed refresh
-                }
-                
-                if update_couchdb_doc("feeds", feed_id, feed_doc):
-                    results["success"] += 1
-                else:
-                    results["failed"] += 1
-                    results["errors"].append({"url": url_str, "error": "Failed to store in database"})
-                    
-            except Exception as e:
+            # Security: Skip favicon fetching during bulk import to prevent DoS
+            # Favicon will be fetched on first feed refresh
+            feed_doc = {
+                "_id": feed_id,
+                "url": feed_url,
+                "title": "",  # Will be filled by first fetch
+                "category": "imported",
+                "added_at": datetime.now().isoformat(),
+                "favicon_url": None  # Will be fetched on first feed refresh
+            }
+            
+            if update_couchdb_doc("feeds", feed_id, feed_doc):
+                results["success"] += 1
+            else:
                 results["failed"] += 1
-                results["errors"].append({"url": url_str, "error": str(e)})
-        
-        return jsonify(results), 200
-        
-    except Exception as e:
-        abort(500, description=f"Bulk import failed: {str(e)}")
-
-    # Fallback explicit return to avoid implicit None on fall-through
-    return jsonify({"status": "error"}), 500
+                results["errors"].append({"url": url_str, "error": "Failed to store in database"})
+                
+        except ValidationError as e:
+            # Expected: Invalid URL format
+            results["failed"] += 1
+            results["errors"].append({"url": url_str, "error": f"Invalid URL: {str(e)}"})
+        except ValueError as e:
+            # Expected: Pydantic URL validation errors
+            results["failed"] += 1
+            results["errors"].append({"url": url_str, "error": f"Invalid URL: {str(e)}"})
+    
+    return jsonify(results), 200
 
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
