@@ -159,16 +159,34 @@ const handleFaviconError = (event: Event) => {
   img.style.display = 'none'
 }
 
+let bulkImportKeydownListenerAttached = false
+
+const handleBulkImportKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    closeBulkImportModal()
+  }
+}
+
 const openBulkImportModal = () => {
   showBulkImportModal.value = true
   bulkImportText.value = ''
   bulkImportResults.value = null
+
+  if (!bulkImportKeydownListenerAttached) {
+    window.addEventListener('keydown', handleBulkImportKeydown)
+    bulkImportKeydownListenerAttached = true
+  }
 }
 
 const closeBulkImportModal = () => {
   showBulkImportModal.value = false
   bulkImportText.value = ''
   bulkImportResults.value = null
+
+  if (bulkImportKeydownListenerAttached) {
+    window.removeEventListener('keydown', handleBulkImportKeydown)
+    bulkImportKeydownListenerAttached = false
+  }
 }
 
 const handleFileUpload = (event: Event) => {
