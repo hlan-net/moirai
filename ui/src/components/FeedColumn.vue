@@ -156,6 +156,13 @@ const bulkImportFeeds = async () => {
     return
   }
   
+  // Client-side validation: match server limit
+  const MAX_BULK_IMPORT_SIZE = 50
+  if (urls.length > MAX_BULK_IMPORT_SIZE) {
+    alert(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`)
+    return
+  }
+  
   bulkImporting.value = true
   try {
     const res = await fetch('/api/feeds/bulk', {
@@ -173,7 +180,8 @@ const bulkImportFeeds = async () => {
         await fetchFeeds()
       }
     } else {
-      alert('Failed to import feeds')
+      const error = await res.text()
+      alert(`Failed to import feeds: ${error}`)
     }
   } catch (e) {
     console.error(e)
@@ -233,6 +241,7 @@ const bulkImportFeeds = async () => {
         
         <div v-if="!bulkImportResults" class="modal-body">
           <p>Paste feed URLs below (one per line) or upload a text file:</p>
+          <p class="import-limit-notice">⚠️ Maximum 50 URLs per import (security limit)</p>
           
           <div class="file-upload-section">
             <input type="file" accept=".txt,.opml" @change="handleFileUpload" />
@@ -459,6 +468,15 @@ h2 {
 }
 .modal-body {
   padding: 20px;
+}
+.import-limit-notice {
+  color: #ff9800;
+  font-size: 0.9rem;
+  margin: 5px 0 15px 0;
+  padding: 8px;
+  background: #fff3e0;
+  border-left: 3px solid #ff9800;
+  border-radius: 4px;
 }
 .file-upload-section {
   margin-bottom: 15px;

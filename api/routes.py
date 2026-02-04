@@ -187,14 +187,20 @@ def refresh_feeds():
     return jsonify({"status": "started", "count": count})
 
 @api_blueprint.route("/feeds/bulk", methods=["POST"])
+@limiter.limit("5 per hour")  # Strict rate limit for bulk operations
 def bulk_import_feeds():
-    """Import multiple feeds from a list of URLs."""
+    """Import multiple feeds from a list of URLs. Limited to 50 URLs per request."""
     try:
         data = request.json
         urls = data.get("urls", [])
         
         if not urls or not isinstance(urls, list):
             abort(400, description="Expected 'urls' as an array")
+        
+        # Security: Limit bulk import size to prevent DoS
+        MAX_BULK_IMPORT_SIZE = 50
+        if len(urls) > MAX_BULK_IMPORT_SIZE:
+            abort(400, description=f"Too many URLs. Maximum {MAX_BULK_IMPORT_SIZE} URLs per request.")
         
         results = {
             "total": len(urls),
@@ -224,16 +230,15 @@ def bulk_import_feeds():
                     results["skipped"] += 1
                     continue
                 
-                # Fetch favicon for the feed
-                favicon_url = fetch_favicon_url(feed_url)
-                
+                # Security: Skip favicon fetching during bulk import to prevent DoS
+                # Favicon will be fetched on first feed refresh
                 feed_doc = {
                     "_id": feed_id,
                     "url": feed_url,
                     "title": "",  # Will be filled by first fetch
                     "category": "imported",
                     "added_at": datetime.now().isoformat(),
-                    "favicon_url": favicon_url
+                    "favicon_url": None  # Will be fetched on first feed refresh
                 }
                 
                 if update_couchdb_doc("feeds", feed_id, feed_doc):
