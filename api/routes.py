@@ -7,7 +7,7 @@ from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
 from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
-from pydantic import ValidationError
+from pydantic import ValidationError, HttpUrl
 from .validation import (
     FeedCreateRequest, FeedUpdateRequest,
     EventCreateRequest, EventUpdateRequest,
@@ -125,7 +125,7 @@ def create_feed():
         "url": feed_url,
         "title": validated.title,
         "category": validated.category or "general",
-        "added_at": datetime.now().isoformat(),
+        "added_at": datetime.now(timezone.utc).isoformat(),
         "favicon_url": favicon_url
     }
     
@@ -222,7 +222,6 @@ def bulk_import_feeds():
         
         try:
             # Validate URL using Pydantic
-            from pydantic import HttpUrl
             validated_url = HttpUrl(url_str)
             feed_url = str(validated_url)
             
@@ -242,7 +241,7 @@ def bulk_import_feeds():
                 "url": feed_url,
                 "title": "",  # Will be filled by first fetch
                 "category": "imported",
-                "added_at": datetime.now().isoformat(),
+                "added_at": datetime.now(timezone.utc).isoformat(),
                 "favicon_url": None  # Will be fetched on first feed refresh
             }
             
