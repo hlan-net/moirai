@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 
 interface Feed {
   _id: string;
@@ -18,6 +18,44 @@ const showBulkImportModal = ref(false)
 const bulkImportText = ref('')
 const bulkImporting = ref(false)
 const bulkImportResults = ref<any>(null)
+const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
+
+// URL validation function
+const isValidUrl = (urlString: string): boolean => {
+  try {
+    const url = new URL(urlString)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+// Extract and validate URLs from text
+const extractValidUrls = (text: string): string[] => {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && isValidUrl(line))
+}
+
+// Computed: Check if import button should be enabled
+const canImport = computed(() => {
+  if (!bulkImportText.value.trim()) return false
+  const validUrls = extractValidUrls(bulkImportText.value)
+  return validUrls.length > 0 && validUrls.length <= 50
+})
+
+// Computed: URL count for display
+const urlCount = computed(() => {
+  return extractValidUrls(bulkImportText.value).length
+})
+
+const showNotification = (message: string, type: 'error' | 'success' | 'warning') => {
+  notification.value = { message, type }
+  setTimeout(() => {
+    notification.value = null
+  }, 5000) // Auto-dismiss after 5 seconds
+}
 
 const fetchFeeds = async () => {
   try {
@@ -146,20 +184,17 @@ const handleFileUpload = (event: Event) => {
 }
 
 const bulkImportFeeds = async () => {
-  const urls = bulkImportText.value
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line && line.startsWith('http'))
+  const urls = extractValidUrls(bulkImportText.value)
   
   if (urls.length === 0) {
-    alert('No valid URLs found. Please enter URLs starting with http:// or https://')
+    showNotification('No valid URLs found. Please enter URLs starting with http:// or https://', 'warning')
     return
   }
   
   // Client-side validation: match server limit
   const MAX_BULK_IMPORT_SIZE = 50
   if (urls.length > MAX_BULK_IMPORT_SIZE) {
-    alert(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`)
+    showNotification(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`, 'warning')
     return
   }
   
@@ -175,17 +210,45 @@ const bulkImportFeeds = async () => {
       const results = await res.json()
       bulkImportResults.value = results
       
-      // Refresh feed list
+      // Show success notification
       if (results.success > 0) {
+        showNotification(`Successfully imported ${results.success} feed${results.success > 1 ? 's' : ''}!`, 'success')
         await fetchFeeds()
       }
+      
+      // Show warning if some failed
+      if (results.failed > 0 && results.success === 0) {
+        showNotification(`Failed to import ${results.failed} feed${results.failed > 1 ? 's' : ''}. See details below.`, 'error')
+      }
     } else {
-      const error = await res.text()
-      alert(`Failed to import feeds: ${error}`)
+      const errorText = await res.text()
+      let errorMessage = 'Failed to import feeds'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.description || errorJson.error || errorMessage
+      } catch {
+        errorMessage = errorText || errorMessage
+      }
+      bulkImportResults.value = {
+        total: urls.length,
+        success: 0,
+        failed: urls.length,
+        skipped: 0,
+        errors: [{ url: 'Request failed', error: errorMessage }]
+      }
+      showNotification(errorMessage, 'error')
     }
   } catch (e) {
     console.error(e)
-    alert('Error importing feeds')
+    const errorMessage = e instanceof Error ? e.message : 'Network error occurred'
+    bulkImportResults.value = {
+      total: urls.length,
+      success: 0,
+      failed: urls.length,
+      skipped: 0,
+      errors: [{ url: 'Network error', error: errorMessage }]
+    }
+    showNotification(`Error importing feeds: ${errorMessage}`, 'error')
   } finally {
     bulkImporting.value = false
   }
@@ -254,8 +317,17 @@ const bulkImportFeeds = async () => {
             class="bulk-import-textarea"
           ></textarea>
           
+          <div v-if="bulkImportText.trim()" class="url-preview">
+            <span v-if="urlCount > 0" class="url-count-valid">
+              {{ urlCount }} valid URL{{ urlCount !== 1 ? 's' : '' }} found
+            </span>
+            <span v-else class="url-count-invalid">
+              No valid URLs found
+            </span>
+          </div>
+          
           <div class="modal-actions">
-            <button @click="bulkImportFeeds" :disabled="bulkImporting || !bulkImportText.trim()" class="import-btn">
+            <button @click="bulkImportFeeds" :disabled="bulkImporting || !canImport" class="import-btn">
               {{ bulkImporting ? 'Importing...' : 'Import Feeds' }}
             </button>
             <button @click="closeBulkImportModal" class="cancel-btn">Cancel</button>
@@ -285,6 +357,11 @@ const bulkImportFeeds = async () => {
           </div>
         </div>
       </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
+      {{ notification.message }}
     </div>
   </div>
 </template>
@@ -491,6 +568,19 @@ h2 {
   resize: vertical;
   box-sizing: border-box;
 }
+.url-preview {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.url-count-valid {
+  color: #42b983;
+}
+.url-count-invalid {
+  color: #ff9800;
+}
 .modal-actions {
   display: flex;
   gap: 10px;
@@ -564,5 +654,45 @@ h2 {
 .error-details li {
   margin: 5px 0;
   font-size: 0.9rem;
+}
+
+/* Notification Toast */
+.notification-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.95rem;
+  font-weight: 500;
+  z-index: 2000;
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.notification-success {
+  background: #d4edda;
+  color: #155724;
+  border-left: 4px solid #28a745;
+}
+.notification-error {
+  background: #f8d7da;
+  color: #721c24;
+  border-left: 4px solid #dc3545;
+}
+.notification-warning {
+  background: #fff3cd;
+  color: #856404;
+  border-left: 4px solid #ffc107;
 }
 </style>
