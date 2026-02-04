@@ -3,17 +3,23 @@ import requests
 import os
 import uuid
 import time
+import secrets
 
 # Configuration
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8088")
-API_USERNAME = os.environ.get("API_USERNAME", "admin")
-API_PASSWORD = os.environ.get("API_PASSWORD", "changeme")
+# Generate random credentials per test run if not provided via environment
+# This avoids hardcoded credentials flagged as security hotspots by SonarQube
+API_USERNAME = os.environ.get("API_USERNAME") or f"test_user_{secrets.token_hex(8)}"
+API_PASSWORD = os.environ.get("API_PASSWORD") or secrets.token_urlsafe(32)
 
 # Track last bulk import call time to manage rate limiting
 # Note: Global variables are safe here because tests run sequentially due to rate limiting.
 # If parallel execution is needed in the future, consider using pytest fixtures with session scope.
 _rate_limit_window_start = 0
 _bulk_call_count = 0
+
+# Maximum wait time to prevent DoS via excessive sleep (SonarQube security hotspot)
+MAX_RATE_LIMIT_WAIT = 65  # seconds
 
 def wait_for_rate_limit():
     """Helper to wait for rate limit before making bulk API calls (5 per minute)"""
@@ -29,6 +35,8 @@ def wait_for_rate_limit():
     if _bulk_call_count >= 5:
         elapsed = current_time - _rate_limit_window_start
         wait_time = 60 - elapsed + 1  # Add 1 second buffer
+        # Cap wait time to prevent excessive delays (SonarQube security hotspot)
+        wait_time = min(wait_time, MAX_RATE_LIMIT_WAIT)
         if wait_time > 0:
             time.sleep(wait_time)
         # Reset window
