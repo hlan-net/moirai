@@ -6,6 +6,7 @@ interface Feed {
   url: string;
   title?: string;
   category?: string;
+  favicon_url?: string;
 }
 
 const feeds = ref<Feed[]>([])
@@ -109,6 +110,12 @@ function getHostname(urlStr: string) {
 const openFeedInNewTab = (url: string) => {
   window.open(url, '_blank')
 }
+
+const handleFaviconError = (event: Event) => {
+  // Hide the image if it fails to load
+  const img = event.target as HTMLImageElement
+  img.style.display = 'none'
+}
 </script>
 
 <template>
@@ -131,7 +138,11 @@ const openFeedInNewTab = (url: string) => {
           </div>
         </div>
         <div v-else class="feed-info">
-          <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
+          <div class="feed-name-container">
+            <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="feed.title || 'Feed icon'" @error="handleFaviconError" />
+            <span v-else class="feed-favicon-placeholder">📰</span>
+            <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
+          </div>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions">
@@ -201,6 +212,25 @@ h2 {
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+}
+.feed-name-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.feed-favicon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.feed-favicon-placeholder {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
 }
 .feed-link {
   color: #42b983;

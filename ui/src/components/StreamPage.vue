@@ -4,6 +4,7 @@ import { articleCache, type Article } from '../utils/articleCache'
 
 interface ArticleGroup {
   title: string;
+  favicon?: string;
   articles: Article[];
 }
 
@@ -29,6 +30,7 @@ const groupedArticles = computed(() => {
   const groups: ArticleGroup[] = []
   let currentGroup: ArticleGroup = {
     title: articles.value[0].feed_title || getHostname(articles.value[0].feed_url),
+    favicon: articles.value[0].feed_favicon,
     articles: [articles.value[0]]
   }
 
@@ -41,6 +43,7 @@ const groupedArticles = computed(() => {
       groups.push(currentGroup)
       currentGroup = {
         title: articleFeedTitle,
+        favicon: article.feed_favicon,
         articles: [article]
       }
     }
@@ -214,6 +217,12 @@ const toggleExpand = (id: string) => {
     expandedArticles.value.add(id)
   }
 }
+
+const handleFaviconError = (event: Event) => {
+  // Hide the image if it fails to load
+  const img = event.target as HTMLImageElement
+  img.style.display = 'none'
+}
 </script>
 
 <template>
@@ -237,7 +246,11 @@ const toggleExpand = (id: string) => {
     
     <div v-else-if="articles.length" class="stream-container">
       <div v-for="(group, index) in groupedArticles" :key="index" class="feed-group">
-        <h3 class="group-title">{{ group.title }}</h3>
+        <h3 class="group-title">
+          <img v-if="group.favicon" :src="group.favicon" class="group-favicon" :alt="group.title" @error="handleFaviconError" />
+          <span v-else class="group-favicon-placeholder">📰</span>
+          {{ group.title }}
+        </h3>
         <div v-for="article in group.articles" :key="article._id" class="stream-item">
           <h4 class="item-title">
               <a :href="article.link" target="_blank">{{ article.title }}</a>
@@ -373,6 +386,25 @@ const toggleExpand = (id: string) => {
   padding-bottom: 10px;
   margin-bottom: 20px;
   text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-favicon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.group-favicon-placeholder {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 20px;
+  text-align: center;
 }
 
 .stream-item {

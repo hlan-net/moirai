@@ -18,6 +18,7 @@ export interface Article {
   events?: string[]
   trends?: string[]
   feed_title?: string
+  feed_favicon?: string
   cached_at?: string
 }
 

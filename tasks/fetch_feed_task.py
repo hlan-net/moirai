@@ -8,6 +8,7 @@ import requests
 from urllib.parse import quote
 from datetime import datetime
 from .article_processor import ArticleProcessor
+from .favicon_fetcher import fetch_favicon_url
 
 class FetchFeedTask(threading.Thread):
     def __init__(self, url, delay_ignored=0):
@@ -63,7 +64,7 @@ class FetchFeedTask(threading.Thread):
                     is_redirect = True
                     print(f"Redirect detected: {self.url} -> {final_url}")
 
-            # 1. Update Registry (Title + potentially new URL)
+            # 1. Update Registry (Title + potentially new URL + favicon)
             url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
             try:
                 res = requests.get(f"{self.registry_url}/{url_hash}")
@@ -78,18 +79,28 @@ class FetchFeedTask(threading.Thread):
                     if is_redirect and reg_doc.get("url") != final_url:
                         reg_doc["url"] = final_url
                         needs_update = True
+                    
+                    # Fetch and store favicon if not already present
+                    if not reg_doc.get("favicon_url"):
+                        favicon_url = fetch_favicon_url(final_url if is_redirect else self.url)
+                        if favicon_url:
+                            reg_doc["favicon_url"] = favicon_url
+                            needs_update = True
                         
                     if needs_update:
                         print(f"Updating registry for {self.url} (Title: {feed_title}, URL: {final_url})")
                         requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
                 elif res.status_code == 404:
                     print(f"Registering new feed: {self.url}")
+                    # Fetch favicon for new feed
+                    favicon_url = fetch_favicon_url(final_url if is_redirect else self.url)
                     reg_doc = {
                         "_id": url_hash,
                         "url": final_url if is_redirect else self.url,
                         "title": feed_title or "Unknown Feed",
                         "added_at": datetime.now().isoformat(),
-                        "category": "auto-discovered"
+                        "category": "auto-discovered",
+                        "favicon_url": favicon_url
                     }
                     requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
             except Exception as e:
