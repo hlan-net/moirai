@@ -7,7 +7,7 @@ from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
 from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
-from pydantic import ValidationError, HttpUrl
+from pydantic import ValidationError
 from .validation import (
     FeedCreateRequest, FeedUpdateRequest,
     EventCreateRequest, EventUpdateRequest,
@@ -221,9 +221,9 @@ def bulk_import_feeds():
             continue
         
         try:
-            # Validate URL using Pydantic
-            validated_url = HttpUrl(url_str)
-            feed_url = str(validated_url)
+            # Validate URL using FeedCreateRequest for consistency with create_feed endpoint
+            validated = FeedCreateRequest(url=url_str)
+            feed_url = str(validated.url)
             
             # Generate ID
             feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()

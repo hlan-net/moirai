@@ -165,21 +165,70 @@ const handleFaviconError = (event: Event) => {
   img.style.display = 'none'
 }
 
+let bulkImportKeydownListenerAttached = false
+
+const handleBulkImportKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    closeBulkImportModal()
+  }
+}
+
 const openBulkImportModal = () => {
   // Store the currently focused element to restore later
   previousActiveElement.value = document.activeElement as HTMLElement
   showBulkImportModal.value = true
   bulkImportText.value = ''
   bulkImportResults.value = null
+
+  if (!bulkImportKeydownListenerAttached) {
+    window.addEventListener('keydown', handleBulkImportKeydown)
+    bulkImportKeydownListenerAttached = true
+  }
 }
 
 const closeBulkImportModal = () => {
   showBulkImportModal.value = false
   bulkImportText.value = ''
   bulkImportResults.value = null
+
+  // Remove keyboard event listener
+  if (bulkImportKeydownListenerAttached) {
+    window.removeEventListener('keydown', handleBulkImportKeydown)
+    bulkImportKeydownListenerAttached = false
+  }
+
   // Restore focus to the element that opened the modal
   if (previousActiveElement.value) {
     previousActiveElement.value.focus()
+  }
+}
+
+const parseOpmlFile = (xmlContent: string): string[] => {
+  try {
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
+    
+    // Check for parsing errors
+    const parserError = xmlDoc.querySelector('parsererror')
+    if (parserError) {
+      throw new Error('Invalid OPML/XML format')
+    }
+    
+    // Extract feed URLs from <outline> elements with xmlUrl attribute
+    const outlines = xmlDoc.querySelectorAll('outline[xmlUrl]')
+    const urls: string[] = []
+    
+    outlines.forEach(outline => {
+      const xmlUrl = outline.getAttribute('xmlUrl')
+      if (xmlUrl && isValidUrl(xmlUrl)) {
+        urls.push(xmlUrl)
+      }
+    })
+    
+    return urls
+  } catch (error) {
+    console.error('OPML parsing error:', error)
+    throw new Error('Failed to parse OPML file. Please ensure it is a valid OPML format.')
   }
 }
 
@@ -235,7 +284,27 @@ const handleFileUpload = (event: Event) => {
   
   const reader = new FileReader()
   reader.onload = (e) => {
-    bulkImportText.value = e.target?.result as string
+    const content = e.target?.result as string
+    
+    // Check if file is OPML based on extension
+    if (file.name.toLowerCase().endsWith('.opml')) {
+      try {
+        const urls = parseOpmlFile(content)
+        if (urls.length === 0) {
+          showNotification('No valid feed URLs found in OPML file', 'warning')
+        } else {
+          bulkImportText.value = urls.join('\n')
+          showNotification(`Found ${urls.length} feed URL${urls.length !== 1 ? 's' : ''} in OPML file`, 'success')
+        }
+      } catch (error) {
+        showNotification(error instanceof Error ? error.message : 'Failed to parse OPML file', 'error')
+        // Clear the file input
+        input.value = ''
+      }
+    } else {
+      // Plain text file - use as-is
+      bulkImportText.value = content
+    }
   }
   reader.readAsText(file)
 }
@@ -249,7 +318,7 @@ const bulkImportFeeds = async () => {
   }
   
   // Client-side validation: match server limit
-  const MAX_BULK_IMPORT_SIZE = 50
+  const MAX_BULK_IMPORT_SIZE = 100
   if (urls.length > MAX_BULK_IMPORT_SIZE) {
     showNotification(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`, 'warning')
     return
