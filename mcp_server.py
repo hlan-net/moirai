@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP, Context
 from starlette_prometheus import PrometheusMiddleware, metrics
+from tasks.favicon_fetcher import fetch_favicon_url
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
@@ -120,10 +121,14 @@ def validate_namespace(namespace: str):
 @mcp.tool()
 def add_feed(url: str, category: str = "general") -> str:
     """Add a new RSS feed to the shared global list."""
+    # Fetch favicon for the feed
+    favicon_url = fetch_favicon_url(url)
+    
     feed_doc = {
         "url": url,
         "category": category,
-        "added_at": datetime.now().isoformat()
+        "added_at": datetime.now().isoformat(),
+        "favicon_url": favicon_url
     }
     # Use URL hash as ID
     doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()

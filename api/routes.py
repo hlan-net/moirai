@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
+from tasks.favicon_fetcher import fetch_favicon_url
 from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
 from pydantic import ValidationError
 from .validation import (
@@ -114,12 +115,16 @@ def create_feed():
     # Generate ID
     feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
     
+    # Fetch favicon for the feed
+    favicon_url = fetch_favicon_url(feed_url)
+    
     feed_doc = {
         "_id": feed_id,
         "url": feed_url,
         "title": validated.title,
         "category": validated.category or "general",
-        "added_at": datetime.now().isoformat()
+        "added_at": datetime.now().isoformat(),
+        "favicon_url": favicon_url
     }
     
     if update_couchdb_doc("feeds", feed_id, feed_doc):
@@ -215,6 +220,7 @@ def list_articles():
     total_count = len(all_articles)
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
+    feed_favicon_map = {feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")}
     
     # Build article link to event IDs and event names mappings
     article_link_to_event_ids = {}
@@ -263,6 +269,8 @@ def list_articles():
         feed_url = article.get("feed_url")
         if feed_url in feed_title_map:
             article["feed_title"] = feed_title_map[feed_url]
+        if feed_url in feed_favicon_map and feed_favicon_map[feed_url]:
+            article["feed_favicon"] = feed_favicon_map[feed_url]
         
         article_link = article.get("link")
         if article_link in article_event_map:
