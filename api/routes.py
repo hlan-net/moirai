@@ -251,6 +251,9 @@ def bulk_import_feeds():
     except Exception as e:
         abort(500, description=f"Bulk import failed: {str(e)}")
 
+    # Fallback explicit return to avoid implicit None on fall-through
+    return jsonify({"status": "error"}), 500
+
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
