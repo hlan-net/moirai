@@ -50,10 +50,11 @@ async def run_agent(user_message, history, model=None, namespace=None, llm_endpo
     
     system_prompt += (
         "You DO NOT have access to real-time information or the internet directly. "
-        "You MUST use the provided tools (like `list_feeds`, `read_feed`) to fetch any news or external data. "
+        "You MUST use the provided tools (like `list_feeds`, `read_feed`, `list_articles`) to fetch any news or external data. "
         "Do not hallucinate headlines. If you need news, CALL A TOOL. "
-        "When asked for news, FIRST check the available feeds using `list_feeds`. "
-        "If no relevant feeds are found, you can try to `read_feed` with a GUESSED URL, but ensure it is a valid RSS/Atom feed URL. "
+        "When asked for recent articles or news, use `list_articles` to see what's already in the database. "
+        "To fetch fresh articles from a specific feed, use `read_feed` with the feed URL. "
+        "To see available feeds, use `list_feeds`. "
         "Some reliable Linux news feeds are: LWN (https://lwn.net/headlines/rss), Phoronix (https://www.phoronix.com/phoronix-rss.php), "
         "and Kernel.org (https://www.kernel.org/feeds/kall.xml)."
     )
