@@ -221,11 +221,9 @@ const handleModalKeydown = (event: KeyboardEvent) => {
 watch(showBulkImportModal, async (isOpen) => {
   if (isOpen) {
     await nextTick()
-    // Move focus to the first interactive element (textarea or file input)
+    // Move focus to the textarea as the primary interaction element
     if (textareaRef.value) {
       textareaRef.value.focus()
-    } else if (fileInputRef.value) {
-      fileInputRef.value.focus()
     }
   }
 })
