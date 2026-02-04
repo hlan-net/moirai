@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, watch, nextTick } from 'vue'
 
 interface Feed {
   _id: string;
@@ -16,6 +16,54 @@ const loading = ref(true)
 const refreshing = ref(false)
 const renamingFeedId = ref<string | null>(null)
 const newFeedTitle = ref('')
+const showBulkImportModal = ref(false)
+const bulkImportText = ref('')
+const bulkImporting = ref(false)
+const bulkImportResults = ref<any>(null)
+const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
+
+// Refs for modal accessibility
+const modalContentRef = ref<HTMLElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const previousActiveElement = ref<HTMLElement | null>(null)
+
+// URL validation function
+const isValidUrl = (urlString: string): boolean => {
+  try {
+    const url = new URL(urlString)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+// Extract and validate URLs from text
+const extractValidUrls = (text: string): string[] => {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && isValidUrl(line))
+}
+
+// Computed: Check if import button should be enabled
+const canImport = computed(() => {
+  if (!bulkImportText.value.trim()) return false
+  const validUrls = extractValidUrls(bulkImportText.value)
+  return validUrls.length > 0 && validUrls.length <= 50
+})
+
+// Computed: URL count for display
+const urlCount = computed(() => {
+  return extractValidUrls(bulkImportText.value).length
+})
+
+const showNotification = (message: string, type: 'error' | 'success' | 'warning') => {
+  notification.value = { message, type }
+  setTimeout(() => {
+    notification.value = null
+  }, 5000) // Auto-dismiss after 5 seconds
+}
 
 const fetchFeeds = async () => {
   try {
@@ -118,15 +166,233 @@ const handleFaviconError = (event: Event) => {
   const img = event.target as HTMLImageElement
   img.style.display = 'none'
 }
+
+let bulkImportKeydownListenerAttached = false
+
+const handleBulkImportKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' || event.key === 'Esc') {
+    closeBulkImportModal()
+  }
+}
+
+const openBulkImportModal = () => {
+  // Store the currently focused element to restore later
+  previousActiveElement.value = document.activeElement as HTMLElement
+  showBulkImportModal.value = true
+  bulkImportText.value = ''
+  bulkImportResults.value = null
+
+  if (!bulkImportKeydownListenerAttached) {
+    window.addEventListener('keydown', handleBulkImportKeydown)
+    bulkImportKeydownListenerAttached = true
+  }
+}
+
+const closeBulkImportModal = () => {
+  showBulkImportModal.value = false
+  bulkImportText.value = ''
+  bulkImportResults.value = null
+
+  // Remove keyboard event listener
+  if (bulkImportKeydownListenerAttached) {
+    window.removeEventListener('keydown', handleBulkImportKeydown)
+    bulkImportKeydownListenerAttached = false
+  }
+
+  // Restore focus to the element that opened the modal
+  if (previousActiveElement.value) {
+    previousActiveElement.value.focus()
+  }
+}
+
+const parseOpmlFile = (xmlContent: string): string[] => {
+  try {
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
+    
+    // Check for parsing errors
+    const parserError = xmlDoc.querySelector('parsererror')
+    if (parserError) {
+      throw new Error('Invalid OPML/XML format')
+    }
+    
+    // Extract feed URLs from <outline> elements with xmlUrl attribute
+    const outlines = xmlDoc.querySelectorAll('outline[xmlUrl]')
+    const urls: string[] = []
+    
+    outlines.forEach(outline => {
+      const xmlUrl = outline.getAttribute('xmlUrl')
+      if (xmlUrl && isValidUrl(xmlUrl)) {
+        urls.push(xmlUrl)
+      }
+    })
+    
+    return urls
+  } catch (error) {
+    console.error('OPML parsing error:', error)
+    throw new Error('Failed to parse OPML file. Please ensure it is a valid OPML format.')
+  }
+}
+
+// Focus trap: handle Tab key to keep focus within modal
+const handleModalKeydown = (event: KeyboardEvent) => {
+  if (!modalContentRef.value) return
+  
+  // Close modal on Escape
+  if (event.key === 'Escape') {
+    closeBulkImportModal()
+    return
+  }
+  
+  // Focus trap: keep focus within modal when pressing Tab
+  if (event.key === 'Tab') {
+    const focusableElements = modalContentRef.value.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0] as HTMLElement
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+    
+    if (event.shiftKey) {
+      // Shift + Tab: if focus is on first element, move to last
+      if (document.activeElement === firstElement) {
+        event.preventDefault()
+        lastElement.focus()
+      }
+    } else {
+      // Tab: if focus is on last element, move to first
+      if (document.activeElement === lastElement) {
+        event.preventDefault()
+        firstElement.focus()
+      }
+    }
+  }
+}
+
+// Watch for modal open/close to manage focus
+watch(showBulkImportModal, async (isOpen) => {
+  if (isOpen) {
+    await nextTick()
+    // Move focus to the textarea as the primary interaction element
+    if (textareaRef.value) {
+      textareaRef.value.focus()
+    }
+  }
+})
+
+const handleFileUpload = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const content = e.target?.result as string
+    
+    // Check if file is OPML based on extension
+    if (file.name.toLowerCase().endsWith('.opml')) {
+      try {
+        const urls = parseOpmlFile(content)
+        if (urls.length === 0) {
+          showNotification('No valid feed URLs found in OPML file', 'warning')
+        } else {
+          bulkImportText.value = urls.join('\n')
+          showNotification(`Found ${urls.length} feed URL${urls.length !== 1 ? 's' : ''} in OPML file`, 'success')
+        }
+      } catch (error) {
+        showNotification(error instanceof Error ? error.message : 'Failed to parse OPML file', 'error')
+        // Clear the file input
+        input.value = ''
+      }
+    } else {
+      // Plain text file - use as-is
+      bulkImportText.value = content
+    }
+  }
+  reader.readAsText(file)
+}
+
+const bulkImportFeeds = async () => {
+  const urls = extractValidUrls(bulkImportText.value)
+  
+  if (urls.length === 0) {
+    showNotification('No valid URLs found. Please enter URLs starting with http:// or https://', 'warning')
+    return
+  }
+  
+  // Client-side validation: match server limit
+  const MAX_BULK_IMPORT_SIZE = 100
+  if (urls.length > MAX_BULK_IMPORT_SIZE) {
+    showNotification(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`, 'warning')
+    return
+  }
+  
+  bulkImporting.value = true
+  try {
+    const res = await fetch('/api/feeds/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls })
+    })
+    
+    if (res.ok) {
+      const results = await res.json()
+      bulkImportResults.value = results
+      
+      // Show success notification
+      if (results.success > 0) {
+        showNotification(`Successfully imported ${results.success} feed${results.success > 1 ? 's' : ''}!`, 'success')
+        await fetchFeeds()
+      }
+      
+      // Show warning if some failed
+      if (results.failed > 0 && results.success === 0) {
+        showNotification(`Failed to import ${results.failed} feed${results.failed > 1 ? 's' : ''}. See details below.`, 'error')
+      }
+    } else {
+      const errorText = await res.text()
+      let errorMessage = 'Failed to import feeds'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.description || errorJson.error || errorMessage
+      } catch {
+        errorMessage = errorText || errorMessage
+      }
+      bulkImportResults.value = {
+        total: urls.length,
+        success: 0,
+        failed: urls.length,
+        skipped: 0,
+        errors: [{ url: 'Request failed', error: errorMessage }]
+      }
+      showNotification(errorMessage, 'error')
+    }
+  } catch (e) {
+    console.error(e)
+    const errorMessage = e instanceof Error ? e.message : 'Network error occurred'
+    bulkImportResults.value = {
+      total: urls.length,
+      success: 0,
+      failed: urls.length,
+      skipped: 0,
+      errors: [{ url: 'Network error', error: errorMessage }]
+    }
+    showNotification(`Error importing feeds: ${errorMessage}`, 'error')
+  } finally {
+    bulkImporting.value = false
+  }
+}
 </script>
 
 <template>
   <div class="column-container">
     <div class="column-header">
         <h2>Feeds ({{ feeds.length }})</h2>
-        <button @click="triggerRefresh" :disabled="refreshing" class="refresh-btn" title="Refresh All Feeds">
-            {{ refreshing ? '...' : '↻' }}
-        </button>
+        <div class="header-actions">
+          <button @click="openBulkImportModal" class="bulk-import-btn" title="Bulk Import Feeds">📥</button>
+          <button @click="triggerRefresh" :disabled="refreshing" class="refresh-btn" title="Refresh All Feeds">
+              {{ refreshing ? '...' : '↻' }}
+          </button>
+        </div>
     </div>
 
     <div v-if="loading">Loading...</div>
@@ -156,6 +422,85 @@ const handleFaviconError = (event: Event) => {
       </li>
     </ul>
     <div v-else>No feeds found.</div>
+    
+    <!-- Bulk Import Modal -->
+    <div v-if="showBulkImportModal" class="modal-overlay" @click="closeBulkImportModal">
+      <div 
+        ref="modalContentRef"
+        class="modal-content" 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        @click.stop
+        @keydown="handleModalKeydown"
+      >
+        <div class="modal-header">
+          <h3 id="modal-title">Bulk Import Feeds</h3>
+          <button @click="closeBulkImportModal" class="modal-close" aria-label="Close">×</button>
+        </div>
+        
+        <div v-if="!bulkImportResults" class="modal-body">
+          <p>Paste feed URLs below (one per line) or upload a text file:</p>
+          <p class="import-limit-notice">⚠️ Maximum 50 URLs per import (security limit)</p>
+          
+          <div class="file-upload-section">
+            <input ref="fileInputRef" type="file" accept=".txt,.opml" @change="handleFileUpload" />
+          </div>
+          
+          <textarea 
+            ref="textareaRef"
+            v-model="bulkImportText" 
+            placeholder="https://example.com/feed.xml&#10;https://another.com/rss&#10;..."
+            rows="10"
+            class="bulk-import-textarea"
+          ></textarea>
+          
+          <div v-if="bulkImportText.trim()" class="url-preview">
+            <span v-if="urlCount > 0" class="url-count-valid">
+              {{ urlCount }} valid URL{{ urlCount !== 1 ? 's' : '' }} found
+            </span>
+            <span v-else class="url-count-invalid">
+              No valid URLs found
+            </span>
+          </div>
+          
+          <div class="modal-actions">
+            <button @click="bulkImportFeeds" :disabled="bulkImporting || !canImport" class="import-btn">
+              {{ bulkImporting ? 'Importing...' : 'Import Feeds' }}
+            </button>
+            <button @click="closeBulkImportModal" class="cancel-btn">Cancel</button>
+          </div>
+        </div>
+        
+        <div v-else class="modal-body">
+          <h4>Import Results</h4>
+          <div class="import-results">
+            <p><strong>Total URLs:</strong> {{ bulkImportResults.total }}</p>
+            <p class="success-text"><strong>Successfully imported:</strong> {{ bulkImportResults.success }}</p>
+            <p v-if="bulkImportResults.skipped > 0" class="warning-text"><strong>Skipped (already exist):</strong> {{ bulkImportResults.skipped }}</p>
+            <p v-if="bulkImportResults.failed > 0" class="error-text"><strong>Failed:</strong> {{ bulkImportResults.failed }}</p>
+            
+            <div v-if="bulkImportResults.errors && bulkImportResults.errors.length > 0" class="error-details">
+              <h5>Errors:</h5>
+              <ul>
+                <li v-for="(err, idx) in bulkImportResults.errors" :key="idx">
+                  <strong>{{ err.url }}</strong>: {{ err.error }}
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="modal-actions">
+            <button @click="closeBulkImportModal" class="close-btn">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
+      {{ notification.message }}
+    </div>
   </div>
 </template>
 
@@ -178,7 +523,11 @@ h2 {
   margin: 0;
   color: #42b983;
 }
-.refresh-btn {
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+.bulk-import-btn, .refresh-btn {
     background: none;
     border: 1px solid #ccc;
     padding: 2px 8px;
@@ -187,7 +536,7 @@ h2 {
     font-size: 1.2rem;
     color: var(--text-color);
 }
-.refresh-btn:hover:not(:disabled) {
+.bulk-import-btn:hover, .refresh-btn:hover:not(:disabled) {
     background: var(--button-bg);
     color: var(--primary-color);
     border-color: var(--primary-color);
@@ -294,5 +643,201 @@ h2 {
   display: flex;
   gap: 5px;
   margin-top: 5px;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+.modal-header h3 {
+  margin: 0;
+  color: #42b983;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #999;
+}
+.modal-close:hover {
+  color: #000;
+}
+.modal-body {
+  padding: 20px;
+}
+.import-limit-notice {
+  color: #ff9800;
+  font-size: 0.9rem;
+  margin: 5px 0 15px 0;
+  padding: 8px;
+  background: #fff3e0;
+  border-left: 3px solid #ff9800;
+  border-radius: 4px;
+}
+.file-upload-section {
+  margin-bottom: 15px;
+}
+.bulk-import-textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.url-preview {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.url-count-valid {
+  color: #42b983;
+}
+.url-count-invalid {
+  color: #ff9800;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.import-btn, .cancel-btn, .close-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.import-btn {
+  background: #42b983;
+  color: white;
+}
+.import-btn:hover:not(:disabled) {
+  background: #359268;
+}
+.import-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+.cancel-btn {
+  background: #f5f5f5;
+  color: #333;
+}
+.cancel-btn:hover {
+  background: #e0e0e0;
+}
+.close-btn {
+  background: #42b983;
+  color: white;
+}
+.close-btn:hover {
+  background: #359268;
+}
+.import-results {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+.import-results p {
+  margin: 5px 0;
+}
+.success-text {
+  color: #42b983;
+}
+.warning-text {
+  color: #ff9800;
+}
+.error-text {
+  color: #cc0000;
+}
+.error-details {
+  margin-top: 15px;
+  padding: 10px;
+  background: #fff;
+  border-left: 3px solid #cc0000;
+}
+.error-details h5 {
+  margin-top: 0;
+  color: #cc0000;
+}
+.error-details ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+.error-details li {
+  margin: 5px 0;
+  font-size: 0.9rem;
+}
+
+/* Notification Toast */
+.notification-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.95rem;
+  font-weight: 500;
+  z-index: 2000;
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.notification-success {
+  background: #d4edda;
+  color: #155724;
+  border-left: 4px solid #28a745;
+}
+.notification-error {
+  background: #f8d7da;
+  color: #721c24;
+  border-left: 4px solid #dc3545;
+}
+.notification-warning {
+  background: #fff3cd;
+  color: #856404;
+  border-left: 4px solid #ffc107;
 }
 </style>

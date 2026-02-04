@@ -6,7 +6,7 @@ import threading
 import time
 import requests
 from urllib.parse import quote
-from datetime import datetime
+from datetime import datetime, timezone
 from .article_processor import ArticleProcessor
 from .favicon_fetcher import fetch_favicon_url
 
@@ -103,7 +103,7 @@ class FetchFeedTask(threading.Thread):
                         "_id": url_hash,
                         "url": final_url if is_redirect else self.url,
                         "title": feed_title or "Unknown Feed",
-                        "added_at": datetime.now().isoformat(),
+                        "added_at": datetime.now(timezone.utc).isoformat(),
                         "category": "auto-discovered",
                         "favicon_url": favicon_url
                     }
