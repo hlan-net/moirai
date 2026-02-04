@@ -18,6 +18,11 @@ app = mcp.sse_app()  # Call the method to get the app
 app.add_middleware(PrometheusMiddleware)
 app.add_route("/metrics", metrics)
 
+# Add health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 # Database Configuration
 COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
 user = os.environ.get("COUCHDB_USER")
