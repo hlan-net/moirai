@@ -46,11 +46,16 @@ class FetchFeedTask(threading.Thread):
             response = requests.get(self.url, headers=headers, timeout=30)
             self.handle_response(response)
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching {self.url}: {e}")
+            error_msg = f"Error fetching {self.url}: {e}"
+            print(error_msg)
+            self.record_fetch_error(str(e))
 
     def handle_response(self, response):
         if response.status_code == 200:
             print(f"Successfully fetched: {self.url}")
+            
+            # Clear any previous fetch errors on success
+            self.clear_fetch_error()
             
             # Process articles first to extract title
             feed_title = self.process_articles(response.text)
@@ -141,7 +146,9 @@ class FetchFeedTask(threading.Thread):
             except Exception as e:
                 print(f"Error updating content: {e}")
         else:
+            error_msg = f"HTTP {response.status_code}"
             print(f"Failed to fetch: {self.url} with status code: {response.status_code}")
+            self.record_fetch_error(error_msg)
 
     def is_duplicate(self, doc_hash):
         """
@@ -183,3 +190,32 @@ class FetchFeedTask(threading.Thread):
         except Exception as e:
             print(f"Error processing articles from {self.url}: {e}")
             return None
+
+    def record_fetch_error(self, error_message):
+        """Record a fetch error in the feed registry."""
+        url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
+        try:
+            res = requests.get(f"{self.registry_url}/{url_hash}")
+            if res.status_code == 200:
+                reg_doc = res.json()
+                reg_doc["last_fetch_error"] = error_message
+                reg_doc["last_fetch_at"] = datetime.now().isoformat()
+                requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
+                print(f"Recorded fetch error for {self.url}: {error_message}")
+        except Exception as e:
+            print(f"Failed to record fetch error: {e}")
+
+    def clear_fetch_error(self):
+        """Clear any previous fetch error in the feed registry."""
+        url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
+        try:
+            res = requests.get(f"{self.registry_url}/{url_hash}")
+            if res.status_code == 200:
+                reg_doc = res.json()
+                if "last_fetch_error" in reg_doc:
+                    del reg_doc["last_fetch_error"]
+                reg_doc["last_fetch_at"] = datetime.now().isoformat()
+                requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
+                print(f"Cleared fetch error for {self.url}")
+        except Exception as e:
+            print(f"Failed to clear fetch error: {e}")

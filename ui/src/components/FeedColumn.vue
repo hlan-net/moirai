@@ -7,6 +7,8 @@ interface Feed {
   title?: string;
   category?: string;
   favicon_url?: string;
+  last_fetch_error?: string;
+  last_fetch_at?: string;
 }
 
 const feeds = ref<Feed[]>([])
@@ -146,6 +148,7 @@ const handleFaviconError = (event: Event) => {
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions">
+          <button v-if="feed.last_fetch_error" class="warning-btn" :title="`Fetch error: ${feed.last_fetch_error}`" disabled>⚠️</button>
           <button @click="openFeedInNewTab(feed.url)" class="open-link-btn" title="Open Feed">🔗</button>
           <button @click="startRename(feed)" class="rename-btn" title="Rename Feed">✏️</button>
           <button @click="deleteFeed(feed._id)" class="delete-btn" title="Delete Feed">×</button>
@@ -254,12 +257,19 @@ h2 {
   display: flex;
   gap: 5px;
 }
-.open-link-btn, .rename-btn, .delete-btn {
+.warning-btn, .open-link-btn, .rename-btn, .delete-btn {
   background: none;
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 5px;
+}
+.warning-btn {
+  color: #ff9800;
+  cursor: help;
+}
+.warning-btn:disabled {
+  opacity: 1;
 }
 .open-link-btn {
   color: #999;
