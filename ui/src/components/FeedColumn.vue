@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch, nextTick } from 'vue'
 
 interface Feed {
   _id: string;
@@ -19,6 +19,12 @@ const bulkImportText = ref('')
 const bulkImporting = ref(false)
 const bulkImportResults = ref<any>(null)
 const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
+
+// Refs for modal accessibility
+const modalContentRef = ref<HTMLElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const previousActiveElement = ref<HTMLElement | null>(null)
 
 // URL validation function
 const isValidUrl = (urlString: string): boolean => {
@@ -160,6 +166,8 @@ const handleFaviconError = (event: Event) => {
 }
 
 const openBulkImportModal = () => {
+  // Store the currently focused element to restore later
+  previousActiveElement.value = document.activeElement as HTMLElement
   showBulkImportModal.value = true
   bulkImportText.value = ''
   bulkImportResults.value = null
@@ -169,7 +177,58 @@ const closeBulkImportModal = () => {
   showBulkImportModal.value = false
   bulkImportText.value = ''
   bulkImportResults.value = null
+  // Restore focus to the element that opened the modal
+  if (previousActiveElement.value) {
+    previousActiveElement.value.focus()
+  }
 }
+
+// Focus trap: handle Tab key to keep focus within modal
+const handleModalKeydown = (event: KeyboardEvent) => {
+  if (!modalContentRef.value) return
+  
+  // Close modal on Escape
+  if (event.key === 'Escape') {
+    closeBulkImportModal()
+    return
+  }
+  
+  // Focus trap: keep focus within modal when pressing Tab
+  if (event.key === 'Tab') {
+    const focusableElements = modalContentRef.value.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0] as HTMLElement
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+    
+    if (event.shiftKey) {
+      // Shift + Tab: if focus is on first element, move to last
+      if (document.activeElement === firstElement) {
+        event.preventDefault()
+        lastElement.focus()
+      }
+    } else {
+      // Tab: if focus is on last element, move to first
+      if (document.activeElement === lastElement) {
+        event.preventDefault()
+        firstElement.focus()
+      }
+    }
+  }
+}
+
+// Watch for modal open/close to manage focus
+watch(showBulkImportModal, async (isOpen) => {
+  if (isOpen) {
+    await nextTick()
+    // Move focus to the first interactive element (textarea or file input)
+    if (textareaRef.value) {
+      textareaRef.value.focus()
+    } else if (fileInputRef.value) {
+      fileInputRef.value.focus()
+    }
+  }
+})
 
 const handleFileUpload = (event: Event) => {
   const input = event.target as HTMLInputElement
@@ -296,10 +355,18 @@ const bulkImportFeeds = async () => {
     
     <!-- Bulk Import Modal -->
     <div v-if="showBulkImportModal" class="modal-overlay" @click="closeBulkImportModal">
-      <div class="modal-content" @click.stop>
+      <div 
+        ref="modalContentRef"
+        class="modal-content" 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        @click.stop
+        @keydown="handleModalKeydown"
+      >
         <div class="modal-header">
-          <h3>Bulk Import Feeds</h3>
-          <button @click="closeBulkImportModal" class="modal-close">×</button>
+          <h3 id="modal-title">Bulk Import Feeds</h3>
+          <button @click="closeBulkImportModal" class="modal-close" aria-label="Close">×</button>
         </div>
         
         <div v-if="!bulkImportResults" class="modal-body">
@@ -307,10 +374,11 @@ const bulkImportFeeds = async () => {
           <p class="import-limit-notice">⚠️ Maximum 50 URLs per import (security limit)</p>
           
           <div class="file-upload-section">
-            <input type="file" accept=".txt,.opml" @change="handleFileUpload" />
+            <input ref="fileInputRef" type="file" accept=".txt,.opml" @change="handleFileUpload" />
           </div>
           
           <textarea 
+            ref="textareaRef"
             v-model="bulkImportText" 
             placeholder="https://example.com/feed.xml&#10;https://another.com/rss&#10;..."
             rows="10"
