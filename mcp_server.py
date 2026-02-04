@@ -19,9 +19,12 @@ app.add_middleware(PrometheusMiddleware)
 app.add_route("/metrics", metrics)
 
 # Add health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+from starlette.responses import JSONResponse
+
+async def health_check(request):
+    return JSONResponse({"status": "ok"})
+
+app.add_route("/health", health_check)
 
 # Database Configuration
 COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
