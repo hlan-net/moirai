@@ -237,9 +237,17 @@ const handleFaviconError = (event: Event) => {
             </span>
             <span v-if="fetchingUpdates" class="update-badge">↻</span>
         </div>
-        <button @click="fetchLatestUpdates" :disabled="fetchingUpdates" class="refresh-btn" title="Check for updates">
-            {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
-        </button>
+        <div class="header-actions">
+            <a href="/api/stream.rss" class="rss-link" title="Subscribe to RSS feed" target="_blank">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20A2.18 2.18 0 0 1 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
+                </svg>
+                RSS
+            </a>
+            <button @click="fetchLatestUpdates" :disabled="fetchingUpdates" class="refresh-btn" title="Check for updates">
+                {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
+            </button>
+        </div>
     </header>
 
     <div v-if="loading" class="loading">Loading stream...</div>
@@ -324,6 +332,35 @@ const handleFaviconError = (event: Event) => {
     display: flex;
     align-items: baseline;
     gap: 15px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rss-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.rss-link:hover {
+    background: var(--button-bg);
+    border-color: #ee802f;
+    color: #ee802f;
+}
+
+.rss-link svg {
+    vertical-align: middle;
 }
 
 .page-header h2 {

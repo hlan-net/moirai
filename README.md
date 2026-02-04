@@ -11,6 +11,21 @@ Moirai consists of three core components:
 -   **REST API:** A Flask backend that handles data persistence and administrative tasks (secured via HTTP Basic Auth).
 -   **MCP Server:** A FastMCP-powered SSE server that provides tools for LLM agents to fetch and synthesize news data.
 
+### Data Model Concepts
+
+**Feeds** → **Articles** → **Events** → **Trends**
+
+-   **Feed:** An RSS/Atom source URL (e.g., `https://example.com/feed.xml`)
+-   **Article:** A single news item fetched from a feed (title, link, summary, published date)
+-   **Event:** A named grouping of related articles describing a single significant occurrence
+    - Example: "Company X Announces Merger" (groups articles from different sources about the same merger announcement)
+    - Example: "New Climate Policy Announced" (links articles covering the same policy from various outlets)
+    - Example: "Major Security Vulnerability Discovered" (connects articles about the same CVE disclosure)
+-   **Trend:** A higher-level pattern connecting multiple related events over time
+    - Example: "Remote Work Adoption" (links events like "Tech Company Goes Fully Remote", "Office Space Market Decline", "Collaboration Tool Growth")
+    - Example: "Electric Vehicle Market Growth" (connects events about new EV models, charging infrastructure, and manufacturer investments)
+    - Example: "Privacy Legislation Changes" (groups events like GDPR updates, state privacy laws, and data breach regulations)
+
 ## Project Structure
 ```
 .
@@ -57,6 +72,16 @@ A built-in Chat interface allows you to interact with an Agent that has access t
   - By default, it connects to `http://host.docker.internal:11434/v1`.
   - Ensure you have pulled the model (e.g., `ollama pull llama3.1`).
 
+### 4. RSS Feed
+The aggregated article stream is available as a public RSS feed:
+- **URL:** `http://localhost:8088/api/stream.rss`
+- **Features:**
+  - All articles sorted by publication date (newest first)
+  - Event and Trend labels included as `<category>` tags
+  - Source feed information in `<source>` element
+  - Default limit: 100 items (configurable with `?limit=N` query parameter)
+- **No authentication required** - RSS feeds are publicly accessible
+
 > **Helm users:** the chart now deploys both the admin API/UI and the MCP SSE server when `mcpServer.enabled` (default). Disable or customize it by overriding the `mcpServer` block in `values.yaml`.
 
 ### 4. Deploying with Helm
@@ -78,10 +103,13 @@ helm install moirai helm/
 - **Isolation:** All data tools require a `namespace` (GUID).
 
 ## Agent Synthesis Flow
-1.  **Ingest:** `add_feed` → Add RSS sources to a namespace.
-2.  **Fetch:** `read_feed` → Get latest articles.
-3.  **Synthesize Events:** `add_event` → Group articles into significant events.
-4.  **Synthesize Trends:** `add_trend` → Link events into broader trends.
+
+Agents use MCP tools to build a layered understanding of news:
+
+1.  **Ingest:** `add_feed` → Register RSS sources
+2.  **Fetch:** `read_feed` → Retrieve latest articles from feeds
+3.  **Synthesize Events:** `add_event` → Analyze articles and group related ones into named Events (single occurrences covered by multiple sources)
+4.  **Synthesize Trends:** `add_trend` → Identify patterns across Events to form Trends (broader themes emerging from multiple related events)
 
 ## Administrative Flow
 Human editors can use the Dashboard to:

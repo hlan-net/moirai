@@ -95,6 +95,10 @@ def before_request_auth():
     # Allow health check without auth
     if request.endpoint == "api.health_check":
         return None
+    
+    # Allow RSS feed without auth (RSS feeds are typically public)
+    if request.endpoint == "api.rss_feed":
+        return None
 
     # Optional public read access for articles and feeds only
     if request.method == "GET" and request.endpoint in ["api.list_articles", "api.list_feeds"]:
@@ -362,6 +366,134 @@ def list_articles():
         "limit": limit,
         "skip": skip
     })
+
+@api_blueprint.route("/stream.rss", methods=["GET"])
+def rss_feed():
+    """Generate RSS 2.0 feed for the aggregated article stream. Public endpoint (no auth required)."""
+    from xml.sax.saxutils import escape
+    
+    # Fetch all data (reuse logic from list_articles)
+    limit = int(request.args.get('limit', 100))  # Default to 100 items for RSS
+    limit = min(max(limit, 1), 500)  # Clamp between 1-500
+    
+    feeds = fetch_from_couchdb("feeds")
+    all_articles = fetch_from_couchdb("articles")
+    events = fetch_from_couchdb("events")
+    trends = fetch_from_couchdb("trends")
+    
+    # Sort by published date (newest first)
+    all_articles.sort(key=lambda a: a.get("published", ""), reverse=True)
+    
+    # Limit articles for RSS
+    rss_articles = all_articles[:limit]
+    
+    feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
+    
+    # Build article link to event names mapping
+    article_event_map = {}
+    for event in events:
+        event_name = event.get("name")
+        if event_name:
+            for link in event.get("article_links", []):
+                if link not in article_event_map:
+                    article_event_map[link] = []
+                article_event_map[link].append(event_name)
+    
+    # Build event ID to trend names mapping
+    article_link_to_event_ids = {}
+    for event in events:
+        event_id = event.get("_id")
+        if event_id:
+            for link in event.get("article_links", []):
+                if link not in article_link_to_event_ids:
+                    article_link_to_event_ids[link] = []
+                article_link_to_event_ids[link].append(event_id)
+    
+    event_id_to_trends = {}
+    for trend in trends or []:
+        trend_name = trend.get("name")
+        if trend_name:
+            for event_id in trend.get("event_ids", []):
+                if event_id not in event_id_to_trends:
+                    event_id_to_trends[event_id] = []
+                event_id_to_trends[event_id].append(trend_name)
+    
+    article_link_to_trends = {}
+    for link, event_ids in article_link_to_event_ids.items():
+        trend_names = set()
+        for event_id in event_ids:
+            if event_id in event_id_to_trends:
+                for trend_name in event_id_to_trends[event_id]:
+                    trend_names.add(trend_name)
+        if trend_names:
+            article_link_to_trends[link] = sorted(list(trend_names))
+    
+    # Build RSS XML
+    rss_items = []
+    for article in rss_articles:
+        title = escape(article.get("title", "Untitled"))
+        link = escape(article.get("link", ""))
+        summary = escape(article.get("summary", ""))
+        published = article.get("published", "")
+        
+        # Convert ISO datetime to RFC 822 format for RSS
+        pub_date = ""
+        if published:
+            try:
+                dt = parse_datetime_safe(published)
+                pub_date = dt.strftime("%a, %d %b %Y %H:%M:%S %z")
+            except Exception:
+                pass
+        
+        # Build category tags for events and trends
+        categories = []
+        article_link = article.get("link")
+        if article_link in article_event_map:
+            for event_name in article_event_map[article_link]:
+                categories.append(f'    <category domain="event">{escape(event_name)}</category>')
+        
+        if article_link in article_link_to_trends:
+            for trend_name in article_link_to_trends[article_link]:
+                categories.append(f'    <category domain="trend">{escape(trend_name)}</category>')
+        
+        category_xml = "\n".join(categories) if categories else ""
+        
+        # Add source feed info
+        feed_url = article.get("feed_url", "")
+        feed_title = feed_title_map.get(feed_url, "Unknown Source")
+        source_xml = f'    <source><title>{escape(feed_title)}</title></source>' if feed_title else ""
+        
+        item_xml = f"""  <item>
+    <title>{title}</title>
+    <link>{link}</link>
+    <description>{summary}</description>
+    <pubDate>{pub_date}</pubDate>
+    <guid isPermaLink="true">{link}</guid>
+{category_xml}
+{source_xml}
+  </item>"""
+        
+        rss_items.append(item_xml)
+    
+    # Get current datetime for feed metadata
+    build_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")
+    
+    rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Moirai Aggregated Stream</title>
+    <link>{request.host_url}</link>
+    <description>Aggregated news stream with AI-synthesized Events and Trends</description>
+    <language>en</language>
+    <lastBuildDate>{build_date}</lastBuildDate>
+    <atom:link href="{request.url}" rel="self" type="application/rss+xml" />
+
+{chr(10).join(rss_items)}
+
+  </channel>
+</rss>"""
+    
+    return Response(rss_xml, mimetype='application/rss+xml')
 
 @api_blueprint.route("/articles/<article_id>", methods=["DELETE"])
 def delete_article(article_id):

@@ -124,6 +124,54 @@ def validate_namespace(namespace: str):
         raise ValueError("Namespace GUID is required for this operation.")
     return True
 
+# --- MCP Resources ---
+
+@mcp.resource("moirai://concepts")
+def get_concepts_guide() -> str:
+    """Comprehensive guide to Moirai's data model concepts for AI agents"""
+    return """# Moirai Data Model Concepts
+
+## Hierarchy
+Feed → Article → Event → Trend
+
+## Feed
+An RSS/Atom source URL that publishes content periodically.
+- Input: A web URL (e.g., https://example.com/feed.xml)
+- Purpose: Source of raw articles
+- Example: "TechCrunch RSS", "NYT World News Feed", "Hacker News RSS"
+
+## Article
+A single news item fetched from a feed's RSS/Atom stream.
+- Contains: title, link, summary, published date
+- Automatically fetched when using read_feed tool
+- Raw content before any synthesis
+- Example: One blog post, one news article, one podcast episode entry
+
+## Event
+A named grouping of RELATED ARTICLES describing a SINGLE significant occurrence.
+- Links multiple articles from different sources covering the SAME story
+- Has a descriptive name and description
+- Use when: Multiple sources report on the same announcement, incident, or development
+- Examples:
+  * "Company X Announces Merger" (groups 5 articles from different outlets about same merger)
+  * "New Climate Policy Announced" (links articles covering same policy from various sources)
+  * "CVE-2024-1234 Vulnerability Disclosed" (connects security advisories and analyses)
+
+## Trend
+A higher-level pattern connecting MULTIPLE RELATED EVENTS over time.
+- Links several events that share a common theme or pattern
+- Represents emerging or ongoing developments
+- Use when: Multiple distinct events reveal a broader shift or pattern
+- Examples:
+  * "Remote Work Adoption" (links events: "Tech Co Goes Remote", "Office Market Declines", "Zoom Revenue Growth")
+  * "Electric Vehicle Market Growth" (connects: "Tesla Model Y Launch", "GM EV Investment", "Charging Network Expansion")
+  * "Privacy Legislation Changes" (groups: "GDPR Update", "California Privacy Law", "Data Breach Penalties")
+
+## Key Differences
+- Event = ONE occurrence, multiple articles
+- Trend = PATTERN across multiple events over time
+"""
+
 # --- Feeds Tools (Shared) ---
 
 @mcp.tool()
@@ -271,7 +319,11 @@ def refresh_all_feeds() -> str:
 @mcp.tool()
 def add_event(name: str, description: str, article_links: list[str], namespace: str = None) -> str:
     """
-    Create a new Event grouping multiple articles.
+    Create a new Event grouping multiple related articles about a SINGLE occurrence.
+    
+    An Event represents one significant story covered by multiple sources.
+    Use this when different articles report on the same announcement, incident, or development.
+    
     If namespace is not provided, a new GUID will be generated.
     If namespace is provided, it will be used (effectively creating it if new).
     """
@@ -367,7 +419,11 @@ def delete_event(event_id: str, namespace: str) -> str:
 @mcp.tool()
 def add_trend(name: str, description: str, event_ids: list[str], namespace: str = None) -> str:
     """
-    Create a new Trend grouping multiple events.
+    Create a new Trend grouping multiple related events into a pattern.
+    
+    A Trend represents a broader theme or pattern emerging from multiple distinct events over time.
+    Use this when several events reveal a common shift, development, or ongoing story.
+    
     If namespace is not provided, a new GUID will be generated.
     """
     if not namespace:
