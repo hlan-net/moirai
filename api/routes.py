@@ -189,7 +189,7 @@ def refresh_feeds():
     return jsonify({"status": "started", "count": count})
 
 @api_blueprint.route("/feeds/bulk", methods=["POST"])
-@limiter.limit("5 per hour")  # Strict rate limit for bulk operations
+@limiter.limit("5 per minute")  # Strict rate limit for bulk operations
 def bulk_import_feeds():
     """Import multiple feeds from a list of URLs. Limited to 50 URLs per request."""
     # Validate request body
