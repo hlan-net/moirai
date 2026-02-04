@@ -4,6 +4,7 @@ Attempts to fetch favicons from various common locations.
 """
 import requests
 from urllib.parse import urlparse, urljoin
+import warnings
 
 
 def fetch_favicon_url(feed_url: str, timeout: int = 5) -> str:
@@ -32,7 +33,11 @@ def fetch_favicon_url(feed_url: str, timeout: int = 5) -> str:
         for path in favicon_paths:
             favicon_url = urljoin(base_url, path)
             try:
-                response = requests.head(favicon_url, headers=headers, timeout=timeout, allow_redirects=True, verify=False)
+                # Disable SSL verification with warning suppression for Docker environments
+                # where CA certificates may not be properly configured
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    response = requests.head(favicon_url, headers=headers, timeout=timeout, allow_redirects=True, verify=False)
                 if response.status_code == 200:
                     # Check if it's actually an image
                     content_type = response.headers.get('Content-Type', '')

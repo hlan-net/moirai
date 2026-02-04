@@ -247,8 +247,8 @@ const handleFaviconError = (event: Event) => {
     <div v-else-if="articles.length" class="stream-container">
       <div v-for="(group, index) in groupedArticles" :key="index" class="feed-group">
         <h3 class="group-title">
-          <img v-if="group.favicon" :src="group.favicon" class="group-favicon" :alt="group.title" @error="handleFaviconError" />
-          <span v-else class="group-favicon-placeholder">📰</span>
+          <img v-if="group.favicon" :src="group.favicon" class="group-favicon" :alt="`${group.title} icon`" @error="handleFaviconError" />
+          <span v-else class="group-favicon-placeholder" role="img" :aria-label="`${group.title} icon`">📰</span>
           {{ group.title }}
         </h3>
         <div v-for="article in group.articles" :key="article._id" class="stream-item">

@@ -139,8 +139,8 @@ const handleFaviconError = (event: Event) => {
         </div>
         <div v-else class="feed-info">
           <div class="feed-name-container">
-            <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="feed.title || 'Feed icon'" @error="handleFaviconError" />
-            <span v-else class="feed-favicon-placeholder">📰</span>
+            <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="`${feed.title || getHostname(feed.url)} icon`" @error="handleFaviconError" />
+            <span v-else class="feed-favicon-placeholder" role="img" :aria-label="`${feed.title || getHostname(feed.url)} icon`">📰</span>
             <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
           </div>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
