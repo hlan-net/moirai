@@ -632,6 +632,7 @@ def update_config():
 # --- Search Endpoints ---
 
 @api_blueprint.route("/articles/search", methods=["GET"])
+@requires_auth
 @limiter.limit("20 per minute")
 def search_articles_endpoint():
     """Search articles by keyword with optional date filters"""
@@ -704,6 +705,7 @@ def search_articles_endpoint():
     })
 
 @api_blueprint.route("/articles/recent", methods=["GET"])
+@requires_auth
 @limiter.limit("20 per minute")
 def get_recent_articles_endpoint():
     """Get most recent articles"""
@@ -753,6 +755,7 @@ def get_recent_articles_endpoint():
     })
 
 @api_blueprint.route("/events/search", methods=["GET"])
+@requires_auth
 @limiter.limit("20 per minute")
 def search_events_endpoint():
     """Search events by keyword"""
@@ -790,6 +793,7 @@ def search_events_endpoint():
     })
 
 @api_blueprint.route("/trends/search", methods=["GET"])
+@requires_auth
 @limiter.limit("20 per minute")
 def search_trends_endpoint():
     """Search trends by keyword"""
