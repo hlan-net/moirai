@@ -325,12 +325,12 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
         try:
             from_dt = datetime.fromisoformat(date_from)
         except ValueError:
-            pass
+            return json.dumps({"error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
     if date_to:
         try:
             to_dt = datetime.fromisoformat(date_to)
         except ValueError:
-            pass
+            return json.dumps({"error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
     
     for row in all_docs:
         doc = row.get("doc", {})
@@ -348,6 +348,8 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
                     if to_dt and pub_dt > to_dt:
                         continue
                 except (ValueError, AttributeError):
+                    # Skip articles with invalid/unparseable date formats when date filtering is enabled.
+                    # Articles without valid dates are excluded from results rather than causing the search to fail.
                     pass
         
         # Search in title, description, content
@@ -420,6 +422,8 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
                         "_sort_date": pub_dt
                     })
             except (ValueError, AttributeError):
+                # Skip articles with invalid/unparseable date formats rather than failing the entire request.
+                # This allows the tool to return valid recent articles even if some have malformed timestamps.
                 pass
     
     # Sort by date descending

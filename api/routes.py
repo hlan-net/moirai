@@ -681,7 +681,7 @@ def search_articles_endpoint():
             from_dt = datetime.fromisoformat(date_from)
             selector["published"] = {"$gte": from_dt.isoformat()}
         except ValueError:
-            pass
+            return jsonify({"error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"}), 400
     
     if date_to:
         try:
@@ -692,7 +692,7 @@ def search_articles_endpoint():
             else:
                 selector["published"] = {"$lte": to_dt.isoformat()}
         except ValueError:
-            pass
+            return jsonify({"error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"}), 400
     
     # Query CouchDB with selector
     articles = query_couchdb("articles", selector=selector, limit=limit)
@@ -764,6 +764,8 @@ def get_recent_articles_endpoint():
                         "_sort_date": pub_dt
                     })
             except (ValueError, AttributeError):
+                # Skip articles with invalid/unparseable date formats rather than failing the entire request.
+                # This allows the API to return valid articles even if some have malformed timestamps.
                 pass
         
         if len(results) >= limit:
