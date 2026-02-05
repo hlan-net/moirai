@@ -23,9 +23,12 @@ const bulkImportResults = ref<any>(null)
 const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
 const searchQuery = ref('')
 
-// Inject feed selection from parent
+// Inject feed selection from parent (used in template)
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 const selectFeed = inject<(url: string | null) => void>('selectFeed', () => {})
+// Prevent TS warnings - these are used in template
+void selectedFeedUrl
+void selectFeed
 
 // Refs for modal accessibility
 const modalContentRef = ref<HTMLElement | null>(null)
@@ -447,10 +450,8 @@ const bulkImportFeeds = async () => {
             <button @click="cancelRename">Cancel</button>
           </div>
         </div>
-        <div v-else class="feed-info">
-          <div class="feed-name-container" 
-               :class="{ 'selected-feed': selectedFeedUrl === feed.url }"
-               @click.stop="selectFeed(selectedFeedUrl === feed.url ? null : feed.url)">
+        <div v-else class="feed-info" @click.stop>
+          <div class="feed-name-container">
             <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="`${feed.title || getHostname(feed.url)} icon`" @error="handleFaviconError" />
             <span v-else class="feed-favicon-placeholder" role="img" :aria-label="`${feed.title || getHostname(feed.url)} icon`">📰</span>
             <span class="feed-name" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</span>
@@ -462,7 +463,7 @@ const bulkImportFeeds = async () => {
           </div>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
-        <div class="feed-actions">
+        <div class="feed-actions" @click.stop>
           <div v-if="feed.last_fetch_error" class="warning-icon" :title="`Fetch error: ${feed.last_fetch_error}`">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
@@ -678,7 +679,24 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s, border-left 0.2s;
+  border-left: 3px solid transparent;
 }
+
+.feed-item:hover {
+  background-color: #3a3a3a;
+}
+
+.feed-item.selected-feed {
+  background-color: #2d5a8f;
+  border-left: 3px solid #4a7eb7;
+}
+
+.feed-item.selected-feed:hover {
+  background-color: #3a6ba5;
+}
+
 .feed-info {
   display: flex;
   flex-direction: column;
@@ -690,23 +708,6 @@ h2 {
   align-items: center;
   gap: 8px;
   flex: 1;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.feed-name-container:hover {
-  background-color: #3a3a3a;
-}
-
-.feed-name-container.selected-feed {
-  background-color: #2d5a8f;
-  border: 1px solid #4a7eb7;
-}
-
-.feed-name-container.selected-feed:hover {
-  background-color: #3a6ba5;
 }
 
 .feed-name {
