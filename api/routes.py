@@ -666,56 +666,47 @@ def search_articles_endpoint():
     if limit > 200:
         limit = 200
     
-    # Get all articles from CouchDB
-    articles = fetch_from_couchdb("articles")
-    query_lower = query.lower()
-    results = []
+    # Build Mango selector for efficient querying
+    selector = {
+        "$or": [
+            {"title": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}},
+            {"content": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
-    # Parse dates if provided
-    from_dt = None
-    to_dt = None
+    # Add date range filters if provided
     if date_from:
         try:
             from_dt = datetime.fromisoformat(date_from)
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            to_dt = datetime.fromisoformat(date_to)
+            selector["published"] = {"$gte": from_dt.isoformat()}
         except ValueError:
             pass
     
+    if date_to:
+        try:
+            to_dt = datetime.fromisoformat(date_to)
+            # Combine with existing published filter if from_dt exists
+            if "published" in selector:
+                selector["published"]["$lte"] = to_dt.isoformat()
+            else:
+                selector["published"] = {"$lte": to_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    # Query CouchDB with selector
+    articles = query_couchdb("articles", selector=selector, limit=limit)
+    
+    results = []
     for article in articles:
-        # Check date range
-        if from_dt or to_dt:
-            pub_str = article.get("published", "")
-            if pub_str:
-                try:
-                    pub_dt = parse_datetime_safe(pub_str)
-                    if from_dt and pub_dt < from_dt:
-                        continue
-                    if to_dt and pub_dt > to_dt:
-                        continue
-                except (ValueError, AttributeError):
-                    pass
-        
-        # Search in title, description, content
-        title = article.get("title", "").lower()
-        description = article.get("description", "").lower()
-        content = article.get("content", "").lower()
-        
-        if query_lower in title or query_lower in description or query_lower in content:
-            results.append({
-                "_id": article.get("_id"),
-                "title": article.get("title", "Untitled"),
-                "link": article.get("link", ""),
-                "published": article.get("published", ""),
-                "feed_title": article.get("feed_title", "Unknown"),
-                "description": article.get("description", "")[:200]
-            })
-        
-        if len(results) >= limit:
-            break
+        results.append({
+            "_id": article.get("_id"),
+            "title": article.get("title", "Untitled"),
+            "link": article.get("link", ""),
+            "published": article.get("published", ""),
+            "feed_title": article.get("feed_title", "Unknown"),
+            "description": article.get("description", "")[:200]
+        })
     
     return jsonify({
         "total": len(results),
@@ -793,7 +784,7 @@ def get_recent_articles_endpoint():
 @requires_auth
 @limiter.limit("20 per minute")
 def search_events_endpoint():
-    """Search events by keyword"""
+    """Search events by keyword using CouchDB query"""
     query = request.args.get('q', '').strip()
     if not query:
         abort(400, description="Query parameter 'q' is required")
@@ -802,24 +793,25 @@ def search_events_endpoint():
     if limit > 100:
         limit = 100
     
-    events = fetch_from_couchdb("events")
-    query_lower = query.lower()
-    results = []
+    # Use Mango query with regex for case-insensitive search
+    # Note: For better performance at scale, consider using a full-text search engine
+    selector = {
+        "$or": [
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
+    events = query_couchdb("events", selector=selector, limit=limit)
+    
+    results = []
     for event in events:
-        title = event.get("name", "").lower()
-        description = event.get("description", "").lower()
-        
-        if query_lower in title or query_lower in description:
-            results.append({
-                "_id": event.get("_id"),
-                "name": event.get("name", "Untitled"),
-                "description": event.get("description", ""),
-                "article_count": len(event.get("article_links", []))
-            })
-        
-        if len(results) >= limit:
-            break
+        results.append({
+            "_id": event.get("_id"),
+            "name": event.get("name", "Untitled"),
+            "description": event.get("description", ""),
+            "article_count": len(event.get("article_links", []))
+        })
     
     return jsonify({
         "total": len(results),
@@ -831,7 +823,7 @@ def search_events_endpoint():
 @requires_auth
 @limiter.limit("20 per minute")
 def search_trends_endpoint():
-    """Search trends by keyword"""
+    """Search trends by keyword using CouchDB query"""
     query = request.args.get('q', '').strip()
     if not query:
         abort(400, description="Query parameter 'q' is required")
@@ -840,24 +832,31 @@ def search_trends_endpoint():
     if limit > 100:
         limit = 100
     
-    trends = fetch_from_couchdb("trends")
-    query_lower = query.lower()
-    results = []
+    # Use Mango query with regex for case-insensitive search
+    # Note: For better performance at scale, consider using a full-text search engine
+    selector = {
+        "$or": [
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
+    trends = query_couchdb("trends", selector=selector, limit=limit)
+    
+    results = []
     for trend in trends:
-        title = trend.get("name", "").lower()
-        description = trend.get("description", "").lower()
-        
-        if query_lower in title or query_lower in description:
-            results.append({
-                "_id": trend.get("_id"),
-                "name": trend.get("name", "Untitled"),
-                "description": trend.get("description", ""),
-                "event_count": len(trend.get("event_ids", []))
-            })
-        
-        if len(results) >= limit:
-            break
+        results.append({
+            "_id": trend.get("_id"),
+            "name": trend.get("name", "Untitled"),
+            "description": trend.get("description", ""),
+            "event_count": len(trend.get("event_ids", []))
+        })
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
     
     return jsonify({
         "total": len(results),
