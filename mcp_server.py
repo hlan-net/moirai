@@ -9,6 +9,7 @@ from datetime import datetime
 from mcp.server.fastmcp import FastMCP, Context
 from starlette_prometheus import PrometheusMiddleware, metrics
 from tasks.favicon_fetcher import fetch_favicon_url
+from version import get_version_string
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
@@ -286,15 +287,10 @@ def delete_trend(trend_id: str) -> str:
 # app = mcp.sse_app is already set above
 
 if __name__ == "__main__":
+    # Print version info
+    print(f"{get_version_string()} starting...", flush=True)
+    
     # Run the server using SSE transport on port 8090
     import uvicorn
     uvicorn.run("mcp_server:app", host="0.0.0.0", port=8090, reload=False)
 
-
-# Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
-# app = mcp.sse_app is already set above
-
-if __name__ == "__main__":
-    # Run the server using SSE transport on port 8090
-    import uvicorn
-    uvicorn.run("mcp_server:app", host="0.0.0.0", port=8090, reload=False)

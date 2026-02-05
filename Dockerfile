@@ -17,6 +17,10 @@ RUN yarn build
 # Stage 2: Build the Python application
 FROM python:3-slim AS final-stage
 
+# Build arguments for version info
+ARG VERSION=0.1.0
+ARG BUILD_NUMBER=unknown
+
 # Set the working directory in the container
 WORKDIR /app
 
@@ -30,6 +34,9 @@ RUN useradd -d /app appuser  && \
     chown -R appuser:appuser feeds
     
 USER appuser
+
+# Set build number as environment variable
+ENV BUILD_NUMBER=${BUILD_NUMBER}
 
 # Copy the rest of the application code into the container
 COPY --chown=appuser:appuser main.py .

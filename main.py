@@ -7,6 +7,7 @@ from api.mcp_routes import mcp_blueprint
 from api.chat_routes import chat_blueprint
 from tasks.scheduler import scheduler
 from tasks import init
+from version import get_version_string
 
 app = Flask(__name__, static_folder='ui/dist')
 
@@ -51,7 +52,7 @@ def start_services():
     import sys
     sys.stdout.reconfigure(line_buffering=True)
     
-    print("Moirai starting...", flush=True)
+    print(f"{get_version_string()} starting...", flush=True)
     init.run()
     print("Moirai initialised.")
     
