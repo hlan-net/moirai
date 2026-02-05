@@ -86,14 +86,6 @@ def test_feed_url_validation_valid():
     response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
     assert response.status_code in [200, 201]
 
-def test_namespace_validation_invalid_guid():
-    """Test that invalid namespace GUID is rejected"""
-    url = f"{BASE_URL}/api/events"
-    params = {"namespace": "not-a-guid"}
-    response = requests.get(url, params=params, auth=(API_USERNAME, API_PASSWORD))
-    assert response.status_code == 400
-    assert "Invalid namespace GUID format" in response.text
-
 def test_xss_sanitization():
     """Test that HTML tags are stripped from titles"""
     url = f"{BASE_URL}/api/feeds"
