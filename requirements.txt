@@ -8,6 +8,7 @@ python-dateutil
 pytest
 pytest-asyncio
 mcp[cli]
+httpx[http2]
 openai
 uvicorn
 flask-limiter
