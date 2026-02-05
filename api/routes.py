@@ -628,3 +628,200 @@ def update_config():
         return jsonify({"status": "updated", "config": new_doc})
     else:
         abort(500, description="Failed to update config")
+
+# --- Search Endpoints ---
+
+@api_blueprint.route("/articles/search", methods=["GET"])
+@limiter.limit("20 per minute")
+def search_articles_endpoint():
+    """Search articles by keyword with optional date filters"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        abort(400, description="Query parameter 'q' is required")
+    
+    date_from = request.args.get('from', '')
+    date_to = request.args.get('to', '')
+    limit = int(request.args.get('limit', 50))
+    
+    if limit > 200:
+        limit = 200
+    
+    # Get all articles from CouchDB
+    articles = fetch_from_couchdb("articles")
+    query_lower = query.lower()
+    results = []
+    
+    # Parse dates if provided
+    from_dt = None
+    to_dt = None
+    if date_from:
+        try:
+            from_dt = datetime.fromisoformat(date_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            to_dt = datetime.fromisoformat(date_to)
+        except ValueError:
+            pass
+    
+    for article in articles:
+        # Check date range
+        if from_dt or to_dt:
+            pub_str = article.get("published", "")
+            if pub_str:
+                try:
+                    pub_dt = parse_datetime_safe(pub_str)
+                    if from_dt and pub_dt < from_dt:
+                        continue
+                    if to_dt and pub_dt > to_dt:
+                        continue
+                except (ValueError, AttributeError):
+                    pass
+        
+        # Search in title, description, content
+        title = article.get("title", "").lower()
+        description = article.get("description", "").lower()
+        content = article.get("content", "").lower()
+        
+        if query_lower in title or query_lower in description or query_lower in content:
+            results.append({
+                "_id": article.get("_id"),
+                "title": article.get("title", "Untitled"),
+                "link": article.get("link", ""),
+                "published": article.get("published", ""),
+                "feed_title": article.get("feed_title", "Unknown"),
+                "description": article.get("description", "")[:200]
+            })
+        
+        if len(results) >= limit:
+            break
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
+
+@api_blueprint.route("/articles/recent", methods=["GET"])
+@limiter.limit("20 per minute")
+def get_recent_articles_endpoint():
+    """Get most recent articles"""
+    hours = int(request.args.get('hours', 24))
+    limit = int(request.args.get('limit', 50))
+    
+    if hours > 168:  # Max 1 week
+        hours = 168
+    if limit > 200:
+        limit = 200
+    
+    from datetime import timedelta
+    
+    articles = fetch_from_couchdb("articles")
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    results = []
+    
+    for article in articles:
+        pub_str = article.get("published", "")
+        if pub_str:
+            try:
+                pub_dt = parse_datetime_safe(pub_str)
+                if pub_dt >= cutoff:
+                    results.append({
+                        "_id": article.get("_id"),
+                        "title": article.get("title", "Untitled"),
+                        "link": article.get("link", ""),
+                        "published": pub_str,
+                        "feed_title": article.get("feed_title", "Unknown"),
+                        "description": article.get("description", "")[:200],
+                        "_sort_date": pub_dt
+                    })
+            except (ValueError, AttributeError):
+                pass
+    
+    # Sort by date descending
+    results.sort(key=lambda x: x.get("_sort_date", datetime.min), reverse=True)
+    
+    # Remove sort key and limit
+    for r in results:
+        r.pop("_sort_date", None)
+    
+    return jsonify({
+        "total": len(results[:limit]),
+        "hours": hours,
+        "results": results[:limit]
+    })
+
+@api_blueprint.route("/events/search", methods=["GET"])
+@limiter.limit("20 per minute")
+def search_events_endpoint():
+    """Search events by keyword"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        abort(400, description="Query parameter 'q' is required")
+    
+    limit = int(request.args.get('limit', 20))
+    if limit > 100:
+        limit = 100
+    
+    events = fetch_from_couchdb("events")
+    query_lower = query.lower()
+    results = []
+    
+    for event in events:
+        title = event.get("name", "").lower()
+        description = event.get("description", "").lower()
+        
+        if query_lower in title or query_lower in description:
+            results.append({
+                "_id": event.get("_id"),
+                "name": event.get("name", "Untitled"),
+                "description": event.get("description", ""),
+                "article_count": len(event.get("article_links", []))
+            })
+        
+        if len(results) >= limit:
+            break
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
+
+@api_blueprint.route("/trends/search", methods=["GET"])
+@limiter.limit("20 per minute")
+def search_trends_endpoint():
+    """Search trends by keyword"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        abort(400, description="Query parameter 'q' is required")
+    
+    limit = int(request.args.get('limit', 20))
+    if limit > 100:
+        limit = 100
+    
+    trends = fetch_from_couchdb("trends")
+    query_lower = query.lower()
+    results = []
+    
+    for trend in trends:
+        title = trend.get("name", "").lower()
+        description = trend.get("description", "").lower()
+        
+        if query_lower in title or query_lower in description:
+            results.append({
+                "_id": trend.get("_id"),
+                "name": trend.get("name", "Untitled"),
+                "description": trend.get("description", ""),
+                "event_count": len(trend.get("event_ids", []))
+            })
+        
+        if len(results) >= limit:
+            break
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
