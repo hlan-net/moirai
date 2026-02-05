@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from mcp.server.fastmcp import FastMCP, Context
 from tasks.favicon_fetcher import fetch_favicon_url
 from version import get_version_string
@@ -286,6 +286,256 @@ def delete_trend(trend_id: str) -> str:
         return f"Trend {trend_id} deleted successfully."
     else:
         return f"Error deleting trend: {msg}"
+
+# ===== SEARCH TOOLS =====
+
+@mcp.tool()
+def search_articles(query: str, date_from: str = "", date_to: str = "", limit: int = 50) -> str:
+    """
+    Search articles by keyword across title, description, and content.
+    
+    Args:
+        query: Search keywords (case-insensitive)
+        date_from: Optional start date (ISO format: 2026-02-05)
+        date_to: Optional end date (ISO format: 2026-02-05)
+        limit: Maximum number of results (default: 50, max: 200)
+    
+    Returns:
+        JSON string with matching articles
+    """
+    if not query.strip():
+        return json.dumps({"error": "Query cannot be empty"})
+    
+    if limit > 200:
+        limit = 200
+    
+    # Get all articles
+    resp = db_request("GET", "articles", "/_all_docs", params={"include_docs": True})
+    if resp.status_code != 200:
+        return json.dumps({"error": "Failed to fetch articles"})
+    
+    all_docs = resp.json().get("rows", [])
+    query_lower = query.lower()
+    results = []
+    
+    # Parse dates if provided
+    from_dt = None
+    to_dt = None
+    if date_from:
+        try:
+            from_dt = datetime.fromisoformat(date_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            to_dt = datetime.fromisoformat(date_to)
+        except ValueError:
+            pass
+    
+    for row in all_docs:
+        doc = row.get("doc", {})
+        if doc.get("_id", "").startswith("_design"):
+            continue
+        
+        # Check date range
+        if from_dt or to_dt:
+            pub_str = doc.get("published", "")
+            if pub_str:
+                try:
+                    pub_dt = datetime.fromisoformat(pub_str.replace('Z', '+00:00'))
+                    if from_dt and pub_dt < from_dt:
+                        continue
+                    if to_dt and pub_dt > to_dt:
+                        continue
+                except (ValueError, AttributeError):
+                    pass
+        
+        # Search in title, description, content
+        title = doc.get("title", "").lower()
+        description = doc.get("description", "").lower()
+        content = doc.get("content", "").lower()
+        
+        if query_lower in title or query_lower in description or query_lower in content:
+            results.append({
+                "_id": doc.get("_id"),
+                "title": doc.get("title", "Untitled"),
+                "link": doc.get("link", ""),
+                "published": doc.get("published", ""),
+                "feed_title": doc.get("feed_title", "Unknown"),
+                "description": doc.get("description", "")[:200]  # Truncate
+            })
+        
+        if len(results) >= limit:
+            break
+    
+    return json.dumps({
+        "total": len(results),
+        "query": query,
+        "results": results
+    }, indent=2)
+
+@mcp.tool()
+def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
+    """
+    Get most recent articles from all feeds.
+    
+    Args:
+        hours: Number of hours to look back (default: 24, max: 168)
+        limit: Maximum number of results (default: 50, max: 200)
+    
+    Returns:
+        JSON string with recent articles sorted by date
+    """
+    if hours > 168:  # Max 1 week
+        hours = 168
+    if limit > 200:
+        limit = 200
+    
+    # Get all articles
+    resp = db_request("GET", "articles", "/_all_docs", params={"include_docs": True})
+    if resp.status_code != 200:
+        return json.dumps({"error": "Failed to fetch articles"})
+    
+    all_docs = resp.json().get("rows", [])
+    cutoff = datetime.now() - timedelta(hours=hours)
+    results = []
+    
+    for row in all_docs:
+        doc = row.get("doc", {})
+        if doc.get("_id", "").startswith("_design"):
+            continue
+        
+        pub_str = doc.get("published", "")
+        if pub_str:
+            try:
+                pub_dt = datetime.fromisoformat(pub_str.replace('Z', '+00:00'))
+                if pub_dt >= cutoff:
+                    results.append({
+                        "_id": doc.get("_id"),
+                        "title": doc.get("title", "Untitled"),
+                        "link": doc.get("link", ""),
+                        "published": pub_str,
+                        "feed_title": doc.get("feed_title", "Unknown"),
+                        "description": doc.get("description", "")[:200],
+                        "_sort_date": pub_dt
+                    })
+            except (ValueError, AttributeError):
+                pass
+    
+    # Sort by date descending
+    results.sort(key=lambda x: x.get("_sort_date", datetime.min), reverse=True)
+    
+    # Remove sort key and limit
+    for r in results:
+        r.pop("_sort_date", None)
+    
+    return json.dumps({
+        "total": len(results[:limit]),
+        "hours": hours,
+        "results": results[:limit]
+    }, indent=2)
+
+@mcp.tool()
+def search_events(query: str, limit: int = 20) -> str:
+    """
+    Search events by keyword in title or description.
+    
+    Args:
+        query: Search keywords (case-insensitive)
+        limit: Maximum number of results (default: 20, max: 100)
+    
+    Returns:
+        JSON string with matching events
+    """
+    if not query.strip():
+        return json.dumps({"error": "Query cannot be empty"})
+    
+    if limit > 100:
+        limit = 100
+    
+    resp = db_request("GET", "events", "/_all_docs", params={"include_docs": True})
+    if resp.status_code != 200:
+        return json.dumps({"error": "Failed to fetch events"})
+    
+    all_docs = resp.json().get("rows", [])
+    query_lower = query.lower()
+    results = []
+    
+    for row in all_docs:
+        doc = row.get("doc", {})
+        if doc.get("_id", "").startswith("_design"):
+            continue
+        
+        title = doc.get("title", "").lower()
+        description = doc.get("description", "").lower()
+        
+        if query_lower in title or query_lower in description:
+            results.append({
+                "_id": doc.get("_id"),
+                "title": doc.get("title", "Untitled"),
+                "description": doc.get("description", ""),
+                "article_count": len(doc.get("article_ids", []))
+            })
+        
+        if len(results) >= limit:
+            break
+    
+    return json.dumps({
+        "total": len(results),
+        "query": query,
+        "results": results
+    }, indent=2)
+
+@mcp.tool()
+def search_trends(query: str, limit: int = 20) -> str:
+    """
+    Search trends by keyword in title or description.
+    
+    Args:
+        query: Search keywords (case-insensitive)
+        limit: Maximum number of results (default: 20, max: 100)
+    
+    Returns:
+        JSON string with matching trends
+    """
+    if not query.strip():
+        return json.dumps({"error": "Query cannot be empty"})
+    
+    if limit > 100:
+        limit = 100
+    
+    resp = db_request("GET", "trends", "/_all_docs", params={"include_docs": True})
+    if resp.status_code != 200:
+        return json.dumps({"error": "Failed to fetch trends"})
+    
+    all_docs = resp.json().get("rows", [])
+    query_lower = query.lower()
+    results = []
+    
+    for row in all_docs:
+        doc = row.get("doc", {})
+        if doc.get("_id", "").startswith("_design"):
+            continue
+        
+        title = doc.get("title", "").lower()
+        description = doc.get("description", "").lower()
+        
+        if query_lower in title or query_lower in description:
+            results.append({
+                "_id": doc.get("_id"),
+                "title": doc.get("title", "Untitled"),
+                "description": doc.get("description", ""),
+                "event_count": len(doc.get("event_ids", []))
+            })
+        
+        if len(results) >= limit:
+            break
+    
+    return json.dumps({
+        "total": len(results),
+        "query": query,
+        "results": results
+    }, indent=2)
 
 # Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
 # app = mcp.sse_app is already set above
