@@ -7,25 +7,29 @@ import re
 import uuid
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP, Context
-from starlette_prometheus import PrometheusMiddleware, metrics
 from tasks.favicon_fetcher import fetch_favicon_url
 from version import get_version_string
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
 
-# Get the ASGI app and add middleware
+# Get the ASGI app
 app = mcp.sse_app()  # Call the method to get the app
-app.add_middleware(PrometheusMiddleware)
-app.add_route("/metrics", metrics)
 
-# Add health check endpoint
-from starlette.responses import JSONResponse
+# Add metrics endpoint (without middleware that breaks SSE)
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
 
 async def health_check(request):
     return JSONResponse({"status": "ok"})
 
-app.add_route("/health", health_check)
+async def metrics_endpoint(request):
+    # Simple metrics endpoint without PrometheusMiddleware
+    return Response("# Placeholder metrics endpoint\n", media_type="text/plain")
+
+# Add routes directly instead of middleware
+app.routes.append(Route("/health", health_check))
+app.routes.append(Route("/metrics", metrics_endpoint))
 
 # Database Configuration
 COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
