@@ -3,7 +3,7 @@ Test for the list_articles MCP tool.
 This test mocks the database to verify the tool's logic.
 """
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 import json
 
 
