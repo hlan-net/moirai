@@ -50,12 +50,11 @@ If you are using an LLM agent, it will "see" these tools. Here is how they are s
 }
 ```
 
-**Add a Feed to a Namespace:**
+**Add a Feed (Global):**
 ```json
 // Tool: add_feed
 {
   "url": "https://lwn.net/headlines/rss",
-  "namespace": "550e8400-e29b-41d4-a716-446655440000",
   "category": "linux"
 }
 ```

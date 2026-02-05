@@ -1,10 +1,16 @@
-# Model Context Protocol (MCP) API Documentation
+# External REST API Documentation
+
+## Note
+This documentation describes the **REST API endpoints** served by the Flask backend (Port 8088) under the `/mcp` prefix. 
+
+**This is NOT the Model Context Protocol (MCP) Server.**
+The actual MCP Server runs on Port 8090 via SSE (Server-Sent Events) and is designed for direct connection with MCP clients (like Claude Desktop or the Moirai Chat Agent).
+
+These REST endpoints are provided for external non-MCP services or legacy integrations that need to access the data via standard HTTP methods.
 
 ## Introduction
 
-The Model Context Protocol (MCP) is a set of RESTful API endpoints that allow external AI/ML services to interact with the Moirai application's data. These endpoints are designed to be used by services that process articles, identify events, and create trends.
-
-All MCP endpoints are prefixed with `/mcp`.
+The External API provides a set of RESTful endpoints...
 
 ## Endpoints
 
