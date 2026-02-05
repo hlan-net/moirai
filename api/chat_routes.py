@@ -42,6 +42,11 @@ def run_agent_sync(user_message, history, model=None, llm_endpoint=None, api_key
     return asyncio.run(run_agent(user_message, history, model, llm_endpoint, api_key, ollama_base_url))
 
 async def run_agent(user_message, history, model=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
+    # Limit history to last 6 messages (3 exchanges) to prevent token overflow
+    # For a 28k token conversation, this brings it down to ~4-5k tokens
+    if len(history) > 6:
+        history = history[-6:]
+    
     messages = list(history)
     
     # System prompt
@@ -83,8 +88,8 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
         ) -> httpx.AsyncClient:
             """Custom factory that creates AsyncClient for proper DNS resolution"""
             if timeout is None:
-                # Generous timeout for slow LLMs (5 minutes)
-                timeout = httpx.Timeout(300.0)
+                # Very generous timeout for slow LLMs with multi-turn tool calls (10 minutes)
+                timeout = httpx.Timeout(600.0)
             return httpx.AsyncClient(
                 headers=headers,
                 timeout=timeout,
@@ -109,7 +114,7 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
                         }
                     })
 
-                max_turns = 10
+                max_turns = 5  # Reduced from 10 to prevent runaway loops and token overflow
                 for _ in range(max_turns):
                     # Filter messages to ensure clean JSON for API
                     clean_messages = []
