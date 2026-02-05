@@ -3,7 +3,8 @@ from .base import LLMProvider
 
 class OllamaProvider(LLMProvider):
     def __init__(self, api_key, base_url):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        # Very generous timeout for slow local Ollama with multi-turn tool calls (10 minutes)
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=600.0)
 
     def list_models(self):
         models_response = self.client.models.list()

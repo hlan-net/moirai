@@ -71,3 +71,41 @@ def update_couchdb_doc(db_name, doc_id, doc):
     except requests.exceptions.RequestException as e:
         print(f"DB Update Error: {e}")
         return False
+
+def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None):
+    """Query CouchDB using Mango query syntax for efficient filtering."""
+    allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
+    if db_name not in allowed_dbs:
+        abort(400, description="Invalid database name.")
+    
+    safe_db_name = urllib.parse.quote(db_name, safe="")
+    
+    try:
+        # Ensure DB exists
+        requests.put(f"{COUCHDB_URI}/{safe_db_name}")
+        
+        # Build Mango query
+        query = {"selector": selector}
+        if limit:
+            query["limit"] = limit
+        if skip:
+            query["skip"] = skip
+        if sort:
+            query["sort"] = sort
+        if fields:
+            query["fields"] = fields
+        
+        response = requests.post(
+            f"{COUCHDB_URI}/{safe_db_name}/_find",
+            json=query,
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if response.status_code == 404:
+            return []
+        
+        response.raise_for_status()
+        return response.json().get("docs", [])
+    except requests.exceptions.RequestException as e:
+        print(f"Error querying CouchDB: {e}")
+        return []
