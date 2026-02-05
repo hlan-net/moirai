@@ -31,7 +31,7 @@ test.describe('OPML Import Functionality', () => {
     fs.writeFileSync(testOpmlPath, opmlContent);
 
     // Open bulk import modal
-    await page.click('.bulk-import-btn');
+    await page.click('button[title="Bulk Import Feeds"]');
     await page.waitForSelector('.modal-overlay', { state: 'visible' });
 
     // Upload OPML file
@@ -69,7 +69,7 @@ https://example.com/feed3.xml`;
     fs.writeFileSync(testTextPath, textContent);
 
     // Open bulk import modal
-    await page.click('.bulk-import-btn');
+    await page.click('button[title="Bulk Import Feeds"]');
     await page.waitForSelector('.modal-overlay', { state: 'visible' });
 
     // Upload text file
@@ -95,7 +95,7 @@ https://example.com/feed3.xml`;
     fs.writeFileSync(testInvalidPath, invalidContent);
 
     // Open bulk import modal
-    await page.click('.bulk-import-btn');
+    await page.click('button[title="Bulk Import Feeds"]');
     await page.waitForSelector('.modal-overlay', { state: 'visible' });
 
     // Upload invalid file
@@ -132,7 +132,7 @@ https://example.com/feed3.xml`;
     fs.writeFileSync(testEmptyPath, emptyOpmlContent);
 
     // Open bulk import modal
-    await page.click('.bulk-import-btn');
+    await page.click('button[title="Bulk Import Feeds"]');
     await page.waitForSelector('.modal-overlay', { state: 'visible' });
 
     // Upload OPML file
