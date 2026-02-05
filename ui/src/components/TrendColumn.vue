@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, inject, type Ref } from 'vue'
 
 interface Trend {
   _id: string
@@ -12,24 +12,64 @@ const trends = ref<Trend[]>([])
 const loading = ref(true)
 const expandedTrends = ref<Set<string>>(new Set())
 const searchQuery = ref('')
+const events = ref<any[]>([]) // To check which events link to selected feed's articles
+const articles = ref<any[]>([]) // To check article origins
 
-// Computed: Filtered trends based on search query
+// Inject selected feed from parent
+const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+
+// Computed: Filtered trends based on search query and selected feed
 const filteredTrends = computed(() => {
-  if (!searchQuery.value.trim()) return trends.value
+  let filtered = trends.value
   
-  const query = searchQuery.value.toLowerCase()
-  return trends.value.filter(trend => {
-    const name = trend.name.toLowerCase()
-    const description = trend.description.toLowerCase()
-    return name.includes(query) || description.includes(query)
-  })
+  // Filter by selected feed - show only trends with events that have articles from that feed
+  if (selectedFeedUrl.value) {
+    const feedArticles = articles.value.filter(a => a.feed_url === selectedFeedUrl.value)
+    const feedArticleLinks = new Set(feedArticles.map(a => a.link))
+    
+    const relevantEventIds = new Set(
+      events.value
+        .filter(event => event.article_links?.some((link: string) => feedArticleLinks.has(link)))
+        .map(event => event._id)
+    )
+    
+    filtered = filtered.filter(trend => 
+      trend.event_ids.some(eventId => relevantEventIds.has(eventId))
+    )
+  }
+  
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(trend => {
+      const name = trend.name.toLowerCase()
+      const description = trend.description.toLowerCase()
+      return name.includes(query) || description.includes(query)
+    })
+  }
+  
+  return filtered
 })
 
 const fetchTrends = async () => {
   try {
-    const response = await fetch('/api/trends')
-    if (response.ok) {
-      trends.value = await response.json()
+    const [trendsResponse, eventsResponse, articlesResponse] = await Promise.all([
+      fetch('/api/trends'),
+      fetch('/api/events'),
+      fetch('/api/articles?limit=10000'),
+    ])
+
+    if (trendsResponse.ok) {
+      trends.value = await trendsResponse.json()
+    }
+    
+    if (eventsResponse.ok) {
+      events.value = await eventsResponse.json()
+    }
+    
+    if (articlesResponse.ok) {
+      const data = await articlesResponse.json()
+      articles.value = data.articles || []
     }
   } catch (error) {
     console.error('Error fetching trends:', error)

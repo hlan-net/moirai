@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch, nextTick } from 'vue'
+import { onMounted, ref, computed, watch, nextTick, inject, type Ref } from 'vue'
 
 interface Feed {
   _id: string;
@@ -22,6 +22,10 @@ const bulkImporting = ref(false)
 const bulkImportResults = ref<any>(null)
 const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
 const searchQuery = ref('')
+
+// Inject feed selection from parent
+const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+const selectFeed = inject<(url: string | null) => void>('selectFeed', () => {})
 
 // Refs for modal accessibility
 const modalContentRef = ref<HTMLElement | null>(null)
@@ -444,10 +448,17 @@ const bulkImportFeeds = async () => {
           </div>
         </div>
         <div v-else class="feed-info">
-          <div class="feed-name-container">
+          <div class="feed-name-container" 
+               :class="{ 'selected-feed': selectedFeedUrl === feed.url }"
+               @click.stop="selectFeed(selectedFeedUrl === feed.url ? null : feed.url)">
             <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="`${feed.title || getHostname(feed.url)} icon`" @error="handleFaviconError" />
             <span v-else class="feed-favicon-placeholder" role="img" :aria-label="`${feed.title || getHostname(feed.url)} icon`">📰</span>
-            <a :href="feed.url" target="_blank" class="feed-link" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</a>
+            <span class="feed-name" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</span>
+            <a :href="feed.url" target="_blank" class="feed-link-icon" :title="`Open ${feed.url}`" @click.stop>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+              </svg>
+            </a>
           </div>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
@@ -678,7 +689,51 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
 }
+
+.feed-name-container:hover {
+  background-color: #3a3a3a;
+}
+
+.feed-name-container.selected-feed {
+  background-color: #2d5a8f;
+  border: 1px solid #4a7eb7;
+}
+
+.feed-name-container.selected-feed:hover {
+  background-color: #3a6ba5;
+}
+
+.feed-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #42b983;
+}
+
+.feed-link-icon {
+  color: #888;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  text-decoration: none;
+}
+
+.feed-name-container:hover .feed-link-icon {
+  opacity: 1;
+}
+
+.feed-link-icon:hover {
+  color: #007bff;
+}
+
 .feed-favicon {
   width: 16px;
   height: 16px;

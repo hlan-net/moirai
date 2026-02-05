@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted, computed } from 'vue'
+import { onMounted, ref, onUnmounted, computed, inject, type Ref } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 
 const articles = ref<Article[]>([])
@@ -10,6 +10,9 @@ const hasMore = ref(true)
 const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
+
+// Inject selected feed from parent
+const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
 let observer: IntersectionObserver | null = null
 let refreshInterval: number | null = null
@@ -103,15 +106,25 @@ const loadMore = async () => {
 
 // Computed: Filtered articles based on search query
 const filteredArticles = computed(() => {
-  if (!searchQuery.value.trim()) return articles.value
+  let filtered = articles.value
   
-  const query = searchQuery.value.toLowerCase()
-  return articles.value.filter(article => {
-    const title = (article.title || '').toLowerCase()
-    const summary = (article.summary || '').toLowerCase()
-    const feedTitle = (article.feed_title || '').toLowerCase()
-    return title.includes(query) || summary.includes(query) || feedTitle.includes(query)
-  })
+  // Filter by selected feed
+  if (selectedFeedUrl.value) {
+    filtered = filtered.filter(article => article.feed_url === selectedFeedUrl.value)
+  }
+  
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(article => {
+      const title = (article.title || '').toLowerCase()
+      const summary = (article.summary || '').toLowerCase()
+      const feedTitle = (article.feed_title || '').toLowerCase()
+      return title.includes(query) || summary.includes(query) || feedTitle.includes(query)
+    })
+  }
+  
+  return filtered
 })
 
 const deleteArticle = async (id: string) => {
