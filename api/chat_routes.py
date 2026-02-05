@@ -89,7 +89,7 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
             """Custom factory that creates AsyncClient for proper DNS resolution"""
             if timeout is None:
                 # Very generous timeout for slow LLMs with multi-turn tool calls (10 minutes)
-                timeout = httpx.Timeout(600.0)
+                timeout = httpx.Timeout(600.0) # TODO: Use a constant
             return httpx.AsyncClient(
                 headers=headers,
                 timeout=timeout,
