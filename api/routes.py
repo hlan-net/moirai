@@ -175,6 +175,7 @@ def update_feed(feed_id):
         abort(500, description="Failed to update feed")
 
 @api_blueprint.route("/feeds/refresh", methods=["POST"])
+@requires_auth
 def refresh_feeds():
     """Triggers a background refresh of all registered feeds."""
     feeds = fetch_from_couchdb("feeds")
@@ -191,6 +192,24 @@ def refresh_feeds():
             count += 1
             
     return jsonify({"status": "started", "count": count})
+
+@api_blueprint.route("/feeds/refresh/<path:feed_url>", methods=["POST"])
+@requires_auth
+@limiter.limit("10 per minute")
+def refresh_single_feed(feed_url):
+    """Triggers a background refresh of a single feed by URL."""
+    # Validate the feed exists
+    feeds = fetch_from_couchdb("feeds")
+    feed_exists = any(f.get("url") == feed_url for f in feeds)
+    
+    if not feed_exists:
+        abort(404, description="Feed not found")
+    
+    # Run in background thread
+    task = FetchFeedTask(feed_url)
+    task.start()
+    
+    return jsonify({"status": "started", "url": feed_url})
 
 @api_blueprint.route("/feeds/bulk", methods=["POST"])
 @limiter.limit("5 per minute")  # Strict rate limit for bulk operations

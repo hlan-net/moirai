@@ -442,7 +442,9 @@ const bulkImportFeeds = async () => {
       No feeds match "{{ searchQuery }}"
     </div>
     <ul v-else-if="filteredFeeds.length" class="feed-list">
-      <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item">
+      <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item" 
+          @click="selectFeed(feed.url)" 
+          :class="{ 'selected-feed': selectedFeedUrl === feed.url }">
         <div v-if="renamingFeedId === feed._id" class="feed-info">
           <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
           <div class="rename-actions">
@@ -450,7 +452,7 @@ const bulkImportFeeds = async () => {
             <button @click="cancelRename">Cancel</button>
           </div>
         </div>
-        <div v-else class="feed-info" @click.stop>
+        <div v-else class="feed-info">
           <div class="feed-name-container">
             <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="`${feed.title || getHostname(feed.url)} icon`" @error="handleFaviconError" />
             <span v-else class="feed-favicon-placeholder" role="img" :aria-label="`${feed.title || getHostname(feed.url)} icon`">📰</span>

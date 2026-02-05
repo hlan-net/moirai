@@ -194,6 +194,33 @@ onUnmounted(() => {
   }
 })
 
+const refreshingFeed = ref(false)
+
+const refreshSelectedFeed = async () => {
+  if (!selectedFeedUrl.value) return
+  
+  refreshingFeed.value = true
+  try {
+    // Encode the URL for the API path
+    const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
+    const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
+    
+    if (response.ok) {
+      // Wait a bit for the feed to be fetched
+      setTimeout(async () => {
+        await fetchLatestUpdates()
+        refreshingFeed.value = false
+      }, 2000)
+    } else {
+      console.error('Failed to refresh feed')
+      refreshingFeed.value = false
+    }
+  } catch (error) {
+    console.error('Error refreshing feed:', error)
+    refreshingFeed.value = false
+  }
+}
+
 function formatDate(dateStr: string) {
   try {
     return new Date(dateStr).toLocaleString()
@@ -222,6 +249,17 @@ function getHostname(urlStr: string) {
       <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
       <span v-else-if="!loading">({{ filteredArticles.length }})</span>
       <span v-if="fetchingUpdates" class="update-badge">↻</span>
+      <button 
+        v-if="selectedFeedUrl" 
+        @click="refreshSelectedFeed" 
+        :disabled="refreshingFeed"
+        class="refresh-feed-btn"
+        :title="refreshingFeed ? 'Refreshing feed...' : 'Refresh selected feed'"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
+          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
     </h2>
 
     <!-- Search Input -->
@@ -307,6 +345,42 @@ function getHostname(urlStr: string) {
 
 .clear-search-btn:hover {
   color: #e0e0e0;
+}
+
+.refresh-feed-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.refresh-feed-btn:hover:not(:disabled) {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.refresh-feed-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-feed-btn svg.spinning {
+  animation: spin-refresh 1s linear infinite;
+}
+
+@keyframes spin-refresh {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .no-results {
