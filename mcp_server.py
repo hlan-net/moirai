@@ -466,15 +466,15 @@ def search_events(query: str, limit: int = 20) -> str:
         if doc.get("_id", "").startswith("_design"):
             continue
         
-        title = doc.get("title", "").lower()
+        name = doc.get("name", "").lower()
         description = doc.get("description", "").lower()
         
-        if query_lower in title or query_lower in description:
+        if query_lower in name or query_lower in description:
             results.append({
                 "_id": doc.get("_id"),
-                "title": doc.get("title", "Untitled"),
+                "name": doc.get("name", "Untitled"),
                 "description": doc.get("description", ""),
-                "article_count": len(doc.get("article_ids", []))
+                "article_count": len(doc.get("article_links", []))
             })
         
         if len(results) >= limit:
