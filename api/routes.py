@@ -82,6 +82,7 @@ def get_iteration_interval_setting():
     return ITERATION_INTERVAL_ENV
 
 @api_blueprint.route("/health", methods=["GET"])
+@limiter.exempt
 def health_check():
     return jsonify({"status": "healthy"})
 
