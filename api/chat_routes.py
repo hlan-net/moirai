@@ -18,6 +18,10 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
+CHAT_HISTORY_LIMIT = 6
+MAX_AGENT_TURNS = 5
+LLM_TIMEOUT_SECONDS = 600.0
+
 llm_provider_factory = LLMProviderFactory()
 
 def extract_tool_calls_from_content(content):
@@ -42,10 +46,9 @@ def run_agent_sync(user_message, history, model=None, llm_endpoint=None, api_key
     return asyncio.run(run_agent(user_message, history, model, llm_endpoint, api_key, ollama_base_url))
 
 async def run_agent(user_message, history, model=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
-    # Limit history to last 6 messages (3 exchanges) to prevent token overflow
-    # For a 28k token conversation, this brings it down to ~4-5k tokens
-    if len(history) > 6:
-        history = history[-6:]
+    # Limit history to prevent token overflow
+    if len(history) > CHAT_HISTORY_LIMIT:
+        history = history[-CHAT_HISTORY_LIMIT:]
     
     messages = list(history)
     
@@ -114,8 +117,7 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
                         }
                     })
 
-                max_turns = 5  # Reduced from 10 to prevent runaway loops and token overflow
-                for _ in range(max_turns):
+                for _ in range(MAX_AGENT_TURNS):
                     # Filter messages to ensure clean JSON for API
                     clean_messages = []
                     for m in messages:

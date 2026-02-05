@@ -71,7 +71,8 @@ const fetchLatestUpdates = async () => {
       if (newArticles.length > 0) {
         articles.value = [...newArticles, ...articles.value]
         await articleCache.saveArticles(result.articles)
-        console.log(`Fetched ${newArticles.length} new articles`)
+        // Debug log removed for production
+        // console.log(`Fetched ${newArticles.length} new articles`)
       }
     }
     
@@ -207,6 +208,7 @@ const refreshSelectedFeed = async () => {
     
     if (response.ok) {
       // Wait a bit for the feed to be fetched
+      // TODO: Implement SSE or polling for robust status check
       setTimeout(async () => {
         await fetchLatestUpdates()
         refreshingFeed.value = false

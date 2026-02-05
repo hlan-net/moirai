@@ -72,7 +72,7 @@ def update_couchdb_doc(db_name, doc_id, doc):
         print(f"DB Update Error: {e}")
         return False
 
-def query_couchdb(db_name, selector, limit=None, sort=None, fields=None):
+def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None):
     """Query CouchDB using Mango query syntax for efficient filtering."""
     allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
     if db_name not in allowed_dbs:
@@ -88,6 +88,8 @@ def query_couchdb(db_name, selector, limit=None, sort=None, fields=None):
         query = {"selector": selector}
         if limit:
             query["limit"] = limit
+        if skip:
+            query["skip"] = skip
         if sort:
             query["sort"] = sort
         if fields:
