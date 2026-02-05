@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useNamespace } from '../composables/useNamespace'
 import { marked } from 'marked'
-
-const { currentNamespace, namespaces, initNamespace } = useNamespace()
 
 interface Message {
   role: 'user' | 'assistant'
@@ -14,6 +11,8 @@ interface ChatSession {
   _id: string;
   title: string;
   messages: Message[];
+  model?: string;
+  llm_endpoint?: string;
 }
 
 const messages = ref<Message[]>([])
@@ -23,10 +22,23 @@ const sessionId = ref<string | null>(null)
 const sessions = ref<ChatSession[]>([])
 const loadingSessions = ref(true)
 
+const currentLlmEndpoint = ref('ollama')
+const currentModel = ref('llama3.1:latest')
+
 onMounted(() => {
-    initNamespace()
     fetchSessions()
+    loadSettings()
 })
+
+const loadSettings = () => {
+    currentLlmEndpoint.value = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
+    
+    if (currentLlmEndpoint.value === 'openai') {
+        currentModel.value = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
+    } else {
+        currentModel.value = localStorage.getItem('moirai_model') || 'llama3.1:latest'
+    }
+}
 
 const parsedContent = (content: string) => {
   return marked(content)
@@ -69,7 +81,11 @@ const sendMessage = async () => {
       const res = await fetch('/api/chat/history', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: userMsg })
+        body: JSON.stringify({ 
+            title: userMsg,
+            model: currentModel.value,
+            llm_endpoint: currentLlmEndpoint.value
+        })
       })
       if (res.ok) {
         const data = await res.json()
@@ -83,16 +99,10 @@ const sendMessage = async () => {
       content: m.content
     }))
     
-    const llmEndpoint = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
-    let model = localStorage.getItem('moirai_model') || 'llama3.1:latest'
-    if (llmEndpoint === 'openai') {
-      model = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
-    }
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     }
-    if (llmEndpoint === 'openai') {
+    if (currentLlmEndpoint.value === 'openai') {
       const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
       if (openaiApiKey) {
         headers['x-openai-api-key'] = openaiApiKey
@@ -110,9 +120,8 @@ const sendMessage = async () => {
       body: JSON.stringify({ 
           message: userMsg, 
           history, 
-          model,
-          namespace: currentNamespace.value,
-          llm_endpoint: llmEndpoint
+          model: currentModel.value,
+          llm_endpoint: currentLlmEndpoint.value
       })
     })
     
@@ -124,7 +133,11 @@ const sendMessage = async () => {
         await fetch(`/api/chat/history/${sessionId.value}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: messages.value })
+          body: JSON.stringify({ 
+              messages: messages.value,
+              model: currentModel.value,
+              llm_endpoint: currentLlmEndpoint.value
+          })
         })
       }
     } else {
@@ -135,6 +148,11 @@ const sendMessage = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const downloadChat = () => {
+  if (!sessionId.value) return
+  window.location.href = `/api/chat/history/${sessionId.value}/export`
 }
 </script>
 
@@ -156,12 +174,16 @@ const sendMessage = async () => {
     </div>
     <div class="chat-main">
       <div class="chat-header">
-         <select v-model="currentNamespace" class="ns-select">
-          <option value="">-- No Context (Global) --</option>
-          <option v-for="ns in namespaces" :key="ns" :value="ns">
-            {{ ns }}
-          </option>
-        </select>
+        <div class="model-info">
+            <span class="provider-label">{{ currentLlmEndpoint }}</span>
+            <span class="model-name">{{ currentModel }}</span>
+        </div>
+        <button v-if="sessionId" @click="downloadChat" class="download-btn" title="Download Chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+          Download
+        </button>
       </div>
       <div class="chat-container">
         <div class="messages">
@@ -202,9 +224,9 @@ const sendMessage = async () => {
 }
 .sidebar {
   width: 250px;
-  background: #f0f0f0;
+  background: var(--button-bg);
   padding: 10px;
-  border-right: 1px solid #ccc;
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
 }
@@ -218,10 +240,12 @@ const sendMessage = async () => {
 .session-item {
   padding: 10px;
   cursor: pointer;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+  font-size: 0.9rem;
 }
 .session-item:hover, .session-item.active {
-  background: #e0e0e0;
+  background: var(--bg-color);
 }
 .chat-main {
   flex: 1;
@@ -231,14 +255,57 @@ const sendMessage = async () => {
   overflow: hidden;
 }
 .chat-header {
-    text-align: center;
     margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 5px;
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto 10px auto;
 }
-.ns-select {
-  padding: 8px;
-  width: 300px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.model-info {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+.provider-label {
+    font-weight: bold;
+    text-transform: capitalize;
+    background: var(--primary-color);
+    color: var(--bg-color);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+.model-name {
+    opacity: 0.9;
+    font-family: monospace;
+}
+.download-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.download-btn:hover {
+    background: var(--button-bg);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.download-btn svg {
+    vertical-align: middle;
 }
 .chat-container {
   max-width: 800px;
@@ -247,9 +314,9 @@ const sendMessage = async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: white;
+  background: var(--card-bg);
 }
 .messages {
   flex: 1;
@@ -275,12 +342,13 @@ const sendMessage = async () => {
   word-wrap: break-word;
 }
 .user .bubble {
-  background: #007acc;
-  color: white;
+  background: var(--primary-color);
+  color: var(--bg-color);
 }
 .assistant .bubble {
-  background: #f0f0f0;
-  color: #333;
+  background: var(--button-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
 }
 .loading {
   font-style: italic;
@@ -293,20 +361,22 @@ const sendMessage = async () => {
 }
 .input-area {
   padding: 15px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-color);
   display: flex;
   gap: 10px;
 }
 input {
   flex: 1;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-text);
 }
 button {
   padding: 10px 20px;
-  background: #007acc;
-  color: white;
+  background: var(--primary-color);
+  color: var(--bg-color);
   border: none;
   border-radius: 4px;
   cursor: pointer;

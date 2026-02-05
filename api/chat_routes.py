@@ -1,10 +1,11 @@
 import re
 import uuid
 from types import SimpleNamespace
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, abort
 import os
 import json
 import asyncio
+from datetime import datetime
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from .llm.factory import LLMProviderFactory
@@ -37,18 +38,15 @@ def extract_tool_calls_from_content(content):
     
     return tools
 
-def run_agent_sync(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
-    return asyncio.run(run_agent(user_message, history, model, namespace, llm_endpoint, api_key, ollama_base_url))
+def run_agent_sync(user_message, history, model=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
+    return asyncio.run(run_agent(user_message, history, model, llm_endpoint, api_key, ollama_base_url))
 
-async def run_agent(user_message, history, model=None, namespace=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
+async def run_agent(user_message, history, model=None, llm_endpoint=None, api_key=None, ollama_base_url=None):
     messages = list(history)
     
-    # Inject namespace context if provided
-    system_prompt = "You are Moirai, a GenAI-native press review agent. "
-    if namespace:
-        system_prompt += f"You are operating within the Namespace GUID: {namespace}. When calling tools that require a namespace (like add_event, list_events), you MUST use this GUID. "
-    
-    system_prompt += (
+    # System prompt
+    system_prompt = (
+        "You are Moirai, a GenAI-native press review agent. "
         "You DO NOT have access to real-time information or the internet directly. "
         "You MUST use the provided tools (like `list_feeds`, `read_feed`, `list_articles`) to fetch any news or external data. "
         "Do not hallucinate headlines. If you need news, CALL A TOOL. "
@@ -212,12 +210,11 @@ def chat():
     user_message = data.get("message")
     history = data.get("history", [])
     model = data.get("model")
-    namespace = data.get("namespace")
     llm_endpoint = data.get("llm_endpoint")
     api_key = request.headers.get('x-openai-api-key')
     ollama_base_url = request.headers.get('x-ollama-base-url')
 
-    response = run_agent_sync(user_message, history, model, namespace, llm_endpoint, api_key, ollama_base_url)
+    response = run_agent_sync(user_message, history, model, llm_endpoint, api_key, ollama_base_url)
     return jsonify({"response": response})
 
 @chat_blueprint.route("/chat/history", methods=["GET"])
@@ -240,7 +237,9 @@ def create_chat_session():
     session = {
         "_id": session_id,
         "title": title,
-        "messages": []
+        "messages": [],
+        "model": data.get("model"),
+        "llm_endpoint": data.get("llm_endpoint")
     }
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)
@@ -258,11 +257,51 @@ def update_chat_session(session_id):
         abort(400, description="Messages are required")
         
     session["messages"] = data["messages"]
+    if "model" in data:
+        session["model"] = data["model"]
+    if "llm_endpoint" in data:
+        session["llm_endpoint"] = data["llm_endpoint"]
     
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)
     else:
         abort(500, description="Failed to update chat session")
+
+@chat_blueprint.route("/chat/history/<session_id>/export", methods=["GET"])
+def export_chat_session(session_id):
+    session = fetch_from_couchdb("chat_history", session_id)
+    if not session:
+        abort(404, description="Chat session not found")
+    
+    title = session.get("title", "Untitled Chat")
+    safe_title = re.sub(r'[^a-zA-Z0-9_\-]', '_', title)
+    messages = session.get("messages", [])
+    model = session.get("model", "Unknown")
+    llm_endpoint = session.get("llm_endpoint", "Unknown")
+    
+    markdown_content = f"# {title}\n\n"
+    markdown_content += f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    markdown_content += f"Provider: {llm_endpoint}\n"
+    markdown_content += f"Model: {model}\n\n"
+    markdown_content += "---\n\n"
+    
+    for msg in messages:
+        role = msg.get("role", "unknown").capitalize()
+        content = msg.get("content", "")
+        markdown_content += f"### {role}\n{content}\n\n"
+        
+        # Include tool calls if present (for debugging context)
+        if "tool_calls" in msg and msg["tool_calls"]:
+            markdown_content += "*(Tool Calls)*\n```json\n"
+            markdown_content += json.dumps(msg["tool_calls"], indent=2)
+            markdown_content += "\n```\n\n"
+
+    from flask import Response
+    return Response(
+        markdown_content,
+        mimetype="text/markdown",
+        headers={"Content-Disposition": f"attachment;filename={safe_title}.md"}
+    )
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["DELETE"])
 def delete_chat_session(session_id):

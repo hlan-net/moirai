@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-
-const props = defineProps<{ namespace?: string }>()
+import { onMounted, ref } from 'vue'
 
 interface Event {
   _id: string
@@ -34,16 +32,9 @@ const normalizeEvent = (event: any): Event => ({
 const fetchEventsAndTrends = async () => {
   loading.value = true
   try {
-    let eventsUrl = '/api/events'
-    let trendsUrl = '/api/trends'
-    if (props.namespace) {
-      eventsUrl += `?namespace=${props.namespace}`
-      trendsUrl += `?namespace=${props.namespace}`
-    }
-
     const [eventsResponse, trendsResponse] = await Promise.all([
-      fetch(eventsUrl),
-      fetch(trendsUrl),
+      fetch('/api/events'),
+      fetch('/api/trends'),
     ])
 
     if (eventsResponse.ok) {
@@ -67,10 +58,6 @@ const fetchEventsAndTrends = async () => {
     loading.value = false
   }
 }
-
-watch(() => props.namespace, () => {
-  fetchEventsAndTrends()
-})
 
 const deleteEvent = async (id: string) => {
   if (!confirm('Delete this event?')) return
@@ -181,11 +168,11 @@ h2 {
   flex: 1;
 }
 .event-card {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 10px;
-  background: #fff;
+  background: var(--button-bg);
 }
 .card-header {
   display: flex;
@@ -201,21 +188,23 @@ h2 {
 h3 {
   margin: 0;
   font-size: 1.1rem;
-  color: #333;
+  color: var(--text-color);
 }
 .desc {
   font-size: 0.9rem;
-  color: #555;
+  color: var(--text-color);
+  opacity: 0.8;
   margin: 5px 0;
 }
 .trend-link {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-color);
   font-size: 0.9em;
 }
 .trend-label {
-  color: #999;
+  color: var(--text-color);
+  opacity: 0.6;
   margin-right: 5px;
 }
 .trend-name {
@@ -231,13 +220,14 @@ h3 {
 }
 .expand-hint {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--text-color);
+  opacity: 0.5;
   cursor: pointer;
   margin-top: 5px;
 }
 .links-section {
   margin-top: 10px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-color);
   padding-top: 5px;
 }
 .links-section h4 {
@@ -259,12 +249,12 @@ h3 {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  color: #007acc;
+  color: var(--primary-color);
 }
 .remove-link-btn {
   border: none;
-  background: #eee;
-  color: #666;
+  background: var(--bg-color);
+  color: var(--text-color);
   border-radius: 50%;
   width: 20px;
   height: 20px;
@@ -272,7 +262,7 @@ h3 {
   line-height: 1;
 }
 .remove-link-btn:hover {
-  background: #ddd;
-  color: #000;
+  background: #cc0000;
+  color: white;
 }
 </style>

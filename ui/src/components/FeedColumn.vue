@@ -388,9 +388,17 @@ const bulkImportFeeds = async () => {
     <div class="column-header">
         <h2>Feeds ({{ feeds.length }})</h2>
         <div class="header-actions">
-          <button @click="openBulkImportModal" class="bulk-import-btn" title="Bulk Import Feeds">📥</button>
-          <button @click="triggerRefresh" :disabled="refreshing" class="refresh-btn" title="Refresh All Feeds">
-              {{ refreshing ? '...' : '↻' }}
+          <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+            </svg>
+            Import
+          </button>
+          <button @click="triggerRefresh" :disabled="refreshing" class="action-btn" title="Refresh All Feeds">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
+              <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+            {{ refreshing ? 'Refreshing' : 'Refresh' }}
           </button>
         </div>
     </div>
@@ -414,10 +422,26 @@ const bulkImportFeeds = async () => {
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions">
-          <button v-if="feed.last_fetch_error" class="warning-btn" :title="`Fetch error: ${feed.last_fetch_error}`" disabled>⚠️</button>
-          <button @click="openFeedInNewTab(feed.url)" class="open-link-btn" title="Open Feed">🔗</button>
-          <button @click="startRename(feed)" class="rename-btn" title="Rename Feed">✏️</button>
-          <button @click="deleteFeed(feed._id)" class="delete-btn" title="Delete Feed">×</button>
+          <div v-if="feed.last_fetch_error" class="warning-icon" :title="`Fetch error: ${feed.last_fetch_error}`">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+          </div>
+          <button @click="openFeedInNewTab(feed.url)" class="icon-btn" title="Open Feed">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+            </svg>
+          </button>
+          <button @click="startRename(feed)" class="icon-btn" title="Rename Feed">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+          </button>
+          <button @click="deleteFeed(feed._id)" class="icon-btn delete" title="Delete Feed">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
+          </button>
         </div>
       </li>
     </ul>
@@ -527,22 +551,26 @@ h2 {
   display: flex;
   gap: 8px;
 }
-.bulk-import-btn, .refresh-btn {
-    background: none;
-    border: 1px solid #ccc;
-    padding: 2px 8px;
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    cursor: pointer;
-    font-size: 1.2rem;
+    background: transparent;
     color: var(--text-color);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
 }
-.bulk-import-btn:hover, .refresh-btn:hover:not(:disabled) {
+.action-btn:hover:not(:disabled) {
     background: var(--button-bg);
-    color: var(--primary-color);
     border-color: var(--primary-color);
+    color: var(--primary-color);
 }
-.refresh-btn:disabled {
-    opacity: 0.5;
+.action-btn:disabled {
+    opacity: 0.6;
     cursor: wait;
 }
 .feed-list {
@@ -554,7 +582,7 @@ h2 {
 .feed-item {
   margin: 10px 0;
   padding: 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -596,8 +624,9 @@ h2 {
 }
 .category-tag {
   font-size: 0.75rem;
-  background: #eef;
-  color: #669;
+  background: var(--button-bg);
+  color: var(--primary-color);
+  border: 1px solid var(--border-color);
   padding: 2px 6px;
   border-radius: 4px;
   align-self: flex-start;
@@ -605,39 +634,43 @@ h2 {
 .feed-actions {
   display: flex;
   gap: 5px;
+  align-items: center;
 }
-.warning-btn, .open-link-btn, .rename-btn, .delete-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0 5px;
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
 }
-.warning-btn {
-  color: #ff9800;
-  cursor: help;
+.icon-btn:hover {
+    background: var(--button-bg);
+    opacity: 1;
+    color: var(--primary-color);
 }
-.warning-btn:disabled {
-  opacity: 1;
+.icon-btn.delete:hover {
+    color: #cc0000;
+    background: rgba(204, 0, 0, 0.1);
 }
-.open-link-btn {
-  color: #999;
+.warning-icon {
+    color: #ff9800;
+    cursor: help;
+    display: flex;
+    align-items: center;
+    padding: 4px;
 }
-.open-link-btn:hover {
-  color: #000;
+.spinning {
+    animation: spin 1s linear infinite;
 }
-.rename-btn {
-  color: #999;
-}
-.rename-btn:hover {
-  color: #000;
-}
-.delete-btn {
-  color: #cc0000;
-}
-.delete-btn:hover {
-  color: #ff0000;
-  font-weight: bold;
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 .rename-actions {
   display: flex;
@@ -652,27 +685,29 @@ h2 {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
 }
 .modal-content {
-  background: white;
+  background: var(--bg-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   width: 90%;
   max-width: 600px;
   max-height: 80vh;
   overflow: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
 }
 .modal-header h3 {
   margin: 0;
@@ -683,10 +718,11 @@ h2 {
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  color: #999;
+  color: var(--text-color);
+  opacity: 0.5;
 }
 .modal-close:hover {
-  color: #000;
+  opacity: 1;
 }
 .modal-body {
   padding: 20px;
@@ -696,7 +732,7 @@ h2 {
   font-size: 0.9rem;
   margin: 5px 0 15px 0;
   padding: 8px;
-  background: #fff3e0;
+  background: rgba(255, 152, 0, 0.1);
   border-left: 3px solid #ff9800;
   border-radius: 4px;
 }
@@ -706,8 +742,10 @@ h2 {
 .bulk-import-textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-text);
   font-family: monospace;
   font-size: 0.9rem;
   resize: vertical;
@@ -751,11 +789,12 @@ h2 {
   cursor: not-allowed;
 }
 .cancel-btn {
-  background: #f5f5f5;
-  color: #333;
+  background: var(--button-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
 }
 .cancel-btn:hover {
-  background: #e0e0e0;
+  background: var(--bg-color);
 }
 .close-btn {
   background: #42b983;
@@ -765,7 +804,7 @@ h2 {
   background: #359268;
 }
 .import-results {
-  background: #f9f9f9;
+  background: var(--button-bg);
   padding: 15px;
   border-radius: 4px;
   margin-top: 15px;
@@ -785,7 +824,7 @@ h2 {
 .error-details {
   margin-top: 15px;
   padding: 10px;
-  background: #fff;
+  background: var(--bg-color);
   border-left: 3px solid #cc0000;
 }
 .error-details h5 {

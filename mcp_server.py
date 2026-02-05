@@ -118,318 +118,33 @@ def delete_doc(db_name, doc_id):
     else:
         return False, f"Failed to delete doc: {res.text}"
 
-def validate_namespace(namespace: str):
-    """Simple validation for namespace."""
-    if not namespace or not isinstance(namespace, str):
-        raise ValueError("Namespace GUID is required for this operation.")
-    return True
-
-# --- MCP Resources ---
-
-@mcp.resource("moirai://concepts")
-def get_concepts_guide() -> str:
-    """Comprehensive guide to Moirai's data model concepts for AI agents"""
-    return """# Moirai Data Model Concepts
-
-## Hierarchy
-Feed → Article → Event → Trend
-
-## Feed
-An RSS/Atom source URL that publishes content periodically.
-- Input: A web URL (e.g., https://example.com/feed.xml)
-- Purpose: Source of raw articles
-- Example: "TechCrunch RSS", "NYT World News Feed", "Hacker News RSS"
-
-## Article
-A single news item fetched from a feed's RSS/Atom stream.
-- Contains: title, link, summary, published date
-- Automatically fetched when using read_feed tool
-- Raw content before any synthesis
-- Example: One blog post, one news article, one podcast episode entry
-
-## Event
-A named grouping of RELATED ARTICLES describing a SINGLE significant occurrence.
-- Links multiple articles from different sources covering the SAME story
-- Has a descriptive name and description
-- Use when: Multiple sources report on the same announcement, incident, or development
-- Examples:
-  * "Company X Announces Merger" (groups 5 articles from different outlets about same merger)
-  * "New Climate Policy Announced" (links articles covering same policy from various sources)
-  * "CVE-2024-1234 Vulnerability Disclosed" (connects security advisories and analyses)
-
-## Trend
-A higher-level pattern connecting MULTIPLE RELATED EVENTS over time.
-- Links several events that share a common theme or pattern
-- Represents emerging or ongoing developments
-- Use when: Multiple distinct events reveal a broader shift or pattern
-- Examples:
-  * "Remote Work Adoption" (links events: "Tech Co Goes Remote", "Office Market Declines", "Zoom Revenue Growth")
-  * "Electric Vehicle Market Growth" (connects: "Tesla Model Y Launch", "GM EV Investment", "Charging Network Expansion")
-  * "Privacy Legislation Changes" (groups: "GDPR Update", "California Privacy Law", "Data Breach Penalties")
-
-## Key Differences
-- Event = ONE occurrence, multiple articles
-- Trend = PATTERN across multiple events over time
-"""
-
-# --- Feeds Tools (Shared) ---
+# --- Events Tools ---
 
 @mcp.tool()
-def add_feed(url: str, category: str = "general") -> str:
-    """Add a new RSS feed to the shared global list."""
-    # Fetch favicon for the feed
-    favicon_url = fetch_favicon_url(url)
-    
-    feed_doc = {
-        "url": url,
-        "category": category,
-        "added_at": datetime.now().isoformat(),
-        "favicon_url": favicon_url
-    }
-    # Use URL hash as ID
-    doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
-    feed_doc["_id"] = doc_hash
-    
-    # Check if exists first to avoid 409 log
-    if get_doc("feeds", doc_hash):
-        return f"Feed already exists: {url}"
-
-    res = db_request("PUT", "feeds", path=f"/{doc_hash}", json_data=feed_doc)
-    if res.status_code in (200, 201):
-        return f"Feed added: {url} (ID: {doc_hash})"
-    else:
-        return f"Error adding feed: {res.status_code} {res.text}"
-
-@mcp.tool()
-def delete_feed(url: str) -> str:
-    """Delete a feed by its URL."""
-    doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
-    success, msg = delete_doc("feeds", doc_hash)
-    if success:
-        return f"Feed deleted: {url}"
-    else:
-        return f"Error deleting feed: {msg}"
-
-@mcp.tool()
-def update_feed_category(url: str, new_category: str) -> str:
-    """Update the category of an existing feed."""
-    doc_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()
-    success, msg = update_doc("feeds", doc_hash, {"category": new_category})
-    if success:
-        return f"Feed category updated to '{new_category}' for: {url}"
-    else:
-        return f"Error updating feed: {msg}"
-
-@mcp.tool()
-def list_feeds() -> str:
-    """List all registered RSS feeds (Global)."""
-    res = db_request("GET", "feeds", path="/_all_docs", params={"include_docs": "true"})
-    if res.status_code != 200:
-        return "Error fetching feeds or database empty."
-    
-    rows = res.json().get("rows", [])
-    feeds = []
-    for row in rows:
-        doc = row["doc"]
-        feeds.append(f"- {doc.get('url')} (Category: {doc.get('category', 'unknown')})")
-    
-    return "\n".join(feeds) if feeds else "No feeds found."
-
-@mcp.tool()
-def read_feed(url: str, limit: int = 5) -> str:
-    """
-    Fetch and parse articles from a specific RSS feed URL.
-    Returns a list of the latest articles.
-    """
-    try:
-        d = feedparser.parse(url)
-        output_prefix = ""
-        
-        if d.bozo:
-             # If parsing failed but we still got entries, just warn.
-             if not d.entries:
-                return f"Error parsing feed: {d.bozo_exception}"
-             else:
-                output_prefix = f"Warning: Feed parsing had issues ({d.bozo_exception}), but some content was recovered.\n\n"
-        
-        articles = []
-        for entry in d.entries[:limit]:
-            title = entry.get("title", "No Title")
-            link = entry.get("link", "#")
-            summary = entry.get("summary", "")
-            summary = re.sub('<[^<]+?>', '', summary)
-            articles.append(f"Title: {title}\nLink: {link}\nSummary: {summary[:200]}...\n")
-            
-        return output_prefix + "\n---\n".join(articles)
-    except Exception as e:
-        return f"Error reading feed: {e}"
-
-@mcp.tool()
-def list_articles(limit: int = 20, feed_url: str = None) -> str:
-    """
-    List recent articles from the database.
-    
-    If feed_url is provided, returns articles only from that specific feed.
-    Otherwise, returns recent articles from all feeds.
-    
-    Args:
-        limit: Maximum number of articles to return (default: 20, max: 100)
-        feed_url: Optional feed URL to filter articles
-    """
-    try:
-        # Validate and clamp limit
-        limit = min(max(limit, 1), 100)
-        
-        # Fetch all articles from database
-        res = db_request("GET", "articles", path="/_all_docs", params={"include_docs": "true"})
-        if res.status_code != 200:
-            return "No articles found in database. Try using 'read_feed' to fetch articles from a specific RSS feed."
-        
-        rows = res.json().get("rows", [])
-        if not rows:
-            return "No articles found in database. Try using 'read_feed' to fetch articles from a specific RSS feed."
-        
-        # Extract documents and filter by feed_url if specified
-        articles = []
-        for row in rows:
-            doc = row.get("doc", {})
-            # Skip design documents
-            if doc.get("_id", "").startswith("_design/"):
-                continue
-            
-            # Filter by feed_url if specified
-            if feed_url and doc.get("feed_url") != feed_url:
-                continue
-                
-            articles.append(doc)
-        
-        # Sort by published date (newest first)
-        articles.sort(key=lambda x: x.get("published", ""), reverse=True)
-        
-        # Limit results
-        articles = articles[:limit]
-        
-        if not articles:
-            if feed_url:
-                return f"No articles found for feed: {feed_url}"
-            else:
-                return "No articles found in database."
-        
-        # Format output
-        output = []
-        for art in articles:
-            title = art.get("title", "No Title")
-            link = art.get("link", "")
-            summary = art.get("summary", "")
-            published = art.get("published", "Unknown date")
-            feed = art.get("feed_url", "Unknown feed")
-            
-            # Clean HTML from summary
-            summary = re.sub('<[^<]+?>', '', summary)
-            summary = summary[:200] + "..." if len(summary) > 200 else summary
-            
-            output.append(
-                f"Title: {title}\n"
-                f"Link: {link}\n"
-                f"Published: {published}\n"
-                f"Feed: {feed}\n"
-                f"Summary: {summary}\n"
-            )
-        
-        return "\n---\n".join(output)
-        
-    except Exception as e:
-        return f"Error listing articles: {e}"
-
-@mcp.tool()
-def refresh_all_feeds() -> str:
-    """
-    Triggers the system to fetch the latest articles from all registered feeds.
-    This runs in the background. New articles will appear in the system shortly.
-    """
-    # The API service is named 'moirai' in docker-compose, port 8088
-    # We use Basic Auth as configured in env vars or defaults
-    
-    # We need credentials. mcp_server doesn't strictly need them to read DB, but to call API it might.
-    # Actually, the API requires auth.
-    # Let's try to get credentials from env or use defaults.
-    # mcp_server.py doesn't have API_USERNAME/PASSWORD env vars set in docker-compose.
-    # I should add them to docker-compose for mcp-server.
-    
-    # For now, I'll try default "username:password" or assume the user configured it.
-    # But to be robust, I should update docker-compose.
-    
-    api_url = "http://moirai:8088/api/feeds/refresh"
-    # Fallback to localhost if running outside docker for testing?
-    # But this is inside the container usually.
-    
-    # For now, let's just try without auth if public read is on? No, refresh is a POST, likely protected.
-    # Wait, api/routes.py protects everything except specific GETs.
-    
-    try:
-        # We need to get the creds or inject them.
-        # Let's assume standard default or what's in the code for now.
-        # I will update docker-compose in a moment to ensure they are passed.
-        username = os.environ.get("API_USERNAME")
-        password = os.environ.get("API_PASSWORD")
-        
-        res = requests.post(api_url, auth=(username, password), timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            return f"Refresh triggered. Started fetching {data.get('count')} feeds."
-        else:
-            return f"Failed to trigger refresh. API returned {res.status_code}: {res.text}"
-    except Exception as e:
-        # Fallback for local testing if 'moirai' host isn't found
-        if "Name or service not known" in str(e) or "Connection refused" in str(e):
-             try:
-                 res = requests.post("http://localhost:8088/api/feeds/refresh", auth=(username, password), timeout=5)
-                 if res.status_code == 200:
-                    data = res.json()
-                    return f"Refresh triggered (Local). Started fetching {data.get('count')} feeds."
-             except:
-                 pass
-        return f"Error calling refresh API: {e}"
-
-# --- Events Tools (Namespaced) ---
-
-@mcp.tool()
-def add_event(name: str, description: str, article_links: list[str], namespace: str = None) -> str:
+def add_event(name: str, description: str, article_links: list[str]) -> str:
     """
     Create a new Event grouping multiple related articles about a SINGLE occurrence.
     
     An Event represents one significant story covered by multiple sources.
     Use this when different articles report on the same announcement, incident, or development.
-    
-    If namespace is not provided, a new GUID will be generated.
-    If namespace is provided, it will be used (effectively creating it if new).
     """
-    if not namespace:
-        namespace = str(uuid.uuid4())
-        msg_prefix = f"New namespace generated: {namespace}\n"
-    else:
-        msg_prefix = f"Using namespace: {namespace}\n"
-
     event_doc = {
         "name": name,
         "description": description,
         "article_links": article_links,
-        "namespace": namespace,
         "created_at": datetime.now().isoformat(),
         "type": "event"
     }
     
     try:
         doc_id = store_doc("events", event_doc)
-        return f"{msg_prefix}Event created with ID: {doc_id}"
+        return f"Event created with ID: {doc_id}"
     except Exception as e:
         return f"Error creating event: {e}"
 
 @mcp.tool()
-def list_events(namespace: str) -> str:
-    """List all created events for a specific namespace GUID (Required)."""
-    validate_namespace(namespace)
-    
+def list_events() -> str:
+    """List all created events."""
     res = db_request("GET", "events", path="/_all_docs", params={"include_docs": "true"})
     if res.status_code != 200:
         return "No events data found."
@@ -438,32 +153,27 @@ def list_events(namespace: str) -> str:
     events = []
     for row in rows:
         doc = row["doc"]
-        if doc.get("type") == "event" and doc.get("namespace") == namespace:
+        if doc.get("type") == "event":
             events.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nArticles: {len(doc.get('article_links', []))}\n")
     
-    return "\n---\n".join(events) if events else f"No data found for namespace {namespace}."
+    return "\n---\n".join(events) if events else "No events found."
 
 @mcp.tool()
-def read_event(event_id: str, namespace: str) -> str:
-    """Get details of a specific event (Namespace GUID Required)."""
-    validate_namespace(namespace)
-    
+def read_event(event_id: str) -> str:
+    """Get details of a specific event."""
     doc = get_doc("events", event_id)
-    if not doc or doc.get("namespace") != namespace:
-        return f"No data found for this event in namespace {namespace}."
+    if not doc:
+        return "Event not found."
     
     return json.dumps(doc, indent=2)
 
 @mcp.tool()
-def update_event(event_id: str, namespace: str, name: str = None, description: str = None, article_links: list[str] = None) -> str:
-    """Update an existing event. Only provided fields are updated. (Namespace GUID Required)"""
-    validate_namespace(namespace)
-    
-    # Verify ownership
+def update_event(event_id: str, name: str = None, description: str = None, article_links: list[str] = None) -> str:
+    """Update an existing event. Only provided fields are updated."""
     existing = get_doc("events", event_id)
-    if not existing or existing.get("namespace") != namespace:
-        return f"Event not found in namespace {namespace}."
-
+    if not existing:
+        return "Event not found."
+    
     updates = {}
     if name: updates["name"] = name
     if description: updates["description"] = description
@@ -476,14 +186,11 @@ def update_event(event_id: str, namespace: str, name: str = None, description: s
         return f"Error updating event: {msg}"
 
 @mcp.tool()
-def delete_event(event_id: str, namespace: str) -> str:
-    """Delete an event. (Namespace GUID Required)"""
-    validate_namespace(namespace)
-    
-    # Verify ownership
+def delete_event(event_id: str) -> str:
+    """Delete an event."""
     existing = get_doc("events", event_id)
-    if not existing or existing.get("namespace") != namespace:
-        return f"Event not found in namespace {namespace}."
+    if not existing:
+        return "Event not found."
     
     success, msg = delete_doc("events", event_id)
     if success:
@@ -491,29 +198,19 @@ def delete_event(event_id: str, namespace: str) -> str:
     else:
         return f"Error deleting event: {msg}"
 
-# --- Trends Tools (Namespaced) ---
+# --- Trends Tools ---
 
 @mcp.tool()
-def add_trend(name: str, description: str, event_ids: list[str], namespace: str = None) -> str:
+def add_trend(name: str, description: str, event_ids: list[str]) -> str:
     """
     Create a new Trend grouping multiple related events into a pattern.
     
     A Trend represents a broader theme or pattern emerging from multiple distinct events over time.
-    Use this when several events reveal a common shift, development, or ongoing story.
-    
-    If namespace is not provided, a new GUID will be generated.
     """
-    if not namespace:
-        namespace = str(uuid.uuid4())
-        msg_prefix = f"New namespace generated: {namespace}\n"
-    else:
-        msg_prefix = f"Using namespace: {namespace}\n"
-
     trend_doc = {
         "name": name,
         "description": description,
         "event_ids": event_ids,
-        "namespace": namespace,
         "created_at": datetime.now().isoformat(),
         "type": "trend"
     }
@@ -523,15 +220,13 @@ def add_trend(name: str, description: str, event_ids: list[str], namespace: str 
             db_request("PUT", "trends")
 
         doc_id = store_doc("trends", trend_doc)
-        return f"{msg_prefix}Trend created with ID: {doc_id}"
+        return f"Trend created with ID: {doc_id}"
     except Exception as e:
         return f"Error creating trend: {e}"
 
 @mcp.tool()
-def list_trends(namespace: str) -> str:
-    """List all created trends for a specific namespace GUID (Required)."""
-    validate_namespace(namespace)
-    
+def list_trends() -> str:
+    """List all created trends."""
     if db_request("HEAD", "trends").status_code == 404:
         return "No trends data found."
 
@@ -543,32 +238,25 @@ def list_trends(namespace: str) -> str:
     trends = []
     for row in rows:
         doc = row["doc"]
-        if doc.get("namespace") == namespace:
-            trends.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nEvents: {len(doc.get('event_ids', []))}\n")
+        trends.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nEvents: {len(doc.get('event_ids', []))}\n")
     
-    return "\n---\n".join(trends) if trends else f"No data found for namespace {namespace}."
+    return "\n---\n".join(trends) if trends else "No trends found."
 
 @mcp.tool()
-def read_trend(trend_id: str, namespace: str) -> str:
-    """Get details of a specific trend (Namespace GUID Required)."""
-    validate_namespace(namespace)
-    
+def read_trend(trend_id: str) -> str:
+    """Get details of a specific trend."""
     doc = get_doc("trends", trend_id)
-    if not doc or doc.get("namespace") != namespace:
-        return f"No data found for this trend in namespace {namespace}."
-    
+    if not doc:
+        return "Trend not found."
     
     return json.dumps(doc, indent=2)
 
 @mcp.tool()
-def update_trend(trend_id: str, namespace: str, name: str = None, description: str = None, event_ids: list[str] = None) -> str:
-    """Update an existing trend. Only provided fields are updated. (Namespace GUID Required)"""
-    validate_namespace(namespace)
-    
-    # Verify ownership
+def update_trend(trend_id: str, name: str = None, description: str = None, event_ids: list[str] = None) -> str:
+    """Update an existing trend. Only provided fields are updated."""
     existing = get_doc("trends", trend_id)
-    if not existing or existing.get("namespace") != namespace:
-        return f"Trend not found in namespace {namespace}."
+    if not existing:
+        return "Trend not found."
 
     updates = {}
     if name: updates["name"] = name
@@ -582,14 +270,11 @@ def update_trend(trend_id: str, namespace: str, name: str = None, description: s
         return f"Error updating trend: {msg}"
 
 @mcp.tool()
-def delete_trend(trend_id: str, namespace: str) -> str:
-    """Delete a trend. (Namespace GUID Required)"""
-    validate_namespace(namespace)
-    
-    # Verify ownership
+def delete_trend(trend_id: str) -> str:
+    """Delete a trend."""
     existing = get_doc("trends", trend_id)
-    if not existing or existing.get("namespace") != namespace:
-        return f"Trend not found in namespace {namespace}."
+    if not existing:
+        return "Trend not found."
     
     success, msg = delete_doc("trends", trend_id)
     if success:
@@ -597,26 +282,14 @@ def delete_trend(trend_id: str, namespace: str) -> str:
     else:
         return f"Error deleting trend: {msg}"
 
-@mcp.tool()
-def list_namespaces() -> str:
-    """List all unique namespaces found in Events and Trends."""
-    # Query events and trends DBs
-    events_res = db_request("GET", "events", path="/_all_docs", params={"include_docs": "true"})
-    trends_res = db_request("GET", "trends", path="/_all_docs", params={"include_docs": "true"})
-    
-    namespaces = set()
-    
-    if events_res.status_code == 200:
-        for row in events_res.json().get("rows", []):
-            ns = row["doc"].get("namespace")
-            if ns: namespaces.add(ns)
-            
-    if trends_res.status_code == 200:
-        for row in trends_res.json().get("rows", []):
-            ns = row["doc"].get("namespace")
-            if ns: namespaces.add(ns)
-            
-    return "\n".join(sorted(list(namespaces))) if namespaces else "No namespaces found."
+# Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
+# app = mcp.sse_app is already set above
+
+if __name__ == "__main__":
+    # Run the server using SSE transport on port 8090
+    import uvicorn
+    uvicorn.run("mcp_server:app", host="0.0.0.0", port=8090, reload=False)
+
 
 # Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
 # app = mcp.sse_app is already set above

@@ -250,14 +250,15 @@ h2 {
 .loading-state {
   text-align: center;
   padding: 20px;
-  color: #666;
+  color: var(--text-color);
+  opacity: 0.7;
 }
 .article-list {
   overflow-y: auto;
   flex: 1;
 }
 .article-card {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
   padding: 15px 0;
   text-align: left;
 }
@@ -279,12 +280,14 @@ h2 {
 }
 .meta {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-color);
+  opacity: 0.6;
   margin-bottom: 8px;
 }
 .summary {
   font-size: 0.9rem;
-  color: #333;
+  color: var(--text-color);
+  opacity: 0.9;
   line-height: 1.4;
 }
 .event-tags {
@@ -292,8 +295,9 @@ h2 {
 }
 .tag {
   display: inline-block;
-  background: #eee;
-  color: #333;
+  background: var(--button-bg);
+  color: var(--primary-color);
+  border: 1px solid var(--border-color);
   padding: 2px 6px;
   border-radius: 4px;
   margin-right: 5px;

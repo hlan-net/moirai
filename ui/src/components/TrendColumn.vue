@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-
-const props = defineProps<{ namespace?: string }>()
+import { onMounted, ref } from 'vue'
 
 interface Trend {
   _id: string
@@ -16,11 +14,7 @@ const expandedTrends = ref<Set<string>>(new Set())
 
 const fetchTrends = async () => {
   try {
-    let url = '/api/trends'
-    if (props.namespace) {
-      url += `?namespace=${props.namespace}`
-    }
-    const response = await fetch(url)
+    const response = await fetch('/api/trends')
     if (response.ok) {
       trends.value = await response.json()
     }
@@ -30,10 +24,6 @@ const fetchTrends = async () => {
     loading.value = false
   }
 }
-
-watch(() => props.namespace, () => {
-  fetchTrends()
-})
 
 const deleteTrend = async (id: string) => {
   if (!confirm('Delete this trend?')) return
@@ -132,11 +122,11 @@ h2 {
   flex: 1;
 }
 .trend-card {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 10px;
-  background: #fdfdfd;
+  background: var(--button-bg);
 }
 .card-header {
   display: flex;
@@ -152,11 +142,12 @@ h2 {
 h3 {
   margin: 0;
   font-size: 1.1rem;
-  color: #333;
+  color: var(--text-color);
 }
 .desc {
   font-size: 0.9rem;
-  color: #555;
+  color: var(--text-color);
+  opacity: 0.8;
   margin: 5px 0;
 }
 .delete-btn {
@@ -168,13 +159,14 @@ h3 {
 }
 .expand-hint {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--text-color);
+  opacity: 0.5;
   cursor: pointer;
   margin-top: 5px;
 }
 .events-section {
   margin-top: 10px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-color);
   padding-top: 5px;
 }
 .events-section h4 {
@@ -195,12 +187,13 @@ h3 {
 }
 .event-id {
   font-family: monospace;
-  color: #666;
+  color: var(--text-color);
+  opacity: 0.6;
 }
 .remove-event-btn {
   border: none;
-  background: #eee;
-  color: #666;
+  background: var(--bg-color);
+  color: var(--text-color);
   border-radius: 50%;
   width: 20px;
   height: 20px;
@@ -208,7 +201,7 @@ h3 {
   line-height: 1;
 }
 .remove-event-btn:hover {
-  background: #ddd;
-  color: #000;
+  background: #cc0000;
+  color: white;
 }
 </style>
