@@ -6,7 +6,7 @@ from functools import wraps
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
-from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
+from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc, query_couchdb
 from pydantic import ValidationError
 from .validation import (
     FeedCreateRequest, FeedUpdateRequest,
@@ -175,6 +175,7 @@ def update_feed(feed_id):
         abort(500, description="Failed to update feed")
 
 @api_blueprint.route("/feeds/refresh", methods=["POST"])
+@requires_auth
 def refresh_feeds():
     """Triggers a background refresh of all registered feeds."""
     feeds = fetch_from_couchdb("feeds")
@@ -191,6 +192,24 @@ def refresh_feeds():
             count += 1
             
     return jsonify({"status": "started", "count": count})
+
+@api_blueprint.route("/feeds/refresh/<path:feed_url>", methods=["POST"])
+@requires_auth
+@limiter.limit("10 per minute")
+def refresh_single_feed(feed_url):
+    """Triggers a background refresh of a single feed by URL."""
+    # Validate the feed exists
+    feeds = fetch_from_couchdb("feeds")
+    feed_exists = any(f.get("url") == feed_url for f in feeds)
+    
+    if not feed_exists:
+        abort(404, description="Feed not found")
+    
+    # Run in background thread
+    task = FetchFeedTask(feed_url)
+    task.start()
+    
+    return jsonify({"status": "started", "url": feed_url})
 
 @api_blueprint.route("/feeds/bulk", methods=["POST"])
 @limiter.limit("5 per minute")  # Strict rate limit for bulk operations
@@ -628,3 +647,219 @@ def update_config():
         return jsonify({"status": "updated", "config": new_doc})
     else:
         abort(500, description="Failed to update config")
+
+# --- Search Endpoints ---
+
+@api_blueprint.route("/articles/search", methods=["GET"])
+@requires_auth
+@limiter.limit("20 per minute")
+def search_articles_endpoint():
+    """Search articles by keyword with optional date filters"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        abort(400, description="Query parameter 'q' is required")
+    
+    date_from = request.args.get('from', '')
+    date_to = request.args.get('to', '')
+    limit = int(request.args.get('limit', 50))
+    
+    if limit > 200:
+        limit = 200
+    
+    # Build Mango selector for efficient querying
+    selector = {
+        "$or": [
+            {"title": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}},
+            {"content": {"$regex": f"(?i){query}"}}
+        ]
+    }
+    
+    # Add date range filters if provided
+    if date_from:
+        try:
+            from_dt = datetime.fromisoformat(date_from)
+            selector["published"] = {"$gte": from_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_dt = datetime.fromisoformat(date_to)
+            # Combine with existing published filter if from_dt exists
+            if "published" in selector:
+                selector["published"]["$lte"] = to_dt.isoformat()
+            else:
+                selector["published"] = {"$lte": to_dt.isoformat()}
+        except ValueError:
+            pass
+    
+    # Query CouchDB with selector
+    articles = query_couchdb("articles", selector=selector, limit=limit)
+    
+    results = []
+    for article in articles:
+        results.append({
+            "_id": article.get("_id"),
+            "title": article.get("title", "Untitled"),
+            "link": article.get("link", ""),
+            "published": article.get("published", ""),
+            "feed_title": article.get("feed_title", "Unknown"),
+            "description": article.get("description", "")[:200]
+        })
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
+
+@api_blueprint.route("/articles/recent", methods=["GET"])
+@requires_auth
+@limiter.limit("20 per minute")
+def get_recent_articles_endpoint():
+    """Get most recent articles"""
+    hours = int(request.args.get('hours', 24))
+    limit = int(request.args.get('limit', 50))
+    
+    if hours > 168:  # Max 1 week
+        hours = 168
+    if limit > 200:
+        limit = 200
+    
+    from datetime import timedelta
+    
+    # Calculate cutoff timestamp
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff_str = cutoff.isoformat()
+    
+    # Use Mango query to filter at database level
+    selector = {
+        "published": {"$gte": cutoff_str}
+    }
+    
+    # Query with sort by published date descending
+    articles = query_couchdb(
+        "articles",
+        selector=selector,
+        limit=limit * 2,  # Fetch extra to account for parsing issues
+        sort=[{"published": "desc"}]
+    )
+    
+    results = []
+    for article in articles:
+        pub_str = article.get("published", "")
+        if pub_str:
+            try:
+                pub_dt = parse_datetime_safe(pub_str)
+                # Double-check in case CouchDB string comparison differs from parsed date
+                if pub_dt >= cutoff:
+                    results.append({
+                        "_id": article.get("_id"),
+                        "title": article.get("title", "Untitled"),
+                        "link": article.get("link", ""),
+                        "published": pub_str,
+                        "feed_title": article.get("feed_title", "Unknown"),
+                        "description": article.get("description", "")[:200],
+                        "_sort_date": pub_dt
+                    })
+            except (ValueError, AttributeError):
+                pass
+        
+        if len(results) >= limit:
+            break
+    
+    # Sort by published date descending (in case CouchDB sort isn't perfect)
+    results.sort(key=lambda x: x.get("_sort_date", datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+    for r in results:
+        r.pop("_sort_date", None)
+    
+    return jsonify({
+        "total": len(results),
+        "hours": hours,
+        "results": results[:limit]
+    })
+
+@api_blueprint.route("/events/search", methods=["GET"])
+@requires_auth
+@limiter.limit("20 per minute")
+def search_events_endpoint():
+    """Search events by keyword using CouchDB query"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        abort(400, description="Query parameter 'q' is required")
+    
+    limit = int(request.args.get('limit', 20))
+    if limit > 100:
+        limit = 100
+    
+    # Use Mango query with regex for case-insensitive search
+    # Note: For better performance at scale, consider using a full-text search engine
+    selector = {
+        "$or": [
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
+    
+    events = query_couchdb("events", selector=selector, limit=limit)
+    
+    results = []
+    for event in events:
+        results.append({
+            "_id": event.get("_id"),
+            "name": event.get("name", "Untitled"),
+            "description": event.get("description", ""),
+            "article_count": len(event.get("article_links", []))
+        })
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
+
+@api_blueprint.route("/trends/search", methods=["GET"])
+@requires_auth
+@limiter.limit("20 per minute")
+def search_trends_endpoint():
+    """Search trends by keyword using CouchDB query"""
+    query = request.args.get('q', '').strip()
+    if not query:
+        abort(400, description="Query parameter 'q' is required")
+    
+    limit = int(request.args.get('limit', 20))
+    if limit > 100:
+        limit = 100
+    
+    # Use Mango query with regex for case-insensitive search
+    # Note: For better performance at scale, consider using a full-text search engine
+    selector = {
+        "$or": [
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
+    
+    trends = query_couchdb("trends", selector=selector, limit=limit)
+    
+    results = []
+    for trend in trends:
+        results.append({
+            "_id": trend.get("_id"),
+            "name": trend.get("name", "Untitled"),
+            "description": trend.get("description", ""),
+            "event_count": len(trend.get("event_ids", []))
+        })
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
+        "results": results
+    })

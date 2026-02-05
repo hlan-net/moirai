@@ -3,7 +3,8 @@ from .base import LLMProvider
 
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key):
-        self.client = OpenAI(api_key=api_key)
+        # 120s timeout for OpenAI API (default is 600s but be explicit)
+        self.client = OpenAI(api_key=api_key, timeout=120.0)
 
     def list_models(self):
         models_response = self.client.models.list()

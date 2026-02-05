@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, inject, type Ref } from 'vue'
 
 interface Trend {
   _id: string
@@ -11,12 +11,65 @@ interface Trend {
 const trends = ref<Trend[]>([])
 const loading = ref(true)
 const expandedTrends = ref<Set<string>>(new Set())
+const searchQuery = ref('')
+const events = ref<any[]>([]) // To check which events link to selected feed's articles
+const articles = ref<any[]>([]) // To check article origins
+
+// Inject selected feed from parent
+const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+
+// Computed: Filtered trends based on search query and selected feed
+const filteredTrends = computed(() => {
+  let filtered = trends.value
+  
+  // Filter by selected feed - show only trends with events that have articles from that feed
+  if (selectedFeedUrl.value) {
+    const feedArticles = articles.value.filter(a => a.feed_url === selectedFeedUrl.value)
+    const feedArticleLinks = new Set(feedArticles.map(a => a.link))
+    
+    const relevantEventIds = new Set(
+      events.value
+        .filter(event => event.article_links?.some((link: string) => feedArticleLinks.has(link)))
+        .map(event => event._id)
+    )
+    
+    filtered = filtered.filter(trend => 
+      trend.event_ids.some(eventId => relevantEventIds.has(eventId))
+    )
+  }
+  
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(trend => {
+      const name = trend.name.toLowerCase()
+      const description = trend.description.toLowerCase()
+      return name.includes(query) || description.includes(query)
+    })
+  }
+  
+  return filtered
+})
 
 const fetchTrends = async () => {
   try {
-    const response = await fetch('/api/trends')
-    if (response.ok) {
-      trends.value = await response.json()
+    const [trendsResponse, eventsResponse, articlesResponse] = await Promise.all([
+      fetch('/api/trends'),
+      fetch('/api/events'),
+      fetch('/api/articles?limit=10000'),
+    ])
+
+    if (trendsResponse.ok) {
+      trends.value = await trendsResponse.json()
+    }
+    
+    if (eventsResponse.ok) {
+      events.value = await eventsResponse.json()
+    }
+    
+    if (articlesResponse.ok) {
+      const data = await articlesResponse.json()
+      articles.value = data.articles || []
     }
   } catch (error) {
     console.error('Error fetching trends:', error)
@@ -73,10 +126,27 @@ onMounted(() => {
 
 <template>
   <div class="column-container">
-    <h2>Trends ({{ trends.length }})</h2>
+    <h2>Trends ({{ filteredTrends.length }})</h2>
+
+    <!-- Search Input -->
+    <div class="search-container">
+      <input 
+        v-model="searchQuery" 
+        type="text" 
+        placeholder="Search trends by name or description..." 
+        class="search-input"
+      />
+      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+        ×
+      </button>
+    </div>
+
     <div v-if="loading">Loading trends...</div>
-    <div v-else-if="trends.length" class="trend-list">
-      <div v-for="trend in trends" :key="trend._id" class="trend-card">
+    <div v-else-if="!filteredTrends.length && searchQuery" class="no-results">
+      No trends match "{{ searchQuery }}"
+    </div>
+    <div v-else-if="filteredTrends.length" class="trend-list">
+      <div v-for="trend in filteredTrends" :key="trend._id" class="trend-card">
         <div class="card-header">
           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
           <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
@@ -108,6 +178,57 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.search-container {
+  position: relative;
+  margin: 0.75rem 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: #e0e0e0;
+}
+
+.no-results {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
 .column-container {
   height: 100%;
   display: flex;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted } from 'vue'
+import { onMounted, ref, onUnmounted, computed, inject, type Ref } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 
 const articles = ref<Article[]>([])
@@ -9,6 +9,10 @@ const fetchingUpdates = ref(false)
 const hasMore = ref(true)
 const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
+const searchQuery = ref('')
+
+// Inject selected feed from parent
+const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
 let observer: IntersectionObserver | null = null
 let refreshInterval: number | null = null
@@ -100,6 +104,29 @@ const loadMore = async () => {
   }
 }
 
+// Computed: Filtered articles based on search query
+const filteredArticles = computed(() => {
+  let filtered = articles.value
+  
+  // Filter by selected feed
+  if (selectedFeedUrl.value) {
+    filtered = filtered.filter(article => article.feed_url === selectedFeedUrl.value)
+  }
+  
+  // Filter by search query
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(article => {
+      const title = (article.title || '').toLowerCase()
+      const summary = (article.summary || '').toLowerCase()
+      const feedTitle = (article.feed_title || '').toLowerCase()
+      return title.includes(query) || summary.includes(query) || feedTitle.includes(query)
+    })
+  }
+  
+  return filtered
+})
+
 const deleteArticle = async (id: string) => {
   if (!confirm("Delete this article?")) return;
   try {
@@ -167,6 +194,33 @@ onUnmounted(() => {
   }
 })
 
+const refreshingFeed = ref(false)
+
+const refreshSelectedFeed = async () => {
+  if (!selectedFeedUrl.value) return
+  
+  refreshingFeed.value = true
+  try {
+    // Encode the URL for the API path
+    const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
+    const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
+    
+    if (response.ok) {
+      // Wait a bit for the feed to be fetched
+      setTimeout(async () => {
+        await fetchLatestUpdates()
+        refreshingFeed.value = false
+      }, 2000)
+    } else {
+      console.error('Failed to refresh feed')
+      refreshingFeed.value = false
+    }
+  } catch (error) {
+    console.error('Error refreshing feed:', error)
+    refreshingFeed.value = false
+  }
+}
+
 function formatDate(dateStr: string) {
   try {
     return new Date(dateStr).toLocaleString()
@@ -190,15 +244,47 @@ function getHostname(urlStr: string) {
 
 <template>
   <div class="article-column">
-    <h2>
-      Articles 
-      <span v-if="totalCount > 0">({{ articles.length }}/{{ totalCount }})</span>
-      <span v-else-if="!loading">({{ articles.length }})</span>
-      <span v-if="fetchingUpdates" class="update-badge">↻</span>
-    </h2>
+    <div class="column-header">
+      <h2>
+        Articles 
+        <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
+        <span v-else-if="!loading">({{ filteredArticles.length }})</span>
+        <span v-if="fetchingUpdates" class="update-badge">↻</span>
+      </h2>
+      <div v-if="selectedFeedUrl" class="header-actions">
+        <button 
+          @click="refreshSelectedFeed" 
+          :disabled="refreshingFeed"
+          class="action-btn"
+          :title="refreshingFeed ? 'Refreshing feed...' : 'Refresh selected feed'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
+            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+          {{ refreshingFeed ? 'Refreshing' : 'Refresh' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Input -->
+    <div class="search-container">
+      <input 
+        v-model="searchQuery" 
+        type="text" 
+        placeholder="Search articles by title, description, or source..." 
+        class="search-input"
+      />
+      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+        ×
+      </button>
+    </div>
+
     <div v-if="loading" class="loading-state">Loading cached articles...</div>
-    <div v-else-if="articles.length" class="article-list">
-      <div v-for="article in articles" :key="article._id" class="article-card">
+    <div v-else-if="!filteredArticles.length && searchQuery" class="no-results">
+      No articles match "{{ searchQuery }}"
+    </div>
+    <div v-else-if="filteredArticles.length" class="article-list">
+      <div v-for="article in filteredArticles" :key="article._id" class="article-card">
         <div class="card-header">
            <h3><a :href="article.link" target="_blank">{{ article.title }}</a></h3>
            <button @click="deleteArticle(article._id)" class="delete-btn" title="Delete Article">×</button>
@@ -221,6 +307,109 @@ function getHostname(urlStr: string) {
 </template>
 
 <style scoped>
+.search-container {
+  position: relative;
+  margin: 0.75rem 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: #e0e0e0;
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  margin-top: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: rgba(0, 123, 255, 0.1);
+  border-color: #007bff;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn svg.spinning {
+  animation: spin-action 1s linear infinite;
+}
+
+@keyframes spin-action {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.no-results {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
 .article-column {
   height: 100%;
   display: flex;
