@@ -21,6 +21,7 @@ const bulkImportText = ref('')
 const bulkImporting = ref(false)
 const bulkImportResults = ref<any>(null)
 const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
+const searchQuery = ref('')
 
 // Refs for modal accessibility
 const modalContentRef = ref<HTMLElement | null>(null)
@@ -56,6 +57,19 @@ const canImport = computed(() => {
 // Computed: URL count for display
 const urlCount = computed(() => {
   return extractValidUrls(bulkImportText.value).length
+})
+
+// Computed: Filtered feeds based on search query
+const filteredFeeds = computed(() => {
+  if (!searchQuery.value.trim()) return feeds.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return feeds.value.filter(feed => {
+    const title = (feed.title || '').toLowerCase()
+    const url = feed.url.toLowerCase()
+    const category = (feed.category || '').toLowerCase()
+    return title.includes(query) || url.includes(query) || category.includes(query)
+  })
 })
 
 const showNotification = (message: string, type: 'error' | 'success' | 'warning') => {
@@ -386,7 +400,7 @@ const bulkImportFeeds = async () => {
 <template>
   <div class="column-container">
     <div class="column-header">
-        <h2>Feeds ({{ feeds.length }})</h2>
+        <h2>Feeds ({{ filteredFeeds.length }})</h2>
         <div class="header-actions">
           <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -396,16 +410,32 @@ const bulkImportFeeds = async () => {
           </button>
           <button @click="triggerRefresh" :disabled="refreshing" class="action-btn" title="Refresh All Feeds">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
-              <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
             </svg>
             {{ refreshing ? 'Refreshing' : 'Refresh' }}
           </button>
         </div>
     </div>
 
+    <!-- Search Input -->
+    <div class="search-container">
+      <input 
+        v-model="searchQuery" 
+        type="text" 
+        placeholder="Search feeds by title, URL, or category..." 
+        class="search-input"
+      />
+      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+        ×
+      </button>
+    </div>
+
     <div v-if="loading">Loading...</div>
-    <ul v-else-if="feeds.length" class="feed-list">
-      <li v-for="feed in feeds" :key="feed._id" class="feed-item">
+    <div v-else-if="!filteredFeeds.length && searchQuery" class="no-results">
+      No feeds match "{{ searchQuery }}"
+    </div>
+    <ul v-else-if="filteredFeeds.length" class="feed-list">
+      <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item">
         <div v-if="renamingFeedId === feed._id" class="feed-info">
           <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
           <div class="rename-actions">
@@ -529,6 +559,57 @@ const bulkImportFeeds = async () => {
 </template>
 
 <style scoped>
+.search-container {
+  position: relative;
+  margin: 0.75rem 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: #e0e0e0;
+}
+
+.no-results {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
 .column-container {
   height: 100%;
   display: flex;

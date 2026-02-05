@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 
 interface Trend {
   _id: string
@@ -11,6 +11,19 @@ interface Trend {
 const trends = ref<Trend[]>([])
 const loading = ref(true)
 const expandedTrends = ref<Set<string>>(new Set())
+const searchQuery = ref('')
+
+// Computed: Filtered trends based on search query
+const filteredTrends = computed(() => {
+  if (!searchQuery.value.trim()) return trends.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return trends.value.filter(trend => {
+    const name = trend.name.toLowerCase()
+    const description = trend.description.toLowerCase()
+    return name.includes(query) || description.includes(query)
+  })
+})
 
 const fetchTrends = async () => {
   try {
@@ -73,10 +86,27 @@ onMounted(() => {
 
 <template>
   <div class="column-container">
-    <h2>Trends ({{ trends.length }})</h2>
+    <h2>Trends ({{ filteredTrends.length }})</h2>
+
+    <!-- Search Input -->
+    <div class="search-container">
+      <input 
+        v-model="searchQuery" 
+        type="text" 
+        placeholder="Search trends by name or description..." 
+        class="search-input"
+      />
+      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+        ×
+      </button>
+    </div>
+
     <div v-if="loading">Loading trends...</div>
-    <div v-else-if="trends.length" class="trend-list">
-      <div v-for="trend in trends" :key="trend._id" class="trend-card">
+    <div v-else-if="!filteredTrends.length && searchQuery" class="no-results">
+      No trends match "{{ searchQuery }}"
+    </div>
+    <div v-else-if="filteredTrends.length" class="trend-list">
+      <div v-for="trend in filteredTrends" :key="trend._id" class="trend-card">
         <div class="card-header">
           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
           <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
@@ -108,6 +138,57 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.search-container {
+  position: relative;
+  margin: 0.75rem 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: #e0e0e0;
+}
+
+.no-results {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
 .column-container {
   height: 100%;
   display: flex;
