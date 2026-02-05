@@ -897,9 +897,3 @@ def search_trends_endpoint():
         "query": query,
         "results": results
     })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
-        "results": results
-    })
