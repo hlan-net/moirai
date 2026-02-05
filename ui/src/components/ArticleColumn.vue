@@ -244,23 +244,27 @@ function getHostname(urlStr: string) {
 
 <template>
   <div class="article-column">
-    <h2>
-      Articles 
-      <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
-      <span v-else-if="!loading">({{ filteredArticles.length }})</span>
-      <span v-if="fetchingUpdates" class="update-badge">↻</span>
-      <button 
-        v-if="selectedFeedUrl" 
-        @click="refreshSelectedFeed" 
-        :disabled="refreshingFeed"
-        class="refresh-feed-btn"
-        :title="refreshingFeed ? 'Refreshing feed...' : 'Refresh selected feed'"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
-          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-        </svg>
-      </button>
-    </h2>
+    <div class="column-header">
+      <h2>
+        Articles 
+        <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
+        <span v-else-if="!loading">({{ filteredArticles.length }})</span>
+        <span v-if="fetchingUpdates" class="update-badge">↻</span>
+      </h2>
+      <div v-if="selectedFeedUrl" class="header-actions">
+        <button 
+          @click="refreshSelectedFeed" 
+          :disabled="refreshingFeed"
+          class="action-btn"
+          :title="refreshingFeed ? 'Refreshing feed...' : 'Refresh selected feed'"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
+            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+          {{ refreshingFeed ? 'Refreshing' : 'Refresh' }}
+        </button>
+      </div>
+    </div>
 
     <!-- Search Input -->
     <div class="search-container">
@@ -347,34 +351,50 @@ function getHostname(urlStr: string) {
   color: #e0e0e0;
 }
 
-.refresh-feed-btn {
-  background: none;
-  border: none;
-  color: #007bff;
-  cursor: pointer;
-  padding: 4px 8px;
-  margin-left: 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-  display: inline-flex;
+.column-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  vertical-align: middle;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  margin-top: 0;
 }
 
-.refresh-feed-btn:hover:not(:disabled) {
-  background-color: rgba(0, 123, 255, 0.1);
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
-.refresh-feed-btn:disabled {
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: rgba(0, 123, 255, 0.1);
+  border-color: #007bff;
+}
+
+.action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.refresh-feed-btn svg.spinning {
-  animation: spin-refresh 1s linear infinite;
+.action-btn svg.spinning {
+  animation: spin-action 1s linear infinite;
 }
 
-@keyframes spin-refresh {
+@keyframes spin-action {
   from {
     transform: rotate(0deg);
   }
