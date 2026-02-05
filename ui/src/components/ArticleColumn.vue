@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted } from 'vue'
+import { onMounted, ref, onUnmounted, computed } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 
 const articles = ref<Article[]>([])
@@ -9,6 +9,7 @@ const fetchingUpdates = ref(false)
 const hasMore = ref(true)
 const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
+const searchQuery = ref('')
 
 let observer: IntersectionObserver | null = null
 let refreshInterval: number | null = null
@@ -99,6 +100,19 @@ const loadMore = async () => {
     loadingMore.value = false
   }
 }
+
+// Computed: Filtered articles based on search query
+const filteredArticles = computed(() => {
+  if (!searchQuery.value.trim()) return articles.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return articles.value.filter(article => {
+    const title = (article.title || '').toLowerCase()
+    const summary = (article.summary || '').toLowerCase()
+    const feedTitle = (article.feed_title || '').toLowerCase()
+    return title.includes(query) || summary.includes(query) || feedTitle.includes(query)
+  })
+})
 
 const deleteArticle = async (id: string) => {
   if (!confirm("Delete this article?")) return;
@@ -192,13 +206,30 @@ function getHostname(urlStr: string) {
   <div class="article-column">
     <h2>
       Articles 
-      <span v-if="totalCount > 0">({{ articles.length }}/{{ totalCount }})</span>
-      <span v-else-if="!loading">({{ articles.length }})</span>
+      <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
+      <span v-else-if="!loading">({{ filteredArticles.length }})</span>
       <span v-if="fetchingUpdates" class="update-badge">↻</span>
     </h2>
+
+    <!-- Search Input -->
+    <div class="search-container">
+      <input 
+        v-model="searchQuery" 
+        type="text" 
+        placeholder="Search articles by title, description, or source..." 
+        class="search-input"
+      />
+      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+        ×
+      </button>
+    </div>
+
     <div v-if="loading" class="loading-state">Loading cached articles...</div>
-    <div v-else-if="articles.length" class="article-list">
-      <div v-for="article in articles" :key="article._id" class="article-card">
+    <div v-else-if="!filteredArticles.length && searchQuery" class="no-results">
+      No articles match "{{ searchQuery }}"
+    </div>
+    <div v-else-if="filteredArticles.length" class="article-list">
+      <div v-for="article in filteredArticles" :key="article._id" class="article-card">
         <div class="card-header">
            <h3><a :href="article.link" target="_blank">{{ article.title }}</a></h3>
            <button @click="deleteArticle(article._id)" class="delete-btn" title="Delete Article">×</button>
@@ -221,6 +252,57 @@ function getHostname(urlStr: string) {
 </template>
 
 <style scoped>
+.search-container {
+  position: relative;
+  margin: 0.75rem 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: #e0e0e0;
+}
+
+.no-results {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
 .article-column {
   height: 100%;
   display: flex;
