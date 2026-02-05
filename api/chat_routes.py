@@ -73,7 +73,13 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
         # Connect to MCP Server
         # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
         headers = {"Host": "localhost:8090"}
-        async with sse_client(MCP_SERVER_URL, headers=headers) as (read, write):
+        
+        # Create async HTTP client factory for proper DNS resolution in Kubernetes
+        import httpx
+        def async_http_client_factory():
+            return httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+        
+        async with sse_client(MCP_SERVER_URL, headers=headers, httpx_client_factory=async_http_client_factory) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 
