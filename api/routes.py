@@ -6,7 +6,7 @@ from functools import wraps
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
-from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc
+from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc, query_couchdb
 from pydantic import ValidationError
 from .validation import (
     FeedCreateRequest, FeedUpdateRequest,
@@ -738,15 +738,30 @@ def get_recent_articles_endpoint():
     
     from datetime import timedelta
     
-    articles = fetch_from_couchdb("articles")
+    # Calculate cutoff timestamp
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-    results = []
+    cutoff_str = cutoff.isoformat()
     
+    # Use Mango query to filter at database level
+    selector = {
+        "published": {"$gte": cutoff_str}
+    }
+    
+    # Query with sort by published date descending
+    articles = query_couchdb(
+        "articles",
+        selector=selector,
+        limit=limit * 2,  # Fetch extra to account for parsing issues
+        sort=[{"published": "desc"}]
+    )
+    
+    results = []
     for article in articles:
         pub_str = article.get("published", "")
         if pub_str:
             try:
                 pub_dt = parse_datetime_safe(pub_str)
+                # Double-check in case CouchDB string comparison differs from parsed date
                 if pub_dt >= cutoff:
                     results.append({
                         "_id": article.get("_id"),
@@ -759,16 +774,17 @@ def get_recent_articles_endpoint():
                     })
             except (ValueError, AttributeError):
                 pass
+        
+        if len(results) >= limit:
+            break
     
-    # Sort by date descending
-    results.sort(key=lambda x: x.get("_sort_date", datetime.min), reverse=True)
-    
-    # Remove sort key and limit
+    # Sort by published date descending (in case CouchDB sort isn't perfect)
+    results.sort(key=lambda x: x.get("_sort_date", datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
     for r in results:
         r.pop("_sort_date", None)
     
     return jsonify({
-        "total": len(results[:limit]),
+        "total": len(results),
         "hours": hours,
         "results": results[:limit]
     })
