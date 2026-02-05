@@ -858,12 +858,6 @@ def search_events_endpoint():
             "description": event.get("description", ""),
             "article_count": len(event.get("article_links", []))
         })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
-        "results": results
-    })
 
 @api_blueprint.route("/trends/search", methods=["GET"])
 @requires_auth
