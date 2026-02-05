@@ -33,6 +33,23 @@ The MCP server (port 8090) uses **SSE** transport. While agents call these tools
 ### Example Tool Calls
 If you are using an LLM agent, it will "see" these tools. Here is how they are structured:
 
+**List Recent Articles:**
+```json
+// Tool: list_articles
+{
+  "limit": 20  // Optional: Max number of articles (default: 20, max: 100)
+}
+```
+
+**List Articles from a Specific Feed:**
+```json
+// Tool: list_articles
+{
+  "limit": 10,
+  "feed_url": "https://lwn.net/headlines/rss"  // Optional: Filter by feed URL
+}
+```
+
 **Add a Feed to a Namespace:**
 ```json
 // Tool: add_feed

@@ -265,6 +265,83 @@ def read_feed(url: str, limit: int = 5) -> str:
         return f"Error reading feed: {e}"
 
 @mcp.tool()
+def list_articles(limit: int = 20, feed_url: str = None) -> str:
+    """
+    List recent articles from the database.
+    
+    If feed_url is provided, returns articles only from that specific feed.
+    Otherwise, returns recent articles from all feeds.
+    
+    Args:
+        limit: Maximum number of articles to return (default: 20, max: 100)
+        feed_url: Optional feed URL to filter articles
+    """
+    try:
+        # Validate and clamp limit
+        limit = min(max(limit, 1), 100)
+        
+        # Fetch all articles from database
+        res = db_request("GET", "articles", path="/_all_docs", params={"include_docs": "true"})
+        if res.status_code != 200:
+            return "No articles found in database. Try using 'read_feed' to fetch articles from a specific RSS feed."
+        
+        rows = res.json().get("rows", [])
+        if not rows:
+            return "No articles found in database. Try using 'read_feed' to fetch articles from a specific RSS feed."
+        
+        # Extract documents and filter by feed_url if specified
+        articles = []
+        for row in rows:
+            doc = row.get("doc", {})
+            # Skip design documents
+            if doc.get("_id", "").startswith("_design/"):
+                continue
+            
+            # Filter by feed_url if specified
+            if feed_url and doc.get("feed_url") != feed_url:
+                continue
+                
+            articles.append(doc)
+        
+        # Sort by published date (newest first)
+        articles.sort(key=lambda x: x.get("published", ""), reverse=True)
+        
+        # Limit results
+        articles = articles[:limit]
+        
+        if not articles:
+            if feed_url:
+                return f"No articles found for feed: {feed_url}"
+            else:
+                return "No articles found in database."
+        
+        # Format output
+        output = []
+        for art in articles:
+            title = art.get("title", "No Title")
+            link = art.get("link", "")
+            summary = art.get("summary", "")
+            published = art.get("published", "Unknown date")
+            feed = art.get("feed_url", "Unknown feed")
+            
+            # Clean HTML from summary
+            summary = re.sub('<[^<]+?>', '', summary)
+            summary = summary[:200] + "..." if len(summary) > 200 else summary
+            
+            output.append(
+                f"Title: {title}\n"
+                f"Link: {link}\n"
+                f"Published: {published}\n"
+                f"Feed: {feed}\n"
+                f"Summary: {summary}\n"
+            )
+        
+        return "\n---\n".join(output)
+        
+    except Exception as e:
+        return f"Error listing articles: {e}"
+
+@mcp.tool()
 def refresh_all_feeds() -> str:
     """
     Triggers the system to fetch the latest articles from all registered feeds.
