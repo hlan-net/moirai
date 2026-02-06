@@ -163,7 +163,7 @@ const filteredSessions = computed(() => {
   }
   const query = searchQuery.value.toLowerCase()
   return sessions.value.filter(session => 
-    session.title.toLowerCase().includes(query) ||
+    session.title?.toLowerCase().includes(query) ||
     session.model?.toLowerCase().includes(query) ||
     session.llm_endpoint?.toLowerCase().includes(query)
   )
