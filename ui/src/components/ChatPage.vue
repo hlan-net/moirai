@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { marked } from 'marked'
 
 interface Message {
@@ -21,6 +21,8 @@ const loading = ref(false)
 const sessionId = ref<string | null>(null)
 const sessions = ref<ChatSession[]>([])
 const loadingSessions = ref(true)
+const searchQuery = ref('')
+const deleteConfirmId = ref<string | null>(null)
 
 const currentLlmEndpoint = ref('ollama')
 const currentModel = ref('llama3.1:latest')
@@ -154,22 +156,111 @@ const downloadChat = () => {
   if (!sessionId.value) return
   window.location.href = `/api/chat/history/${sessionId.value}/export`
 }
+
+const filteredSessions = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return sessions.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return sessions.value.filter(session => 
+    session.title.toLowerCase().includes(query) ||
+    session.model?.toLowerCase().includes(query) ||
+    session.llm_endpoint?.toLowerCase().includes(query)
+  )
+})
+
+const confirmDelete = (id: string, event: Event) => {
+  event.stopPropagation()
+  deleteConfirmId.value = id
+}
+
+const cancelDelete = () => {
+  deleteConfirmId.value = null
+}
+
+const deleteSession = async (id: string, event: Event) => {
+  event.stopPropagation()
+  try {
+    const response = await fetch(`/api/chat/history/${id}`, {
+      method: 'DELETE'
+    })
+    if (response.ok) {
+      sessions.value = sessions.value.filter(s => s._id !== id)
+      if (sessionId.value === id) {
+        newChat()
+      }
+      deleteConfirmId.value = null
+    } else {
+      console.error('Failed to delete session')
+    }
+  } catch (error) {
+    console.error('Error deleting session:', error)
+  }
+}
+
+const getProviderColor = (provider?: string) => {
+  if (!provider) return '#666'
+  switch (provider.toLowerCase()) {
+    case 'openai': return '#10a37f'
+    case 'ollama': return '#5865F2'
+    case 'gemini': return '#4285f4'
+    default: return '#666'
+  }
+}
 </script>
 
 <template>
   <div class="chat-page">
     <div class="sidebar">
       <button @click="newChat" class="new-chat-btn">New Chat</button>
+      <input 
+        v-model="searchQuery" 
+        type="text" 
+        placeholder="Search chats..." 
+        class="search-input"
+      />
       <div v-if="loadingSessions">Loading...</div>
-      <div v-else-if="sessions.length" class="session-list">
+      <div v-else-if="filteredSessions.length" class="session-list">
         <div 
-          v-for="session in sessions" 
+          v-for="session in filteredSessions" 
           :key="session._id" 
           @click="loadSession(session)"
           :class="['session-item', { active: sessionId === session._id }]"
         >
-          {{ session.title }}
+          <div class="session-header">
+            <span class="session-title">{{ session.title }}</span>
+            <button 
+              @click="confirmDelete(session._id, $event)" 
+              class="delete-btn"
+              title="Delete chat"
+            >
+              ×
+            </button>
+          </div>
+          <div class="session-tags">
+            <span 
+              class="tag provider-tag" 
+              :style="{ backgroundColor: getProviderColor(session.llm_endpoint) }"
+            >
+              {{ session.llm_endpoint || 'ollama' }}
+            </span>
+            <span class="tag model-tag" v-if="session.model">
+              {{ session.model }}
+            </span>
+          </div>
+          
+          <!-- Delete confirmation overlay -->
+          <div v-if="deleteConfirmId === session._id" class="delete-confirm" @click.stop>
+            <p>Delete this chat?</p>
+            <div class="confirm-buttons">
+              <button @click="deleteSession(session._id, $event)" class="confirm-yes">Delete</button>
+              <button @click="cancelDelete" class="confirm-no">Cancel</button>
+            </div>
+          </div>
         </div>
+      </div>
+      <div v-else class="no-results">
+        {{ searchQuery ? 'No chats found' : 'No chats yet' }}
       </div>
     </div>
     <div class="chat-main">
@@ -229,9 +320,21 @@ const downloadChat = () => {
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 .new-chat-btn {
-  margin-bottom: 10px;
+  margin-bottom: 0;
+}
+.search-input {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.9rem;
+}
+.search-input::placeholder {
+  color: #888;
 }
 .session-list {
   flex: 1;
@@ -243,9 +346,108 @@ const downloadChat = () => {
   border-bottom: 1px solid var(--border-color);
   color: var(--text-color);
   font-size: 0.9rem;
+  position: relative;
 }
 .session-item:hover, .session-item.active {
   background: var(--bg-color);
+}
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+.session-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 24px;
+  line-height: 1;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.delete-btn:hover {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+.session-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tag {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: white;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.provider-tag {
+  /* Background color set dynamically */
+}
+.model-tag {
+  background: #666;
+  font-family: monospace;
+  font-size: 0.65rem;
+}
+.delete-confirm {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  z-index: 10;
+}
+.delete-confirm p {
+  color: white;
+  margin: 0 0 10px 0;
+  font-size: 0.9rem;
+}
+.confirm-buttons {
+  display: flex;
+  gap: 8px;
+}
+.confirm-yes, .confirm-no {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.confirm-yes {
+  background: #ff3b30;
+  color: white;
+}
+.confirm-no {
+  background: #666;
+  color: white;
+}
+.no-results {
+  padding: 20px 10px;
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
 }
 .chat-main {
   flex: 1;
