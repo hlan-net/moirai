@@ -279,14 +279,16 @@ def update_chat_session(session_id):
         abort(404, description="Chat session not found")
     
     data = request.json
-    if "messages" not in data:
-        abort(400, description="Messages are required")
-        
-    session["messages"] = data["messages"]
+    
+    # Update fields if provided
+    if "messages" in data:
+        session["messages"] = data["messages"]
     if "model" in data:
         session["model"] = data["model"]
     if "llm_endpoint" in data:
         session["llm_endpoint"] = data["llm_endpoint"]
+    if "title" in data:
+        session["title"] = data["title"]
     
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)

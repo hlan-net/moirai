@@ -23,6 +23,8 @@ const sessions = ref<ChatSession[]>([])
 const loadingSessions = ref(true)
 const searchQuery = ref('')
 const deleteConfirmId = ref<string | null>(null)
+const renamingSessionId = ref<string | null>(null)
+const newSessionTitle = ref('')
 
 const currentLlmEndpoint = ref('ollama')
 const currentModel = ref('llama3.1:latest')
@@ -207,18 +209,64 @@ const getProviderColor = (provider?: string) => {
     default: return '#666'
   }
 }
+
+const startRename = (session: ChatSession, event: Event) => {
+  event.stopPropagation()
+  renamingSessionId.value = session._id
+  newSessionTitle.value = session.title
+}
+
+const cancelRename = () => {
+  renamingSessionId.value = null
+  newSessionTitle.value = ''
+}
+
+const renameSession = async (session: ChatSession) => {
+  try {
+    const response = await fetch(`/api/chat/history/${session._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newSessionTitle.value,
+        messages: session.messages,
+        model: session.model,
+        llm_endpoint: session.llm_endpoint
+      })
+    })
+    if (response.ok) {
+      const updatedSession = await response.json()
+      const index = sessions.value.findIndex(s => s._id === updatedSession._id)
+      if (index !== -1) {
+        sessions.value[index] = updatedSession
+      }
+      cancelRename()
+    } else {
+      console.error('Failed to rename session')
+    }
+  } catch (error) {
+    console.error('Error renaming session:', error)
+  }
+}
 </script>
 
 <template>
   <div class="chat-page">
     <div class="sidebar">
       <button @click="newChat" class="new-chat-btn">New Chat</button>
-      <input 
-        v-model="searchQuery" 
-        type="text" 
-        placeholder="Search chats..." 
-        class="search-input"
-      />
+      
+      <!-- Search Input -->
+      <div class="search-container">
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="Search chats by title, model, or provider..." 
+          class="search-input"
+        />
+        <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+          ×
+        </button>
+      </div>
+      
       <div v-if="loadingSessions">Loading...</div>
       <div v-else-if="filteredSessions.length" class="session-list">
         <div 
@@ -227,26 +275,53 @@ const getProviderColor = (provider?: string) => {
           @click="loadSession(session)"
           :class="['session-item', { active: sessionId === session._id }]"
         >
-          <div class="session-header">
-            <span class="session-title">{{ session.title }}</span>
-            <button 
-              @click="confirmDelete(session._id, $event)" 
-              class="delete-btn"
-              title="Delete chat"
-            >
-              ×
-            </button>
+          <!-- Rename mode -->
+          <div v-if="renamingSessionId === session._id" class="rename-mode" @click.stop>
+            <input 
+              v-model="newSessionTitle" 
+              @keyup.enter="renameSession(session)" 
+              @keyup.esc="cancelRename"
+              class="rename-input"
+              autofocus
+            />
+            <div class="rename-actions">
+              <button @click="renameSession(session)" class="rename-save">Save</button>
+              <button @click="cancelRename" class="rename-cancel">Cancel</button>
+            </div>
           </div>
-          <div class="session-tags">
-            <span 
-              class="tag provider-tag" 
-              :style="{ backgroundColor: getProviderColor(session.llm_endpoint) }"
-            >
-              {{ session.llm_endpoint || 'ollama' }}
-            </span>
-            <span class="tag model-tag" v-if="session.model">
-              {{ session.model }}
-            </span>
+          
+          <!-- Normal view -->
+          <div v-else>
+            <div class="session-header">
+              <span class="session-title" @dblclick="startRename(session, $event)">{{ session.title }}</span>
+              <div class="session-actions">
+                <button 
+                  @click="startRename(session, $event)" 
+                  class="action-btn rename-btn"
+                  title="Rename chat"
+                >
+                  ✎
+                </button>
+                <button 
+                  @click="confirmDelete(session._id, $event)" 
+                  class="action-btn delete-btn"
+                  title="Delete chat"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div class="session-tags">
+              <span 
+                class="tag provider-tag" 
+                :style="{ backgroundColor: getProviderColor(session.llm_endpoint) }"
+              >
+                {{ session.llm_endpoint || 'ollama' }}
+              </span>
+              <span class="tag model-tag" v-if="session.model">
+                {{ session.model }}
+              </span>
+            </div>
           </div>
           
           <!-- Delete confirmation overlay -->
@@ -260,7 +335,8 @@ const getProviderColor = (provider?: string) => {
         </div>
       </div>
       <div v-else class="no-results">
-        {{ searchQuery ? 'No chats found' : 'No chats yet' }}
+        <span v-if="searchQuery">No chats match "{{ searchQuery }}"</span>
+        <span v-else>No chats yet</span>
       </div>
     </div>
     <div class="chat-main">
@@ -325,16 +401,48 @@ const getProviderColor = (provider?: string) => {
 .new-chat-btn {
   margin-bottom: 0;
 }
+.search-container {
+  position: relative;
+}
+
 .search-input {
-  padding: 8px;
+  width: 100%;
+  padding: 8px 2rem 8px 8px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: var(--input-bg);
   color: var(--input-text);
   font-size: 0.9rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
 }
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
 .search-input::placeholder {
   color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: var(--text-color);
 }
 .session-list {
   flex: 1;
@@ -356,29 +464,48 @@ const getProviderColor = (provider?: string) => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 5px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .session-title {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: text;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 500;
 }
-.delete-btn {
+.session-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.action-btn {
   background: transparent;
   border: none;
   color: #999;
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
   padding: 0;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   cursor: pointer;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+.rename-btn {
+  font-size: 16px;
+}
+.rename-btn:hover {
+  background: rgba(66, 185, 131, 0.1);
+  color: #42b983;
+}
+.delete-btn {
+  font-size: 22px;
 }
 .delete-btn:hover {
   background: rgba(255, 59, 48, 0.1);
@@ -388,14 +515,16 @@ const getProviderColor = (provider?: string) => {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+  margin-top: 2px;
 }
 .tag {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  border-radius: 2px;
   color: white;
   font-weight: 500;
   text-transform: capitalize;
+  line-height: 1.2;
 }
 .provider-tag {
   /* Background color set dynamically */
@@ -403,7 +532,52 @@ const getProviderColor = (provider?: string) => {
 .model-tag {
   background: #666;
   font-family: monospace;
-  font-size: 0.65rem;
+  font-size: 0.55rem;
+}
+.rename-mode {
+  padding: 5px 0;
+}
+.rename-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  box-sizing: border-box;
+}
+.rename-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(66, 185, 131, 0.2);
+}
+.rename-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.rename-save, .rename-cancel {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.rename-save {
+  background: var(--primary-color);
+  color: var(--bg-color);
+}
+.rename-save:hover {
+  opacity: 0.9;
+}
+.rename-cancel {
+  background: #666;
+  color: white;
+}
+.rename-cancel:hover {
+  background: #777;
 }
 .delete-confirm {
   position: absolute;
@@ -444,10 +618,10 @@ const getProviderColor = (provider?: string) => {
   color: white;
 }
 .no-results {
-  padding: 20px 10px;
+  padding: 2rem 1rem;
   text-align: center;
   color: #888;
-  font-size: 0.9rem;
+  font-style: italic;
 }
 .chat-main {
   flex: 1;
