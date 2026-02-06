@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
 import hashlib
+import version
 from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
@@ -660,7 +661,8 @@ def get_config():
     # Helper to return the effective config
     return jsonify({
         "allow_public_read": get_public_read_setting(),
-        "iteration_interval": get_iteration_interval_setting()
+        "iteration_interval": get_iteration_interval_setting(),
+        "version": version.get_version_string()
     })
 
 @api_blueprint.route("/config", methods=["PUT"])

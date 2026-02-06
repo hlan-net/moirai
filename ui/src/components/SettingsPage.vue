@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useTheme, type Theme } from '../composables/useTheme'
 
-const appVersion = ref('0.1.0-alpha')
+const appVersion = ref('Loading...')
 const modelName = ref('llama3.1:latest')
 const availableModels = ref<string[]>([])
 const loadingModels = ref(false)
@@ -111,6 +111,9 @@ const fetchConfig = async () => {
             const data = await res.json()
             allowPublicRead.value = data.allow_public_read
             iterationInterval.value = data.iteration_interval
+            if (data.version) {
+                appVersion.value = data.version
+            }
         }
     } catch (e) {
         console.error("Error fetching config", e)
@@ -243,9 +246,9 @@ onMounted(() => {
         <div class="form-group checkbox-group">
           <label for="public-read" class="checkbox-label">
             <input type="checkbox" id="public-read" v-model="allowPublicRead" />
-            Allow Public Read Access (History Page)
+            Allow Public Read Access (Stream Page)
           </label>
-          <small>If enabled, the History page can be viewed without logging in.</small>
+          <small>If enabled, the Stream page can be viewed without logging in.</small>
         </div>
         <div class="form-group">
           <label for="interval">Feed Refresh Interval (seconds):</label>
