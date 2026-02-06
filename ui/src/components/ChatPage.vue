@@ -201,12 +201,12 @@ const deleteSession = async (id: string, event: Event) => {
 }
 
 const getProviderColor = (provider?: string) => {
-  if (!provider) return '#666'
+  if (!provider) return '#444'
   switch (provider.toLowerCase()) {
-    case 'openai': return '#10a37f'
-    case 'ollama': return '#5865F2'
-    case 'gemini': return '#4285f4'
-    default: return '#666'
+    case 'openai': return '#0d8a68'  // Darker green for better contrast
+    case 'ollama': return '#4651d9'  // Darker blue for better contrast
+    case 'gemini': return '#1a66c9'  // Darker blue for better contrast
+    default: return '#444'
   }
 }
 
@@ -530,7 +530,7 @@ const renameSession = async (session: ChatSession) => {
   /* Background color set dynamically */
 }
 .model-tag {
-  background: #666;
+  background: #444;
   font-family: monospace;
   font-size: 0.55rem;
 }
