@@ -501,15 +501,15 @@ const renameSession = async (session: ChatSession) => {
   font-size: 16px;
 }
 .rename-btn:hover {
-  background: rgba(66, 185, 131, 0.1);
-  color: #42b983;
+  background: rgba(66, 185, 131, 0.15);
+  color: #2d8a5f;
 }
 .delete-btn {
   font-size: 22px;
 }
 .delete-btn:hover {
-  background: rgba(255, 59, 48, 0.1);
-  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.15);
+  color: #cc2e24;
 }
 .session-tags {
   display: flex;
@@ -614,7 +614,7 @@ const renameSession = async (session: ChatSession) => {
   color: white;
 }
 .confirm-no {
-  background: #666;
+  background: #444;
   color: white;
 }
 .no-results {
