@@ -173,10 +173,11 @@ onMounted(() => {
     </div>
 
     <div v-if="loading" class="loading-state">Loading events...</div>
-    <div v-else-if="!filteredEvents.length && searchQuery" class="no-results">
-      No events match "{{ searchQuery }}"
+    <div v-else-if="!filteredEvents.length" class="no-results">
+      <span v-if="searchQuery">No events match "{{ searchQuery }}"</span>
+      <span v-else>No events found yet.</span>
     </div>
-    <div v-else-if="filteredEvents.length" class="event-list">
+    <div v-else class="event-list">
       <div v-for="event in filteredEvents" :key="event._id" class="event-card">
         <div class="card-header">
           <h3 @click="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
@@ -208,7 +209,6 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <div v-else>No events found.</div>
   </div>
 </template>
 
@@ -262,6 +262,10 @@ onMounted(() => {
   text-align: center;
   color: #888;
   font-style: italic;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .column-header {
@@ -275,9 +279,10 @@ onMounted(() => {
 }
 
 .event-column {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 h2 {

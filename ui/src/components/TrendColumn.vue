@@ -146,10 +146,11 @@ onMounted(() => {
     </div>
 
     <div v-if="loading" class="loading-state">Loading trends...</div>
-    <div v-else-if="!filteredTrends.length && searchQuery" class="no-results">
-      No trends match "{{ searchQuery }}"
+    <div v-else-if="!filteredTrends.length" class="no-results">
+      <span v-if="searchQuery">No trends match "{{ searchQuery }}"</span>
+      <span v-else>No trends found yet.</span>
     </div>
-    <div v-else-if="filteredTrends.length" class="trend-list">
+    <div v-else class="trend-list">
       <div v-for="trend in filteredTrends" :key="trend._id" class="trend-card">
         <div class="card-header">
           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
@@ -177,7 +178,6 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <div v-else>No trends found.</div>
   </div>
 </template>
 
@@ -231,6 +231,10 @@ onMounted(() => {
   text-align: center;
   color: #888;
   font-style: italic;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .column-header {
@@ -244,9 +248,10 @@ onMounted(() => {
 }
 
 .trend-column {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 h2 {

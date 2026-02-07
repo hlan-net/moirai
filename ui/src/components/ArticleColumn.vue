@@ -280,10 +280,11 @@ function getHostname(urlStr: string) {
     </div>
 
     <div v-if="loading" class="loading-state">Loading cached articles...</div>
-    <div v-else-if="!filteredArticles.length && searchQuery" class="no-results">
-      No articles match "{{ searchQuery }}"
+    <div v-else-if="!filteredArticles.length" class="no-results">
+      <span v-if="searchQuery">No articles match "{{ searchQuery }}"</span>
+      <span v-else>No articles found yet.</span>
     </div>
-    <div v-else-if="filteredArticles.length" class="article-list">
+    <div v-else class="article-list">
       <div v-for="article in filteredArticles" :key="article._id" class="article-card">
         <div class="card-header">
            <h3><a :href="article.link" target="_blank">{{ article.title }}</a></h3>
@@ -302,7 +303,6 @@ function getHostname(urlStr: string) {
         <div v-else-if="!hasMore" class="end-message">No more articles</div>
       </div>
     </div>
-    <div v-else>No articles found yet.</div>
   </div>
 </template>
 
@@ -403,18 +403,24 @@ function getHostname(urlStr: string) {
   }
 }
 
+.article-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .no-results {
   padding: 2rem 1rem;
   text-align: center;
   color: #888;
   font-style: italic;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.article-column {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
 h2 {
   color: #007acc;
   margin-top: 0;
