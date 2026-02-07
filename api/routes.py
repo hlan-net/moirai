@@ -568,6 +568,25 @@ def delete_article(article_id):
 # --- Events ---
 @api_blueprint.route("/events", methods=["GET"])
 def list_events():
+    feed_url = request.args.get('feed_url')
+    
+    if feed_url:
+        # 1. Get all article links for this feed
+        articles = query_couchdb("articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000)
+        links = [a.get("link") for a in articles if a.get("link")]
+        
+        if not links:
+            return jsonify([])
+            
+        # 2. Find events containing any of these links
+        # Using $elemMatch with $in for efficient array searching
+        selector = {
+            "type": "event",
+            "article_links": {"$elemMatch": {"$in": links}}
+        }
+        events = query_couchdb("events", selector=selector, limit=1000)
+        return jsonify(events)
+        
     events = fetch_from_couchdb("events")
     # Filter only actual events (legacy docs might not have 'type')
     events = [e for e in events if e.get('type', 'event') == 'event']
@@ -602,9 +621,36 @@ def remove_event_link(event_id):
 # --- Trends ---
 @api_blueprint.route("/trends", methods=["GET"])
 def list_trends():
+    feed_url = request.args.get('feed_url')
+    
+    if feed_url:
+        # 1. Get all article links for this feed
+        articles = query_couchdb("articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000)
+        links = [a.get("link") for a in articles if a.get("link")]
+        
+        if not links:
+            return jsonify([])
+            
+        # 2. Find event IDs containing any of these links
+        event_docs = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": links}}}, fields=["_id"], limit=1000)
+        event_ids = [e.get("_id") for e in event_docs if e.get("_id")]
+        
+        if not event_ids:
+            return jsonify([])
+            
+        # 3. Find trends containing any of these event IDs
+        selector = {
+            "type": "trend",
+            "event_ids": {"$elemMatch": {"$in": event_ids}}
+        }
+        trends = query_couchdb("trends", selector=selector, limit=1000)
+        return jsonify(trends)
+
     trends = fetch_from_couchdb("trends")
     if not trends:
         trends = []
+    # Ensure we only return trend documents
+    trends = [t for t in trends if t.get('type', 'trend') == 'trend']
     return jsonify(trends)
 
 @api_blueprint.route("/trends/<trend_id>", methods=["GET"])

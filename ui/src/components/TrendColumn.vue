@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, inject, onUnmounted, type Ref } from 'vue'
+import { onMounted, ref, computed, inject, onUnmounted, watch, type Ref } from 'vue'
 
 interface Trend {
   _id: string
@@ -13,32 +13,14 @@ const loading = ref(true)
 const refreshing = ref(false)
 const expandedTrends = ref<Set<string>>(new Set())
 const searchQuery = ref('')
-const events = ref<any[]>([]) // To check which events link to selected feed's articles
-const articles = ref<any[]>([]) // To check article origins
 let refreshInterval: number | null = null
 
 // Inject selected feed from parent
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
-// Computed: Filtered trends based on search query and selected feed
+// Computed: Filtered trends based on search query
 const filteredTrends = computed(() => {
   let filtered = trends.value
-  
-  // Filter by selected feed - show only trends with events that have articles from that feed
-  if (selectedFeedUrl.value) {
-    const feedArticles = articles.value.filter(a => a.feed_url === selectedFeedUrl.value)
-    const feedArticleLinks = new Set(feedArticles.map(a => a.link))
-    
-    const relevantEventIds = new Set(
-      events.value
-        .filter(event => event.article_links?.some((link: string) => feedArticleLinks.has(link)))
-        .map(event => event._id)
-    )
-    
-    filtered = filtered.filter(trend => 
-      (trend.event_ids || []).some(eventId => relevantEventIds.has(eventId))
-    )
-  }
   
   // Filter by search query
   if (searchQuery.value.trim()) {
@@ -61,42 +43,37 @@ const fetchTrends = async (isRefresh = false) => {
   }
   
   try {
-    const [trendsResponse, eventsResponse, articlesResponse] = await Promise.all([
-      fetch('/api/trends'),
-      fetch('/api/events'),
-      fetch('/api/articles?limit=10000'),
-    ])
+    const params = new URLSearchParams()
+    if (selectedFeedUrl.value) {
+      params.append('feed_url', selectedFeedUrl.value)
+    }
+    const queryString = params.toString() ? `?${params.toString()}` : ''
 
-    if (trendsResponse.ok) {
-      const data = await trendsResponse.json()
+    const response = await fetch(`/api/trends${queryString}`)
+
+    if (response.ok) {
+      const data = await response.json()
       console.log('Trends API response:', data)
       const allTrends = Array.isArray(data) ? data : []
       trends.value = allTrends.filter((t: Trend) => !t._id.startsWith('_design/'))
-    }
-    
-    if (eventsResponse.ok) {
-      try {
-        events.value = await eventsResponse.json()
-      } catch (e) {
-        console.error('Error parsing events:', e)
-      }
-    }
-    
-    if (articlesResponse.ok) {
-      try {
-        const data = await articlesResponse.json()
-        articles.value = data.articles || []
-      } catch (e) {
-        console.error('Error parsing articles:', e)
-      }
+    } else if (!isRefresh) {
+      trends.value = []
     }
   } catch (error) {
     console.error('Error fetching data:', error)
+    if (!isRefresh) {
+      trends.value = []
+    }
   } finally {
     loading.value = false
     refreshing.value = false
   }
 }
+
+// Watch for feed selection changes to refresh data
+watch(selectedFeedUrl, () => {
+  fetchTrends()
+})
 
 const deleteTrend = async (id: string) => {
   if (!confirm('Delete this trend?')) return
