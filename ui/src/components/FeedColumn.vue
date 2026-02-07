@@ -618,13 +618,6 @@ const bulkImportFeeds = async () => {
   color: #e0e0e0;
 }
 
-.no-results {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #888;
-  font-style: italic;
-}
-
 .column-container {
   flex: 1;
   display: flex;

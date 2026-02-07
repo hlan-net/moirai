@@ -309,72 +309,75 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
     if limit > 200:
         limit = 200
     
-    # Get all articles
-    resp = db_request("GET", "articles", "/_all_docs", params={"include_docs": True})
-    if resp.status_code != 200:
-        return json.dumps({"error": "Failed to fetch articles"})
+    # Build Mango selector
+    selector = {
+        "$or": [
+            {"title": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}},
+            {"content": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
-    all_docs = resp.json().get("rows", [])
-    query_lower = query.lower()
-    results = []
-    
-    # Parse dates if provided
-    from_dt = None
-    to_dt = None
+    # Add date range filters
     if date_from:
         try:
             from_dt = datetime.fromisoformat(date_from)
+            selector["published"] = {"$gte": from_dt.isoformat()}
         except ValueError:
             return json.dumps({"error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
+    
     if date_to:
         try:
             to_dt = datetime.fromisoformat(date_to)
+            # Combine with existing published filter if from_dt exists
+            if "published" in selector:
+                selector["published"]["$lte"] = to_dt.isoformat()
+            else:
+                selector["published"] = {"$lte": to_dt.isoformat()}
         except ValueError:
             return json.dumps({"error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
-    
-    for row in all_docs:
-        doc = row.get("doc", {})
-        if doc.get("_id", "").startswith("_design"):
-            continue
+            
+    # Execute query
+    try:
+        query_payload = {
+            "selector": selector,
+            "limit": limit,
+            "sort": [{"published": "desc"}] if "published" in selector else None,
+             # We need to exclude design docs, though Mango usually handles this.
+             # Fields projection to reduce bandwidth
+            "fields": ["_id", "title", "link", "published", "feed_title", "description"]
+        }
         
-        # Check date range
-        if from_dt or to_dt:
-            pub_str = doc.get("published", "")
-            if pub_str:
-                try:
-                    pub_dt = datetime.fromisoformat(pub_str.replace('Z', '+00:00'))
-                    if from_dt and pub_dt < from_dt:
-                        continue
-                    if to_dt and pub_dt > to_dt:
-                        continue
-                except (ValueError, AttributeError):
-                    # Skip articles with invalid/unparseable date formats when date filtering is enabled.
-                    # Articles without valid dates are excluded from results rather than causing the search to fail.
-                    pass
+        # Remove sort if it's None to avoid errors
+        if not query_payload["sort"]:
+             del query_payload["sort"]
+
+        resp = db_request("POST", "articles", "/_find", json_data=query_payload)
         
-        # Search in title, description, content
-        title = doc.get("title", "").lower()
-        description = doc.get("description", "").lower()
-        content = doc.get("content", "").lower()
+        if resp.status_code != 200:
+             return json.dumps({"error": f"Search failed: {resp.text}"})
+
+        docs = resp.json().get("docs", [])
         
-        if query_lower in title or query_lower in description or query_lower in content:
+        results = []
+        for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
                 "title": doc.get("title", "Untitled"),
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", "Unknown"),
-                "description": doc.get("description", "")[:200]  # Truncate
+                "description": doc.get("description", "")[:200]
             })
-        
-        if len(results) >= limit:
-            break
-    
-    return json.dumps({
-        "total": len(results),
-        "query": query,
-        "results": results
-    }, indent=2)
+            
+        return json.dumps({
+            "total": len(results),
+            "query": query,
+            "results": results
+        }, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
 def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
@@ -393,51 +396,47 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
     if limit > 200:
         limit = 200
     
-    # Get all articles
-    resp = db_request("GET", "articles", "/_all_docs", params={"include_docs": True})
-    if resp.status_code != 200:
-        return json.dumps({"error": "Failed to fetch articles"})
-    
-    all_docs = resp.json().get("rows", [])
     cutoff = datetime.now() - timedelta(hours=hours)
-    results = []
     
-    for row in all_docs:
-        doc = row.get("doc", {})
-        if doc.get("_id", "").startswith("_design"):
-            continue
+    # Mango Query
+    selector = {
+        "published": {"$gte": cutoff.isoformat()}
+    }
+    
+    try:
+        query_payload = {
+            "selector": selector,
+            "limit": limit,
+            "sort": [{"published": "desc"}],
+            "fields": ["_id", "title", "link", "published", "feed_title", "description"]
+        }
         
-        pub_str = doc.get("published", "")
-        if pub_str:
-            try:
-                pub_dt = datetime.fromisoformat(pub_str.replace('Z', '+00:00'))
-                if pub_dt >= cutoff:
-                    results.append({
-                        "_id": doc.get("_id"),
-                        "title": doc.get("title", "Untitled"),
-                        "link": doc.get("link", ""),
-                        "published": pub_str,
-                        "feed_title": doc.get("feed_title", "Unknown"),
-                        "description": doc.get("description", "")[:200],
-                        "_sort_date": pub_dt
-                    })
-            except (ValueError, AttributeError):
-                # Skip articles with invalid/unparseable date formats rather than failing the entire request.
-                # This allows the tool to return valid recent articles even if some have malformed timestamps.
-                pass
-    
-    # Sort by date descending
-    results.sort(key=lambda x: x.get("_sort_date", datetime.min), reverse=True)
-    
-    # Remove sort key and limit
-    for r in results:
-        r.pop("_sort_date", None)
-    
-    return json.dumps({
-        "total": len(results[:limit]),
-        "hours": hours,
-        "results": results[:limit]
-    }, indent=2)
+        resp = db_request("POST", "articles", "/_find", json_data=query_payload)
+        
+        if resp.status_code != 200:
+             return json.dumps({"error": f"Fetch failed: {resp.text}"})
+             
+        docs = resp.json().get("docs", [])
+        
+        results = []
+        for doc in docs:
+             results.append({
+                "_id": doc.get("_id"),
+                "title": doc.get("title", "Untitled"),
+                "link": doc.get("link", ""),
+                "published": doc.get("published", ""),
+                "feed_title": doc.get("feed_title", "Unknown"),
+                "description": doc.get("description", "")[:200]
+            })
+            
+        return json.dumps({
+            "total": len(results),
+            "hours": hours,
+            "results": results
+        }, indent=2)
+        
+    except Exception as e:
+        return json.dumps({"error": f"Fetch execution error: {str(e)}"})
 
 @mcp.tool()
 def search_events(query: str, limit: int = 20) -> str:
@@ -457,38 +456,81 @@ def search_events(query: str, limit: int = 20) -> str:
     if limit > 100:
         limit = 100
     
-    resp = db_request("GET", "events", "/_all_docs", params={"include_docs": True})
-    if resp.status_code != 200:
-        return json.dumps({"error": "Failed to fetch events"})
+    # Mango selector
+    selector = {
+        "$or": [
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
-    all_docs = resp.json().get("rows", [])
-    query_lower = query.lower()
-    results = []
-    
-    for row in all_docs:
-        doc = row.get("doc", {})
-        if doc.get("_id", "").startswith("_design"):
-            continue
+    try:
+        query_payload = {
+            "selector": selector,
+            "limit": limit,
+            "fields": ["_id", "name", "description", "article_links"]
+        }
         
-        name = doc.get("name", "").lower()
-        description = doc.get("description", "").lower()
+        resp = db_request("POST", "events", "/_find", json_data=query_payload)
+         
+        if resp.status_code != 200:
+             return json.dumps({"error": f"Search failed: {resp.text}"})
+             
+        docs = resp.json().get("docs", [])
         
-        if query_lower in name or query_lower in description:
+        results = []
+        for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
                 "name": doc.get("name", "Untitled"),
                 "description": doc.get("description", ""),
                 "article_count": len(doc.get("article_links", []))
             })
-        
-        if len(results) >= limit:
-            break
+            
+        return json.dumps({
+            "total": len(results),
+            "query": query,
+            "results": results
+        }, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Search execution error: {str(e)}"})
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
-    return json.dumps({
-        "total": len(results),
-        "query": query,
-        "results": results
-    }, indent=2)
+    try:
+        query_payload = {
+            "selector": selector,
+            "limit": limit,
+            "fields": ["_id", "name", "description", "article_links"]
+        }
+        
+        resp = db_request("POST", "events", "/_find", json_data=query_payload)
+         
+        if resp.status_code != 200:
+             return json.dumps({"error": f"Search failed: {resp.text}"})
+             
+        docs = resp.json().get("docs", [])
+        
+        results = []
+        for doc in docs:
+            results.append({
+                "_id": doc.get("_id"),
+                "name": doc.get("name", "Untitled"),
+                "description": doc.get("description", ""),
+                "article_count": len(doc.get("article_links", []))
+            })
+            
+        return json.dumps({
+            "total": len(results),
+            "query": query,
+            "results": results
+        }, indent=2)
+
+    except Exception as e:
+        return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
 def search_trends(query: str, limit: int = 20) -> str:
@@ -508,38 +550,45 @@ def search_trends(query: str, limit: int = 20) -> str:
     if limit > 100:
         limit = 100
     
-    resp = db_request("GET", "trends", "/_all_docs", params={"include_docs": True})
-    if resp.status_code != 200:
-        return json.dumps({"error": "Failed to fetch trends"})
+    # Mango selector
+    selector = {
+        "$or": [
+            {"name": {"$regex": f"(?i){query}"}},
+            {"description": {"$regex": f"(?i){query}"}}
+        ]
+    }
     
-    all_docs = resp.json().get("rows", [])
-    query_lower = query.lower()
-    results = []
-    
-    for row in all_docs:
-        doc = row.get("doc", {})
-        if doc.get("_id", "").startswith("_design"):
-            continue
+    try:
+         query_payload = {
+            "selector": selector,
+            "limit": limit,
+            "fields": ["_id", "name", "description", "event_ids"]
+        }
         
-        name = doc.get("name", "").lower()
-        description = doc.get("description", "").lower()
-        
-        if query_lower in name or query_lower in description:
+         resp = db_request("POST", "trends", "/_find", json_data=query_payload)
+         
+         if resp.status_code != 200:
+             return json.dumps({"error": f"Search failed: {resp.text}"})
+
+         docs = resp.json().get("docs", [])
+         
+         results = []
+         for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
                 "name": doc.get("name", "Untitled"),
                 "description": doc.get("description", ""),
                 "event_count": len(doc.get("event_ids", []))
             })
+            
+         return json.dumps({
+            "total": len(results),
+            "query": query,
+            "results": results
+        }, indent=2)
         
-        if len(results) >= limit:
-            break
-    
-    return json.dumps({
-        "total": len(results),
-        "query": query,
-        "results": results
-    }, indent=2)
+    except Exception as e:
+         return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 # Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
 # app = mcp.sse_app is already set above

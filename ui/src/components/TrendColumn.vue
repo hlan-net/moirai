@@ -68,6 +68,7 @@ const fetchTrends = async (isRefresh = false) => {
     ])
 
     if (trendsResponse.ok) {
+    if (trendsResponse.ok) {
       const data = await trendsResponse.json()
       console.log('Trends API response:', data)
       const allTrends = Array.isArray(data) ? data : []
@@ -224,6 +225,7 @@ onUnmounted(() => {
 .search-container {
   position: relative;
   margin: 0.75rem 0;
+}
 }
 
 .search-input {

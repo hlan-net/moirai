@@ -94,7 +94,6 @@ h1 {
   margin: 0;
   text-align: center;
 }
-
 .header-controls {
   position: absolute;
   left: 100%;

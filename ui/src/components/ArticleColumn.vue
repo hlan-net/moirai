@@ -71,7 +71,8 @@ const fetchLatestUpdates = async () => {
       if (newArticles.length > 0) {
         articles.value = [...newArticles, ...articles.value]
         await articleCache.saveArticles(result.articles)
-        console.log(`Fetched ${newArticles.length} new articles`)
+        // Debug log removed for production
+        // console.log(`Fetched ${newArticles.length} new articles`)
       }
     }
     
@@ -225,6 +226,9 @@ const handleRefresh = async () => {
     refreshingFeed.value = false
   }
 }
+    refreshingFeed.value = false
+  }
+}
 
 function formatDate(dateStr: string) {
   try {
@@ -361,7 +365,7 @@ function getHostname(urlStr: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 10px;
   margin-bottom: 10px;
   margin-top: 0;

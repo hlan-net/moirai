@@ -107,6 +107,13 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
     } else {
       if (!isRefresh) articles.value = []
     }
+    
+    if (articlesResponse.ok) {
+      const articlesData = await articlesResponse.json()
+      articles.value = articlesData.articles || []
+    } else {
+      articles.value = []
+    }
   } catch (error) {
     console.error('Error fetching events or trends:', error)
     // Only clear events if we failed to fetch them and it's not a refresh
@@ -258,6 +265,7 @@ onUnmounted(() => {
 .search-container {
   position: relative;
   margin: 0.75rem 0;
+}
 }
 
 .search-input {

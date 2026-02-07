@@ -79,6 +79,17 @@ spec:
                   echo "Database '$db_name' created successfully."
                 fi
               }
+              
+              # Function to create a Mango index
+              create_index() {
+                db_name=$1
+                index_json=$2
+                echo "Creating index for '$db_name'..."
+                curl -X POST -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
+                  -H "Content-Type: application/json" \
+                  -d "$index_json" \
+                  http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name/_index
+              }
 
               # Check CouchDB readiness
               check_couchdb_ready
@@ -88,6 +99,12 @@ spec:
               create_database "feeds"
               create_database "articles"
               create_database "events"
+              create_database "trends"
+
+              # Create indexes
+              create_index "articles" '{"index": {"fields": ["published"]}, "name": "published-index", "type": "json"}'
+              create_index "events" '{"index": {"fields": ["article_links"]}, "name": "events-links-index", "type": "json"}'
+              create_index "trends" '{"index": {"fields": ["event_ids"]}, "name": "trends-events-index", "type": "json"}'
 
               # Get cluster status
               echo "Fetching CouchDB cluster status..."

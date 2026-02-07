@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
 import hashlib
+import version
 from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
@@ -293,25 +294,57 @@ def list_articles():
     skip = max(skip, 0)
     
     feeds = fetch_from_couchdb("feeds")
-    all_articles = fetch_from_couchdb("articles")
-    events = fetch_from_couchdb("events")
-    trends = fetch_from_couchdb("trends")
     
-    # Filter by 'since' if provided
+    # Build selector for efficient DB querying
+    selector = {}
     if since:
         try:
             since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
-            all_articles = [
-                a for a in all_articles 
-                if a.get("published") and parse_datetime_safe(a["published"]) > since_dt
-            ]
+            # Ensure timezone awareness
+            if since_dt.tzinfo is None:
+                since_dt = since_dt.replace(tzinfo=timezone.utc)
+            selector["published"] = {"$gt": since_dt.isoformat()}
         except (ValueError, AttributeError):
             pass  # Invalid since parameter, ignore
+
+    # Ensure we have a selector for sorting field to optimize index usage
+    if "published" not in selector:
+        selector["published"] = {"$gt": None}
+
+    # Query CouchDB directly with pagination and sorting
+    # We fetch limit + 1 to determine if there are more results
+    articles = query_couchdb(
+        "articles", 
+        selector=selector, 
+        limit=limit + 1, 
+        skip=skip, 
+        sort=[{"published": "desc"}]
+    )
+
+    # Handle has_more logic
+    has_more = False
+    if len(articles) > limit:
+        has_more = True
+        articles = articles[:limit]
     
-    # Sort by published date (newest first)
-    all_articles.sort(key=lambda a: a.get("published", ""), reverse=True)
+    paginated_articles = articles
+    # Total count is not available efficiently with Mango queries
+    total_count = len(articles) + skip + (1 if has_more else 0)
     
-    total_count = len(all_articles)
+    # Fetch only relevant events and trends
+    article_links = [a.get("link") for a in paginated_articles if a.get("link")]
+    
+    events = []
+    if article_links:
+        # Use $elemMatch with $in to find events containing any of the article links
+        events = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": article_links}}}, limit=1000)
+        
+    event_ids = [e.get("_id") for e in events if e.get("_id")]
+    
+    trends = []
+    if event_ids:
+        # Use $elemMatch with $in to find trends containing any of the event IDs
+        trends = query_couchdb("trends", selector={"event_ids": {"$elemMatch": {"$in": event_ids}}}, limit=1000)
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
     feed_favicon_map = {feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")}
@@ -356,8 +389,7 @@ def list_articles():
         if trend_names:
             article_link_to_trends[link] = sorted(list(trend_names))
     
-    # Apply pagination
-    paginated_articles = all_articles[skip:skip + limit]
+    # Mapping logic completed
     
     for article in paginated_articles:
         feed_url = article.get("feed_url")
@@ -391,15 +423,28 @@ def rss_feed():
     limit = min(max(limit, 1), 500)  # Clamp between 1-500
     
     feeds = fetch_from_couchdb("feeds")
-    all_articles = fetch_from_couchdb("articles")
-    events = fetch_from_couchdb("events")
-    trends = fetch_from_couchdb("trends")
     
-    # Sort by published date (newest first)
-    all_articles.sort(key=lambda a: a.get("published", ""), reverse=True)
+    # Query CouchDB directly for RSS
+    # Requires index on 'published' field
+    rss_articles = query_couchdb(
+        "articles", 
+        selector={"published": {"$gt": None}}, 
+        limit=limit, 
+        sort=[{"published": "desc"}]
+    )
     
-    # Limit articles for RSS
-    rss_articles = all_articles[:limit]
+    # Fetch only relevant events and trends for RSS
+    article_links = [a.get("link") for a in rss_articles if a.get("link")]
+    
+    events = []
+    if article_links:
+        events = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": article_links}}}, limit=1000)
+        
+    event_ids = [e.get("_id") for e in events if e.get("_id")]
+    
+    trends = []
+    if event_ids:
+        trends = query_couchdb("trends", selector={"event_ids": {"$elemMatch": {"$in": event_ids}}}, limit=1000)
     
     feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
     
@@ -611,7 +656,8 @@ def get_config():
     # Helper to return the effective config
     return jsonify({
         "allow_public_read": get_public_read_setting(),
-        "iteration_interval": get_iteration_interval_setting()
+        "iteration_interval": get_iteration_interval_setting(),
+        "version": version.get_version_string()
     })
 
 @api_blueprint.route("/config", methods=["PUT"])
@@ -848,12 +894,6 @@ def search_trends_endpoint():
             "description": trend.get("description", ""),
             "event_count": len(trend.get("event_ids", []))
         })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
-        "results": results
-    })
     
     return jsonify({
         "total": len(results),
