@@ -68,7 +68,10 @@ const processEventsResponse = async (response: Response, isRefresh: boolean) => 
     const eventsData = await response.json()
     const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
     events.value = allEvents.filter(e => !e._id.startsWith('_design/'))
-  } else if (!isRefresh) {
+    return
+  }
+  
+  if (!isRefresh) {
     events.value = []
   }
 }
@@ -78,11 +81,13 @@ const processTrendsResponse = async (response: Response, isRefresh: boolean) => 
     try {
       const trendsData = await response.json()
       trends.value = Array.isArray(trendsData) ? trendsData : []
+      return
     } catch (e) {
       console.error('Error parsing trends:', e)
-      if (!isRefresh) trends.value = []
     }
-  } else if (!isRefresh) {
+  }
+  
+  if (!isRefresh) {
     trends.value = []
   }
 }
@@ -92,11 +97,13 @@ const processArticlesResponse = async (response: Response, isRefresh: boolean) =
     try {
       const articlesData = await response.json()
       articles.value = articlesData.articles || []
+      return
     } catch (e) {
       console.error('Error parsing articles:', e)
-      if (!isRefresh) articles.value = []
     }
-  } else if (!isRefresh) {
+  }
+  
+  if (!isRefresh) {
     articles.value = []
   }
 }
