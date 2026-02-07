@@ -60,7 +60,7 @@ def store_to_couchdb(db_name, doc):
         return response.json()
     except requests.exceptions.RequestException as e:
         logger.error(f"Error storing to CouchDB: {e}")
-        abort(500, description="Database error")
+        return abort(500, description="Database error")
 
 def delete_from_couchdb(db_name, doc_id, rev):
     """Delete a document from CouchDB."""
