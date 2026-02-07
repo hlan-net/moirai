@@ -41,45 +41,84 @@ body, html, #app {
 </style>
 
 <style scoped>
+/* Mobile-first navigation */
 .app-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
+
 .main-nav {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 10px 20px;
+  padding: 10px;
   background-color: #333;
   color: white;
+  gap: 10px;
 }
+
 .brand {
   font-weight: bold;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: white;
   text-decoration: none;
 }
+
 .brand:hover {
   text-decoration: underline;
 }
+
 .links {
   display: flex;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
 }
+
 .nav-link {
   color: #ddd;
   text-decoration: none;
   font-weight: 500;
+  font-size: 0.9rem;
+  padding: 5px 10px;
 }
+
 .nav-link:hover, .nav-link.router-link-active {
   color: white;
   text-decoration: underline;
 }
+
 .content {
   flex: 1;
   overflow: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* Tablet and up: horizontal navigation */
+@media (min-width: 768px) {
+  .main-nav {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 20px;
+    gap: 0;
+  }
+
+  .brand {
+    font-size: 1.2rem;
+  }
+
+  .links {
+    flex-wrap: nowrap;
+    gap: 20px;
+    width: auto;
+  }
+
+  .nav-link {
+    font-size: 1rem;
+    padding: 0;
+  }
 }
 </style>

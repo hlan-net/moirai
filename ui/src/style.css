@@ -110,6 +110,33 @@ button:focus-visible {
   text-align: center;
 }
 
+/* Mobile-first responsive utilities */
+@media (max-width: 767px) {
+  /* Improve touch targets on mobile */
+  button, .action-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better spacing on mobile */
+  .card {
+    padding: 1em;
+  }
+
+  /* Smaller font sizes on mobile */
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+  }
+}
+
 /* Shared Dashboard Column Styles */
 .column-header {
   display: flex;

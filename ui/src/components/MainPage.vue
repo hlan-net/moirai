@@ -65,39 +65,42 @@ provide('selectFeed', selectFeed)
 </template>
 
 <style scoped>
+/* Mobile-first approach: Base styles for mobile devices */
 .main-page {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 10px;
   box-sizing: border-box;
 }
 
 .header-container {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  margin-bottom: 20px;
-  position: relative;
+  margin-bottom: 15px;
+  gap: 10px;
 }
 
 .title-wrapper {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  position: relative;
+  width: 100%;
 }
 
 h1 {
   margin: 0;
   text-align: center;
+  font-size: 1.5rem;
 }
+
 .header-controls {
-  position: absolute;
-  left: 100%;
-  margin-left: 20px;
   display: flex;
-  gap: 10px;
-  white-space: nowrap;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
 }
 
 .clear-focus-btn, .clear-filter-btn {
@@ -108,6 +111,7 @@ h1 {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  width: 100%;
 }
 
 .clear-focus-btn:hover, .clear-filter-btn:hover {
@@ -124,29 +128,139 @@ h1 {
   background: #3a6ba5;
 }
 
+/* Mobile: Stack columns vertically */
 .columns-container {
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
+  flex-direction: column;
+  gap: 15px;
   flex: 1;
-  overflow: hidden; /* Prevent full page scroll, allow columns to scroll */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
+
 .column {
-  flex: 1;
+  width: 100%;
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: var(--card-bg);
   display: flex;
   flex-direction: column;
+  min-height: 300px;
+  max-height: 500px;
   overflow: hidden;
   transition: all 0.3s ease;
 }
+
 .column.focused {
-  flex-grow: 2;
+  min-height: 400px;
+  max-height: 600px;
 }
+
 .column.unfocused {
-  flex-grow: 0.5;
-  opacity: 0.5;
+  opacity: 0.7;
+  min-height: 200px;
+  max-height: 300px;
+}
+
+/* Tablet: 2-column layout */
+@media (min-width: 768px) {
+  .main-page {
+    padding: 15px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .header-container {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .title-wrapper {
+    flex-direction: row;
+    width: auto;
+  }
+
+  .header-controls {
+    flex-direction: row;
+    gap: 10px;
+    width: auto;
+  }
+
+  .clear-focus-btn, .clear-filter-btn {
+    width: auto;
+  }
+
+  .columns-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 15px;
+    overflow: hidden;
+  }
+
+  .column {
+    flex: 1 1 calc(50% - 10px);
+    min-width: 0;
+    max-height: none;
+    overflow: hidden;
+  }
+
+  .column.focused {
+    flex: 1 1 60%;
+    max-height: none;
+  }
+
+  .column.unfocused {
+    flex: 1 1 calc(40% - 15px);
+    max-height: none;
+  }
+}
+
+/* Desktop: 4-column layout */
+@media (min-width: 1200px) {
+  .main-page {
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .header-container {
+    justify-content: center;
+  }
+
+  .title-wrapper {
+    position: relative;
+  }
+
+  .header-controls {
+    position: absolute;
+    left: 100%;
+    margin-left: 20px;
+    white-space: nowrap;
+  }
+
+  .columns-container {
+    flex-wrap: nowrap;
+    gap: 20px;
+  }
+
+  .column {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .column.focused {
+    flex-grow: 2;
+  }
+
+  .column.unfocused {
+    flex-grow: 0.5;
+    opacity: 0.5;
+  }
 }
 </style>
