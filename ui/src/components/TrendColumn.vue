@@ -34,7 +34,7 @@ const filteredTrends = computed(() => {
     )
     
     filtered = filtered.filter(trend => 
-      trend.event_ids.some(eventId => relevantEventIds.has(eventId))
+      (trend.event_ids || []).some(eventId => relevantEventIds.has(eventId))
     )
   }
   
@@ -171,9 +171,9 @@ onMounted(() => {
         <p class="summary">{{ trend.description }}</p>
 
         <div v-if="expandedTrends.has(trend._id)" class="events-section">
-          <h4>Linked Events ({{ trend.event_ids.length }})</h4>
+          <h4>Linked Events ({{ (trend.event_ids || []).length }})</h4>
           <ul>
-            <li v-for="eid in trend.event_ids" :key="eid">
+            <li v-for="eid in (trend.event_ids || [])" :key="eid">
               <span class="event-id">{{ eid.substring(0, 8) }}...</span>
               <button
                 @click="removeEvent(trend._id, eid)"
@@ -186,7 +186,7 @@ onMounted(() => {
           </ul>
         </div>
         <div v-else class="expand-hint" @click="toggleExpand(trend._id)">
-          {{ trend.event_ids.length }} events (click to expand)
+          {{ (trend.event_ids || []).length }} events (click to expand)
         </div>
       </div>
     </div>

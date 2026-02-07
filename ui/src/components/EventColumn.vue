@@ -44,7 +44,7 @@ const filteredEvents = computed(() => {
     const feedArticleLinks = new Set(feedArticles.map(a => a.link))
     
     filtered = filtered.filter(event => 
-      event.article_links.some(link => feedArticleLinks.has(link))
+      (event.article_links || []).some(link => feedArticleLinks.has(link))
     )
   }
   
@@ -201,9 +201,9 @@ onMounted(() => {
         </div>
 
         <div v-if="expandedEvents.has(event._id)" class="links-section">
-          <h4>Linked Articles ({{ event.article_links.length }})</h4>
+          <h4>Linked Articles ({{ (event.article_links || []).length }})</h4>
           <ul>
-            <li v-for="link in event.article_links" :key="link">
+            <li v-for="link in (event.article_links || [])" :key="link">
               <a :href="link" target="_blank" rel="noopener noreferrer">{{ link }}</a>
               <button
                 @click="removeLink(event._id, link)"
@@ -216,7 +216,7 @@ onMounted(() => {
           </ul>
         </div>
         <div v-else class="expand-hint" @click="toggleExpand(event._id)">
-          {{ event.article_links.length }} articles (click to expand)
+          {{ (event.article_links || []).length }} articles (click to expand)
         </div>
       </div>
     </div>
