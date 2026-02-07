@@ -495,41 +495,6 @@ def search_events(query: str, limit: int = 20) -> str:
 
     except Exception as e:
         return json.dumps({"error": f"Search execution error: {str(e)}"})
-            {"name": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}}
-        ]
-    }
-    
-    try:
-        query_payload = {
-            "selector": selector,
-            "limit": limit,
-            "fields": ["_id", "name", "description", "article_links"]
-        }
-        
-        resp = db_request("POST", "events", "/_find", json_data=query_payload)
-         
-        if resp.status_code != 200:
-             return json.dumps({"error": f"Search failed: {resp.text}"})
-             
-        docs = resp.json().get("docs", [])
-        
-        results = []
-        for doc in docs:
-            results.append({
-                "_id": doc.get("_id"),
-                "name": doc.get("name", "Untitled"),
-                "description": doc.get("description", ""),
-                "article_count": len(doc.get("article_links", []))
-            })
-            
-        return json.dumps({
-            "total": len(results),
-            "query": query,
-            "results": results
-        }, indent=2)
-
-    except Exception as e:
         return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
