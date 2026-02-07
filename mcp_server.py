@@ -30,6 +30,7 @@ DEFAULT_SEARCH_LIMIT = 20
 MAX_SEARCH_LIMIT = 100
 DEFAULT_HOURS_LOOKBACK = 24
 MAX_HOURS_LOOKBACK = 168  # 1 week
+MAX_DESCRIPTION_LENGTH = 200  # Maximum characters for description preview
 
 # HTTP Status Codes
 HTTP_OK = 200
@@ -60,9 +61,11 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 async def health_check(request):
+    """Health check endpoint for service monitoring."""
     return JSONResponse({"status": "ok"})
 
 async def metrics_endpoint(request):
+    """Metrics endpoint placeholder for Prometheus integration."""
     # Simple metrics endpoint without PrometheusMiddleware
     return Response("# Placeholder metrics endpoint\n", media_type="text/plain")
 
@@ -73,9 +76,32 @@ app.routes.append(Route("/metrics", metrics_endpoint))
 # --- DB Helpers ---
 
 def get_db_url(db_name):
+    """Construct the full database URL from base URI and database name.
+    
+    Args:
+        db_name: Name of the CouchDB database
+        
+    Returns:
+        Complete URL string for the database
+    """
     return f"{COUCHDB_URI}{db_name}"
 
 def db_request(method, db_name, path="", json_data=None, params=None):
+    """Execute an HTTP request against CouchDB.
+    
+    Args:
+        method: HTTP method (GET, POST, PUT, HEAD, DELETE)
+        db_name: Name of the CouchDB database
+        path: Optional path within the database (default: "")
+        json_data: Optional JSON data for request body (default: None)
+        params: Optional query parameters (default: None)
+        
+    Returns:
+        requests.Response object
+        
+    Raises:
+        RuntimeError: On database connection errors (non-404 errors)
+    """
     url = f"{get_db_url(db_name)}{path}"
     try:
         if method == "GET":
@@ -90,7 +116,9 @@ def db_request(method, db_name, path="", json_data=None, params=None):
             response = requests.delete(url, params=params)
         
         # Don't raise for 404s if we want to handle them gracefully in callers
-        if response.status_code >= HTTP_BAD_REQUEST and response.status_code != HTTP_NOT_FOUND:
+        is_error_not_404 = (response.status_code >= HTTP_BAD_REQUEST and 
+                           response.status_code != HTTP_NOT_FOUND)
+        if is_error_not_404:
             logger.error(f"DB Error {method} {url}: {response.text}")
             
         return response
@@ -98,12 +126,35 @@ def db_request(method, db_name, path="", json_data=None, params=None):
         raise RuntimeError(f"Database connection error: {e}")
 
 def get_doc(db_name, doc_id):
+    """Retrieve a document from CouchDB by ID.
+    
+    Args:
+        db_name: Name of the CouchDB database
+        doc_id: Document identifier
+        
+    Returns:
+        Document as dictionary if found, None otherwise
+    """
     res = db_request("GET", db_name, path=f"/{doc_id}")
     if res.status_code == HTTP_OK:
         return res.json()
     return None
 
 def store_doc(db_name, doc):
+    """Store a document in CouchDB.
+    
+    Generates a hash-based ID if one is not provided in the document.
+    
+    Args:
+        db_name: Name of the CouchDB database
+        doc: Document dictionary to store
+        
+    Returns:
+        Document ID if successful, or an error message string
+        
+    Raises:
+        RuntimeError: If storage fails
+    """
     if "_id" not in doc:
         # Generate hash ID if not present
         doc_hash = hashlib.sha256(json.dumps(doc, sort_keys=True).encode('utf-8')).hexdigest()
@@ -387,14 +438,14 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
             "selector": selector,
             "limit": limit,
             "sort": [{"published": "desc"}] if "published" in selector else None,
-             # We need to exclude design docs, though Mango usually handles this.
-             # Fields projection to reduce bandwidth
+            # We need to exclude design docs, though Mango usually handles this.
+            # Fields projection to reduce bandwidth
             "fields": ["_id", "title", "link", "published", "feed_title", "description"]
         }
         
         # Remove sort if it's None to avoid errors
         if not query_payload["sort"]:
-             del query_payload["sort"]
+            del query_payload["sort"]
 
         resp = db_request("POST", "articles", "/_find", json_data=query_payload)
         
@@ -415,7 +466,7 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", MSG_UNKNOWN_FEED),
-                "description": doc.get("description", "")[:200]
+                "description": doc.get("description", "")[:MAX_DESCRIPTION_LENGTH]
             })
             
         return json.dumps({
@@ -479,7 +530,7 @@ def get_recent_articles(hours: int = DEFAULT_HOURS_LOOKBACK, limit: int = DEFAUL
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", MSG_UNKNOWN_FEED),
-                "description": doc.get("description", "")[:200]
+                "description": doc.get("description", "")[:MAX_DESCRIPTION_LENGTH]
             })
             
         return json.dumps({
@@ -528,10 +579,10 @@ def search_events(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> str:
         }
         
         resp = db_request("POST", "events", "/_find", json_data=query_payload)
-         
+        
         if resp.status_code != HTTP_OK:
-             return json.dumps({"error": f"Search failed: {resp.text}"})
-             
+            return json.dumps({"error": f"Search failed: {resp.text}"})
+            
         try:
             docs = resp.json().get("docs", [])
         except (ValueError, AttributeError) as e:
@@ -586,25 +637,25 @@ def search_trends(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> str:
     }
     
     try:
-         query_payload = {
+        query_payload = {
             "selector": selector,
             "limit": limit,
             "fields": ["_id", "name", "description", "event_ids"]
         }
         
-         resp = db_request("POST", "trends", "/_find", json_data=query_payload)
+        resp = db_request("POST", "trends", "/_find", json_data=query_payload)
          
-         if resp.status_code != HTTP_OK:
+        if resp.status_code != HTTP_OK:
              return json.dumps({"error": f"Search failed: {resp.text}"})
 
-         try:
-             docs = resp.json().get("docs", [])
-         except (ValueError, AttributeError) as e:
-             logger.error(f"Error parsing trends search response: {e}")
-             return json.dumps({"error": "Error searching trends"})
-         
-         results = []
-         for doc in docs:
+        try:
+            docs = resp.json().get("docs", [])
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Error parsing trends search response: {e}")
+            return json.dumps({"error": "Error searching trends"})
+        
+        results = []
+        for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
                 "name": doc.get("name", MSG_UNTITLED),
@@ -612,15 +663,15 @@ def search_trends(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> str:
                 "event_count": len(doc.get("event_ids", []))
             })
             
-         return json.dumps({
+        return json.dumps({
             "total": len(results),
             "query": query,
             "results": results
         }, indent=2)
         
     except requests.exceptions.RequestException as e:
-         logger.error(f"Search execution error: {e}")
-         return json.dumps({"error": f"Search execution error: {str(e)}"})
+        logger.error(f"Search execution error: {e}")
+        return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 # Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
 # app = mcp.sse_app is already set above
