@@ -4,10 +4,12 @@ Requires MCP server to be running on localhost:8090.
 Run with: python tests/test_list_articles_integration.py
 """
 import asyncio
+import pytest
 from mcp.client.sse import sse_client
 from mcp import ClientSession
 
 
+@pytest.mark.asyncio
 async def test_list_articles():
     url = "http://localhost:8090/sse"
     print(f"Connecting to MCP server at {url}...")
