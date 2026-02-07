@@ -60,7 +60,8 @@ const fetchTrends = async () => {
     ])
 
     if (trendsResponse.ok) {
-      trends.value = await trendsResponse.json()
+      const data = await trendsResponse.json()
+      trends.value = Array.isArray(data) ? data : []
     }
     
     if (eventsResponse.ok) {
@@ -73,6 +74,7 @@ const fetchTrends = async () => {
     }
   } catch (error) {
     console.error('Error fetching trends:', error)
+    trends.value = []
   } finally {
     loading.value = false
   }
@@ -125,8 +127,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="column-container">
-    <h2>Trends ({{ filteredTrends.length }})</h2>
+  <div class="trend-column">
+    <div class="column-header">
+      <h2>Trends ({{ filteredTrends.length }})</h2>
+    </div>
 
     <!-- Search Input -->
     <div class="search-container">
@@ -141,7 +145,7 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="loading">Loading trends...</div>
+    <div v-if="loading" class="loading-state">Loading trends...</div>
     <div v-else-if="!filteredTrends.length && searchQuery" class="no-results">
       No trends match "{{ searchQuery }}"
     </div>
@@ -151,7 +155,7 @@ onMounted(() => {
           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
           <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
         </div>
-        <p class="desc">{{ trend.description }}</p>
+        <p class="summary">{{ trend.description }}</p>
 
         <div v-if="expandedTrends.has(trend._id)" class="events-section">
           <h4>Linked Events ({{ trend.event_ids.length }})</h4>
@@ -229,62 +233,100 @@ onMounted(() => {
   font-style: italic;
 }
 
-.column-container {
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  margin-top: 0;
+}
+
+.trend-column {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
+
 h2 {
   color: #6a0dad;
   margin-top: 0;
+  position: sticky;
+  top: 0;
+  background: transparent;
+  padding: 10px 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.loading-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
 .trend-list {
   overflow-y: auto;
   flex: 1;
 }
+
 .trend-card {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 10px;
-  margin-bottom: 10px;
-  background: var(--button-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 15px 0;
+  text-align: left;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
 }
+
 .clickable {
   cursor: pointer;
 }
 .clickable:hover {
   text-decoration: underline;
 }
+
 h3 {
-  margin: 0;
+  margin: 0 0 5px 0;
   font-size: 1.1rem;
   color: var(--text-color);
 }
-.desc {
+
+.summary {
   font-size: 0.9rem;
   color: var(--text-color);
-  opacity: 0.8;
+  opacity: 0.9;
+  line-height: 1.4;
   margin: 5px 0;
 }
+
 .delete-btn {
   background: none;
   border: none;
-  color: #cc0000;
+  color: #999;
   font-size: 1.2rem;
   cursor: pointer;
+  padding: 0 5px;
 }
+.delete-btn:hover {
+  color: #cc0000;
+}
+
 .expand-hint {
   font-size: 0.8rem;
   color: var(--text-color);
   opacity: 0.5;
   cursor: pointer;
-  margin-top: 5px;
+  margin-top: 10px;
 }
+
 .events-section {
   margin-top: 10px;
   border-top: 1px solid var(--border-color);

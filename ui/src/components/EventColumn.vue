@@ -154,8 +154,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="column-container">
-    <h2>Events ({{ filteredEvents.length }})</h2>
+  <div class="event-column">
+    <div class="column-header">
+      <h2>Events ({{ filteredEvents.length }})</h2>
+    </div>
 
     <!-- Search Input -->
     <div class="search-container">
@@ -170,7 +172,7 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="loading">Loading events...</div>
+    <div v-if="loading" class="loading-state">Loading events...</div>
     <div v-else-if="!filteredEvents.length && searchQuery" class="no-results">
       No events match "{{ searchQuery }}"
     </div>
@@ -180,7 +182,7 @@ onMounted(() => {
           <h3 @click="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
           <button @click="deleteEvent(event._id)" class="delete-btn" title="Delete Event">×</button>
         </div>
-        <p v-if="event.description" class="desc">{{ event.description }}</p>
+        <p v-if="event.description" class="summary">{{ event.description }}</p>
         <div v-if="event.trend_id" class="trend-link">
           <span class="trend-label">Related Trend:</span>
           <span class="trend-name">{{ getTrendDisplayName(event.trend_id) }}</span>
@@ -262,48 +264,80 @@ onMounted(() => {
   font-style: italic;
 }
 
-.column-container {
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  margin-top: 0;
+}
+
+.event-column {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
+
 h2 {
   color: #d83b01;
   margin-top: 0;
+  position: sticky;
+  top: 0;
+  background: transparent;
+  padding: 10px 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.loading-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
 .event-list {
   overflow-y: auto;
   flex: 1;
 }
+
 .event-card {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 10px;
-  margin-bottom: 10px;
-  background: var(--button-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 15px 0;
+  text-align: left;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
 }
+
 .clickable {
   cursor: pointer;
 }
 .clickable:hover {
   text-decoration: underline;
 }
+
 h3 {
-  margin: 0;
+  margin: 0 0 5px 0;
   font-size: 1.1rem;
   color: var(--text-color);
 }
-.desc {
+
+.summary {
   font-size: 0.9rem;
   color: var(--text-color);
-  opacity: 0.8;
+  opacity: 0.9;
+  line-height: 1.4;
   margin: 5px 0;
 }
+
 .trend-link {
   margin-top: 8px;
   padding-top: 8px;
@@ -319,20 +353,27 @@ h3 {
   color: #ff6b6b;
   font-weight: 500;
 }
+
 .delete-btn {
   background: none;
   border: none;
-  color: #cc0000;
+  color: #999;
   font-size: 1.2rem;
   cursor: pointer;
+  padding: 0 5px;
 }
+.delete-btn:hover {
+  color: #cc0000;
+}
+
 .expand-hint {
   font-size: 0.8rem;
   color: var(--text-color);
   opacity: 0.5;
   cursor: pointer;
-  margin-top: 5px;
+  margin-top: 10px;
 }
+
 .links-section {
   margin-top: 10px;
   border-top: 1px solid var(--border-color);
