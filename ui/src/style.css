@@ -8,12 +8,13 @@
   --button-bg: #1a1a1a;
   --input-bg: #333;
   --input-text: #fff;
-  
+
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark; /* Default hint */
+  color-scheme: dark;
+  /* Default hint */
   color: var(--text-color);
   background-color: var(--bg-color);
 
@@ -34,7 +35,7 @@
   --button-bg: #f9f9f9;
   --input-bg: #ffffff;
   --input-text: #333;
-  
+
   color-scheme: light;
 }
 
@@ -50,7 +51,7 @@
     --button-bg: #f9f9f9;
     --input-bg: #ffffff;
     --input-text: #333;
-    
+
     color-scheme: light;
   }
 }
@@ -60,6 +61,7 @@ a {
   color: var(--primary-color);
   text-decoration: inherit;
 }
+
 a:hover {
   color: var(--primary-hover);
 }
@@ -72,7 +74,12 @@ body {
   color: var(--text-color);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--text-color);
 }
 
@@ -88,9 +95,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: var(--primary-color);
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -112,8 +121,10 @@ button:focus-visible {
 
 /* Mobile-first responsive utilities */
 @media (max-width: 767px) {
+
   /* Improve touch targets on mobile */
-  button, .action-btn {
+  button,
+  .action-btn {
     min-height: 44px;
     min-width: 44px;
   }
@@ -250,8 +261,13 @@ button:focus-visible {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spinning {
