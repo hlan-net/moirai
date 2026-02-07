@@ -296,12 +296,7 @@ onUnmounted(() => {
 
 h2 {
   color: #6a0dad;
-  margin-top: 0;
-  position: sticky;
-  top: 0;
-  background: transparent;
-  padding: 10px 0;
-  z-index: 1;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
