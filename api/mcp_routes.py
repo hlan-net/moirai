@@ -7,7 +7,6 @@ import re
 from datetime import datetime
 import hashlib
 import json
-from api.db_config import COUCHDB_URI
 from api.db import fetch_from_couchdb, store_to_couchdb
 
 mcp_blueprint = Blueprint('mcp', __name__)
