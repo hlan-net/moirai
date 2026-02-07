@@ -78,21 +78,32 @@ const fetchEventsAndTrends = async () => {
     }
 
     if (trendsResponse.ok) {
-      const trendsData = await trendsResponse.json()
-      trends.value = Array.isArray(trendsData) ? trendsData : []
+      try {
+        const trendsData = await trendsResponse.json()
+        trends.value = Array.isArray(trendsData) ? trendsData : []
+      } catch (e) {
+        console.error('Error parsing trends:', e)
+      }
     } else {
       trends.value = []
     }
     
     if (articlesResponse.ok) {
-      const articlesData = await articlesResponse.json()
-      articles.value = articlesData.articles || []
+      try {
+        const articlesData = await articlesResponse.json()
+        articles.value = articlesData.articles || []
+      } catch (e) {
+        console.error('Error parsing articles:', e)
+      }
     } else {
       articles.value = []
     }
   } catch (error) {
     console.error('Error fetching events or trends:', error)
-    events.value = []
+    // Only clear events if we failed to fetch them
+    if (events.value.length === 0) {
+      events.value = []
+    }
     trends.value = []
   } finally {
     loading.value = false

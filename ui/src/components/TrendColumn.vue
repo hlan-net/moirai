@@ -61,20 +61,32 @@ const fetchTrends = async () => {
 
     if (trendsResponse.ok) {
       const data = await trendsResponse.json()
+      console.log('Trends API response:', data)
       trends.value = Array.isArray(data) ? data : []
     }
     
     if (eventsResponse.ok) {
-      events.value = await eventsResponse.json()
+      try {
+        events.value = await eventsResponse.json()
+      } catch (e) {
+        console.error('Error parsing events:', e)
+      }
     }
     
     if (articlesResponse.ok) {
-      const data = await articlesResponse.json()
-      articles.value = data.articles || []
+      try {
+        const data = await articlesResponse.json()
+        articles.value = data.articles || []
+      } catch (e) {
+        console.error('Error parsing articles:', e)
+      }
     }
   } catch (error) {
-    console.error('Error fetching trends:', error)
-    trends.value = []
+    console.error('Error fetching data:', error)
+    // Don't clear trends.value here if it was partially successful? 
+    // Actually, if Promise.all fails, trendsResponse might not be accessible.
+    // But if Promise.all succeeds, we are in the try block.
+    // If trendsResponse.json() fails, we catch it here.
   } finally {
     loading.value = false
   }
