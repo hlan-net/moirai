@@ -57,12 +57,7 @@ def requires_auth(f):
 
 def get_config_doc():
     """Helper to get the main config doc. Returns None if config doesn't exist or DB is unavailable."""
-    try:
-        return fetch_from_couchdb("config", "main")
-    except (ConnectionError, TimeoutError, OSError) as e:
-        # Expected: Database connectivity issues
-        print(f"Warning: Could not fetch config from database: {e}")
-        return None
+    return fetch_from_couchdb("config", "main")
 
 def get_public_read_setting():
     """Checks DB for config, falls back to env var."""
