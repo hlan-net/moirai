@@ -853,12 +853,6 @@ def search_events_endpoint():
             "_id": event.get("_id"),
             "name": event.get("name", "Untitled"),
             "description": event.get("description", ""),
-            "article_count": len(event.get("article_links", []))
-        })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
         "results": results
     })
 
