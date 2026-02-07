@@ -495,7 +495,6 @@ def search_events(query: str, limit: int = 20) -> str:
 
     except Exception as e:
         return json.dumps({"error": f"Search execution error: {str(e)}"})
-        return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
 def search_trends(query: str, limit: int = 20) -> str:
