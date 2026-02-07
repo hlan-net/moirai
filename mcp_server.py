@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import feedparser
 import hashlib
@@ -9,6 +10,10 @@ from datetime import datetime, timedelta, timezone
 from mcp.server.fastmcp import FastMCP, Context
 from tasks.favicon_fetcher import fetch_favicon_url
 from version import get_version_string
+
+# Add parent directory to path to import shared modules
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from api.db_config import COUCHDB_URI
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
@@ -30,21 +35,6 @@ async def metrics_endpoint(request):
 # Add routes directly instead of middleware
 app.routes.append(Route("/health", health_check))
 app.routes.append(Route("/metrics", metrics_endpoint))
-
-# Database Configuration
-COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
-user = os.environ.get("COUCHDB_USER")
-password = os.environ.get("COUCHDB_PASSWORD")
-if user and password and "@" not in COUCHDB_URI:
-    from urllib.parse import quote
-    if "://" in COUCHDB_URI:
-        scheme, host = COUCHDB_URI.split("://", 1)
-    else:
-        scheme, host = "http", COUCHDB_URI
-    COUCHDB_URI = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
-
-if not COUCHDB_URI.endswith("/"):
-    COUCHDB_URI += "/"
 
 # --- DB Helpers ---
 
