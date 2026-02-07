@@ -33,13 +33,6 @@ class GeminiProvider(LLMProvider):
         # Create model
         model_name = model if model.startswith('models/') else f'models/{model}'
         # If model name doesn't exist/invalid, might accept short name.
-        if model_name.startswith('models/gemini'):
-            # Just 'gemini-1.5-pro' etc is often used in client, but let's stick to what list_models returns or user input
-            # If user input 'gemini-1.5-pro' -> 'models/gemini-1.5-pro' is safe usually
-            pass
-        else:
-             # handle cases where user just stored "gemini-pro"
-             pass 
 
         generative_model = genai.GenerativeModel(
             model_name=model_name,
@@ -142,49 +135,50 @@ class GeminiProvider(LLMProvider):
 
     def _convert_history(self, messages):
         gemini_history = []
-        
         for msg in messages:
-            role = msg['role']
-            content = msg.get('content')
-            
-            if role == 'user':
-                parts = [{'text': content}] if content else []
-                gemini_history.append({'role': 'user', 'parts': parts})
-                
-            elif role == 'assistant':
-                parts = []
-                if content:
-                    parts.append({'text': content})
-                
-                # Handle tool calls
-                if 'tool_calls' in msg and msg['tool_calls']:
-                    for tc in msg['tool_calls']:
-                        func = tc['function']
-                        # FunctionCall part
-                        parts.append({
-                            'function_call': {
-                                'name': func['name'],
-                                'args': json.loads(func['arguments'])
-                            }
-                        })
-                
-                gemini_history.append({'role': 'model', 'parts': parts})
-                
-            elif role == 'tool':
-                # FunctionResponse part
-                # We need to find the name. In OpenAI format `name` is in the tool message.
-                parts = [{
-                    'function_response': {
-                        'name': msg['name'],
-                        'response': {'result': content}
-                    }
-                }]
-                
-                # In Gemini chat history, function responses are from 'function' role (which maps to user side in chat structure sometimes)
-                # But strictly for Content object, role is 'function'
-                gemini_history.append({'role': 'function', 'parts': parts})
-
+            gemini_msg = self._convert_message_to_gemini(msg)
+            if gemini_msg:
+                gemini_history.append(gemini_msg)
         return gemini_history
+
+    def _convert_message_to_gemini(self, msg):
+        role = msg['role']
+        content = msg.get('content')
+        
+        if role == 'user':
+            parts = [{'text': content}] if content else []
+            return {'role': 'user', 'parts': parts}
+            
+        elif role == 'assistant':
+            parts = []
+            if content:
+                parts.append({'text': content})
+            
+            # Handle tool calls
+            if 'tool_calls' in msg and msg['tool_calls']:
+                for tc in msg['tool_calls']:
+                    func = tc['function']
+                    # FunctionCall part
+                    parts.append({
+                        'function_call': {
+                            'name': func['name'],
+                            'args': json.loads(func['arguments'])
+                        }
+                    })
+            
+            return {'role': 'model', 'parts': parts}
+            
+        elif role == 'tool':
+            # FunctionResponse part
+            parts = [{
+                'function_response': {
+                    'name': msg['name'],
+                    'response': {'result': content}
+                }
+            }]
+            return {'role': 'function', 'parts': parts}
+            
+        return None
 
     def _convert_response(self, response):
         # Convert Gemini response to OpenAI-like object

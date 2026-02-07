@@ -13,6 +13,7 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8090/sse
       - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - API_USERNAME=${API_USERNAME:-username}
       - API_PASSWORD=${API_PASSWORD:-password}
       - MODEL_NAME=llama3.1:latest

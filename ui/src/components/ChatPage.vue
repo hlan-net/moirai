@@ -73,6 +73,29 @@ const newChat = () => {
   messages.value = []
 }
 
+const getHeaders = () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (currentLlmEndpoint.value === 'openai') {
+      const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
+      if (openaiApiKey) {
+        headers['x-openai-api-key'] = openaiApiKey
+      }
+    } else if (currentLlmEndpoint.value === 'gemini') {
+      const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+      if (geminiApiKey) {
+        headers['x-gemini-api-key'] = geminiApiKey
+      }
+    } else {
+      const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
+      if (ollamaEndpointUrl) {
+        headers['x-ollama-base-url'] = ollamaEndpointUrl
+      }
+    }
+    return headers
+}
+
 const sendMessage = async () => {
   if (!input.value.trim() || loading.value) return
   
@@ -105,25 +128,7 @@ const sendMessage = async () => {
       content: m.content
     }))
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    if (currentLlmEndpoint.value === 'openai') {
-      const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
-      if (openaiApiKey) {
-        headers['x-openai-api-key'] = openaiApiKey
-      }
-    } else if (currentLlmEndpoint.value === 'gemini') {
-      const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
-      if (geminiApiKey) {
-        headers['x-gemini-api-key'] = geminiApiKey
-      }
-    } else {
-      const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
-      if (ollamaEndpointUrl) {
-        headers['x-ollama-base-url'] = ollamaEndpointUrl
-      }
-    }
+    const headers = getHeaders()
 
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -638,7 +643,7 @@ const renameSession = async (session: ChatSession) => {
   overflow: hidden;
 }
 .chat-header {
-    margin-bottom: 10px;
+
     display: flex;
     justify-content: space-between;
     align-items: center;

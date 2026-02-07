@@ -117,6 +117,28 @@ const fetchOpenAiModels = async () => {
   }
 }
 
+const fetchGeminiModels = async () => {
+  if (!geminiApiKey.value) {
+    alert('Please provide a Gemini API key.')
+    return
+  }
+  loadingModels.value = true
+  try {
+    const res = await fetch('/api/models?llm_endpoint=gemini', {
+      headers: {
+        'x-gemini-api-key': geminiApiKey.value
+      }
+    })
+    if (res.ok) {
+      availableGeminiModels.value = await res.json()
+    }
+  } catch (e) {
+    console.error('Error fetching models:', e)
+  } finally {
+    loadingModels.value = false
+  }
+}
+
 const fetchConfig = async () => {
     try {
         const res = await fetch('/api/config')
@@ -206,7 +228,7 @@ onMounted(() => {
           </label>
         </div>
       </div>
-      <div :class="['sub-section', { 'disabled': llmEndpoint !== 'ollama' }]">
+      <div class="sub-section">
         <h3 @click="toggleSection('ollama')">
           Ollama
           <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
@@ -214,23 +236,23 @@ onMounted(() => {
         <div v-if="!collapsedSections.has('ollama')">
           <div class="form-group">
             <label for="ollama-url">Ollama Endpoint URL:</label>
-            <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" :disabled="llmEndpoint !== 'ollama'" />
+            <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" />
           </div>
           <div class="form-group">
             <label for="model">LLM Model Name (Ollama):</label>
-            <select v-if="availableModels.length" id="model" v-model="modelName" :disabled="llmEndpoint !== 'ollama'">
+            <select v-if="availableModels.length" id="model" v-model="modelName">
               <option v-for="model in availableModels" :key="model" :value="model">
                 {{ model }}
               </option>
             </select>
-            <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" :disabled="llmEndpoint !== 'ollama'" />
+            <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" />
             <small v-if="loadingModels">Loading available models...</small>
             <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
             <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>
           </div>
         </div>
       </div>
-      <div :class="['sub-section', { 'disabled': llmEndpoint !== 'openai' }]">
+      <div class="sub-section">
         <h3 @click="toggleSection('openai')">
           OpenAI
           <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
@@ -238,14 +260,14 @@ onMounted(() => {
         <div v-if="!collapsedSections.has('openai')">
           <div class="form-group">
             <label for="openai-api-key">OpenAI API Key:</label>
-            <input type="password" id="openai-api-key" v-model="openaiApiKey" :disabled="llmEndpoint !== 'openai'" />
+            <input type="password" id="openai-api-key" v-model="openaiApiKey" />
           </div>
           <div class="form-group">
             <label for="openai-model">OpenAI Model Name:</label>
-            <button @click="fetchOpenAiModels" :disabled="llmEndpoint !== 'openai' || !openaiApiKey || loadingModels">
+            <button @click="fetchOpenAiModels" :disabled="!openaiApiKey || loadingModels">
               {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
             </button>
-            <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName" :disabled="llmEndpoint !== 'openai'">
+            <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName">
               <option v-for="model in availableOpenAiModels" :key="model" :value="model">
                 {{ model }}
               </option>
@@ -254,10 +276,9 @@ onMounted(() => {
             <small v-if="!openaiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
           </div>
         </div>
-          </div>
-        </div>
       </div>
-      <div :class="['sub-section', { 'disabled': llmEndpoint !== 'gemini' }]">
+
+      <div class="sub-section">
         <h3 @click="toggleSection('gemini')">
           Gemini
           <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
@@ -265,14 +286,14 @@ onMounted(() => {
         <div v-if="!collapsedSections.has('gemini')">
           <div class="form-group">
             <label for="gemini-api-key">Gemini API Key:</label>
-            <input type="password" id="gemini-api-key" v-model="geminiApiKey" :disabled="llmEndpoint !== 'gemini'" />
+            <input type="password" id="gemini-api-key" v-model="geminiApiKey" />
           </div>
           <div class="form-group">
             <label for="gemini-model">Gemini Model Name:</label>
-            <button @click="fetchGeminiModels" :disabled="llmEndpoint !== 'gemini' || !geminiApiKey || loadingModels">
+            <button @click="fetchGeminiModels" :disabled="!geminiApiKey || loadingModels">
               {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
             </button>
-            <select v-if="availableGeminiModels.length" id="gemini-model" v-model="geminiModelName" :disabled="llmEndpoint !== 'gemini'">
+            <select v-if="availableGeminiModels.length" id="gemini-model" v-model="geminiModelName">
               <option v-for="model in availableGeminiModels" :key="model" :value="model">
                 {{ model }}
               </option>

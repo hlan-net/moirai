@@ -60,8 +60,9 @@ class TestGeminiProvider(unittest.TestCase):
         self.assertIsNone(response.choices[0].message.tool_calls)
         
         # Verify call arguments
+        # Verify call arguments
         mock_model.start_chat.assert_called()
-        args, kwargs = mock_chat.send_message.call_args
+        args, _ = mock_chat.send_message.call_args
         self.assertEqual(args[0], {'role': 'user', 'parts': [{'text': 'Hi'}]})
 
     @patch('api.llm.gemini.genai')
@@ -111,7 +112,7 @@ class TestGeminiProvider(unittest.TestCase):
         provider.create_chat_completion(messages, "gemini-pro", tools=[], tool_choice="auto")
         
         # Check start_chat history argument
-        args, kwargs = mock_model.start_chat.call_args
+        _, kwargs = mock_model.start_chat.call_args
         history = kwargs['history']
         
         # Item 0: User
@@ -132,7 +133,7 @@ class TestGeminiProvider(unittest.TestCase):
         self.assertEqual(len(history), 2)
         
         # Verify the message sent is the function response
-        msgs_args, msgs_kwargs = mock_chat.send_message.call_args
+        msgs_args, _ = mock_chat.send_message.call_args
         sent_msg = msgs_args[0]
         self.assertEqual(sent_msg['role'], 'function')
         self.assertEqual(sent_msg['parts'][0]['function_response']['name'], 'get_weather')
