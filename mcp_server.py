@@ -446,6 +446,20 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
         return json.dumps({"error": f"Fetch execution error: {str(e)}"})
 
 @mcp.tool()
+def search_events(query: str, limit: int = 20) -> str:
+    """
+    Search events by keyword in name or description.
+    
+    Args:
+        query: Search keywords (case-insensitive)
+        limit: Maximum number of results (default: 20, max: 100)
+    
+    Returns:
+        JSON string with matching events
+    """
+    if not query.strip():
+        return json.dumps({"error": "Query cannot be empty"})
+    
     if limit > 100:
         limit = 100
     
