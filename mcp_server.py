@@ -5,7 +5,7 @@ import hashlib
 import json
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from mcp.server.fastmcp import FastMCP, Context
 from tasks.favicon_fetcher import fetch_favicon_url
 from version import get_version_string
@@ -309,12 +309,15 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
     if limit > 200:
         limit = 200
     
+    import re
+    safe_query = re.escape(query)
+    
     # Build Mango selector
     selector = {
         "$or": [
-            {"title": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}},
-            {"content": {"$regex": f"(?i){query}"}}
+            {"title": {"$regex": f"(?i){safe_query}"}},
+            {"description": {"$regex": f"(?i){safe_query}"}},
+            {"content": {"$regex": f"(?i){safe_query}"}}
         ]
     }
     
@@ -322,6 +325,8 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
     if date_from:
         try:
             from_dt = datetime.fromisoformat(date_from)
+            if from_dt.tzinfo is None:
+                from_dt = from_dt.replace(tzinfo=timezone.utc)
             selector["published"] = {"$gte": from_dt.isoformat()}
         except ValueError:
             return json.dumps({"error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
@@ -329,6 +334,8 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
     if date_to:
         try:
             to_dt = datetime.fromisoformat(date_to)
+            if to_dt.tzinfo is None:
+                to_dt = to_dt.replace(tzinfo=timezone.utc)
             # Combine with existing published filter if from_dt exists
             if "published" in selector:
                 selector["published"]["$lte"] = to_dt.isoformat()
@@ -396,7 +403,7 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
     if limit > 200:
         limit = 200
     
-    cutoff = datetime.now() - timedelta(hours=hours)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     
     # Mango Query
     selector = {
@@ -439,28 +446,16 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
         return json.dumps({"error": f"Fetch execution error: {str(e)}"})
 
 @mcp.tool()
-def search_events(query: str, limit: int = 20) -> str:
-    """
-    Search events by keyword in title or description.
-    
-    Args:
-        query: Search keywords (case-insensitive)
-        limit: Maximum number of results (default: 20, max: 100)
-    
-    Returns:
-        JSON string with matching events
-    """
-    if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
-    
     if limit > 100:
         limit = 100
+    
+    safe_query = re.escape(query)
     
     # Mango selector
     selector = {
         "$or": [
-            {"name": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}}
+            {"name": {"$regex": f"(?i){safe_query}"}},
+            {"description": {"$regex": f"(?i){safe_query}"}}
         ]
     }
     
@@ -514,11 +509,13 @@ def search_trends(query: str, limit: int = 20) -> str:
     if limit > 100:
         limit = 100
     
+    safe_query = re.escape(query)
+    
     # Mango selector
     selector = {
         "$or": [
-            {"name": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}}
+            {"name": {"$regex": f"(?i){safe_query}"}},
+            {"description": {"$regex": f"(?i){safe_query}"}}
         ]
     }
     

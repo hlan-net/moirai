@@ -16,9 +16,6 @@ const setFocus = (column: string | null) => {
 
 const selectFeed = (feedUrl: string | null) => {
   selectedFeedUrl.value = feedUrl
-  if (feedUrl) {
-    console.log('Feed selected:', feedUrl)
-  }
 }
 
 // Provide selectedFeedUrl to child components
