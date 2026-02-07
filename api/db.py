@@ -12,11 +12,14 @@ logger = logging.getLogger(__name__)
 # Allowed database names for security validation
 ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history"}
 
+# Error messages
+ERROR_INVALID_DB_NAME = "Invalid database name."
+
 
 def fetch_from_couchdb(db_name, doc_id=None):
     """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
     if db_name not in ALLOWED_DBS:
-        abort(400, description="Invalid database name.")
+        abort(400, description=ERROR_INVALID_DB_NAME)
     
     # Validate doc_id format if provided
     if doc_id and not re.match(r'^[A-Za-z0-9\-_]+$', doc_id):
@@ -48,7 +51,7 @@ def fetch_from_couchdb(db_name, doc_id=None):
 def store_to_couchdb(db_name, doc):
     """Stores a document to CouchDB."""
     if db_name not in ALLOWED_DBS:
-        abort(400, description="Invalid database name.")
+        abort(400, description=ERROR_INVALID_DB_NAME)
     
     try:
         safe_db_name = urllib.parse.quote(db_name, safe="")
@@ -62,7 +65,7 @@ def store_to_couchdb(db_name, doc):
 def delete_from_couchdb(db_name, doc_id, rev):
     """Delete a document from CouchDB."""
     if db_name not in ALLOWED_DBS:
-        abort(400, description="Invalid database name.")
+        abort(400, description=ERROR_INVALID_DB_NAME)
         
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
@@ -77,7 +80,7 @@ def delete_from_couchdb(db_name, doc_id, rev):
 def update_couchdb_doc(db_name, doc_id, doc):
     """Update a document in CouchDB."""
     if db_name not in ALLOWED_DBS:
-        abort(400, description="Invalid database name.")
+        abort(400, description=ERROR_INVALID_DB_NAME)
         
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
@@ -95,7 +98,7 @@ def update_couchdb_doc(db_name, doc_id, doc):
 def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None):
     """Query CouchDB using Mango query syntax for efficient filtering."""
     if db_name not in ALLOWED_DBS:
-        abort(400, description="Invalid database name.")
+        abort(400, description=ERROR_INVALID_DB_NAME)
     
     safe_db_name = urllib.parse.quote(db_name, safe="")
     
