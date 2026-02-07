@@ -146,21 +146,18 @@ h1 {
   background: var(--card-bg);
   display: flex;
   flex-direction: column;
-  min-height: 300px;
-  max-height: 500px;
+  min-height: 200px;
   overflow: hidden;
   transition: all 0.3s ease;
 }
 
 .column.focused {
-  min-height: 400px;
-  max-height: 600px;
+  min-height: 300px;
 }
 
 .column.unfocused {
   opacity: 0.7;
-  min-height: 200px;
-  max-height: 300px;
+  min-height: 150px;
 }
 
 /* Tablet: 2-column layout */
