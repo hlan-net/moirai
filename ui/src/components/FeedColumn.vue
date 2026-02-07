@@ -179,7 +179,7 @@ function getHostname(urlStr: string) {
 }
 
 const openFeedInNewTab = (url: string) => {
-  window.open(url, '_blank')
+  globalThis.open(url, '_blank')
 }
 
 const handleFaviconError = (event: Event) => {
@@ -204,7 +204,7 @@ const openBulkImportModal = () => {
   bulkImportResults.value = null
 
   if (!bulkImportKeydownListenerAttached) {
-    window.addEventListener('keydown', handleBulkImportKeydown)
+    globalThis.addEventListener('keydown', handleBulkImportKeydown)
     bulkImportKeydownListenerAttached = true
   }
 }
@@ -216,7 +216,7 @@ const closeBulkImportModal = () => {
 
   // Remove keyboard event listener
   if (bulkImportKeydownListenerAttached) {
-    window.removeEventListener('keydown', handleBulkImportKeydown)
+    globalThis.removeEventListener('keydown', handleBulkImportKeydown)
     bulkImportKeydownListenerAttached = false
   }
 

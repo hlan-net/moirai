@@ -8,8 +8,9 @@ export function useTheme() {
   
   const applyTheme = () => {
     const root = document.documentElement
-    const isDark = theme.value === 'dark' || 
-      (theme.value === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        const isDark = 
+          theme.value === 'dark' || 
+          (theme.value === 'auto' && globalThis.matchMedia('(prefers-color-scheme: dark)').matches)
 
     if (isDark) {
       root.classList.add('dark-theme')
@@ -34,7 +35,7 @@ export function useTheme() {
     applyTheme()
 
     // Listen for system changes if in auto mode
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    globalThis.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       if (theme.value === 'auto') {
         applyTheme()
       }

@@ -192,7 +192,7 @@ const getTrendDisplayName = (trendId?: string) => {
 onMounted(() => {
   fetchEventsAndTrends()
   // Refresh every 30 seconds
-  refreshInterval = window.setInterval(() => fetchEventsAndTrends(true), 30000)
+  refreshInterval = globalThis.setInterval(() => fetchEventsAndTrends(true), 30000)
 })
 
 onUnmounted(() => {

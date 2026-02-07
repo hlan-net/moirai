@@ -142,7 +142,7 @@ const toggleExpand = (id: string) => {
 onMounted(() => {
   fetchTrends()
   // Refresh every 30 seconds
-  refreshInterval = window.setInterval(() => fetchTrends(true), 30000)
+  refreshInterval = globalThis.setInterval(() => fetchTrends(true), 30000)
 })
 
 onUnmounted(() => {
