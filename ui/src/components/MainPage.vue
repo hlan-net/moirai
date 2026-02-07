@@ -92,7 +92,6 @@ provide('selectFeed', selectFeed)
 h1 {
   margin: 0;
   text-align: center;
-  font-size: 1.5rem;
 }
 
 .header-controls {
@@ -166,10 +165,6 @@ h1 {
     padding: 15px;
   }
 
-  h1 {
-    font-size: 1.8rem;
-  }
-
   .header-container {
     flex-direction: row;
     justify-content: space-between;
@@ -201,7 +196,6 @@ h1 {
   .column {
     flex: 1 1 calc(50% - 10px);
     min-width: 0;
-    overflow: hidden;
   }
 
   .column.focused {
@@ -217,10 +211,6 @@ h1 {
 @media (min-width: 1200px) {
   .main-page {
     padding: 20px;
-  }
-
-  h1 {
-    font-size: 2rem;
   }
 
   .header-container {
