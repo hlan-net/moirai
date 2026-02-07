@@ -5,6 +5,19 @@ from .cleanup_task import CleanupTask
 
 # initialise the CouchDB database if they don't yet exists
 
+def ensure_db(db_name):
+    try:
+        response = requests.put(f"{COUCHDB_URI}/{db_name}")
+        if response.status_code in (200, 201):
+            print(f"Database '{db_name}' created.")
+        elif response.status_code == 412:
+            # Database already exists
+            pass
+        else:
+            print(f"Failed to ensure database '{db_name}': {response.text}")
+    except Exception as e:
+        print(f"Error ensuring database '{db_name}': {e}")
+
 def create_index(db_name, fields, name):
     url = f"{COUCHDB_URI}/{db_name}/_index"
     payload = {
@@ -15,8 +28,8 @@ def create_index(db_name, fields, name):
         "type": "json"
     }
     try:
-        # Ensure DB exists
-        requests.put(f"{COUCHDB_URI}/{db_name}")
+        # Ensure DB exists before index creation
+        ensure_db(db_name)
         
         response = requests.post(url, json=payload)
         if response.status_code in (200, 201):
@@ -30,8 +43,14 @@ def init_db():
   # Skip network check as initContainer handles it
   print("Assuming CouchDB is ready (handled by initContainer).")
   
+  # Ensure all databases exist
+  allowed_dbs = ["feeds", "articles", "events", "trends", "config", "chat_history"]
+  for db in allowed_dbs:
+      ensure_db(db)
+  
   # Create indexes
   create_index("articles", ["published"], "published-index")
+  create_index("articles", ["feed_url"], "feed-url-index")
   create_index("events", ["article_links"], "events-links-index")
   create_index("trends", ["event_ids"], "trends-events-index")
   
