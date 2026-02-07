@@ -12,8 +12,11 @@ const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
 const openaiApiKey = ref('')
 const openaiModelName = ref('gpt-4-turbo')
 const availableOpenAiModels = ref<string[]>([])
+const geminiApiKey = ref('')
+const geminiModelName = ref('gemini-1.5-pro')
+const availableGeminiModels = ref<string[]>([])
 const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
-const collapsedSections = ref<Set<string>>(new Set(['general', 'ollama', 'openai']))
+const collapsedSections = ref<Set<string>>(new Set(['general', 'ollama', 'openai', 'gemini']))
 
 const { theme, setTheme } = useTheme()
 
@@ -22,12 +25,20 @@ watch(llmEndpoint, (newEndpoint) => {
     fetchOpenAiModels()
   } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
     fetchOllamaModels()
+  } else if (newEndpoint === 'gemini' && availableGeminiModels.value.length === 0 && geminiApiKey.value) {
+    fetchGeminiModels()
   }
 })
 
 watch(openaiApiKey, (newKey) => {
   if (!newKey) {
     availableOpenAiModels.value = []
+  }
+})
+
+watch(geminiApiKey, (newKey) => {
+  if (!newKey) {
+    availableGeminiModels.value = []
   }
 })
 
@@ -44,6 +55,8 @@ const saveSettings = async () => {
   localStorage.setItem('moirai_llm_endpoint', llmEndpoint.value)
   localStorage.setItem('moirai_openai_api_key', openaiApiKey.value)
   localStorage.setItem('moirai_openai_model', openaiModelName.value)
+  localStorage.setItem('moirai_gemini_api_key', geminiApiKey.value)
+  localStorage.setItem('moirai_gemini_model', geminiModelName.value)
   localStorage.setItem('moirai_ollama_endpoint_url', ollamaEndpointUrl.value)
 
   // Save server config
@@ -137,6 +150,14 @@ onMounted(() => {
   if (savedOpenaiModel) {
     openaiModelName.value = savedOpenaiModel
   }
+  const savedGeminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+  if (savedGeminiApiKey) {
+    geminiApiKey.value = savedGeminiApiKey
+  }
+  const savedGeminiModel = localStorage.getItem('moirai_gemini_model')
+  if (savedGeminiModel) {
+    geminiModelName.value = savedGeminiModel
+  }
   const savedOllamaUrl = localStorage.getItem('moirai_ollama_endpoint_url')
   if (savedOllamaUrl) {
     ollamaEndpointUrl.value = savedOllamaUrl
@@ -146,6 +167,8 @@ onMounted(() => {
     fetchOllamaModels()
   } else if (llmEndpoint.value === 'openai' && openaiApiKey.value) {
     fetchOpenAiModels()
+  } else if (llmEndpoint.value === 'gemini' && geminiApiKey.value) {
+    fetchGeminiModels()
   }
   fetchConfig()
 })
@@ -176,6 +199,10 @@ onMounted(() => {
           <label>
             <input type="radio" value="openai" v-model="llmEndpoint">
             OpenAI
+          </label>
+          <label>
+            <input type="radio" value="gemini" v-model="llmEndpoint">
+            Gemini
           </label>
         </div>
       </div>
@@ -225,6 +252,33 @@ onMounted(() => {
             </select>
             <small v-if="loadingModels">Loading available models...</small>
             <small v-if="!openaiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
+          </div>
+        </div>
+          </div>
+        </div>
+      </div>
+      <div :class="['sub-section', { 'disabled': llmEndpoint !== 'gemini' }]">
+        <h3 @click="toggleSection('gemini')">
+          Gemini
+          <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+        </h3>
+        <div v-if="!collapsedSections.has('gemini')">
+          <div class="form-group">
+            <label for="gemini-api-key">Gemini API Key:</label>
+            <input type="password" id="gemini-api-key" v-model="geminiApiKey" :disabled="llmEndpoint !== 'gemini'" />
+          </div>
+          <div class="form-group">
+            <label for="gemini-model">Gemini Model Name:</label>
+            <button @click="fetchGeminiModels" :disabled="llmEndpoint !== 'gemini' || !geminiApiKey || loadingModels">
+              {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+            </button>
+            <select v-if="availableGeminiModels.length" id="gemini-model" v-model="geminiModelName" :disabled="llmEndpoint !== 'gemini'">
+              <option v-for="model in availableGeminiModels" :key="model" :value="model">
+                {{ model }}
+              </option>
+            </select>
+            <small v-if="loadingModels">Loading available models...</small>
+            <small v-if="!geminiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
           </div>
         </div>
       </div>

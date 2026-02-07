@@ -6,39 +6,44 @@ Moirai is a GenAI-native press review platform designed for the Model Context Pr
 
 Moirai acts as a synthesis engine that LLM agents use to analyze news. It consists of:
 
-*   **MCP Server (Port 8090):** The primary interface for AI agents. Provides tools to fetch news, create events, and track trends via Server-Sent Events (SSE).
-*   **Admin UI (Port 8088):** A Vue.js dashboard for humans to review the agent's work, manage feeds, and visualize the data.
-*   **REST API (Port 8088):** The backend for the UI and external integrations.
+* **MCP Server (Port 8090):** The primary interface for AI agents. Provides tools to fetch news, create events, and track trends via Server-Sent Events (SSE).
+* **Admin UI (Port 8088):** A Vue.js dashboard for humans to review the agent's work, manage feeds, and visualize the data.
+* **REST API (Port 8088):** The backend for the UI and external integrations.
 
 **Architecture Details:** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick Start
 
 ### 1. Run with Docker Compose
+
 The easiest way to run the full stack (UI, API, MCP Server, Database):
 
 ```bash
 docker compose up --build
 ```
 
-*   **Admin UI:** [http://localhost:8088](http://localhost:8088)
-*   **MCP Server:** [http://localhost:8090/sse](http://localhost:8090/sse)
-*   **API:** [http://localhost:8088/api](http://localhost:8088/api)
+* **Admin UI:** [http://localhost:8088](http://localhost:8088)
+* **MCP Server:** [http://localhost:8090/sse](http://localhost:8090/sse)
+* **API:** [http://localhost:8088/api](http://localhost:8088/api)
 
 ### 2. Configure Chat
+
 The UI includes a Chat interface to interact with the Agent.
-1.  Go to **Chat** in the UI.
-2.  Open **Settings**.
-3.  Configure your LLM endpoint (e.g., Ollama at `http://host.docker.internal:11434/v1`) and model (e.g., `llama3.1`).
+
+1. Go to **Chat** in the UI.
+2. Open **Settings**.
+3. Configure your LLM endpoint (e.g., Ollama at `http://host.docker.internal:11434/v1`) and model (e.g., `llama3.1`).
 
 ### 3. Agent Workflow
-1.  **Add Feeds:** Ask the agent to "Add the RSS feed for Hacker News".
-2.  **Synthesize:** Ask the agent to "Check recent articles and create events for major stories".
-3.  **Review:** Use the dashboard to see the Events and Trends created by the agent.
+
+1. **Add Feeds:** Ask the agent to "Add the RSS feed for Hacker News".
+2. **Synthesize:** Ask the agent to "Check recent articles and create events for major stories".
+3. **Review:** Use the dashboard to see the Events and Trends created by the agent.
 
 ## Development
 
 ### Project Structure
+
 ```
 .
 ├── api/             # Flask REST API (Port 8088)
@@ -51,19 +56,25 @@ The UI includes a Chat interface to interact with the Agent.
 ```
 
 ### Manual Setup (Local Dev)
+
 If you want to run components individually without Docker:
 
-1.  **Database:** Ensure CouchDB is running (e.g., via `docker compose up couchdb`).
-2.  **API:**
+1. **Database:** Ensure CouchDB is running (e.g., via `docker compose up couchdb`).
+2. **API:**
+
     ```bash
     pip install -r requirements.txt
     python main.py
     ```
-3.  **MCP Server:**
+
+3. **MCP Server:**
+
     ```bash
     python mcp_server.py
     ```
-4.  **UI:**
+
+4. **UI:**
+
     ```bash
     cd ui
     yarn install
@@ -71,9 +82,12 @@ If you want to run components individually without Docker:
     ```
 
 ## Documentation
-*   [Architecture](docs/ARCHITECTURE.md)
-*   [External REST API](docs/EXTERNAL_API.md) - Documentation for `/mcp` endpoints on the REST API.
-*   [Example Usage](EXAMPLES.md)
+
+* [Architecture](docs/ARCHITECTURE.md)
+* [LLM Configuration](docs/LLM_CONFIGURATION.md) - How to configure Ollama, OpenAI, and Gemini.
+* [External REST API](docs/EXTERNAL_API.md) - Documentation for `/mcp` endpoints on the REST API.
+* [Example Usage](EXAMPLES.md)
 
 ## License
+
 MIT License

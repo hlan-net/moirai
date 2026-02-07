@@ -225,6 +225,8 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
 def list_models():
     llm_endpoint = request.args.get('llm_endpoint')
     api_key = request.headers.get('x-openai-api-key')
+    if not api_key:
+        api_key = request.headers.get('x-gemini-api-key')
     ollama_base_url = request.headers.get('x-ollama-base-url')
     llm_provider = llm_provider_factory.get_provider(llm_endpoint, api_key, ollama_base_url or OLLAMA_BASE_URL)
     try:
@@ -242,6 +244,8 @@ def chat():
     model = data.get("model")
     llm_endpoint = data.get("llm_endpoint")
     api_key = request.headers.get('x-openai-api-key')
+    if not api_key:
+        api_key = request.headers.get('x-gemini-api-key')
     ollama_base_url = request.headers.get('x-ollama-base-url')
 
     response = run_agent_sync(user_message, history, model, llm_endpoint, api_key, ollama_base_url)

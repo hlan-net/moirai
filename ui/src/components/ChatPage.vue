@@ -39,6 +39,8 @@ const loadSettings = () => {
     
     if (currentLlmEndpoint.value === 'openai') {
         currentModel.value = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
+    } else if (currentLlmEndpoint.value === 'gemini') {
+        currentModel.value = localStorage.getItem('moirai_gemini_model') || 'gemini-1.5-pro'
     } else {
         currentModel.value = localStorage.getItem('moirai_model') || 'llama3.1:latest'
     }
@@ -110,6 +112,11 @@ const sendMessage = async () => {
       const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
       if (openaiApiKey) {
         headers['x-openai-api-key'] = openaiApiKey
+      }
+    } else if (currentLlmEndpoint.value === 'gemini') {
+      const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+      if (geminiApiKey) {
+        headers['x-gemini-api-key'] = geminiApiKey
       }
     } else {
       const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
