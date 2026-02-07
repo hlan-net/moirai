@@ -196,27 +196,32 @@ onUnmounted(() => {
 
 const refreshingFeed = ref(false)
 
-const refreshSelectedFeed = async () => {
-  if (!selectedFeedUrl.value) return
-  
+const handleRefresh = async () => {
   refreshingFeed.value = true
+  
   try {
-    // Encode the URL for the API path
-    const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
-    const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
-    
-    if (response.ok) {
-      // Wait a bit for the feed to be fetched
-      setTimeout(async () => {
-        await fetchLatestUpdates()
+    if (selectedFeedUrl.value) {
+      // Refresh specific feed
+      const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
+      const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
+      
+      if (response.ok) {
+        // Wait a bit for the feed to be fetched
+        setTimeout(async () => {
+          await fetchLatestUpdates()
+          refreshingFeed.value = false
+        }, 2000)
+      } else {
+        console.error('Failed to refresh feed')
         refreshingFeed.value = false
-      }, 2000)
+      }
     } else {
-      console.error('Failed to refresh feed')
+      // Just fetch latest updates from DB
+      await fetchLatestUpdates()
       refreshingFeed.value = false
     }
   } catch (error) {
-    console.error('Error refreshing feed:', error)
+    console.error('Error refreshing:', error)
     refreshingFeed.value = false
   }
 }
@@ -251,12 +256,12 @@ function getHostname(urlStr: string) {
         <span v-else-if="!loading">({{ filteredArticles.length }})</span>
         <span v-if="fetchingUpdates" class="update-badge">↻</span>
       </h2>
-      <div v-if="selectedFeedUrl" class="header-actions">
+      <div class="header-actions">
         <button 
-          @click="refreshSelectedFeed" 
+          @click="handleRefresh" 
           :disabled="refreshingFeed"
           class="action-btn"
-          :title="refreshingFeed ? 'Refreshing feed...' : 'Refresh selected feed'"
+          :title="refreshingFeed ? 'Refreshing...' : (selectedFeedUrl ? 'Refresh selected feed' : 'Check for updates')"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
             <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
@@ -314,6 +319,7 @@ function getHostname(urlStr: string) {
 
 .search-input {
   width: 100%;
+  box-sizing: border-box;
   padding: 0.6rem 2.5rem 0.6rem 0.75rem;
   border: 1px solid #444;
   border-radius: 4px;
