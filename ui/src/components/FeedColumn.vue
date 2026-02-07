@@ -580,6 +580,7 @@ const bulkImportFeeds = async () => {
 
 .search-input {
   width: 100%;
+  box-sizing: border-box;
   padding: 0.6rem 2.5rem 0.6rem 0.75rem;
   border: 1px solid #444;
   border-radius: 4px;
@@ -625,9 +626,10 @@ const bulkImportFeeds = async () => {
 }
 
 .column-container {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 .column-header {
     display: flex;

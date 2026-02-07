@@ -361,7 +361,7 @@ function getHostname(urlStr: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid #eee;
   padding-bottom: 10px;
   margin-bottom: 10px;
   margin-top: 0;
