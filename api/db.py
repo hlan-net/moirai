@@ -9,11 +9,13 @@ from api.db_config import COUCHDB_URI
 # Configure logging for database operations
 logger = logging.getLogger(__name__)
 
+# Allowed database names for security validation
+ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history"}
+
 
 def fetch_from_couchdb(db_name, doc_id=None):
     """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
-    allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
-    if db_name not in allowed_dbs:
+    if db_name not in ALLOWED_DBS:
         abort(400, description="Invalid database name.")
     
     # Validate doc_id format if provided
@@ -45,8 +47,7 @@ def fetch_from_couchdb(db_name, doc_id=None):
 
 def store_to_couchdb(db_name, doc):
     """Stores a document to CouchDB."""
-    allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
-    if db_name not in allowed_dbs:
+    if db_name not in ALLOWED_DBS:
         abort(400, description="Invalid database name.")
     
     try:
@@ -60,8 +61,7 @@ def store_to_couchdb(db_name, doc):
 
 def delete_from_couchdb(db_name, doc_id, rev):
     """Delete a document from CouchDB."""
-    allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
-    if db_name not in allowed_dbs:
+    if db_name not in ALLOWED_DBS:
         abort(400, description="Invalid database name.")
         
     safe_db_name = urllib.parse.quote(db_name, safe="")
@@ -76,8 +76,7 @@ def delete_from_couchdb(db_name, doc_id, rev):
 
 def update_couchdb_doc(db_name, doc_id, doc):
     """Update a document in CouchDB."""
-    allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
-    if db_name not in allowed_dbs:
+    if db_name not in ALLOWED_DBS:
         abort(400, description="Invalid database name.")
         
     safe_db_name = urllib.parse.quote(db_name, safe="")
@@ -95,8 +94,7 @@ def update_couchdb_doc(db_name, doc_id, doc):
 
 def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None):
     """Query CouchDB using Mango query syntax for efficient filtering."""
-    allowed_dbs = {"feeds", "articles", "events", "trends", "config", "chat_history"}
-    if db_name not in allowed_dbs:
+    if db_name not in ALLOWED_DBS:
         abort(400, description="Invalid database name.")
     
     safe_db_name = urllib.parse.quote(db_name, safe="")
