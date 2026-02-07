@@ -226,9 +226,6 @@ const handleRefresh = async () => {
     refreshingFeed.value = false
   }
 }
-    refreshingFeed.value = false
-  }
-}
 
 function formatDate(dateStr: string) {
   try {

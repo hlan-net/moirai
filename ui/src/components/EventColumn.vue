@@ -266,7 +266,6 @@ onUnmounted(() => {
   position: relative;
   margin: 0.75rem 0;
 }
-}
 
 .search-input {
   width: 100%;
