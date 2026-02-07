@@ -63,6 +63,44 @@ const filteredEvents = computed(() => {
   return filtered
 })
 
+const processEventsResponse = async (response: Response, isRefresh: boolean) => {
+  if (response.ok) {
+    const eventsData = await response.json()
+    const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
+    events.value = allEvents.filter(e => !e._id.startsWith('_design/'))
+  } else if (!isRefresh) {
+    events.value = []
+  }
+}
+
+const processTrendsResponse = async (response: Response, isRefresh: boolean) => {
+  if (response.ok) {
+    try {
+      const trendsData = await response.json()
+      trends.value = Array.isArray(trendsData) ? trendsData : []
+    } catch (e) {
+      console.error('Error parsing trends:', e)
+      if (!isRefresh) trends.value = []
+    }
+  } else if (!isRefresh) {
+    trends.value = []
+  }
+}
+
+const processArticlesResponse = async (response: Response, isRefresh: boolean) => {
+  if (response.ok) {
+    try {
+      const articlesData = await response.json()
+      articles.value = articlesData.articles || []
+    } catch (e) {
+      console.error('Error parsing articles:', e)
+      if (!isRefresh) articles.value = []
+    }
+  } else if (!isRefresh) {
+    articles.value = []
+  }
+}
+
 const fetchEventsAndTrends = async (isRefresh = false) => {
   if (isRefresh) {
     refreshing.value = true
@@ -77,50 +115,18 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
       fetch('/api/articles?limit=10000'), // Fetch all articles for filtering
     ])
 
-    if (eventsResponse.ok) {
-      const eventsData = await eventsResponse.json()
-      const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
-      events.value = allEvents.filter(e => !e._id.startsWith('_design/'))
-    } else {
-      // Don't clear on refresh failure if we have data
-      if (!isRefresh) events.value = []
-    }
-
-    if (trendsResponse.ok) {
-      try {
-        const trendsData = await trendsResponse.json()
-        trends.value = Array.isArray(trendsData) ? trendsData : []
-      } catch (e) {
-        console.error('Error parsing trends:', e)
-      }
-    } else {
-      if (!isRefresh) trends.value = []
-    }
-    
-    if (articlesResponse.ok) {
-      try {
-        const articlesData = await articlesResponse.json()
-        articles.value = articlesData.articles || []
-      } catch (e) {
-        console.error('Error parsing articles:', e)
-      }
-    } else {
-      if (!isRefresh) articles.value = []
-    }
-    
-    if (articlesResponse.ok) {
-      const articlesData = await articlesResponse.json()
-      articles.value = articlesData.articles || []
-    } else {
-      articles.value = []
-    }
+    await Promise.all([
+      processEventsResponse(eventsResponse, isRefresh),
+      processTrendsResponse(trendsResponse, isRefresh),
+      processArticlesResponse(articlesResponse, isRefresh)
+    ])
   } catch (error) {
     console.error('Error fetching events or trends:', error)
     // Only clear events if we failed to fetch them and it's not a refresh
-    if (!isRefresh && events.value.length === 0) {
+    if (!isRefresh) {
       events.value = []
+      trends.value = []
     }
-    if (!isRefresh) trends.value = []
   } finally {
     loading.value = false
     refreshing.value = false
