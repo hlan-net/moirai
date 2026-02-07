@@ -6,14 +6,44 @@ import hashlib
 import json
 import re
 import uuid
+import logging
 from datetime import datetime, timedelta, timezone
 from mcp.server.fastmcp import FastMCP, Context
 from tasks.favicon_fetcher import fetch_favicon_url
 from version import get_version_string
 
-# Add parent directory to path to import shared modules
+# Import shared modules using proper Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from api.db_config import COUCHDB_URI
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Constants for limits and defaults
+DEFAULT_ARTICLE_LIMIT = 50
+MAX_ARTICLE_LIMIT = 200
+DEFAULT_SEARCH_LIMIT = 20
+MAX_SEARCH_LIMIT = 100
+DEFAULT_HOURS_LOOKBACK = 24
+MAX_HOURS_LOOKBACK = 168  # 1 week
+
+# HTTP Status Codes
+HTTP_OK = 200
+HTTP_CREATED = 201
+HTTP_ACCEPTED = 202
+HTTP_BAD_REQUEST = 400
+HTTP_NOT_FOUND = 404
+
+# Common error messages
+MSG_NOT_FOUND = "not found."
+MSG_EVENT_NOT_FOUND = "Event not found."
+MSG_TREND_NOT_FOUND = "Trend not found."
+MSG_NO_EVENTS_FOUND = "No events found."
+MSG_NO_TRENDS_FOUND = "No trends found."
+MSG_QUERY_EMPTY = "Query cannot be empty"
+MSG_UNTITLED = "Untitled"
+MSG_UNKNOWN_FEED = "Unknown"
+MSG_DOC_NOT_FOUND = "Document not found."
 
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
@@ -52,10 +82,12 @@ def db_request(method, db_name, path="", json_data=None, params=None):
             response = requests.put(url, json=json_data)
         elif method == "HEAD":
             response = requests.head(url)
+        elif method == "DELETE":
+            response = requests.delete(url, params=params)
         
         # Don't raise for 404s if we want to handle them gracefully in callers
-        if response.status_code >= 400 and response.status_code != 404:
-            print(f"DB Error {method} {url}: {response.text}")
+        if response.status_code >= HTTP_BAD_REQUEST and response.status_code != HTTP_NOT_FOUND:
+            logger.error(f"DB Error {method} {url}: {response.text}")
             
         return response
     except requests.exceptions.RequestException as e:
@@ -63,7 +95,7 @@ def db_request(method, db_name, path="", json_data=None, params=None):
 
 def get_doc(db_name, doc_id):
     res = db_request("GET", db_name, path=f"/{doc_id}")
-    if res.status_code == 200:
+    if res.status_code == HTTP_OK:
         return res.json()
     return None
 
@@ -78,7 +110,7 @@ def store_doc(db_name, doc):
         return f"Document {doc['_id']} already exists."
     
     res = db_request("POST", db_name, json_data=doc)
-    if res.status_code in (200, 201):
+    if res.status_code in (HTTP_OK, HTTP_CREATED):
         return doc["_id"]
     else:
         raise RuntimeError(f"Failed to store doc: {res.text}")
@@ -90,11 +122,11 @@ def update_doc(db_name, doc_id, updates):
     """
     doc = get_doc(db_name, doc_id)
     if not doc:
-        return None, "Document not found."
+        return None, MSG_DOC_NOT_FOUND
     
     doc.update(updates)
     res = db_request("PUT", db_name, path=f"/{doc_id}", json_data=doc)
-    if res.status_code in (200, 201):
+    if res.status_code in (HTTP_OK, HTTP_CREATED):
         return doc_id, None
     else:
         return None, f"Failed to update doc: {res.text}"
@@ -105,10 +137,10 @@ def delete_doc(db_name, doc_id):
     """
     doc = get_doc(db_name, doc_id)
     if not doc:
-        return False, "Document not found."
+        return False, MSG_DOC_NOT_FOUND
     
     res = db_request("DELETE", db_name, path=f"/{doc_id}", params={"rev": doc["_rev"]})
-    if res.status_code in (200, 202):
+    if res.status_code in (HTTP_OK, HTTP_ACCEPTED):
         return True, None
     else:
         return False, f"Failed to delete doc: {res.text}"
@@ -134,31 +166,37 @@ def add_event(name: str, description: str, article_links: list[str]) -> str:
     try:
         doc_id = store_doc("events", event_doc)
         return f"Event created with ID: {doc_id}"
-    except Exception as e:
+    except (RuntimeError, requests.exceptions.RequestException) as e:
+        logger.error(f"Error creating event: {e}")
         return f"Error creating event: {e}"
 
 @mcp.tool()
 def list_events() -> str:
     """List all created events."""
     res = db_request("GET", "events", path="/_all_docs", params={"include_docs": "true"})
-    if res.status_code != 200:
+    if res.status_code != HTTP_OK:
         return "No events data found."
     
-    rows = res.json().get("rows", [])
+    try:
+        rows = res.json().get("rows", [])
+    except (ValueError, AttributeError) as e:
+        logger.error(f"Error parsing events response: {e}")
+        return "Error retrieving events."
+    
     events = []
     for row in rows:
         doc = row["doc"]
         if doc.get("type") == "event":
             events.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nArticles: {len(doc.get('article_links', []))}\n")
     
-    return "\n---\n".join(events) if events else "No events found."
+    return "\n---\n".join(events) if events else MSG_NO_EVENTS_FOUND
 
 @mcp.tool()
 def read_event(event_id: str) -> str:
     """Get details of a specific event."""
     doc = get_doc("events", event_id)
     if not doc:
-        return "Event not found."
+        return MSG_EVENT_NOT_FOUND
     
     return json.dumps(doc, indent=2)
 
@@ -167,7 +205,7 @@ def update_event(event_id: str, name: str = None, description: str = None, artic
     """Update an existing event. Only provided fields are updated."""
     existing = get_doc("events", event_id)
     if not existing:
-        return "Event not found."
+        return MSG_EVENT_NOT_FOUND
     
     updates = {}
     if name: updates["name"] = name
@@ -185,7 +223,7 @@ def delete_event(event_id: str) -> str:
     """Delete an event."""
     existing = get_doc("events", event_id)
     if not existing:
-        return "Event not found."
+        return MSG_EVENT_NOT_FOUND
     
     success, msg = delete_doc("events", event_id)
     if success:
@@ -211,38 +249,44 @@ def add_trend(name: str, description: str, event_ids: list[str]) -> str:
     }
     
     try:
-        if db_request("HEAD", "trends").status_code == 404:
+        if db_request("HEAD", "trends").status_code == HTTP_NOT_FOUND:
             db_request("PUT", "trends")
 
         doc_id = store_doc("trends", trend_doc)
         return f"Trend created with ID: {doc_id}"
-    except Exception as e:
+    except (RuntimeError, requests.exceptions.RequestException) as e:
+        logger.error(f"Error creating trend: {e}")
         return f"Error creating trend: {e}"
 
 @mcp.tool()
 def list_trends() -> str:
     """List all created trends."""
-    if db_request("HEAD", "trends").status_code == 404:
+    if db_request("HEAD", "trends").status_code == HTTP_NOT_FOUND:
         return "No trends data found."
 
     res = db_request("GET", "trends", path="/_all_docs", params={"include_docs": "true"})
-    if res.status_code != 200:
+    if res.status_code != HTTP_OK:
         return "No trends data found."
     
-    rows = res.json().get("rows", [])
+    try:
+        rows = res.json().get("rows", [])
+    except (ValueError, AttributeError) as e:
+        logger.error(f"Error parsing trends response: {e}")
+        return "Error retrieving trends."
+    
     trends = []
     for row in rows:
         doc = row["doc"]
         trends.append(f"ID: {doc['_id']}\nName: {doc['name']}\nDesc: {doc['description']}\nEvents: {len(doc.get('event_ids', []))}\n")
     
-    return "\n---\n".join(trends) if trends else "No trends found."
+    return "\n---\n".join(trends) if trends else MSG_NO_TRENDS_FOUND
 
 @mcp.tool()
 def read_trend(trend_id: str) -> str:
     """Get details of a specific trend."""
     doc = get_doc("trends", trend_id)
     if not doc:
-        return "Trend not found."
+        return MSG_TREND_NOT_FOUND
     
     return json.dumps(doc, indent=2)
 
@@ -251,7 +295,7 @@ def update_trend(trend_id: str, name: str = None, description: str = None, event
     """Update an existing trend. Only provided fields are updated."""
     existing = get_doc("trends", trend_id)
     if not existing:
-        return "Trend not found."
+        return MSG_TREND_NOT_FOUND
 
     updates = {}
     if name: updates["name"] = name
@@ -269,7 +313,7 @@ def delete_trend(trend_id: str) -> str:
     """Delete a trend."""
     existing = get_doc("trends", trend_id)
     if not existing:
-        return "Trend not found."
+        return MSG_TREND_NOT_FOUND
     
     success, msg = delete_doc("trends", trend_id)
     if success:
@@ -280,7 +324,7 @@ def delete_trend(trend_id: str) -> str:
 # ===== SEARCH TOOLS =====
 
 @mcp.tool()
-def search_articles(query: str, date_from: str = "", date_to: str = "", limit: int = 50) -> str:
+def search_articles(query: str, date_from: str = "", date_to: str = "", limit: int = DEFAULT_ARTICLE_LIMIT) -> str:
     """
     Search articles by keyword across title, description, and content.
     
@@ -294,12 +338,11 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
         JSON string with matching articles
     """
     if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
+        return json.dumps({"error": MSG_QUERY_EMPTY})
     
-    if limit > 200:
-        limit = 200
+    if limit > MAX_ARTICLE_LIMIT:
+        limit = MAX_ARTICLE_LIMIT
     
-    import re
     safe_query = re.escape(query)
     
     # Build Mango selector
@@ -351,19 +394,23 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
 
         resp = db_request("POST", "articles", "/_find", json_data=query_payload)
         
-        if resp.status_code != 200:
+        if resp.status_code != HTTP_OK:
              return json.dumps({"error": f"Search failed: {resp.text}"})
 
-        docs = resp.json().get("docs", [])
+        try:
+            docs = resp.json().get("docs", [])
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Error parsing search response: {e}")
+            return json.dumps({"error": "Error parsing search results"})
         
         results = []
         for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
-                "title": doc.get("title", "Untitled"),
+                "title": doc.get("title", MSG_UNTITLED),
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
-                "feed_title": doc.get("feed_title", "Unknown"),
+                "feed_title": doc.get("feed_title", MSG_UNKNOWN_FEED),
                 "description": doc.get("description", "")[:200]
             })
             
@@ -373,11 +420,12 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
             "results": results
         }, indent=2)
 
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Search execution error: {e}")
         return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
-def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
+def get_recent_articles(hours: int = DEFAULT_HOURS_LOOKBACK, limit: int = DEFAULT_ARTICLE_LIMIT) -> str:
     """
     Get most recent articles from all feeds.
     
@@ -388,10 +436,10 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
     Returns:
         JSON string with recent articles sorted by date
     """
-    if hours > 168:  # Max 1 week
-        hours = 168
-    if limit > 200:
-        limit = 200
+    if hours > MAX_HOURS_LOOKBACK:
+        hours = MAX_HOURS_LOOKBACK
+    if limit > MAX_ARTICLE_LIMIT:
+        limit = MAX_ARTICLE_LIMIT
     
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     
@@ -410,19 +458,23 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
         
         resp = db_request("POST", "articles", "/_find", json_data=query_payload)
         
-        if resp.status_code != 200:
+        if resp.status_code != HTTP_OK:
              return json.dumps({"error": f"Fetch failed: {resp.text}"})
              
-        docs = resp.json().get("docs", [])
+        try:
+            docs = resp.json().get("docs", [])
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Error parsing fetch response: {e}")
+            return json.dumps({"error": "Error retrieving articles"})
         
         results = []
         for doc in docs:
              results.append({
                 "_id": doc.get("_id"),
-                "title": doc.get("title", "Untitled"),
+                "title": doc.get("title", MSG_UNTITLED),
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
-                "feed_title": doc.get("feed_title", "Unknown"),
+                "feed_title": doc.get("feed_title", MSG_UNKNOWN_FEED),
                 "description": doc.get("description", "")[:200]
             })
             
@@ -432,11 +484,12 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
             "results": results
         }, indent=2)
         
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Fetch execution error: {e}")
         return json.dumps({"error": f"Fetch execution error: {str(e)}"})
 
 @mcp.tool()
-def search_events(query: str, limit: int = 20) -> str:
+def search_events(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> str:
     """
     Search events by keyword in name or description.
     
@@ -448,10 +501,10 @@ def search_events(query: str, limit: int = 20) -> str:
         JSON string with matching events
     """
     if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
+        return json.dumps({"error": MSG_QUERY_EMPTY})
     
-    if limit > 100:
-        limit = 100
+    if limit > MAX_SEARCH_LIMIT:
+        limit = MAX_SEARCH_LIMIT
     
     safe_query = re.escape(query)
     
@@ -472,16 +525,20 @@ def search_events(query: str, limit: int = 20) -> str:
         
         resp = db_request("POST", "events", "/_find", json_data=query_payload)
          
-        if resp.status_code != 200:
+        if resp.status_code != HTTP_OK:
              return json.dumps({"error": f"Search failed: {resp.text}"})
              
-        docs = resp.json().get("docs", [])
+        try:
+            docs = resp.json().get("docs", [])
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Error parsing events search response: {e}")
+            return json.dumps({"error": "Error searching events"})
         
         results = []
         for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
-                "name": doc.get("name", "Untitled"),
+                "name": doc.get("name", MSG_UNTITLED),
                 "description": doc.get("description", ""),
                 "article_count": len(doc.get("article_links", []))
             })
@@ -492,11 +549,12 @@ def search_events(query: str, limit: int = 20) -> str:
             "results": results
         }, indent=2)
 
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Search execution error: {e}")
         return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
-def search_trends(query: str, limit: int = 20) -> str:
+def search_trends(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> str:
     """
     Search trends by keyword in title or description.
     
@@ -508,10 +566,10 @@ def search_trends(query: str, limit: int = 20) -> str:
         JSON string with matching trends
     """
     if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
+        return json.dumps({"error": MSG_QUERY_EMPTY})
     
-    if limit > 100:
-        limit = 100
+    if limit > MAX_SEARCH_LIMIT:
+        limit = MAX_SEARCH_LIMIT
     
     safe_query = re.escape(query)
     
@@ -532,16 +590,20 @@ def search_trends(query: str, limit: int = 20) -> str:
         
          resp = db_request("POST", "trends", "/_find", json_data=query_payload)
          
-         if resp.status_code != 200:
+         if resp.status_code != HTTP_OK:
              return json.dumps({"error": f"Search failed: {resp.text}"})
 
-         docs = resp.json().get("docs", [])
+         try:
+             docs = resp.json().get("docs", [])
+         except (ValueError, AttributeError) as e:
+             logger.error(f"Error parsing trends search response: {e}")
+             return json.dumps({"error": "Error searching trends"})
          
          results = []
          for doc in docs:
             results.append({
                 "_id": doc.get("_id"),
-                "name": doc.get("name", "Untitled"),
+                "name": doc.get("name", MSG_UNTITLED),
                 "description": doc.get("description", ""),
                 "event_count": len(doc.get("event_ids", []))
             })
@@ -552,15 +614,16 @@ def search_trends(query: str, limit: int = 20) -> str:
             "results": results
         }, indent=2)
         
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
+         logger.error(f"Search execution error: {e}")
          return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 # Expose the SSE ASGI app for Uvicorn (already defined at top with middleware)
 # app = mcp.sse_app is already set above
 
 if __name__ == "__main__":
-    # Print version info
-    print(f"{get_version_string()} starting...", flush=True)
+    # Log version info
+    logger.info(f"{get_version_string()} starting...")
     
     # Run the server using SSE transport on port 8090
     import uvicorn
