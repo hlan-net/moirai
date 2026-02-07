@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, onUnmounted, computed, inject, type Ref } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
+import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -227,25 +228,6 @@ const handleRefresh = async () => {
   }
 }
 
-function formatDate(dateStr: string) {
-  try {
-    return new Date(dateStr).toLocaleString()
-  } catch (e) {
-    return dateStr
-  }
-}
-
-function stripHtml(html: string) {
-   const doc = new DOMParser().parseFromString(html, 'text/html');
-   return doc.body.textContent || "";
-}
-function getHostname(urlStr: string) {
-  try {
-    return new URL(urlStr).hostname
-  } catch (e) {
-    return urlStr
-  }
-}
 </script>
 
 <template>
@@ -313,119 +295,11 @@ function getHostname(urlStr: string) {
 </template>
 
 <style scoped>
-.search-container {
-  position: relative;
-  margin: 0.75rem 0;
-}
-
-.search-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #e0e0e0;
-  font-size: 0.9rem;
-  transition: border-color 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.search-input::placeholder {
-  color: #888;
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0 0.5rem;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.clear-search-btn:hover {
-  color: #e0e0e0;
-}
-
-.column-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 10px;
-  margin-bottom: 10px;
-  margin-top: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: transparent;
-  color: #e0e0e0;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-btn:hover:not(:disabled) {
-  background: rgba(0, 123, 255, 0.1);
-  border-color: #007bff;
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.action-btn svg.spinning {
-  animation: spin-action 1s linear infinite;
-}
-
-@keyframes spin-action {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .article-column {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.no-results {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #888;
-  font-style: italic;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 h2 {
@@ -435,15 +309,7 @@ h2 {
   align-items: center;
   gap: 8px;
 }
-.update-badge {
-  font-size: 0.9rem;
-  color: #666;
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+
 .loading-state {
   text-align: center;
   padding: 20px;
