@@ -11,7 +11,9 @@ from version import get_version_string
 
 app = Flask(__name__, static_folder='ui/dist')
 
-# Disable CSRF protection (TODO: re-enable in future)
+# CSRF protection is disabled to support the current API authentication design.
+# The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
+# Note: If adding session-based authentication in the future, re-enable CSRF protection.
 csrf = CSRFProtect()
 csrf.init_app(app)
 app.config['WTF_CSRF_ENABLED'] = False
@@ -38,7 +40,8 @@ def catch_all(path):
     if '.' in path.split('/')[-1]:
         try:
             return send_from_directory(app.static_folder, path)
-        except:
+        except (FileNotFoundError, NotADirectoryError):
+            # File doesn't exist, fall through to serve index.html
             pass
     # Otherwise serve index.html for client-side routing
     return send_from_directory(app.static_folder, 'index.html')

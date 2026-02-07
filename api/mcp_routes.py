@@ -7,68 +7,9 @@ import re
 from datetime import datetime
 import hashlib
 import json
+from api.db import fetch_from_couchdb, store_to_couchdb
 
 mcp_blueprint = Blueprint('mcp', __name__)
-
-COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
-user = os.environ.get("COUCHDB_USER")
-password = os.environ.get("COUCHDB_PASSWORD")
-if user and password and "@" not in COUCHDB_URI:
-    from urllib.parse import quote
-    if "://" in COUCHDB_URI:
-        scheme, host = COUCHDB_URI.split("://", 1)
-    else:
-        scheme, host = "http", COUCHDB_URI
-    COUCHDB_URI = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
-
-if not COUCHDB_URI.endswith("/"):
-    COUCHDB_URI += "/"
-
-def fetch_from_couchdb(db_name, doc_id=None):
-    """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
-    allowed_dbs = {"feeds", "articles", "events", "trends"}
-    if db_name not in allowed_dbs:
-        abort(400, description="Invalid database name.")
-    if doc_id and not re.match(r'^[A-Za-z0-9\-_]+$', doc_id):
-        abort(400, description="Invalid document id.")
-    try:
-        if doc_id:
-            safe_db_name = urllib.parse.quote(db_name, safe="")
-            safe_doc_id = urllib.parse.quote(doc_id, safe="")
-            response = requests.get(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
-        else:
-            response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
-
-        response.raise_for_status()
-        if doc_id:
-            return response.json()
-        else:
-            docs = [row["doc"] for row in response.json()["rows"]]
-            return docs
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching from CouchDB: {e}")
-        abort(500, description="Database error")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        abort(500, description="Unexpected error")
-
-def store_to_couchdb(db_name, doc):
-    """Stores a document to CouchDB."""
-    allowed_dbs = {"feeds", "articles", "events", "trends"}
-    if db_name not in allowed_dbs:
-        abort(400, description="Invalid database name.")
-    
-    try:
-        safe_db_name = urllib.parse.quote(db_name, safe="")
-        response = requests.post(f"{COUCHDB_URI}{safe_db_name}", json=doc)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error storing to CouchDB: {e}")
-        abort(500, description="Database error")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        abort(500, description="Unexpected error")
 
 # Articles Endpoints
 
