@@ -16,7 +16,11 @@ from version import get_version_string
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from api.db_config import COUCHDB_URI
 
-# Configure logging
+# Configure logging with basic setup
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Constants for limits and defaults
