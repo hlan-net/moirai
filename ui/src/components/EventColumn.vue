@@ -72,7 +72,8 @@ const fetchEventsAndTrends = async () => {
 
     if (eventsResponse.ok) {
       const eventsData = await eventsResponse.json()
-      events.value = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
+      const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
+      events.value = allEvents.filter(e => !e._id.startsWith('_design/'))
     } else {
       events.value = []
     }

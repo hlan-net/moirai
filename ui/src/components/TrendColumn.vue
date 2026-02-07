@@ -62,7 +62,8 @@ const fetchTrends = async () => {
     if (trendsResponse.ok) {
       const data = await trendsResponse.json()
       console.log('Trends API response:', data)
-      trends.value = Array.isArray(data) ? data : []
+      const allTrends = Array.isArray(data) ? data : []
+      trends.value = allTrends.filter((t: Trend) => !t._id.startsWith('_design/'))
     }
     
     if (eventsResponse.ok) {
