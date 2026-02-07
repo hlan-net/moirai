@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, inject, type Ref } from 'vue'
+import { onMounted, ref, computed, inject, onUnmounted, type Ref } from 'vue'
 
 interface Event {
   _id: string
@@ -19,9 +19,11 @@ interface Trend {
 const events = ref<Event[]>([])
 const trends = ref<Trend[]>([])
 const loading = ref(true)
+const refreshing = ref(false)
 const expandedEvents = ref<Set<string>>(new Set())
 const searchQuery = ref('')
 const articles = ref<any[]>([]) // To check which articles belong to selected feed
+let refreshInterval: number | null = null
 
 // Inject selected feed from parent
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
@@ -61,8 +63,13 @@ const filteredEvents = computed(() => {
   return filtered
 })
 
-const fetchEventsAndTrends = async () => {
-  loading.value = true
+const fetchEventsAndTrends = async (isRefresh = false) => {
+  if (isRefresh) {
+    refreshing.value = true
+  } else {
+    loading.value = true
+  }
+  
   try {
     const [eventsResponse, trendsResponse, articlesResponse] = await Promise.all([
       fetch('/api/events'),
@@ -75,7 +82,8 @@ const fetchEventsAndTrends = async () => {
       const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
       events.value = allEvents.filter(e => !e._id.startsWith('_design/'))
     } else {
-      events.value = []
+      // Don't clear on refresh failure if we have data
+      if (!isRefresh) events.value = []
     }
 
     if (trendsResponse.ok) {
@@ -86,7 +94,7 @@ const fetchEventsAndTrends = async () => {
         console.error('Error parsing trends:', e)
       }
     } else {
-      trends.value = []
+      if (!isRefresh) trends.value = []
     }
     
     if (articlesResponse.ok) {
@@ -97,17 +105,18 @@ const fetchEventsAndTrends = async () => {
         console.error('Error parsing articles:', e)
       }
     } else {
-      articles.value = []
+      if (!isRefresh) articles.value = []
     }
   } catch (error) {
     console.error('Error fetching events or trends:', error)
-    // Only clear events if we failed to fetch them
-    if (events.value.length === 0) {
+    // Only clear events if we failed to fetch them and it's not a refresh
+    if (!isRefresh && events.value.length === 0) {
       events.value = []
     }
-    trends.value = []
+    if (!isRefresh) trends.value = []
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -162,13 +171,34 @@ const getTrendDisplayName = (trendId?: string) => {
 
 onMounted(() => {
   fetchEventsAndTrends()
+  // Refresh every 30 seconds
+  refreshInterval = window.setInterval(() => fetchEventsAndTrends(true), 30000)
+})
+
+onUnmounted(() => {
+  if (refreshInterval !== null) {
+    clearInterval(refreshInterval)
+  }
 })
 </script>
 
 <template>
   <div class="event-column">
     <div class="column-header">
-      <h2>Events ({{ filteredEvents.length }})</h2>
+      <h2>
+        Events ({{ filteredEvents.length }})
+        <span v-if="refreshing" class="update-badge">↻</span>
+      </h2>
+      <button 
+        @click="() => fetchEventsAndTrends(true)" 
+        :disabled="refreshing"
+        class="action-btn"
+        title="Refresh events"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
+          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Search Input -->
@@ -308,6 +338,50 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.update-badge {
+  font-size: 0.9rem;
+  color: #666;
+  animation: spin 1s linear infinite;
+  margin-left: 8px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: transparent;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: rgba(0, 123, 255, 0.1);
+  border-color: #007bff;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn svg.spinning {
+  animation: spin-action 1s linear infinite;
+}
+
+@keyframes spin-action {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .loading-state {
