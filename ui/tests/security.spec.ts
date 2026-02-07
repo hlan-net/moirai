@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+const BASE_URL = process.env.CI ? 'http://localhost:8088' : 'http://localhost:5173';
+
 test.describe('API Authentication', () => {
   // Create a new request context without HTTP credentials for each test
   test('GET /api/config requires authentication', async ({ playwright }) => {
     const context = await playwright.request.newContext({
-      baseURL: 'http://localhost:8088',
+      baseURL: BASE_URL,
       httpCredentials: { username: 'invalid', password: 'invalid' },
     });
     const response = await context.get('/api/config');
@@ -16,7 +18,7 @@ test.describe('API Authentication', () => {
 
   test('PUT /api/config requires authentication', async ({ playwright }) => {
     const context = await playwright.request.newContext({
-      baseURL: 'http://localhost:8088',
+      baseURL: BASE_URL,
       httpCredentials: { username: 'invalid', password: 'invalid' },
     });
     const response = await context.put('/api/config', {
@@ -28,7 +30,7 @@ test.describe('API Authentication', () => {
 
   test('DELETE /api/feeds/:id requires authentication', async ({ playwright }) => {
     const context = await playwright.request.newContext({
-      baseURL: 'http://localhost:8088',
+      baseURL: BASE_URL,
       httpCredentials: { username: 'invalid', password: 'invalid' },
     });
     const response = await context.delete('/api/feeds/test-id');
@@ -40,7 +42,7 @@ test.describe('API Authentication', () => {
 
   test('DELETE /api/articles/:id requires authentication', async ({ playwright }) => {
     const context = await playwright.request.newContext({
-      baseURL: 'http://localhost:8088',
+      baseURL: BASE_URL,
       httpCredentials: { username: 'invalid', password: 'invalid' },
     });
     const response = await context.delete('/api/articles/test-id');
@@ -50,7 +52,7 @@ test.describe('API Authentication', () => {
 
   test('DELETE /api/events/:id requires authentication', async ({ playwright }) => {
     const context = await playwright.request.newContext({
-      baseURL: 'http://localhost:8088',
+      baseURL: BASE_URL,
       httpCredentials: { username: 'invalid', password: 'invalid' },
     });
     const response = await context.delete('/api/events/test-id');
@@ -60,7 +62,7 @@ test.describe('API Authentication', () => {
 
   test('DELETE /api/trends/:id requires authentication', async ({ playwright }) => {
     const context = await playwright.request.newContext({
-      baseURL: 'http://localhost:8088',
+      baseURL: BASE_URL,
       httpCredentials: { username: 'invalid', password: 'invalid' },
     });
     const response = await context.delete('/api/trends/test-id');
