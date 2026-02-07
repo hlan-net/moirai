@@ -84,10 +84,16 @@ test.describe('Mobile Responsive Dashboard', () => {
     const firstBox = await firstColumn.boundingBox();
     const lastBox = await lastColumn.boundingBox();
     
-    // Last column should be to the right of the first column
-    expect(lastBox!.x).toBeGreaterThan(firstBox!.x);
-    // Both should be on roughly the same vertical level (allowing for small differences)
-    expect(Math.abs(lastBox!.y - firstBox!.y)).toBeLessThan(50);
+    // Both bounding boxes should exist on desktop
+    expect(firstBox).not.toBeNull();
+    expect(lastBox).not.toBeNull();
+    
+    if (firstBox && lastBox) {
+      // Last column should be to the right of the first column
+      expect(lastBox.x).toBeGreaterThan(firstBox.x);
+      // Both should be on roughly the same vertical level (allowing for small differences)
+      expect(Math.abs(lastBox.y - firstBox.y)).toBeLessThan(50);
+    }
   });
 
   test('navigation should be mobile-friendly', async ({ page }) => {

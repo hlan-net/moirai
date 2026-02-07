@@ -201,18 +201,15 @@ h1 {
   .column {
     flex: 1 1 calc(50% - 10px);
     min-width: 0;
-    max-height: none;
     overflow: hidden;
   }
 
   .column.focused {
     flex: 1 1 60%;
-    max-height: none;
   }
 
   .column.unfocused {
     flex: 1 1 calc(40% - 15px);
-    max-height: none;
   }
 }
 
