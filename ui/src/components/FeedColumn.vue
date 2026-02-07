@@ -443,7 +443,11 @@ const bulkImportFeeds = async () => {
     </div>
     <ul v-else-if="filteredFeeds.length" class="feed-list">
       <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item" 
-          @click="selectFeed(feed.url)" 
+          role="button"
+          tabindex="0"
+          @click="selectFeed(feed.url)"
+          @keydown.enter.prevent="selectFeed(feed.url)"
+          @keydown.space.prevent="selectFeed(feed.url)"
           :class="{ 'selected-feed': selectedFeedUrl === feed.url }">
         <div v-if="renamingFeedId === feed._id" class="feed-info">
           <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
