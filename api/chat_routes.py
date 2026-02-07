@@ -22,6 +22,10 @@ CHAT_HISTORY_LIMIT = 6
 MAX_AGENT_TURNS = 5
 LLM_TIMEOUT_SECONDS = 600.0
 
+CHAT_HISTORY_LIMIT = 6
+MAX_AGENT_TURNS = 5
+LLM_TIMEOUT_SECONDS = 600.0
+
 llm_provider_factory = LLMProviderFactory()
 
 def extract_tool_calls_from_content(content):
@@ -92,7 +96,7 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
             """Custom factory that creates AsyncClient for proper DNS resolution"""
             if timeout is None:
                 # Very generous timeout for slow LLMs with multi-turn tool calls (10 minutes)
-                timeout = httpx.Timeout(600.0) # TODO: Use a constant
+                timeout = httpx.Timeout(LLM_TIMEOUT_SECONDS)
             return httpx.AsyncClient(
                 headers=headers,
                 timeout=timeout,

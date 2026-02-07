@@ -26,8 +26,6 @@ def fetch_from_couchdb(db_name, doc_id=None):
             safe_doc_id = urllib.parse.quote(doc_id, safe="")
             response = requests.get(f"{COUCHDB_URI}/{safe_db_name}/{safe_doc_id}")
         else:
-            # Check if DB exists first (lazy check for 'trends', 'config')
-            requests.put(f"{COUCHDB_URI}/{db_name}") 
             response = requests.get(f"{COUCHDB_URI}/{db_name}/_all_docs", params={"include_docs": "true"})
 
         if response.status_code == 404:
@@ -57,11 +55,6 @@ def update_couchdb_doc(db_name, doc_id, doc):
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
-        # Ensure DB exists
-        create_res = requests.put(f"{COUCHDB_URI}/{safe_db_name}")
-        if create_res.status_code not in (200, 201, 412):
-             print(f"DB Creation Failed: {create_res.status_code} {create_res.text}")
-        
         response = requests.put(f"{COUCHDB_URI}/{safe_db_name}/{safe_doc_id}", json=doc)
         if response.status_code in (200, 201):
             return True
@@ -81,9 +74,6 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
     safe_db_name = urllib.parse.quote(db_name, safe="")
     
     try:
-        # Ensure DB exists
-        requests.put(f"{COUCHDB_URI}/{safe_db_name}")
-        
         # Build Mango query
         query = {"selector": selector}
         if limit:

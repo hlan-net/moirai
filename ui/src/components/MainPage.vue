@@ -16,9 +16,6 @@ const setFocus = (column: string | null) => {
 
 const selectFeed = (feedUrl: string | null) => {
   selectedFeedUrl.value = feedUrl
-  if (feedUrl) {
-    console.log('Feed selected:', feedUrl)
-  }
 }
 
 // Provide selectedFeedUrl to child components
@@ -28,11 +25,14 @@ provide('selectFeed', selectFeed)
 
 <template>
   <div class="main-page">
-    <h1>{{ msg }}</h1>
-    
-    <div v-if="focusedColumn || selectedFeedUrl" class="controls">
-      <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">Clear Focus</button>
-      <button v-if="selectedFeedUrl" @click="selectFeed(null)" class="clear-filter-btn">Clear Feed Filter</button>
+    <div class="header-container">
+      <div class="title-wrapper">
+        <h1>{{ msg }}</h1>
+        <div class="header-controls">
+          <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">Clear Focus</button>
+          <button v-if="selectedFeedUrl" @click="selectFeed(null)" class="clear-filter-btn">Clear Feed Filter</button>
+        </div>
+      </div>
     </div>
 
     <div class="columns-container">
@@ -72,16 +72,32 @@ provide('selectFeed', selectFeed)
   padding: 20px;
   box-sizing: border-box;
 }
-h1 {
+
+.header-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   margin-bottom: 20px;
+  position: relative;
+}
+
+.title-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+h1 {
+  margin: 0;
   text-align: center;
 }
-.controls {
-  margin-bottom: 20px;
-  text-align: center;
+.header-controls {
+  position: absolute;
+  left: 100%;
+  margin-left: 20px;
   display: flex;
   gap: 10px;
-  justify-content: center;
+  white-space: nowrap;
 }
 
 .clear-focus-btn, .clear-filter-btn {

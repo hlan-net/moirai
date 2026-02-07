@@ -58,12 +58,7 @@ def requires_auth(f):
 
 def get_config_doc():
     """Helper to get the main config doc. Returns None if config doesn't exist or DB is unavailable."""
-    try:
-        return fetch_from_couchdb("config", "main")
-    except (ConnectionError, TimeoutError, OSError) as e:
-        # Expected: Database connectivity issues
-        print(f"Warning: Could not fetch config from database: {e}")
-        return None
+    return fetch_from_couchdb("config", "main")
 
 def get_public_read_setting():
     """Checks DB for config, falls back to env var."""
@@ -199,11 +194,11 @@ def refresh_feeds():
 @limiter.limit("10 per minute")
 def refresh_single_feed(feed_url):
     """Triggers a background refresh of a single feed by URL."""
-    # Validate the feed exists
-    feeds = fetch_from_couchdb("feeds")
-    feed_exists = any(f.get("url") == feed_url for f in feeds)
+    # Validate the feed exists efficiently
+    selector = {"url": feed_url}
+    existing_feeds = query_couchdb("feeds", selector=selector, limit=1)
     
-    if not feed_exists:
+    if not existing_feeds:
         abort(404, description="Feed not found")
     
     # Run in background thread
@@ -290,8 +285,11 @@ def bulk_import_feeds():
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
     # Pagination parameters
-    limit = int(request.args.get('limit', 50))
-    skip = int(request.args.get('skip', 0))
+    try:
+        limit = int(request.args.get('limit', 50))
+        skip = int(request.args.get('skip', 0))
+    except ValueError:
+        abort(400, description="limit and skip must be integers")
     since = request.args.get('since')  # ISO timestamp to fetch only newer articles
     
     # Validate pagination params
@@ -573,6 +571,25 @@ def delete_article(article_id):
 # --- Events ---
 @api_blueprint.route("/events", methods=["GET"])
 def list_events():
+    feed_url = request.args.get('feed_url')
+    
+    if feed_url:
+        # 1. Get all article links for this feed
+        articles = query_couchdb("articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000)
+        links = [a.get("link") for a in articles if a.get("link")]
+        
+        if not links:
+            return jsonify([])
+            
+        # 2. Find events containing any of these links
+        # Using $elemMatch with $in for efficient array searching
+        selector = {
+            "type": "event",
+            "article_links": {"$elemMatch": {"$in": links}}
+        }
+        events = query_couchdb("events", selector=selector, limit=1000)
+        return jsonify(events)
+        
     events = fetch_from_couchdb("events")
     # Filter only actual events (legacy docs might not have 'type')
     events = [e for e in events if e.get('type', 'event') == 'event']
@@ -607,9 +624,36 @@ def remove_event_link(event_id):
 # --- Trends ---
 @api_blueprint.route("/trends", methods=["GET"])
 def list_trends():
+    feed_url = request.args.get('feed_url')
+    
+    if feed_url:
+        # 1. Get all article links for this feed
+        articles = query_couchdb("articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000)
+        links = [a.get("link") for a in articles if a.get("link")]
+        
+        if not links:
+            return jsonify([])
+            
+        # 2. Find event IDs containing any of these links
+        event_docs = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": links}}}, fields=["_id"], limit=1000)
+        event_ids = [e.get("_id") for e in event_docs if e.get("_id")]
+        
+        if not event_ids:
+            return jsonify([])
+            
+        # 3. Find trends containing any of these event IDs
+        selector = {
+            "type": "trend",
+            "event_ids": {"$elemMatch": {"$in": event_ids}}
+        }
+        trends = query_couchdb("trends", selector=selector, limit=1000)
+        return jsonify(trends)
+
     trends = fetch_from_couchdb("trends")
     if not trends:
         trends = []
+    # Ensure we only return trend documents
+    trends = [t for t in trends if t.get('type', 'trend') == 'trend']
     return jsonify(trends)
 
 @api_blueprint.route("/trends/<trend_id>", methods=["GET"])
@@ -705,9 +749,16 @@ def search_articles_endpoint():
     if not query:
         abort(400, description="Query parameter 'q' is required")
     
+    import re
+    safe_query = re.escape(query)
+    
     date_from = request.args.get('from', '')
     date_to = request.args.get('to', '')
-    limit = int(request.args.get('limit', 50))
+    
+    try:
+        limit = int(request.args.get('limit', 50))
+    except ValueError:
+        abort(400, description="limit must be an integer")
     
     if limit > 200:
         limit = 200
@@ -715,9 +766,9 @@ def search_articles_endpoint():
     # Build Mango selector for efficient querying
     selector = {
         "$or": [
-            {"title": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}},
-            {"content": {"$regex": f"(?i){query}"}}
+            {"title": {"$regex": f"(?i){safe_query}"}},
+            {"description": {"$regex": f"(?i){safe_query}"}},
+            {"content": {"$regex": f"(?i){safe_query}"}}
         ]
     }
     
@@ -765,8 +816,11 @@ def search_articles_endpoint():
 @limiter.limit("20 per minute")
 def get_recent_articles_endpoint():
     """Get most recent articles"""
-    hours = int(request.args.get('hours', 24))
-    limit = int(request.args.get('limit', 50))
+    try:
+        hours = int(request.args.get('hours', 24))
+        limit = int(request.args.get('limit', 50))
+    except ValueError:
+        abort(400, description="hours and limit must be integers")
     
     if hours > 168:  # Max 1 week
         hours = 168
@@ -837,7 +891,14 @@ def search_events_endpoint():
     if not query:
         abort(400, description="Query parameter 'q' is required")
     
-    limit = int(request.args.get('limit', 20))
+    import re
+    safe_query = re.escape(query)
+    
+    try:
+        limit = int(request.args.get('limit', 20))
+    except ValueError:
+        abort(400, description="limit must be an integer")
+
     if limit > 100:
         limit = 100
     
@@ -845,8 +906,8 @@ def search_events_endpoint():
     # Note: For better performance at scale, consider using a full-text search engine
     selector = {
         "$or": [
-            {"name": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}}
+            {"name": {"$regex": f"(?i){safe_query}"}},
+            {"description": {"$regex": f"(?i){safe_query}"}}
         ]
     }
     
@@ -858,8 +919,8 @@ def search_events_endpoint():
             "_id": event.get("_id"),
             "name": event.get("name", "Untitled"),
             "description": event.get("description", ""),
-            "article_count": len(event.get("article_links", []))
-        })
+        "results": results
+    })
 
 @api_blueprint.route("/trends/search", methods=["GET"])
 @requires_auth
@@ -870,7 +931,14 @@ def search_trends_endpoint():
     if not query:
         abort(400, description="Query parameter 'q' is required")
     
-    limit = int(request.args.get('limit', 20))
+    import re
+    safe_query = re.escape(query)
+    
+    try:
+        limit = int(request.args.get('limit', 20))
+    except ValueError:
+        abort(400, description="limit must be an integer")
+
     if limit > 100:
         limit = 100
     
@@ -878,8 +946,8 @@ def search_trends_endpoint():
     # Note: For better performance at scale, consider using a full-text search engine
     selector = {
         "$or": [
-            {"name": {"$regex": f"(?i){query}"}},
-            {"description": {"$regex": f"(?i){query}"}}
+            {"name": {"$regex": f"(?i){safe_query}"}},
+            {"description": {"$regex": f"(?i){safe_query}"}}
         ]
     }
     

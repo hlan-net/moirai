@@ -4,7 +4,7 @@ import * as fs from 'fs';
 
 test.describe('OPML Import Functionality', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:8088/#/dashboard');
+    await page.goto('/#/dashboard');
     await page.waitForTimeout(1000);
   });
 

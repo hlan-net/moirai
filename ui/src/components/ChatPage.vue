@@ -156,7 +156,7 @@ const sendMessage = async () => {
 
 const downloadChat = () => {
   if (!sessionId.value) return
-  window.location.href = `/api/chat/history/${sessionId.value}/export`
+  globalThis.location.href = `/api/chat/history/${sessionId.value}/export`
 }
 
 const filteredSessions = computed(() => {
