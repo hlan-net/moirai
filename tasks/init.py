@@ -2,6 +2,8 @@ import os
 import requests
 from api.db import COUCHDB_URI, _request
 from .cleanup_task import CleanupTask
+from tenacity import retry, stop_after_delay, wait_fixed, retry_if_exception_type
+import requests
 
 # initialise the CouchDB database if they don't yet exists
 
@@ -39,6 +41,12 @@ def create_index(db_name, fields, name):
     except Exception as e:
         print(f"Error creating index on '{db_name}': {e}")
 
+@retry(
+    stop=stop_after_delay(60),
+    wait=wait_fixed(2),
+    retry=retry_if_exception_type((requests.exceptions.RequestException, ConnectionError)),
+    reraise=True
+)
 def init_db():
   # Skip network check as initContainer handles it
   print("Assuming CouchDB is ready (handled by initContainer).")
