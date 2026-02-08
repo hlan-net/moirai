@@ -16,6 +16,7 @@ prometheus-flask-exporter
 pydantic
 validators
 bleach
+starlette
 starlette-prometheus
 prometheus_client
 google-generativeai

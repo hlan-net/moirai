@@ -9,7 +9,7 @@ from .tools import trends
 from .tools import search
 
 # Get the ASGI app
-app = mcp.sse_app()
+app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()
 
 # Initialize Telemetry
 from api.telemetry import configure_telemetry

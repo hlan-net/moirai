@@ -59,18 +59,25 @@ The UI includes a Chat interface to interact with the Agent.
 
 If you want to run components individually without Docker:
 
+1. **Create/Use a Virtualenv:**
+
+    ```bash
+    python3 -m venv my_venv
+    ./my_venv/bin/python -m ensurepip --upgrade
+    ./my_venv/bin/pip install -r requirements.txt
+    ```
+
 1. **Database:** Ensure CouchDB is running (e.g., via `docker compose up couchdb`).
 2. **API:**
 
     ```bash
-    pip install -r requirements.txt
-    python main.py
+    ./my_venv/bin/python main.py
     ```
 
 3. **MCP Server:**
 
     ```bash
-    python mcp_server.py
+    ./my_venv/bin/python mcp_server.py
     ```
 
 4. **UI:**
