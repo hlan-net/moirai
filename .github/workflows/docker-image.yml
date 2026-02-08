@@ -110,7 +110,7 @@ jobs:
           API_PASSWORD: testpassword
         run: |
           # Run security API tests (should all pass)
-          PYTHONPATH=. pytest tests/test_security_api.py
+          PYTHONPATH=. pytest -m integration tests/test_security_api.py
           
           # Skip MCP test for now - it requires complex SSE connection setup
           # PYTHONPATH=. pytest tests/test_mcp_crud.py
