@@ -16,12 +16,21 @@ from .validation import (
     ConfigUpdateRequest
 )
 
+from api.enrichment import enrich_articles_with_events_and_trends
+from api.feed_ops import process_bulk_import_url
+from api.rss_ops import generate_rss_item_xml
+
 api_blueprint = Blueprint('api', __name__)
 
 API_USERNAME = os.environ.get("API_USERNAME")
 API_PASSWORD = os.environ.get("API_PASSWORD")
 ALLOW_PUBLIC_READ_ENV = os.environ.get("ALLOW_PUBLIC_READ", "false").lower() == "true"
 ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
+
+# Constants for error messages
+ERROR_FEED_NOT_FOUND = "Feed not found"
+ERROR_LIMIT_INTEGER = "limit must be an integer"
+ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
 
 def parse_datetime_safe(date_str):
     """Parse datetime and ensure it's timezone-aware for comparison."""
@@ -144,7 +153,7 @@ def list_feeds():
 def delete_feed(feed_id):
     feed = fetch_from_couchdb("feeds", feed_id)
     if not feed:
-        abort(404, description="Feed not found")
+        abort(404, description=ERROR_FEED_NOT_FOUND)
     
     if delete_from_couchdb("feeds", feed_id, feed["_rev"]):
         return jsonify({"status": "deleted"})
@@ -155,7 +164,7 @@ def delete_feed(feed_id):
 def update_feed(feed_id):
     feed = fetch_from_couchdb("feeds", feed_id)
     if not feed:
-        abort(404, description="Feed not found")
+        abort(404, description=ERROR_FEED_NOT_FOUND)
     
     # Validate input
     try:
@@ -199,7 +208,7 @@ def refresh_single_feed(feed_url):
     existing_feeds = query_couchdb("feeds", selector=selector, limit=1)
     
     if not existing_feeds:
-        abort(404, description="Feed not found")
+        abort(404, description=ERROR_FEED_NOT_FOUND)
     
     # Run in background thread
     task = FetchFeedTask(feed_url)
@@ -235,49 +244,14 @@ def bulk_import_feeds():
     }
     
     for url_str in urls:
-        url_str = url_str.strip()
-        if not url_str:
-            continue
-        
-        try:
-            # Validate URL using FeedCreateRequest for consistency with create_feed endpoint
-            validated = FeedCreateRequest(url=url_str)
-            feed_url = str(validated.url)
-            
-            # Generate ID
-            feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
-            
-            # Check if feed already exists
-            existing = fetch_from_couchdb("feeds", feed_id)
-            if existing:
-                results["skipped"] += 1
-                continue
-            
-            # Security: Skip favicon fetching during bulk import to prevent DoS
-            # Favicon will be fetched on first feed refresh
-            feed_doc = {
-                "_id": feed_id,
-                "url": feed_url,
-                "title": "",  # Will be filled by first fetch
-                "category": "imported",
-                "added_at": datetime.now(timezone.utc).isoformat(),
-                "favicon_url": None  # Will be fetched on first feed refresh
-            }
-            
-            if update_couchdb_doc("feeds", feed_id, feed_doc):
-                results["success"] += 1
-            else:
-                results["failed"] += 1
-                results["errors"].append({"url": url_str, "error": "Failed to store in database"})
-                
-        except ValidationError as e:
-            # Expected: Invalid URL format
+        result = process_bulk_import_url(url_str)
+        if result["status"] == "success":
+            results["success"] += 1
+        elif result["status"] == "skipped":
+            results["skipped"] += 1
+        elif result["status"] == "failed":
             results["failed"] += 1
-            results["errors"].append({"url": url_str, "error": f"Invalid URL: {str(e)}"})
-        except ValueError as e:
-            # Expected: Pydantic URL validation errors
-            results["failed"] += 1
-            results["errors"].append({"url": url_str, "error": f"Invalid URL: {str(e)}"})
+            results["errors"].append({"url": url_str, "error": result["error"]})
     
     return jsonify(results), 200
 
@@ -296,7 +270,6 @@ def list_articles():
     limit = min(max(limit, 1), 200)  # Clamp between 1-200
     skip = max(skip, 0)
     
-    feeds = fetch_from_couchdb("feeds")
     
     # Build selector for efficient DB querying
     selector = {}
@@ -313,6 +286,8 @@ def list_articles():
     # Ensure we have a selector for sorting field to optimize index usage
     if "published" not in selector:
         selector["published"] = {"$gt": None}
+
+
 
     # Query CouchDB directly with pagination and sorting
     # We fetch limit + 1 to determine if there are more results
@@ -334,79 +309,8 @@ def list_articles():
     # Total count is not available efficiently with Mango queries
     total_count = len(articles) + skip + (1 if has_more else 0)
     
-    # Fetch only relevant events and trends
-    article_links = [a.get("link") for a in paginated_articles if a.get("link")]
-    
-    events = []
-    if article_links:
-        # Use $elemMatch with $in to find events containing any of the article links
-        events = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": article_links}}}, limit=1000)
-        
-    event_ids = [e.get("_id") for e in events if e.get("_id")]
-    
-    trends = []
-    if event_ids:
-        # Use $elemMatch with $in to find trends containing any of the event IDs
-        trends = query_couchdb("trends", selector={"event_ids": {"$elemMatch": {"$in": event_ids}}}, limit=1000)
-    
-    feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
-    feed_favicon_map = {feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")}
-    
-    # Build article link to event IDs and event names mappings
-    article_link_to_event_ids = {}
-    article_event_map = {}
-    for event in events:
-        event_id = event.get("_id")
-        event_name = event.get("name")
-        
-        # Only process events with a valid name
-        if event_name:
-            for link in event.get("article_links", []):
-                if link not in article_event_map:
-                    article_event_map[link] = []
-                article_event_map[link].append(event_name)
-                
-                if link not in article_link_to_event_ids:
-                    article_link_to_event_ids[link] = []
-                if event_id:
-                    article_link_to_event_ids[link].append(event_id)
-    
-    # Build event ID to trend names mapping
-    event_id_to_trends = {}
-    for trend in trends or []:
-        trend_name = trend.get("name")
-        if trend_name:  # Only process trends with valid names
-            for event_id in trend.get("event_ids", []):
-                if event_id not in event_id_to_trends:
-                    event_id_to_trends[event_id] = []
-                event_id_to_trends[event_id].append(trend_name)
-    
-    # Build article link to trend names mapping
-    article_link_to_trends = {}
-    for link, event_ids in article_link_to_event_ids.items():
-        trend_names = set()
-        for event_id in event_ids:
-            if event_id in event_id_to_trends:
-                for trend_name in event_id_to_trends[event_id]:
-                    trend_names.add(trend_name)
-        if trend_names:
-            article_link_to_trends[link] = sorted(list(trend_names))
-    
-    # Mapping logic completed
-    
-    for article in paginated_articles:
-        feed_url = article.get("feed_url")
-        if feed_url in feed_title_map:
-            article["feed_title"] = feed_title_map[feed_url]
-        if feed_url in feed_favicon_map and feed_favicon_map[feed_url]:
-            article["feed_favicon"] = feed_favicon_map[feed_url]
-        
-        article_link = article.get("link")
-        if article_link in article_event_map:
-            article["events"] = article_event_map[article_link]
-        
-        if article_link in article_link_to_trends:
-            article["trends"] = article_link_to_trends[article_link]
+    # Enrichment
+    enrich_articles_with_events_and_trends(paginated_articles)
     
     return jsonify({
         "articles": paginated_articles,
@@ -425,8 +329,8 @@ def rss_feed():
     limit = int(request.args.get('limit', 100))  # Default to 100 items for RSS
     limit = min(max(limit, 1), 500)  # Clamp between 1-500
     
-    feeds = fetch_from_couchdb("feeds")
-    
+
+
     # Query CouchDB directly for RSS
     # Requires index on 'published' field
     rss_articles = query_couchdb(
@@ -436,105 +340,18 @@ def rss_feed():
         sort=[{"published": "desc"}]
     )
     
-    # Fetch only relevant events and trends for RSS
-    article_links = [a.get("link") for a in rss_articles if a.get("link")]
-    
-    events = []
-    if article_links:
-        events = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": article_links}}}, limit=1000)
-        
-    event_ids = [e.get("_id") for e in events if e.get("_id")]
-    
-    trends = []
-    if event_ids:
-        trends = query_couchdb("trends", selector={"event_ids": {"$elemMatch": {"$in": event_ids}}}, limit=1000)
-    
-    feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
-    
-    # Build article link to event names mapping
-    article_event_map = {}
-    for event in events:
-        event_name = event.get("name")
-        if event_name:
-            for link in event.get("article_links", []):
-                if link not in article_event_map:
-                    article_event_map[link] = []
-                article_event_map[link].append(event_name)
-    
-    # Build event ID to trend names mapping
-    article_link_to_event_ids = {}
-    for event in events:
-        event_id = event.get("_id")
-        if event_id:
-            for link in event.get("article_links", []):
-                if link not in article_link_to_event_ids:
-                    article_link_to_event_ids[link] = []
-                article_link_to_event_ids[link].append(event_id)
-    
-    event_id_to_trends = {}
-    for trend in trends or []:
-        trend_name = trend.get("name")
-        if trend_name:
-            for event_id in trend.get("event_ids", []):
-                if event_id not in event_id_to_trends:
-                    event_id_to_trends[event_id] = []
-                event_id_to_trends[event_id].append(trend_name)
-    
-    article_link_to_trends = {}
-    for link, event_ids in article_link_to_event_ids.items():
-        trend_names = set()
-        for event_id in event_ids:
-            if event_id in event_id_to_trends:
-                for trend_name in event_id_to_trends[event_id]:
-                    trend_names.add(trend_name)
-        if trend_names:
-            article_link_to_trends[link] = sorted(list(trend_names))
+    # Enrichment
+    enrich_articles_with_events_and_trends(rss_articles)
     
     # Build RSS XML
     rss_items = []
+    
+    # Pre-fetch feed info for title mapping
+    feeds = fetch_from_couchdb("feeds")
+    feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
+    
     for article in rss_articles:
-        title = escape(article.get("title", "Untitled"))
-        link = escape(article.get("link", ""))
-        summary = escape(article.get("summary", ""))
-        published = article.get("published", "")
-        
-        # Convert ISO datetime to RFC 822 format for RSS
-        pub_date = ""
-        if published:
-            try:
-                dt = parse_datetime_safe(published)
-                pub_date = dt.strftime("%a, %d %b %Y %H:%M:%S %z")
-            except Exception:
-                pass
-        
-        # Build category tags for events and trends
-        categories = []
-        article_link = article.get("link")
-        if article_link in article_event_map:
-            for event_name in article_event_map[article_link]:
-                categories.append(f'    <category domain="event">{escape(event_name)}</category>')
-        
-        if article_link in article_link_to_trends:
-            for trend_name in article_link_to_trends[article_link]:
-                categories.append(f'    <category domain="trend">{escape(trend_name)}</category>')
-        
-        category_xml = "\n".join(categories) if categories else ""
-        
-        # Add source feed info
-        feed_url = article.get("feed_url", "")
-        feed_title = feed_title_map.get(feed_url, "Unknown Source")
-        source_xml = f'    <source><title>{escape(feed_title)}</title></source>' if feed_title else ""
-        
-        item_xml = f"""  <item>
-    <title>{title}</title>
-    <link>{link}</link>
-    <description>{summary}</description>
-    <pubDate>{pub_date}</pubDate>
-    <guid isPermaLink="true">{link}</guid>
-{category_xml}
-{source_xml}
-  </item>"""
-        
+        item_xml = generate_rss_item_xml(article, feed_title_map, parse_datetime_safe)
         rss_items.append(item_xml)
     
     # Get current datetime for feed metadata
@@ -747,7 +564,7 @@ def search_articles_endpoint():
     """Search articles by keyword with optional date filters"""
     query = request.args.get('q', '').strip()
     if not query:
-        abort(400, description="Query parameter 'q' is required")
+        abort(400, description=ERROR_QUERY_REQUIRED)
     
     import re
     safe_query = re.escape(query)
@@ -758,7 +575,7 @@ def search_articles_endpoint():
     try:
         limit = int(request.args.get('limit', 50))
     except ValueError:
-        abort(400, description="limit must be an integer")
+        abort(400, description=ERROR_LIMIT_INTEGER)
     
     if limit > 200:
         limit = 200
@@ -889,7 +706,7 @@ def search_events_endpoint():
     """Search events by keyword using CouchDB query"""
     query = request.args.get('q', '').strip()
     if not query:
-        abort(400, description="Query parameter 'q' is required")
+        abort(400, description=ERROR_QUERY_REQUIRED)
     
     import re
     safe_query = re.escape(query)
@@ -897,7 +714,7 @@ def search_events_endpoint():
     try:
         limit = int(request.args.get('limit', 20))
     except ValueError:
-        abort(400, description="limit must be an integer")
+        abort(400, description=ERROR_LIMIT_INTEGER)
 
     if limit > 100:
         limit = 100
@@ -929,7 +746,7 @@ def search_trends_endpoint():
     """Search trends by keyword using CouchDB query"""
     query = request.args.get('q', '').strip()
     if not query:
-        abort(400, description="Query parameter 'q' is required")
+        abort(400, description=ERROR_QUERY_REQUIRED)
     
     import re
     safe_query = re.escape(query)
@@ -937,7 +754,7 @@ def search_trends_endpoint():
     try:
         limit = int(request.args.get('limit', 20))
     except ValueError:
-        abort(400, description="limit must be an integer")
+        abort(400, description=ERROR_LIMIT_INTEGER)
 
     if limit > 100:
         limit = 100

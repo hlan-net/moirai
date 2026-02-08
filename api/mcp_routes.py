@@ -8,6 +8,7 @@ from datetime import datetime
 import hashlib
 import json
 from api.db import fetch_from_couchdb, store_to_couchdb
+from api.enrichment import enrich_events_with_articles, enrich_trends_with_events
 
 mcp_blueprint = Blueprint('mcp', __name__)
 
@@ -99,6 +100,8 @@ def get_event(event_id):
     Query Parameters:
         - include_articles: Boolean to include full article objects
     """
+
+
     event = fetch_from_couchdb("events", event_id)
     if not event:
         abort(404, description="Event not found")
@@ -106,18 +109,8 @@ def get_event(event_id):
     # Check if we should include full article objects
     include_articles = request.args.get('include_articles', '').lower() == 'true'
     
-    if include_articles and 'article_ids' in event:
-        articles = []
-        for article_id in event['article_ids']:
-            try:
-                article = fetch_from_couchdb("articles", article_id)
-                if article:
-                    articles.append(article)
-            except Exception as e:
-                # Skip articles that don't exist or can't be fetched
-                print(f"Warning: Could not fetch article {article_id}: {e}")
-                continue
-        event['articles'] = articles
+    if include_articles:
+        enrich_events_with_articles([event], include_articles=True)
     
     return jsonify(event)
 
@@ -186,29 +179,7 @@ def get_trend(trend_id):
     include_events = request.args.get('include_events', '').lower() == 'true'
     include_articles = request.args.get('include_articles', '').lower() == 'true'
     
-    if include_events and 'event_ids' in trend:
-        events = []
-        for event_id in trend['event_ids']:
-            try:
-                event = fetch_from_couchdb("events", event_id)
-                if event:
-                    # If include_articles is also requested, fetch articles for each event
-                    if include_articles and 'article_ids' in event:
-                        articles = []
-                        for article_id in event['article_ids']:
-                            try:
-                                article = fetch_from_couchdb("articles", article_id)
-                                if article:
-                                    articles.append(article)
-                            except Exception as e:
-                                print(f"Warning: Could not fetch article {article_id}: {e}")
-                                continue
-                        event['articles'] = articles
-                    events.append(event)
-            except Exception as e:
-                # Skip events that don't exist or can't be fetched
-                print(f"Warning: Could not fetch event {event_id}: {e}")
-                continue
-        trend['events'] = events
+    if include_events:
+        enrich_trends_with_events([trend], include_events=True, include_articles=include_articles)
     
     return jsonify(trend)

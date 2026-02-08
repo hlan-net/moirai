@@ -116,10 +116,8 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
 @chat_blueprint.route("/models", methods=["GET"])
 def list_models():
     llm_endpoint = request.args.get('llm_endpoint')
-    api_key = None
-    if llm_endpoint == 'openai':
-        api_key = request.headers.get('x-openai-api-key')
-    elif llm_endpoint == 'gemini':
+    api_key = request.headers.get('x-openai-api-key')
+    if not api_key:
         api_key = request.headers.get('x-gemini-api-key')
     ollama_base_url = request.headers.get('x-ollama-base-url')
     # Determine API Key based on provider if not passed in headers
