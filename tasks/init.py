@@ -1,13 +1,13 @@
 import os
 import requests
-from api.db import COUCHDB_URI
+from api.db import COUCHDB_URI, _request
 from .cleanup_task import CleanupTask
 
 # initialise the CouchDB database if they don't yet exists
 
 def ensure_db(db_name):
     try:
-        response = requests.put(f"{COUCHDB_URI}/{db_name}")
+        response = _request('PUT', f"{COUCHDB_URI}/{db_name}")
         if response.status_code in (200, 201):
             print(f"Database '{db_name}' created.")
         elif response.status_code == 412:
@@ -31,7 +31,7 @@ def create_index(db_name, fields, name):
         # Ensure DB exists before index creation
         ensure_db(db_name)
         
-        response = requests.post(url, json=payload)
+        response = _request('POST', url, json=payload)
         if response.status_code in (200, 201):
              print(f"Index '{name}' created/verified on '{db_name}'")
         else:
