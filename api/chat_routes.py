@@ -1,5 +1,6 @@
 import re
 import uuid
+import logging
 from types import SimpleNamespace
 from flask import Blueprint, request, jsonify, abort
 import os
@@ -39,6 +40,8 @@ SYSTEM_PROMPT = (
     "Some reliable Linux news feeds are: LWN (https://lwn.net/headlines/rss), Phoronix (https://www.phoronix.com/phoronix-rss.php), "
     "and Kernel.org (https://www.kernel.org/feeds/kall.xml)."
 )
+
+logger = logging.getLogger(__name__)
 
 llm_provider_factory = LLMProviderFactory()
 
@@ -99,8 +102,7 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
                 return await _run_agent_loop(messages, llm_provider, target_model, openai_tools, session)
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error("Error running agent loop", exc_info=True)
         
         # Unwrap ExceptionGroup if present (common in anyio/asyncio)
         if hasattr(e, 'exceptions'):

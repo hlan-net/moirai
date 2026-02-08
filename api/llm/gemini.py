@@ -5,6 +5,10 @@ import json
 from types import SimpleNamespace
 from .base import LLMProvider
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
@@ -16,8 +20,8 @@ class GeminiProvider(LLMProvider):
             # Filter for models that support generation
             return [m.name.replace('models/', '') for m in models if 'generateContent' in m.supported_generation_methods]
         except Exception as e:
-            print(f"Error listing Gemini models: {e}")
-            return ["gemini-pro"] # Fallback
+            logger.error(f"Error listing Gemini models: {e}")
+            raise e
 
     def create_chat_completion(self, messages, model, tools, tool_choice):
         # 1. Setup Model
@@ -57,11 +61,7 @@ class GeminiProvider(LLMProvider):
 
         chat = generative_model.start_chat(history=history_except_last)
         
-        try:
-            response = chat.send_message(last_message)
-        except Exception as e:
-            print(f"Gemini generation error: {e}")
-            raise e
+        response = chat.send_message(last_message)
 
         # 4. Map Response back to OpenAI format
         return self._convert_response(response)

@@ -34,6 +34,15 @@ class TestGeminiProvider(unittest.TestCase):
         self.assertEqual(models, ['gemini-pro'])
 
     @patch('api.llm.gemini.genai')
+    def test_list_models_error(self, mock_genai):
+        mock_genai.list_models.side_effect = Exception("API Error")
+        
+        provider = GeminiProvider(api_key="test")
+        
+        with self.assertRaises(Exception):
+            provider.list_models()
+
+    @patch('api.llm.gemini.genai')
     def test_create_chat_completion_text(self, mock_genai):
         # Mock model and chat
         mock_model = MagicMock()
