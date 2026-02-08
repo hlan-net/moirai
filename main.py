@@ -33,6 +33,9 @@ app.register_blueprint(api_blueprint, url_prefix='/api')
 app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
 app.register_blueprint(chat_blueprint, url_prefix='/api')
 
+from api.auth import auth_blueprint
+app.register_blueprint(auth_blueprint, url_prefix='/api/auth')
+
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, 'index.html')

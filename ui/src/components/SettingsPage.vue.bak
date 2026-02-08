@@ -62,9 +62,52 @@ const toggleSection = (section: string) => {
   }
 }
 
-
-
-
+const saveSettings = async () => {
+  // Save User Settings
+  try {
+      await axios.put('/api/auth/me/settings', {
+          moirai_model: modelName.value,
+          moirai_llm_endpoint: llmEndpoint.value,
+          moirai_openai_api_key: openaiApiKey.value,
+          moirai_openai_model: openaiModelName.value,
+          moirai_gemini_api_key: geminiApiKey.value,
+          moirai_gemini_model: geminiModelName.value,
+          moirai_ollama_endpoint_url: ollamaEndpointUrl.value
+      })
+      
+      // Save System Config (Admin only or if allowed)
+      // For now we try, and if 403 we just log it or notify user they aren't admin
+      const configRes = await fetch('/api/config', {
+          method: 'PUT',
+          headers: authStore.token ? { 
+              'Authorization': `Bearer ${authStore.token}`,
+              'Content-Type': 'application/json'
+          } : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              allow_public_read: allowPublicRead.value,
+              iteration_interval: iterationInterval.value,
+              google_client_id: googleClientId.value,
+              entra_client_id: entraClientId.value,
+              entra_tenant_id: entraTenantId.value,
+              github_client_id: githubClientId.value,
+              github_client_secret: githubClientSecret.value
+          })
+      })
+      
+      if (!configRes.ok) {
+           if (configRes.status === 403) {
+               console.warn("User does not have permission to update system config.")
+           } else {
+               throw new Error("Failed to save config")
+           }
+      }
+      
+      alert('Settings saved!')
+  } catch (e) {
+      console.error(e)
+      alert("Failed to save settings.")
+  }
+}
 
 const fetchOllamaModels = async () => {
   loadingModels.value = true
@@ -285,7 +328,6 @@ onMounted(() => {
 
 <template>
   <div class="settings-page">
-
     <h1>Settings</h1>
     
     <div class="settings-section">
@@ -496,7 +538,7 @@ onMounted(() => {
     </div> <!-- End System Tab -->
 
     <div class="actions-bar">
-      <button @click="console.log" class="save-all-btn">Save All Settings</button>
+      <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
     </div>
   </div>
 </template>

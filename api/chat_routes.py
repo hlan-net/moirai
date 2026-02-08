@@ -10,7 +10,10 @@ from datetime import datetime
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from .llm.factory import LLMProviderFactory
-from .db import fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb
+from .llm.factory import LLMProviderFactory
+from .db import fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb, query_couchdb
+from .auth import jwt_required
+from flask import g
 
 chat_blueprint = Blueprint('chat', __name__)
 
@@ -114,13 +117,29 @@ async def run_agent(user_message, history, model=None, llm_endpoint=None, api_ke
         return f"System Error: {str(e)}"
 
 @chat_blueprint.route("/models", methods=["GET"])
+@jwt_required
 def list_models():
     llm_endpoint = request.args.get('llm_endpoint')
-    api_key = request.headers.get('x-openai-api-key')
+    
+    # Get API key from user settings if available
+    user = fetch_from_couchdb("users", g.user_id)
+    user_settings = user.get("settings", {}) if user else {}
+    
+    api_key = None
+    if llm_endpoint == 'openai':
+        api_key = user_settings.get('moirai_openai_api_key')
+    elif llm_endpoint == 'gemini':
+        api_key = user_settings.get('moirai_gemini_api_key')
+        
+    # Fallback to headers (or env vars in _get_api_key)
+    if not api_key:
+        api_key = request.headers.get('x-openai-api-key')
     if not api_key:
         api_key = request.headers.get('x-gemini-api-key')
-    ollama_base_url = request.headers.get('x-ollama-base-url')
-    # Determine API Key based on provider if not passed in headers
+        
+    ollama_base_url = user_settings.get('moirai_ollama_endpoint_url') or request.headers.get('x-ollama-base-url')
+    
+    # Determine API Key based on provider if not passed
     final_api_key = _get_api_key(llm_endpoint, api_key)
 
     llm_provider = llm_provider_factory.get_provider(llm_endpoint, final_api_key, ollama_base_url or OLLAMA_BASE_URL)
@@ -132,43 +151,69 @@ def list_models():
         return jsonify({"error": str(e)}), 500
 
 @chat_blueprint.route("/chat", methods=["POST"])
+@jwt_required
 def chat():
     data = request.json
     user_message = data.get("message")
     history = data.get("history", [])
     model = data.get("model")
     llm_endpoint = data.get("llm_endpoint")
-    api_key = request.headers.get('x-openai-api-key')
+    
+    # Get user settings
+    user = fetch_from_couchdb("users", g.user_id)
+    user_settings = user.get("settings", {}) if user else {}
+    
+    api_key = None
+    if llm_endpoint == 'openai':
+        api_key = user_settings.get('moirai_openai_api_key')
+    elif llm_endpoint == 'gemini':
+        api_key = user_settings.get('moirai_gemini_api_key')
+
+    # Fallback
+    if not api_key:
+        api_key = request.headers.get('x-openai-api-key')
     if not api_key:
         api_key = request.headers.get('x-gemini-api-key')
-    ollama_base_url = request.headers.get('x-ollama-base-url')
+        
+    ollama_base_url = user_settings.get('moirai_ollama_endpoint_url') or request.headers.get('x-ollama-base-url')
 
     response = run_agent_sync(user_message, history, model, llm_endpoint, api_key, ollama_base_url)
     return jsonify({"response": response})
 
 @chat_blueprint.route("/chat/history", methods=["GET"])
+@jwt_required
 def list_chat_history():
-    history = fetch_from_couchdb("chat_history")
+    # Filter by user_id
+    history = query_couchdb("chat_history", {"user_id": g.user_id})
     return jsonify(history)
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["GET"])
+@jwt_required
 def get_chat_session(session_id):
     session = fetch_from_couchdb("chat_history", session_id)
     if not session:
         abort(404, description=CHAT_SESSION_NOT_FOUND)
+        
+    # Check ownership
+    if session.get("user_id") != g.user_id:
+        abort(403, description="Access denied")
+        
     return jsonify(session)
 
 @chat_blueprint.route("/chat/history", methods=["POST"])
+@jwt_required
 def create_chat_session():
     data = request.json
     title = data.get("title", "New Chat")
     session_id = str(uuid.uuid4())
     session = {
         "_id": session_id,
+        "user_id": g.user_id,
         "title": title,
         "messages": [],
         "model": data.get("model"),
-        "llm_endpoint": data.get("llm_endpoint")
+        "llm_endpoint": data.get("llm_endpoint"),
+        "created_at": datetime.now(datetime.timezone.utc).isoformat()
     }
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)
@@ -176,10 +221,14 @@ def create_chat_session():
         abort(500, description="Failed to create chat session")
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["PUT"])
+@jwt_required
 def update_chat_session(session_id):
     session = fetch_from_couchdb("chat_history", session_id)
     if not session:
         abort(404, description=CHAT_SESSION_NOT_FOUND)
+    
+    if session.get("user_id") != g.user_id:
+        abort(403, description="Access denied")
     
     data = request.json
     
@@ -199,10 +248,14 @@ def update_chat_session(session_id):
         abort(500, description="Failed to update chat session")
 
 @chat_blueprint.route("/chat/history/<session_id>/export", methods=["GET"])
+@jwt_required
 def export_chat_session(session_id):
     session = fetch_from_couchdb("chat_history", session_id)
     if not session:
         abort(404, description=CHAT_SESSION_NOT_FOUND)
+        
+    if session.get("user_id") != g.user_id:
+        abort(403, description="Access denied")
     
     title = session.get("title", "Untitled Chat")
     safe_title = re.sub(r'[^a-zA-Z0-9_\-]', '_', title)
@@ -235,10 +288,14 @@ def export_chat_session(session_id):
     )
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["DELETE"])
+@jwt_required
 def delete_chat_session(session_id):
     session = fetch_from_couchdb("chat_history", session_id)
     if not session:
         abort(404, description=CHAT_SESSION_NOT_FOUND)
+    
+    if session.get("user_id") != g.user_id:
+        abort(403, description="Access denied")
     
     if delete_from_couchdb("chat_history", session_id, session["_rev"]):
         return jsonify({"status": "deleted"})

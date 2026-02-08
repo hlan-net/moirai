@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, inject, onUnmounted, watch, type Ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
 interface Event {
   _id: string
@@ -26,6 +27,9 @@ let refreshInterval: number | null = null
 
 // Inject selected feed from parent
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 const normalizeEvent = (event: any): Event => ({
   _id: event._id,
@@ -191,7 +195,7 @@ onUnmounted(() => {
         Events ({{ filteredEvents.length }})
         <span v-if="refreshing" class="update-badge">↻</span>
       </h2>
-      <button 
+      <button v-if="isAdmin" 
         @click="() => fetchEventsAndTrends(true)" 
         :disabled="refreshing"
         class="action-btn"
@@ -225,7 +229,7 @@ onUnmounted(() => {
       <div v-for="event in filteredEvents" :key="event._id" class="event-card">
         <div class="card-header">
           <h3 @click="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
-          <button @click="deleteEvent(event._id)" class="delete-btn" title="Delete Event">×</button>
+          <button v-if="isAdmin" @click="deleteEvent(event._id)" class="delete-btn" title="Delete Event">×</button>
         </div>
         <p v-if="event.description" class="summary">{{ event.description }}</p>
         <div v-if="event.trend_id" class="trend-link">
@@ -239,6 +243,7 @@ onUnmounted(() => {
             <li v-for="link in (event.article_links || [])" :key="link">
               <a :href="link" target="_blank" rel="noopener noreferrer">{{ link }}</a>
               <button
+                v-if="isAdmin"
                 @click="removeLink(event._id, link)"
                 class="remove-link-btn"
                 title="Remove link"

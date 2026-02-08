@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, inject, onUnmounted, watch, type Ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
 interface Trend {
   _id: string
@@ -17,6 +18,9 @@ let refreshInterval: number | null = null
 
 // Inject selected feed from parent
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Computed: Filtered trends based on search query
 const filteredTrends = computed(() => {
@@ -135,7 +139,7 @@ onUnmounted(() => {
         Trends ({{ filteredTrends.length }})
         <span v-if="refreshing" class="update-badge">↻</span>
       </h2>
-      <button 
+      <button v-if="isAdmin" 
         @click="() => fetchTrends(true)" 
         :disabled="refreshing"
         class="action-btn"
@@ -169,7 +173,7 @@ onUnmounted(() => {
       <div v-for="trend in filteredTrends" :key="trend._id" class="trend-card">
         <div class="card-header">
           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
-          <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
+          <button v-if="isAdmin" @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
         </div>
         <p class="summary">{{ trend.description }}</p>
 
@@ -179,6 +183,7 @@ onUnmounted(() => {
             <li v-for="eid in (trend.event_ids || [])" :key="eid">
               <span class="event-id">{{ eid.substring(0, 8) }}...</span>
               <button
+                v-if="isAdmin"
                 @click="removeEvent(trend._id, eid)"
                 class="remove-event-btn"
                 title="Remove event"

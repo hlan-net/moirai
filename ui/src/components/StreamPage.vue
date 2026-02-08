@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
+import { useAuthStore } from '../stores/auth'
+import LoginModal from './LoginModal.vue'
 
 interface ArticleGroup {
   title: string;
@@ -16,6 +18,10 @@ const hasMore = ref(true)
 const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
 const expandedArticles = ref<Set<string>>(new Set())
+const showLoginModal = ref(false)
+
+const authStore = useAuthStore()
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 let observer: IntersectionObserver | null = null
 let refreshInterval: number | null = null
@@ -238,6 +244,11 @@ const handleFaviconError = (event: Event) => {
             <span v-if="fetchingUpdates" class="update-badge">↻</span>
         </div>
         <div class="header-actions">
+            <!-- Login Button for Public View -->
+            <button v-if="!isAuthenticated" @click="showLoginModal = true" class="login-btn">
+                Sign In
+            </button>
+
             <a href="/api/stream.rss" class="rss-link" title="Subscribe to RSS feed" target="_blank">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20A2.18 2.18 0 0 1 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
@@ -306,6 +317,8 @@ const handleFaviconError = (event: Event) => {
     </div>
     
     <div v-else class="empty-state">No articles found in the stream.</div>
+    
+    <LoginModal v-if="showLoginModal" @close="showLoginModal = false" @success="fetchLatestUpdates" />
   </div>
 </template>
 
@@ -404,6 +417,19 @@ const handleFaviconError = (event: Event) => {
 .refresh-btn:disabled {
     opacity: 0.6;
     cursor: wait;
+}
+
+.login-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.login-btn:hover {
+    background: var(--primary-hover);
 }
 
 .stream-container {

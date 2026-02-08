@@ -1,0 +1,279 @@
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue'
+import axios from 'axios'
+import { useAuthStore } from '../stores/auth'
+import { useTheme, type Theme } from '../composables/useTheme'
+
+const authStore = useAuthStore()
+
+const appVersion = ref('Loading...')
+const modelName = ref('llama3.1:latest')
+const availableModels = ref([])
+const loadingModels = ref(false)
+const allowPublicRead = ref(false)
+const iterationInterval = ref(600)
+const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
+const openaiApiKey = ref('')
+const openaiModelName = ref('gpt-4-turbo')
+const availableOpenAiModels = ref([])
+const geminiApiKey = ref('')
+const geminiModelName = ref('gemini-1.5-pro')
+const availableGeminiModels = ref([])
+const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
+const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'authentication']))
+const activeTab = ref('user')
+
+// Auth Config
+const googleClientId = ref('')
+const entraClientId = ref('')
+const entraTenantId = ref('')
+const githubClientId = ref('')
+const githubClientSecret = ref('')
+
+const { theme, setTheme } = useTheme()
+
+watch(llmEndpoint, (newEndpoint) => {
+  if (newEndpoint === 'openai' && availableOpenAiModels.value.length === 0 && openaiApiKey.value) {
+    fetchOpenAiModels()
+  } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
+    fetchOllamaModels()
+  } else if (newEndpoint === 'gemini' && availableGeminiModels.value.length === 0 && geminiApiKey.value) {
+    fetchGeminiModels()
+  }
+})
+
+watch(openaiApiKey, (newKey) => {
+  if (!newKey) {
+    availableOpenAiModels.value = []
+  }
+})
+
+watch(geminiApiKey, (newKey) => {
+  if (!newKey) {
+    availableGeminiModels.value = []
+  }
+})
+
+const toggleSection = (section: string) => {
+  if (collapsedSections.value.has(section)) {
+    collapsedSections.value.delete(section)
+  } else {
+    collapsedSections.value.add(section)
+  }
+}
+    const res = await fetch('/api/models?llm_endpoint=gemini', {
+      headers: {
+        'x-gemini-api-key': geminiApiKey.value
+      }
+    })
+    if (res.ok) {
+      availableGeminiModels.value = await res.json()
+    }
+  } catch (e) {
+    console.error('Error fetching models:', e)
+  } finally {
+    loadingModels.value = false
+  }
+}
+
+const fetchUserProfile = async () => {
+    try {
+        const res = await axios.get('/api/auth/me')
+        if (res.data) {
+            const settings = res.data.settings || {}
+            // Load User Settings
+            if (settings.moirai_model) modelName.value = settings.moirai_model
+            if (settings.moirai_llm_endpoint) llmEndpoint.value = settings.moirai_llm_endpoint
+            if (settings.moirai_openai_api_key) openaiApiKey.value = settings.moirai_openai_api_key
+            if (settings.moirai_openai_model) openaiModelName.value = settings.moirai_openai_model
+            if (settings.moirai_gemini_api_key) geminiApiKey.value = settings.moirai_gemini_api_key
+            if (settings.moirai_gemini_model) geminiModelName.value = settings.moirai_gemini_model
+            if (settings.moirai_ollama_endpoint_url) ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
+            if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
+            
+            // Refresh models based on loaded settings
+            if (llmEndpoint.value === 'ollama') fetchOllamaModels()
+            else if (llmEndpoint.value === 'openai' && openaiApiKey.value) fetchOpenAiModels()
+            else if (llmEndpoint.value === 'gemini' && geminiApiKey.value) fetchGeminiModels()
+        }
+    } catch (e) {
+        console.error("Error fetching user profile", e)
+    }
+}
+
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const exportSettings = async () => {
+  // 1. Fetch server config
+  let serverConfig = {}
+  try {
+      const res = await fetch('/api/config')
+      if (res.ok) {
+          serverConfig = await res.json()
+      }
+  } catch (e) {
+      console.error("Error fetching config for export", e)
+  }
+
+  // 2. Gather local storage
+  const clientSettings: Record<string, string | null> = {
+      'moirai_model': localStorage.getItem('moirai_model'),
+      'moirai_llm_endpoint': localStorage.getItem('moirai_llm_endpoint'),
+      'moirai_openai_api_key': localStorage.getItem('moirai_openai_api_key'),
+      'moirai_openai_model': localStorage.getItem('moirai_openai_model'),
+      'moirai_gemini_api_key': localStorage.getItem('moirai_gemini_api_key'),
+      'moirai_gemini_model': localStorage.getItem('moirai_gemini_model'),
+      'moirai_ollama_endpoint_url': localStorage.getItem('moirai_ollama_endpoint_url'),
+      'moirai_theme': localStorage.getItem('moirai_theme'),
+  }
+
+  // 3. Construct JSON
+  const exportData = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      client_settings: clientSettings,
+      server_config: serverConfig
+  }
+
+  // 4. Download file
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", "moirai-settings.json");
+  document.body.appendChild(downloadAnchorNode); // required for firefox
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+}
+
+const triggerImport = () => {
+  fileInput.value?.click()
+}
+
+const importSettings = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+
+  const file = target.files[0]
+  const reader = new FileReader()
+
+  reader.onload = async (e) => {
+    try {
+      if (!e.target?.result) return
+      const content = e.target.result as string
+      const data = JSON.parse(content)
+
+      // Validate basic structure
+      if (!data.client_settings || !data.server_config) {
+          alert("Invalid settings file format.")
+          return
+      }
+
+      if (!confirm("This will overwrite your current settings and reload the page. Continue?")) {
+          return
+      }
+
+      // Restore client settings
+      Object.entries(data.client_settings).forEach(([key, value]) => {
+          if (value !== null && typeof value === 'string') {
+              localStorage.setItem(key, value)
+          }
+      })
+
+      // Restore server config
+      try {
+          const res = await fetch('/api/config', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data.server_config)
+          })
+          if (!res.ok) {
+              console.error("Failed to restore server config during import")
+              alert("Settings imported, but server configuration failed to update.")
+          }
+      } catch (err) {
+          console.error("Error updating server config:", err)
+      }
+
+      alert("Settings imported successfully! Reloading...")
+      location.reload()
+
+    } catch (err) {
+      console.error("Error parsing settings file:", err)
+      alert("Failed to parse settings file.")
+    }
+  }
+
+  reader.readAsText(file)
+  // Reset input so same file can be selected again
+  target.value = ''
+}
+
+const fetchConfig = async () => {
+    try {
+        const res = await fetch('/api/config', {
+            headers: authStore.token ? { 'Authorization': `Bearer ${authStore.token}` } : {}
+        })
+        if (res.ok) {
+            const config = await res.json()
+            if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
+            if (config.iteration_interval !== undefined) iterationInterval.value = config.iteration_interval
+            if (config.google_client_id) googleClientId.value = config.google_client_id
+            if (config.entra_client_id) entraClientId.value = config.entra_client_id
+            if (config.entra_tenant_id) entraTenantId.value = config.entra_tenant_id
+            if (config.github_client_id) githubClientId.value = config.github_client_id
+            if (config.github_client_secret) githubClientSecret.value = config.github_client_secret
+        }
+    } catch (e) {
+        console.error("Error fetching system config", e)
+    }
+}
+
+onMounted(() => {
+  fetchUserProfile()
+  // Still fetch system config for version and system-wide settings
+  fetchConfig()
+})
+</script>
+
+<template>
+  <div class="settings-page">
+    <h1>Settings</h1>
+    
+    <div class="settings-section">
+      <h2>About Moirai</h2>
+      <div>
+        <p><strong>Version:</strong> {{ appVersion }}</p>
+        <p>Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).</p>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button 
+        :class="['tab-btn', { active: activeTab === 'user' }]" 
+        @click="activeTab = 'user'"
+      >
+        User Settings
+      </button>
+      <button 
+        :class="['tab-btn', { active: activeTab === 'system' }]" 
+        @click="activeTab = 'system'"
+      >
+        System Settings
+      </button>
+    </div>
+
+    <!-- User Settings Tab -->
+    <div v-show="activeTab === 'user'" class="tab-content">
+      <div class="settings-section">
+        <h2>
+          General (User)
+        </h2>
+        <div>
+          <div class="form-group">
+            <label for="theme">Theme:</label>
+            <select id="theme" :value="theme" @change="setTheme(($event.target as HTMLSelectElement).value as Theme)">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="auto">Auto (System)</option>
+            </select>
