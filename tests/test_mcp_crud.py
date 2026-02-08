@@ -25,6 +25,7 @@ def call_mcp_tool(tool_name, arguments):
     # We saw 'mcp' installed in the container environment.
     pass
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_crud_flow():
     from mcp.client.sse import sse_client

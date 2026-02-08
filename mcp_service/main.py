@@ -11,6 +11,10 @@ from .tools import search
 # Get the ASGI app
 app = mcp.sse_app()
 
+# Initialize Telemetry
+from api.telemetry import configure_telemetry
+configure_telemetry(app, "moirai-mcp")
+
 async def health_check(request):
     return JSONResponse({"status": "ok"})
 

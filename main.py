@@ -11,6 +11,10 @@ from version import get_version_string
 
 app = Flask(__name__, static_folder='ui/dist')
 
+# Initialize Telemetry
+from api.telemetry import configure_telemetry
+configure_telemetry(app, "moirai-api")
+
 # CSRF protection is disabled to support the current API authentication design.
 # The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
 # Note: If adding session-based authentication in the future, re-enable CSRF protection.

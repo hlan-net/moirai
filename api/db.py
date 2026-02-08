@@ -5,9 +5,31 @@ import urllib.parse
 import re
 import logging
 from api.db_config import COUCHDB_URI
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Configure logging for database operations
 logger = logging.getLogger(__name__)
+
+# Retry configuration
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type((requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.ChunkedEncodingError)),
+    reraise=True
+)
+def _request(method, url, **kwargs):
+    """
+    Helper to make HTTP requests with retry logic for transient network errors.
+    Does NOT retry on HTTP 5xx errors automatically to avoid side effects, 
+    but handles connection/timeout errors.
+    Default timeout set to 10s if not provided.
+    """
+    if 'timeout' not in kwargs:
+        kwargs['timeout'] = 10
+        
+    response = requests.request(method, url, **kwargs)
+    return response
+
 
 # Allowed database names for security validation
 ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history"}
@@ -29,9 +51,9 @@ def fetch_from_couchdb(db_name, doc_id=None):
         if doc_id:
             safe_db_name = urllib.parse.quote(db_name, safe="")
             safe_doc_id = urllib.parse.quote(doc_id, safe="")
-            response = requests.get(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
+            response = _request('GET', f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
         else:
-            response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
+            response = _request('GET', f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
 
         if response.status_code == 404:
              return None if doc_id else []
@@ -55,7 +77,7 @@ def store_to_couchdb(db_name, doc):
     
     try:
         safe_db_name = urllib.parse.quote(db_name, safe="")
-        response = requests.post(f"{COUCHDB_URI}{safe_db_name}", json=doc)
+        response = _request('POST', f"{COUCHDB_URI}{safe_db_name}", json=doc)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -70,7 +92,7 @@ def delete_from_couchdb(db_name, doc_id, rev):
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
-        response = requests.delete(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", params={"rev": rev})
+        response = _request('DELETE', f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", params={"rev": rev})
         return response.status_code in (200, 202)
     except requests.exceptions.RequestException as e:
         logger.error(f"Error deleting from CouchDB: {e}")
@@ -85,7 +107,7 @@ def update_couchdb_doc(db_name, doc_id, doc):
     safe_db_name = urllib.parse.quote(db_name, safe="")
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
-        response = requests.put(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", json=doc)
+        response = _request('PUT', f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", json=doc)
         if response.status_code in (200, 201):
             return True
         else:
@@ -114,7 +136,8 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
         if fields:
             query["fields"] = fields
         
-        response = requests.post(
+        response = _request(
+            'POST',
             f"{COUCHDB_URI}{safe_db_name}/_find",
             json=query,
             headers={"Content-Type": "application/json"}

@@ -9,6 +9,7 @@ from mcp.client.sse import sse_client
 from mcp import ClientSession
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_articles():
     url = "http://localhost:8090/sse"
