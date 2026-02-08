@@ -1,24 +1,24 @@
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from ..core import mcp
+from ..core import mcp, auth_required, validate_namespace
 from ..db import db_request
 
 # ===== SEARCH TOOLS =====
 
 @mcp.tool()
-def search_articles(query: str, date_from: str = "", date_to: str = "", limit: int = 50) -> str:
+@auth_required
+def search_articles(query: str, namespace: str = None, date_from: str = "", date_to: str = "", limit: int = 50, api_key: str = None) -> str:
     """
-    Search articles by keyword across title, description, and content.
+    Search articles by keyword. Optionally filter by namespace.
     
     Args:
-        query: Search keywords (case-insensitive)
-        date_from: Optional start date (ISO format: 2026-02-05)
-        date_to: Optional end date (ISO format: 2026-02-05)
-        limit: Maximum number of results (default: 50, max: 200)
-    
-    Returns:
-        JSON string with matching articles
+        query: Search keywords.
+        namespace: Optional GUID of the namespace.
+        date_from: Optional start date (ISO).
+        date_to: Optional end date (ISO).
+        limit: Max results.
+        api_key: Required for authentication.
     """
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
@@ -37,6 +37,9 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
         ]
     }
     
+    if namespace:
+        selector["namespace"] = namespace
+    
     # Add date range filters
     if date_from:
         try:
@@ -45,33 +48,28 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
                 from_dt = from_dt.replace(tzinfo=timezone.utc)
             selector["published"] = {"$gte": from_dt.isoformat()}
         except ValueError:
-            return json.dumps({"error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
+            return json.dumps({"error": "Invalid date_from format."})
     
     if date_to:
         try:
             to_dt = datetime.fromisoformat(date_to)
             if to_dt.tzinfo is None:
                 to_dt = to_dt.replace(tzinfo=timezone.utc)
-            # Combine with existing published filter if from_dt exists
             if "published" in selector:
                 selector["published"]["$lte"] = to_dt.isoformat()
             else:
                 selector["published"] = {"$lte": to_dt.isoformat()}
         except ValueError:
-            return json.dumps({"error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"})
+            return json.dumps({"error": "Invalid date_to format."})
             
-    # Execute query
     try:
         query_payload = {
             "selector": selector,
             "limit": limit,
             "sort": [{"published": "desc"}] if "published" in selector else None,
-             # We need to exclude design docs, though Mango usually handles this.
-             # Fields projection to reduce bandwidth
-            "fields": ["_id", "title", "link", "published", "feed_title", "description"]
+            "fields": ["_id", "title", "link", "published", "feed_title", "description", "namespace"]
         }
         
-        # Remove sort if it's None to avoid errors
         if not query_payload["sort"]:
              del query_payload["sort"]
 
@@ -90,12 +88,14 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", "Unknown"),
-                "description": doc.get("description", "")[:200]
+                "description": doc.get("description", "")[:200],
+                "namespace": doc.get("namespace")
             })
             
         return json.dumps({
             "total": len(results),
             "query": query,
+            "namespace": namespace,
             "results": results
         }, indent=2)
 
@@ -103,35 +103,36 @@ def search_articles(query: str, date_from: str = "", date_to: str = "", limit: i
         return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
-def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
+@auth_required
+def get_recent_articles(namespace: str = None, hours: int = 24, limit: int = 50, api_key: str = None) -> str:
     """
-    Get most recent articles from all feeds.
+    Get most recent articles. Optionally filter by namespace.
     
     Args:
-        hours: Number of hours to look back (default: 24, max: 168)
-        limit: Maximum number of results (default: 50, max: 200)
-    
-    Returns:
-        JSON string with recent articles sorted by date
+        namespace: Optional GUID of the namespace.
+        hours: How far back to look.
+        limit: Max results.
+        api_key: Required for authentication.
     """
-    if hours > 168:  # Max 1 week
+    if hours > 168:
         hours = 168
     if limit > 200:
         limit = 200
     
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     
-    # Mango Query
     selector = {
         "published": {"$gte": cutoff.isoformat()}
     }
+    if namespace:
+        selector["namespace"] = namespace
     
     try:
         query_payload = {
             "selector": selector,
             "limit": limit,
             "sort": [{"published": "desc"}],
-            "fields": ["_id", "title", "link", "published", "feed_title", "description"]
+            "fields": ["_id", "title", "link", "published", "feed_title", "description", "namespace"]
         }
         
         resp = db_request("POST", "articles", "/_find", json_data=query_payload)
@@ -149,12 +150,14 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", "Unknown"),
-                "description": doc.get("description", "")[:200]
+                "description": doc.get("description", "")[:200],
+                "namespace": doc.get("namespace")
             })
             
         return json.dumps({
             "total": len(results),
             "hours": hours,
+            "namespace": namespace,
             "results": results
         }, indent=2)
         
@@ -162,20 +165,23 @@ def get_recent_articles(hours: int = 24, limit: int = 50) -> str:
         return json.dumps({"error": f"Fetch execution error: {str(e)}"})
 
 @mcp.tool()
-def search_events(query: str, limit: int = 50) -> str:
+@auth_required
+def search_events(query: str, namespace: str, limit: int = 50, api_key: str = None) -> str:
     """
-    Search events by name or description.
+    Search events by keyword within a namespace.
     
     Args:
-        query: Search keywords (case-insensitive)
-        limit: Maximum number of results (default: 50, max: 100)
-    
-    Returns:
-        JSON string with matching events
+        query: Search keywords.
+        namespace: GUID of the namespace.
+        limit: Max results.
+        api_key: Required for authentication.
     """
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
     
+    valid, err = validate_namespace(namespace)
+    if not valid: return json.dumps({"error": err})
+
     if limit > 100:
         limit = 100
     
@@ -183,6 +189,7 @@ def search_events(query: str, limit: int = 50) -> str:
     
     # Mango selector
     selector = {
+        "namespace": namespace,
         "$or": [
             {"name": {"$regex": f"(?i){safe_query}"}},
             {"description": {"$regex": f"(?i){safe_query}"}}
@@ -222,20 +229,23 @@ def search_events(query: str, limit: int = 50) -> str:
         return json.dumps({"error": f"Search execution error: {str(e)}"})
 
 @mcp.tool()
-def search_trends(query: str, limit: int = 20) -> str:
+@auth_required
+def search_trends(query: str, namespace: str, limit: int = 20, api_key: str = None) -> str:
     """
-    Search trends by keyword in title or description.
+    Search trends by keyword within a namespace.
     
     Args:
-        query: Search keywords (case-insensitive)
-        limit: Maximum number of results (default: 20, max: 100)
-    
-    Returns:
-        JSON string with matching trends
+        query: Search keywords.
+        namespace: GUID of the namespace.
+        limit: Max results.
+        api_key: Required for authentication.
     """
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
     
+    valid, err = validate_namespace(namespace)
+    if not valid: return json.dumps({"error": err})
+
     if limit > 100:
         limit = 100
     
@@ -243,6 +253,7 @@ def search_trends(query: str, limit: int = 20) -> str:
     
     # Mango selector
     selector = {
+        "namespace": namespace,
         "$or": [
             {"name": {"$regex": f"(?i){safe_query}"}},
             {"description": {"$regex": f"(?i){safe_query}"}}
