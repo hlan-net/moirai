@@ -1,4 +1,3 @@
-import os
 import google.generativeai as genai
 from google.generativeai.types import content_types
 from google.ai.generativelanguage import Content, Part, Tool, FunctionDeclaration, FunctionCall, FunctionResponse
