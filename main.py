@@ -25,6 +25,10 @@ limiter.init_app(app)
 metrics.init_app(app)
 metrics.info('app_info', 'Application info', version='1.0.0')
 
+app.register_blueprint(api_blueprint, url_prefix='/api')
+app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
+app.register_blueprint(chat_blueprint, url_prefix='/api')
+
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -45,10 +49,6 @@ def catch_all(path):
             pass
     # Otherwise serve index.html for client-side routing
     return send_from_directory(app.static_folder, 'index.html')
-
-app.register_blueprint(api_blueprint, url_prefix='/api')
-app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
-app.register_blueprint(chat_blueprint, url_prefix='/api')
 
 def start_services():
     # Force unbuffered output

@@ -5,7 +5,8 @@ import time
 import pytest
 
 # Configuration
-MCP_URL = "http://localhost:8090/sse"
+# Configuration
+MCP_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8090/sse")
 
 # Helper to simulate an MCP tool call
 def call_mcp_tool(tool_name, arguments):
