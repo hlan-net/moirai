@@ -155,6 +155,113 @@ const fetchConfig = async () => {
     }
 }
 
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const exportSettings = async () => {
+  // 1. Fetch server config
+  let serverConfig = {}
+  try {
+      const res = await fetch('/api/config')
+      if (res.ok) {
+          serverConfig = await res.json()
+      }
+  } catch (e) {
+      console.error("Error fetching config for export", e)
+  }
+
+  // 2. Gather local storage
+  const clientSettings: Record<string, string | null> = {
+      'moirai_model': localStorage.getItem('moirai_model'),
+      'moirai_llm_endpoint': localStorage.getItem('moirai_llm_endpoint'),
+      'moirai_openai_api_key': localStorage.getItem('moirai_openai_api_key'),
+      'moirai_openai_model': localStorage.getItem('moirai_openai_model'),
+      'moirai_gemini_api_key': localStorage.getItem('moirai_gemini_api_key'),
+      'moirai_gemini_model': localStorage.getItem('moirai_gemini_model'),
+      'moirai_ollama_endpoint_url': localStorage.getItem('moirai_ollama_endpoint_url'),
+      'moirai_theme': localStorage.getItem('moirai_theme'),
+  }
+
+  // 3. Construct JSON
+  const exportData = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      client_settings: clientSettings,
+      server_config: serverConfig
+  }
+
+  // 4. Download file
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", "moirai-settings.json");
+  document.body.appendChild(downloadAnchorNode); // required for firefox
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+}
+
+const triggerImport = () => {
+  fileInput.value?.click()
+}
+
+const importSettings = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+
+  const file = target.files[0]
+  const reader = new FileReader()
+
+  reader.onload = async (e) => {
+    try {
+      if (!e.target?.result) return
+      const content = e.target.result as string
+      const data = JSON.parse(content)
+
+      // Validate basic structure
+      if (!data.client_settings || !data.server_config) {
+          alert("Invalid settings file format.")
+          return
+      }
+
+      if (!confirm("This will overwrite your current settings and reload the page. Continue?")) {
+          return
+      }
+
+      // Restore client settings
+      Object.entries(data.client_settings).forEach(([key, value]) => {
+          if (value !== null && typeof value === 'string') {
+              localStorage.setItem(key, value)
+          }
+      })
+
+      // Restore server config
+      try {
+          const res = await fetch('/api/config', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data.server_config)
+          })
+          if (!res.ok) {
+              console.error("Failed to restore server config during import")
+              alert("Settings imported, but server configuration failed to update.")
+          }
+      } catch (err) {
+          console.error("Error updating server config:", err)
+      }
+
+      alert("Settings imported successfully! Reloading...")
+      location.reload()
+
+    } catch (err) {
+      console.error("Error parsing settings file:", err)
+      alert("Failed to parse settings file.")
+    }
+  }
+
+  reader.readAsText(file)
+  // Reset input so same file can be selected again
+  target.value = ''
+}
+
 onMounted(() => {
   const saved = localStorage.getItem('moirai_model')
   if (saved) {
@@ -333,6 +440,24 @@ onMounted(() => {
       </div>
     </div>
 
+    <div class="settings-section">
+      <h2>Backup & Restore</h2>
+      <div>
+        <p>Export your settings to a JSON file or restore from a backup. Note: Export includes your API keys.</p>
+        <div class="button-group">
+            <button class="secondary" @click="exportSettings">Export Settings</button>
+            <button class="secondary" @click="triggerImport">Import Settings</button>
+            <input 
+                type="file" 
+                ref="fileInput" 
+                style="display: none" 
+                accept=".json" 
+                @change="importSettings" 
+            />
+        </div>
+      </div>
+    </div>
+
     <button @click="saveSettings">Save All Settings</button>
   </div>
 </template>
@@ -434,5 +559,21 @@ button {
 }
 button:hover {
   background: var(--primary-hover);
+}
+
+.button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+button.secondary {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+button.secondary:hover {
+    background: var(--input-bg);
 }
 </style>
