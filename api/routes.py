@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, abort, request, Response
 import os
 import hashlib
 import version
+import requests
 from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
@@ -735,7 +736,12 @@ def search_events_endpoint():
         results.append({
             "_id": event.get("_id"),
             "name": event.get("name", "Untitled"),
-            "description": event.get("description", ""),
+            "description": event.get("description", "")
+        })
+    
+    return jsonify({
+        "total": len(results),
+        "query": query,
         "results": results
     })
 
