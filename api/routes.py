@@ -22,6 +22,10 @@ from .auth import get_auth_config
 from api.enrichment import enrich_articles_with_events_and_trends
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
+from api.article_ops import build_article_selector, paginate_results
+from api.db_constants import (
+    MONGO_ELEM_MATCH, MONGO_REGEX, MONGO_OR, MONGO_IN, MONGO_GT, MONGO_GTE, MONGO_LTE
+)
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -35,14 +39,7 @@ ERROR_FEED_NOT_FOUND = "Feed not found"
 ERROR_LIMIT_INTEGER = "limit must be an integer"
 ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
 
-# Mongo Constants
-MONGO_ELEM_MATCH = "$elemMatch"
-MONGO_REGEX = "$regex"
-MONGO_OR = "$or"
-MONGO_IN = "$in"
-MONGO_GT = "$gt"
-MONGO_GTE = "$gte"
-MONGO_LTE = "$lte"
+# Mongo Constants are now imported from api.db_constants
 
 def parse_datetime_safe(date_str):
     """Parse datetime and ensure it's timezone-aware for comparison."""
@@ -84,6 +81,16 @@ def get_iteration_interval_setting():
         except (ValueError, TypeError):
             pass
     return ITERATION_INTERVAL_ENV
+
+@api_blueprint.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: *; connect-src 'self';"
+    return response
 
 @api_blueprint.route("/health", methods=["GET"])
 @limiter.exempt
@@ -259,23 +266,7 @@ def list_articles():
     skip = max(skip, 0)
     
     
-    # Build selector for efficient DB querying
-    selector = {}
-    if since:
-        try:
-            since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
-            # Ensure timezone awareness
-            if since_dt.tzinfo is None:
-                since_dt = since_dt.replace(tzinfo=timezone.utc)
-            selector["published"] = {"$gt": since_dt.isoformat()}
-        except (ValueError, AttributeError):
-            pass  # Invalid since parameter, ignore
-
-    # Ensure we have a selector for sorting field to optimize index usage
-    if "published" not in selector:
-        selector["published"] = {MONGO_GT: None}
-
-
+    selector = build_article_selector(since)
 
     # Query CouchDB directly with pagination and sorting
     # We fetch limit + 1 to determine if there are more results
@@ -287,15 +278,7 @@ def list_articles():
         sort=[{"published": "desc"}]
     )
 
-    # Handle has_more logic
-    has_more = False
-    if len(articles) > limit:
-        has_more = True
-        articles = articles[:limit]
-    
-    paginated_articles = articles
-    # Total count is not available efficiently with Mango queries
-    total_count = len(articles) + skip + (1 if has_more else 0)
+    paginated_articles, has_more, total_count = paginate_results(articles, limit, skip)
     
     # Enrichment
     enrich_articles_with_events_and_trends(paginated_articles)
@@ -303,7 +286,7 @@ def list_articles():
     return jsonify({
         "articles": paginated_articles,
         "total_count": total_count,
-        "has_more": (skip + limit) < total_count,
+        "has_more": has_more,
         "limit": limit,
         "skip": skip
     })
