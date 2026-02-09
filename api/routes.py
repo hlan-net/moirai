@@ -397,6 +397,7 @@ def delete_event(event_id):
     abort(500)
 
 @api_blueprint.route("/events/<event_id>/links", methods=["DELETE"])
+@admin_required
 def remove_event_link(event_id):
     """Remove a specific article link from an event."""
     data = request.json
@@ -458,6 +459,7 @@ def get_trend(trend_id):
     return jsonify(trend)
 
 @api_blueprint.route("/trends/<trend_id>", methods=["DELETE"])
+@admin_required
 def delete_trend(trend_id):
     trend = fetch_from_couchdb("trends", trend_id)
     if not trend:
