@@ -227,10 +227,7 @@ const renameSession = async (session: ChatSession) => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title: newSessionTitle.value,
-        messages: session.messages,
-        model: session.model,
-        llm_endpoint: session.llm_endpoint
+        title: newSessionTitle.value
       })
     })
     if (response.ok) {
