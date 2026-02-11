@@ -368,7 +368,6 @@ def entra_login():
         # to fetch the JWKS and verify the signature.
         
         tenant_id = config.get("entra_tenant_id") or "common"
-        authority = f"https://login.microsoftonline.com/{tenant_id}"
         
         # We will use MSAL to validate if possible, otherwise we decode carefully.
         # For now, we fix the "unverified" decode by requiring signature verification
