@@ -259,6 +259,92 @@ const renameSession = async (session: ChatSession) => {
     console.error('Error renaming session:', error)
   }
 }
+
+const filteredSessions = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return sessions.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return sessions.value.filter(session => 
+    session.title?.toLowerCase().includes(query) ||
+    session.model?.toLowerCase().includes(query) ||
+    session.llm_endpoint?.toLowerCase().includes(query)
+  )
+})
+
+const confirmDelete = (id: string, event: Event) => {
+  event.stopPropagation()
+  deleteConfirmId.value = id
+}
+
+const cancelDelete = () => {
+  deleteConfirmId.value = null
+}
+
+const deleteSession = async (id: string, event: Event) => {
+  event.stopPropagation()
+  try {
+    const response = await fetch(`/api/chat/history/${id}`, {
+      method: 'DELETE'
+    })
+    if (response.ok) {
+      sessions.value = sessions.value.filter(s => s._id !== id)
+      if (sessionId.value === id) {
+        newChat()
+      }
+      deleteConfirmId.value = null
+    } else {
+      console.error('Failed to delete session')
+    }
+  } catch (error) {
+    console.error('Error deleting session:', error)
+  }
+}
+
+const getProviderColor = (provider?: string) => {
+  if (!provider) return '#444'
+  switch (provider.toLowerCase()) {
+    case 'openai': return '#0d8a68'  // Darker green for better contrast
+    case 'ollama': return '#4651d9'  // Darker blue for better contrast
+    case 'gemini': return '#1a66c9'  // Darker blue for better contrast
+    default: return '#444'
+  }
+}
+
+const startRename = (session: ChatSession, event: Event) => {
+  event.stopPropagation()
+  renamingSessionId.value = session._id
+  newSessionTitle.value = session.title
+}
+
+const cancelRename = () => {
+  renamingSessionId.value = null
+  newSessionTitle.value = ''
+}
+
+const renameSession = async (session: ChatSession) => {
+  try {
+    const response = await fetch(`/api/chat/history/${session._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newSessionTitle.value
+      })
+    })
+    if (response.ok) {
+      const updatedSession = await response.json()
+      const index = sessions.value.findIndex(s => s._id === updatedSession._id)
+      if (index !== -1) {
+        sessions.value[index] = updatedSession
+      }
+      cancelRename()
+    } else {
+      console.error('Failed to rename session')
+    }
+  } catch (error) {
+    console.error('Error renaming session:', error)
+  }
+}
 </script>
 
 <template>
