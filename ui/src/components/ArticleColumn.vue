@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, onUnmounted, computed, inject, type Ref } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
+import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -183,7 +184,7 @@ onMounted(async () => {
   articleCache.clearOldArticles().catch(console.error)
   
   // 6. Periodic refresh (every 2 minutes)
-  refreshInterval = window.setInterval(fetchLatestUpdates, 120000)
+  refreshInterval = globalThis.setInterval(fetchLatestUpdates, 120000)
 })
 
 onUnmounted(() => {
@@ -197,51 +198,36 @@ onUnmounted(() => {
 
 const refreshingFeed = ref(false)
 
-const refreshSelectedFeed = async () => {
-  if (!selectedFeedUrl.value) return
-  
+const handleRefresh = async () => {
   refreshingFeed.value = true
+  
   try {
-    // Encode the URL for the API path
-    const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
-    const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
-    
-    if (response.ok) {
-      // Wait a bit for the feed to be fetched
-      // TODO: Implement SSE or polling for robust status check
-      setTimeout(async () => {
-        await fetchLatestUpdates()
+    if (selectedFeedUrl.value) {
+      // Refresh specific feed
+      const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
+      const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
+      
+      if (response.ok) {
+        // Wait a bit for the feed to be fetched
+        setTimeout(async () => {
+          await fetchLatestUpdates()
+          refreshingFeed.value = false
+        }, 2000)
+      } else {
+        console.error('Failed to refresh feed')
         refreshingFeed.value = false
-      }, 2000)
+      }
     } else {
-      console.error('Failed to refresh feed')
+      // Just fetch latest updates from DB
+      await fetchLatestUpdates()
       refreshingFeed.value = false
     }
   } catch (error) {
-    console.error('Error refreshing feed:', error)
+    console.error('Error refreshing:', error)
     refreshingFeed.value = false
   }
 }
 
-function formatDate(dateStr: string) {
-  try {
-    return new Date(dateStr).toLocaleString()
-  } catch (e) {
-    return dateStr
-  }
-}
-
-function stripHtml(html: string) {
-   const doc = new DOMParser().parseFromString(html, 'text/html');
-   return doc.body.textContent || "";
-}
-function getHostname(urlStr: string) {
-  try {
-    return new URL(urlStr).hostname
-  } catch (e) {
-    return urlStr
-  }
-}
 </script>
 
 <template>
@@ -253,15 +239,15 @@ function getHostname(urlStr: string) {
         <span v-else-if="!loading">({{ filteredArticles.length }})</span>
         <span v-if="fetchingUpdates" class="update-badge">↻</span>
       </h2>
-      <div v-if="selectedFeedUrl" class="header-actions">
+      <div class="header-actions">
         <button 
-          @click="refreshSelectedFeed" 
+          @click="handleRefresh" 
           :disabled="refreshingFeed"
           class="action-btn"
-          :title="refreshingFeed ? 'Refreshing feed...' : 'Refresh selected feed'"
+          :title="refreshingFeed ? 'Refreshing...' : (selectedFeedUrl ? 'Refresh selected feed' : 'Check for updates')"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
-            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
           </svg>
           {{ refreshingFeed ? 'Refreshing' : 'Refresh' }}
         </button>
@@ -282,10 +268,11 @@ function getHostname(urlStr: string) {
     </div>
 
     <div v-if="loading" class="loading-state">Loading cached articles...</div>
-    <div v-else-if="!filteredArticles.length && searchQuery" class="no-results">
-      No articles match "{{ searchQuery }}"
+    <div v-else-if="!filteredArticles.length" class="no-results">
+      <span v-if="searchQuery">No articles match "{{ searchQuery }}"</span>
+      <span v-else>No articles found yet.</span>
     </div>
-    <div v-else-if="filteredArticles.length" class="article-list">
+    <div v-else class="article-list">
       <div v-for="article in filteredArticles" :key="article._id" class="article-card">
         <div class="card-header">
            <h3><a :href="article.link" target="_blank">{{ article.title }}</a></h3>
@@ -304,140 +291,25 @@ function getHostname(urlStr: string) {
         <div v-else-if="!hasMore" class="end-message">No more articles</div>
       </div>
     </div>
-    <div v-else>No articles found yet.</div>
   </div>
 </template>
 
 <style scoped>
-.search-container {
-  position: relative;
-  margin: 0.75rem 0;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #e0e0e0;
-  font-size: 0.9rem;
-  transition: border-color 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.search-input::placeholder {
-  color: #888;
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0 0.5rem;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.clear-search-btn:hover {
-  color: #e0e0e0;
-}
-
-.column-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #444;
-  padding-bottom: 10px;
-  margin-bottom: 10px;
-  margin-top: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: transparent;
-  color: #e0e0e0;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-btn:hover:not(:disabled) {
-  background: rgba(0, 123, 255, 0.1);
-  border-color: #007bff;
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.action-btn svg.spinning {
-  animation: spin-action 1s linear infinite;
-}
-
-@keyframes spin-action {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.no-results {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #888;
-  font-style: italic;
-}
-
 .article-column {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
+
 h2 {
   color: #007acc;
-  margin-top: 0;
-  position: sticky;
-  top: 0;
-  background: transparent;
-  padding: 10px 0;
-  z-index: 1;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.update-badge {
-  font-size: 0.9rem;
-  color: #666;
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+
 .loading-state {
   text-align: center;
   padding: 20px;

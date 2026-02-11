@@ -45,12 +45,8 @@ mcpServer:
   enabled: true
   # -- MCP server command
   command:
-    - uvicorn
-    - mcp_server:app
-    - --host
-    - 0.0.0.0
-    - --port
-    - "8090"
+    - python
+    - mcp_server.py
   # -- MCP server service configuration
   service:
     # -- MCP server service type
@@ -101,14 +97,8 @@ moirai:
   apiPassword: ""
   # -- Command to run the application (overrides Dockerfile CMD)
   command:
-    - uvicorn
-    - main:app
-    - --interface
-    - wsgi
-    - --host
-    - 0.0.0.0
-    - --port
-    - "8088"
+    - python
+    - main.py
   # -- Enable production startup logic (scheduler, init)
   enableProdStartup: "true"
   # -- Number of days after which an article is considered expired

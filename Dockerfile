@@ -44,6 +44,7 @@ COPY --chown=appuser:appuser mcp_server.py .
 COPY --chown=appuser:appuser version.py .
 COPY --chown=appuser:appuser api/ api/
 COPY --chown=appuser:appuser tasks/ tasks/
+COPY --chown=appuser:appuser mcp_service/ mcp_service/
 
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/

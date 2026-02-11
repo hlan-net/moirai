@@ -1,10 +1,12 @@
 from openai import OpenAI
 from .base import LLMProvider
 
+OPENAI_TIMEOUT_SECONDS = 120.0
+
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key):
-        # 120s timeout for OpenAI API (default is 600s but be explicit)
-        self.client = OpenAI(api_key=api_key, timeout=120.0)
+        # Explicit timeout for OpenAI API
+        self.client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SECONDS)
 
     def list_models(self):
         models_response = self.client.models.list()

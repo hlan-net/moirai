@@ -11,7 +11,13 @@ from version import get_version_string
 
 app = Flask(__name__, static_folder='ui/dist')
 
-# Disable CSRF protection (TODO: re-enable in future)
+# Initialize Telemetry
+from api.telemetry import configure_telemetry
+configure_telemetry(app, "moirai-api")
+
+# CSRF protection is disabled to support the current API authentication design.
+# The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
+# Note: If adding session-based authentication in the future, re-enable CSRF protection.
 csrf = CSRFProtect()
 csrf.init_app(app)
 app.config['WTF_CSRF_ENABLED'] = False
@@ -22,6 +28,10 @@ limiter.init_app(app)
 # Configure metrics
 metrics.init_app(app)
 metrics.info('app_info', 'Application info', version='1.0.0')
+
+app.register_blueprint(api_blueprint, url_prefix='/api')
+app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
+app.register_blueprint(chat_blueprint, url_prefix='/api')
 
 @app.route("/")
 def index():
@@ -38,14 +48,11 @@ def catch_all(path):
     if '.' in path.split('/')[-1]:
         try:
             return send_from_directory(app.static_folder, path)
-        except:
+        except (FileNotFoundError, NotADirectoryError):
+            # File doesn't exist, fall through to serve index.html
             pass
     # Otherwise serve index.html for client-side routing
     return send_from_directory(app.static_folder, 'index.html')
-
-app.register_blueprint(api_blueprint, url_prefix='/api')
-app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
-app.register_blueprint(chat_blueprint, url_prefix='/api')
 
 def start_services():
     # Force unbuffered output

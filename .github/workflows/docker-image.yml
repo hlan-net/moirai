@@ -64,7 +64,7 @@ jobs:
           echo "=== Checking Backend API ==="
           API_READY=false
           for i in {1..60}; do
-            if curl -f http://localhost:8088/api/feeds --user testuser:testpassword > /dev/null 2>&1; then
+            if curl -f http://localhost:8088/api/health > /dev/null 2>&1; then
               echo "✓ Backend API is ready!"
               API_READY=true
               break
@@ -110,7 +110,7 @@ jobs:
           API_PASSWORD: testpassword
         run: |
           # Run security API tests (should all pass)
-          PYTHONPATH=. pytest tests/test_security_api.py
+          PYTHONPATH=. pytest -m integration tests/test_security_api.py
           
           # Skip MCP test for now - it requires complex SSE connection setup
           # PYTHONPATH=. pytest tests/test_mcp_crud.py
@@ -169,3 +169,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
+          build-args: |
+            BUILD_NUMBER=${{ github.run_number }}

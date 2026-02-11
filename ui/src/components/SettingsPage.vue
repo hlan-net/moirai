@@ -12,8 +12,11 @@ const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
 const openaiApiKey = ref('')
 const openaiModelName = ref('gpt-4-turbo')
 const availableOpenAiModels = ref<string[]>([])
+const geminiApiKey = ref('')
+const geminiModelName = ref('gemini-1.5-pro')
+const availableGeminiModels = ref<string[]>([])
 const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
-const collapsedSections = ref<Set<string>>(new Set(['general', 'ollama', 'openai']))
+const collapsedSections = ref<Set<string>>(new Set(['general', 'ollama', 'openai', 'gemini']))
 
 const { theme, setTheme } = useTheme()
 
@@ -22,12 +25,20 @@ watch(llmEndpoint, (newEndpoint) => {
     fetchOpenAiModels()
   } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
     fetchOllamaModels()
+  } else if (newEndpoint === 'gemini' && availableGeminiModels.value.length === 0 && geminiApiKey.value) {
+    fetchGeminiModels()
   }
 })
 
 watch(openaiApiKey, (newKey) => {
   if (!newKey) {
     availableOpenAiModels.value = []
+  }
+})
+
+watch(geminiApiKey, (newKey) => {
+  if (!newKey) {
+    availableGeminiModels.value = []
   }
 })
 
@@ -44,6 +55,8 @@ const saveSettings = async () => {
   localStorage.setItem('moirai_llm_endpoint', llmEndpoint.value)
   localStorage.setItem('moirai_openai_api_key', openaiApiKey.value)
   localStorage.setItem('moirai_openai_model', openaiModelName.value)
+  localStorage.setItem('moirai_gemini_api_key', geminiApiKey.value)
+  localStorage.setItem('moirai_gemini_model', geminiModelName.value)
   localStorage.setItem('moirai_ollama_endpoint_url', ollamaEndpointUrl.value)
 
   // Save server config
@@ -104,6 +117,28 @@ const fetchOpenAiModels = async () => {
   }
 }
 
+const fetchGeminiModels = async () => {
+  if (!geminiApiKey.value) {
+    alert('Please provide a Gemini API key.')
+    return
+  }
+  loadingModels.value = true
+  try {
+    const res = await fetch('/api/models?llm_endpoint=gemini', {
+      headers: {
+        'x-gemini-api-key': geminiApiKey.value
+      }
+    })
+    if (res.ok) {
+      availableGeminiModels.value = await res.json()
+    }
+  } catch (e) {
+    console.error('Error fetching models:', e)
+  } finally {
+    loadingModels.value = false
+  }
+}
+
 const fetchConfig = async () => {
     try {
         const res = await fetch('/api/config')
@@ -118,6 +153,113 @@ const fetchConfig = async () => {
     } catch (e) {
         console.error("Error fetching config", e)
     }
+}
+
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const exportSettings = async () => {
+  // 1. Fetch server config
+  let serverConfig = {}
+  try {
+      const res = await fetch('/api/config')
+      if (res.ok) {
+          serverConfig = await res.json()
+      }
+  } catch (e) {
+      console.error("Error fetching config for export", e)
+  }
+
+  // 2. Gather local storage
+  const clientSettings: Record<string, string | null> = {
+      'moirai_model': localStorage.getItem('moirai_model'),
+      'moirai_llm_endpoint': localStorage.getItem('moirai_llm_endpoint'),
+      'moirai_openai_api_key': localStorage.getItem('moirai_openai_api_key'),
+      'moirai_openai_model': localStorage.getItem('moirai_openai_model'),
+      'moirai_gemini_api_key': localStorage.getItem('moirai_gemini_api_key'),
+      'moirai_gemini_model': localStorage.getItem('moirai_gemini_model'),
+      'moirai_ollama_endpoint_url': localStorage.getItem('moirai_ollama_endpoint_url'),
+      'moirai_theme': localStorage.getItem('moirai_theme'),
+  }
+
+  // 3. Construct JSON
+  const exportData = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      client_settings: clientSettings,
+      server_config: serverConfig
+  }
+
+  // 4. Download file
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", "moirai-settings.json");
+  document.body.appendChild(downloadAnchorNode); // required for firefox
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+}
+
+const triggerImport = () => {
+  fileInput.value?.click()
+}
+
+const importSettings = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+
+  const file = target.files[0]
+  const reader = new FileReader()
+
+  reader.onload = async (e) => {
+    try {
+      if (!e.target?.result) return
+      const content = e.target.result as string
+      const data = JSON.parse(content)
+
+      // Validate basic structure
+      if (!data.client_settings || !data.server_config) {
+          alert("Invalid settings file format.")
+          return
+      }
+
+      if (!confirm("This will overwrite your current settings and reload the page. Continue?")) {
+          return
+      }
+
+      // Restore client settings
+      Object.entries(data.client_settings).forEach(([key, value]) => {
+          if (value !== null && typeof value === 'string') {
+              localStorage.setItem(key, value)
+          }
+      })
+
+      // Restore server config
+      try {
+          const res = await fetch('/api/config', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data.server_config)
+          })
+          if (!res.ok) {
+              console.error("Failed to restore server config during import")
+              alert("Settings imported, but server configuration failed to update.")
+          }
+      } catch (err) {
+          console.error("Error updating server config:", err)
+      }
+
+      alert("Settings imported successfully! Reloading...")
+      location.reload()
+
+    } catch (err) {
+      console.error("Error parsing settings file:", err)
+      alert("Failed to parse settings file.")
+    }
+  }
+
+  reader.readAsText(file)
+  // Reset input so same file can be selected again
+  target.value = ''
 }
 
 onMounted(() => {
@@ -137,6 +279,14 @@ onMounted(() => {
   if (savedOpenaiModel) {
     openaiModelName.value = savedOpenaiModel
   }
+  const savedGeminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+  if (savedGeminiApiKey) {
+    geminiApiKey.value = savedGeminiApiKey
+  }
+  const savedGeminiModel = localStorage.getItem('moirai_gemini_model')
+  if (savedGeminiModel) {
+    geminiModelName.value = savedGeminiModel
+  }
   const savedOllamaUrl = localStorage.getItem('moirai_ollama_endpoint_url')
   if (savedOllamaUrl) {
     ollamaEndpointUrl.value = savedOllamaUrl
@@ -146,6 +296,8 @@ onMounted(() => {
     fetchOllamaModels()
   } else if (llmEndpoint.value === 'openai' && openaiApiKey.value) {
     fetchOpenAiModels()
+  } else if (llmEndpoint.value === 'gemini' && geminiApiKey.value) {
+    fetchGeminiModels()
   }
   fetchConfig()
 })
@@ -177,9 +329,13 @@ onMounted(() => {
             <input type="radio" value="openai" v-model="llmEndpoint">
             OpenAI
           </label>
+          <label>
+            <input type="radio" value="gemini" v-model="llmEndpoint">
+            Gemini
+          </label>
         </div>
       </div>
-      <div :class="['sub-section', { 'disabled': llmEndpoint !== 'ollama' }]">
+      <div class="sub-section">
         <h3 @click="toggleSection('ollama')">
           Ollama
           <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
@@ -187,23 +343,23 @@ onMounted(() => {
         <div v-if="!collapsedSections.has('ollama')">
           <div class="form-group">
             <label for="ollama-url">Ollama Endpoint URL:</label>
-            <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" :disabled="llmEndpoint !== 'ollama'" />
+            <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" />
           </div>
           <div class="form-group">
             <label for="model">LLM Model Name (Ollama):</label>
-            <select v-if="availableModels.length" id="model" v-model="modelName" :disabled="llmEndpoint !== 'ollama'">
+            <select v-if="availableModels.length" id="model" v-model="modelName">
               <option v-for="model in availableModels" :key="model" :value="model">
                 {{ model }}
               </option>
             </select>
-            <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" :disabled="llmEndpoint !== 'ollama'" />
+            <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" />
             <small v-if="loadingModels">Loading available models...</small>
             <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
             <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>
           </div>
         </div>
       </div>
-      <div :class="['sub-section', { 'disabled': llmEndpoint !== 'openai' }]">
+      <div class="sub-section">
         <h3 @click="toggleSection('openai')">
           OpenAI
           <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
@@ -211,20 +367,46 @@ onMounted(() => {
         <div v-if="!collapsedSections.has('openai')">
           <div class="form-group">
             <label for="openai-api-key">OpenAI API Key:</label>
-            <input type="password" id="openai-api-key" v-model="openaiApiKey" :disabled="llmEndpoint !== 'openai'" />
+            <input type="password" id="openai-api-key" v-model="openaiApiKey" />
           </div>
           <div class="form-group">
             <label for="openai-model">OpenAI Model Name:</label>
-            <button @click="fetchOpenAiModels" :disabled="llmEndpoint !== 'openai' || !openaiApiKey || loadingModels">
+            <button @click="fetchOpenAiModels" :disabled="!openaiApiKey || loadingModels">
               {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
             </button>
-            <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName" :disabled="llmEndpoint !== 'openai'">
+            <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName">
               <option v-for="model in availableOpenAiModels" :key="model" :value="model">
                 {{ model }}
               </option>
             </select>
             <small v-if="loadingModels">Loading available models...</small>
             <small v-if="!openaiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-section">
+        <h3 @click="toggleSection('gemini')">
+          Gemini
+          <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+        </h3>
+        <div v-if="!collapsedSections.has('gemini')">
+          <div class="form-group">
+            <label for="gemini-api-key">Gemini API Key:</label>
+            <input type="password" id="gemini-api-key" v-model="geminiApiKey" />
+          </div>
+          <div class="form-group">
+            <label for="gemini-model">Gemini Model Name:</label>
+            <button @click="fetchGeminiModels" :disabled="!geminiApiKey || loadingModels">
+              {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+            </button>
+            <select v-if="availableGeminiModels.length" id="gemini-model" v-model="geminiModelName">
+              <option v-for="model in availableGeminiModels" :key="model" :value="model">
+                {{ model }}
+              </option>
+            </select>
+            <small v-if="loadingModels">Loading available models...</small>
+            <small v-if="!geminiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
           </div>
         </div>
       </div>
@@ -254,6 +436,24 @@ onMounted(() => {
           <label for="interval">Feed Refresh Interval (seconds):</label>
           <input type="number" id="interval" v-model="iterationInterval" min="0" step="60" />
           <small>How often the system checks for new articles. Set to 0 to disable automatic updates.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Backup & Restore</h2>
+      <div>
+        <p>Export your settings to a JSON file or restore from a backup. Note: Export includes your API keys.</p>
+        <div class="button-group">
+            <button class="secondary" @click="exportSettings">Export Settings</button>
+            <button class="secondary" @click="triggerImport">Import Settings</button>
+            <input 
+                type="file" 
+                ref="fileInput" 
+                style="display: none" 
+                accept=".json" 
+                @change="importSettings" 
+            />
         </div>
       </div>
     </div>
@@ -359,5 +559,21 @@ button {
 }
 button:hover {
   background: var(--primary-hover);
+}
+
+.button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+button.secondary {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+button.secondary:hover {
+    background: var(--input-bg);
 }
 </style>

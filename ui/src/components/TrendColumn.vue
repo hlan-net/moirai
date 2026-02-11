@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, inject, type Ref } from 'vue'
+import { onMounted, ref, computed, inject, onUnmounted, watch, type Ref } from 'vue'
 
 interface Trend {
   _id: string
@@ -10,33 +10,17 @@ interface Trend {
 
 const trends = ref<Trend[]>([])
 const loading = ref(true)
+const refreshing = ref(false)
 const expandedTrends = ref<Set<string>>(new Set())
 const searchQuery = ref('')
-const events = ref<any[]>([]) // To check which events link to selected feed's articles
-const articles = ref<any[]>([]) // To check article origins
+let refreshInterval: number | null = null
 
 // Inject selected feed from parent
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
-// Computed: Filtered trends based on search query and selected feed
+// Computed: Filtered trends based on search query
 const filteredTrends = computed(() => {
   let filtered = trends.value
-  
-  // Filter by selected feed - show only trends with events that have articles from that feed
-  if (selectedFeedUrl.value) {
-    const feedArticles = articles.value.filter(a => a.feed_url === selectedFeedUrl.value)
-    const feedArticleLinks = new Set(feedArticles.map(a => a.link))
-    
-    const relevantEventIds = new Set(
-      events.value
-        .filter(event => event.article_links?.some((link: string) => feedArticleLinks.has(link)))
-        .map(event => event._id)
-    )
-    
-    filtered = filtered.filter(trend => 
-      trend.event_ids.some(eventId => relevantEventIds.has(eventId))
-    )
-  }
   
   // Filter by search query
   if (searchQuery.value.trim()) {
@@ -51,32 +35,44 @@ const filteredTrends = computed(() => {
   return filtered
 })
 
-const fetchTrends = async () => {
+const fetchTrends = async (isRefresh = false) => {
+  if (isRefresh) {
+    refreshing.value = true
+  } else {
+    loading.value = true
+  }
+  
   try {
-    const [trendsResponse, eventsResponse, articlesResponse] = await Promise.all([
-      fetch('/api/trends'),
-      fetch('/api/events'),
-      fetch('/api/articles?limit=10000'),
-    ])
+    const params = new URLSearchParams()
+    if (selectedFeedUrl.value) {
+      params.append('feed_url', selectedFeedUrl.value)
+    }
+    const queryString = params.toString() ? `?${params.toString()}` : ''
 
-    if (trendsResponse.ok) {
-      trends.value = await trendsResponse.json()
-    }
-    
-    if (eventsResponse.ok) {
-      events.value = await eventsResponse.json()
-    }
-    
-    if (articlesResponse.ok) {
-      const data = await articlesResponse.json()
-      articles.value = data.articles || []
+    const response = await fetch(`/api/trends${queryString}`)
+
+    if (response.ok) {
+      const data = await response.json()
+      const allTrends = Array.isArray(data) ? data : []
+      trends.value = allTrends.filter((t: Trend) => !t._id.startsWith('_design/'))
+    } else if (!isRefresh) {
+      trends.value = []
     }
   } catch (error) {
-    console.error('Error fetching trends:', error)
+    console.error('Error fetching data:', error)
+    if (!isRefresh) {
+      trends.value = []
+    }
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
+
+// Watch for feed selection changes to refresh data
+watch(selectedFeedUrl, () => {
+  fetchTrends()
+})
 
 const deleteTrend = async (id: string) => {
   if (!confirm('Delete this trend?')) return
@@ -121,12 +117,35 @@ const toggleExpand = (id: string) => {
 
 onMounted(() => {
   fetchTrends()
+  // Refresh every 30 seconds
+  refreshInterval = globalThis.setInterval(() => fetchTrends(true), 30000)
+})
+
+onUnmounted(() => {
+  if (refreshInterval !== null) {
+    clearInterval(refreshInterval)
+  }
 })
 </script>
 
 <template>
-  <div class="column-container">
-    <h2>Trends ({{ filteredTrends.length }})</h2>
+  <div class="trend-column">
+    <div class="column-header">
+      <h2>
+        Trends ({{ filteredTrends.length }})
+        <span v-if="refreshing" class="update-badge">↻</span>
+      </h2>
+      <button 
+        @click="() => fetchTrends(true)" 
+        :disabled="refreshing"
+        class="action-btn"
+        title="Refresh trends"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
+          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
+    </div>
 
     <!-- Search Input -->
     <div class="search-container">
@@ -141,22 +160,23 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="loading">Loading trends...</div>
-    <div v-else-if="!filteredTrends.length && searchQuery" class="no-results">
-      No trends match "{{ searchQuery }}"
+    <div v-if="loading" class="loading-state">Loading trends...</div>
+    <div v-else-if="!filteredTrends.length" class="no-results">
+      <span v-if="searchQuery">No trends match "{{ searchQuery }}"</span>
+      <span v-else>No trends found yet.</span>
     </div>
-    <div v-else-if="filteredTrends.length" class="trend-list">
+    <div v-else class="trend-list">
       <div v-for="trend in filteredTrends" :key="trend._id" class="trend-card">
         <div class="card-header">
           <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
           <button @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
         </div>
-        <p class="desc">{{ trend.description }}</p>
+        <p class="summary">{{ trend.description }}</p>
 
         <div v-if="expandedTrends.has(trend._id)" class="events-section">
-          <h4>Linked Events ({{ trend.event_ids.length }})</h4>
+          <h4>Linked Events ({{ (trend.event_ids || []).length }})</h4>
           <ul>
-            <li v-for="eid in trend.event_ids" :key="eid">
+            <li v-for="eid in (trend.event_ids || [])" :key="eid">
               <span class="event-id">{{ eid.substring(0, 8) }}...</span>
               <button
                 @click="removeEvent(trend._id, eid)"
@@ -169,122 +189,94 @@ onMounted(() => {
           </ul>
         </div>
         <div v-else class="expand-hint" @click="toggleExpand(trend._id)">
-          {{ trend.event_ids.length }} events (click to expand)
+          {{ (trend.event_ids || []).length }} events (click to expand)
         </div>
       </div>
     </div>
-    <div v-else>No trends found.</div>
   </div>
 </template>
 
 <style scoped>
-.search-container {
-  position: relative;
-  margin: 0.75rem 0;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #e0e0e0;
-  font-size: 0.9rem;
-  transition: border-color 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.search-input::placeholder {
-  color: #888;
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0 0.5rem;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.clear-search-btn:hover {
-  color: #e0e0e0;
-}
-
-.no-results {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #888;
-  font-style: italic;
-}
-
-.column-container {
-  height: 100%;
+.trend-column {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
+
 h2 {
   color: #6a0dad;
-  margin-top: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.loading-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
 .trend-list {
   overflow-y: auto;
   flex: 1;
 }
+
 .trend-card {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 10px;
-  margin-bottom: 10px;
-  background: var(--button-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 15px 0;
+  text-align: left;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
 }
+
 .clickable {
   cursor: pointer;
 }
 .clickable:hover {
   text-decoration: underline;
 }
+
 h3 {
-  margin: 0;
+  margin: 0 0 5px 0;
   font-size: 1.1rem;
   color: var(--text-color);
 }
-.desc {
+
+.summary {
   font-size: 0.9rem;
   color: var(--text-color);
-  opacity: 0.8;
+  opacity: 0.9;
+  line-height: 1.4;
   margin: 5px 0;
 }
+
 .delete-btn {
   background: none;
   border: none;
-  color: #cc0000;
+  color: #999;
   font-size: 1.2rem;
   cursor: pointer;
+  padding: 0 5px;
 }
+.delete-btn:hover {
+  color: #cc0000;
+}
+
 .expand-hint {
   font-size: 0.8rem;
   color: var(--text-color);
   opacity: 0.5;
   cursor: pointer;
-  margin-top: 5px;
+  margin-top: 10px;
 }
+
 .events-section {
   margin-top: 10px;
   border-top: 1px solid var(--border-color);

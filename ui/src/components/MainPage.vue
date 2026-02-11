@@ -16,9 +16,6 @@ const setFocus = (column: string | null) => {
 
 const selectFeed = (feedUrl: string | null) => {
   selectedFeedUrl.value = feedUrl
-  if (feedUrl) {
-    console.log('Feed selected:', feedUrl)
-  }
 }
 
 // Provide selectedFeedUrl to child components
@@ -28,11 +25,14 @@ provide('selectFeed', selectFeed)
 
 <template>
   <div class="main-page">
-    <h1>{{ msg }}</h1>
-    
-    <div v-if="focusedColumn || selectedFeedUrl" class="controls">
-      <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">Clear Focus</button>
-      <button v-if="selectedFeedUrl" @click="selectFeed(null)" class="clear-filter-btn">Clear Feed Filter</button>
+    <div class="header-container">
+      <div class="title-wrapper">
+        <h1>{{ msg }}</h1>
+        <div class="header-controls">
+          <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">Clear Focus</button>
+          <button v-if="selectedFeedUrl" @click="selectFeed(null)" class="clear-filter-btn">Clear Feed Filter</button>
+        </div>
+      </div>
     </div>
 
     <div class="columns-container">
@@ -65,23 +65,41 @@ provide('selectFeed', selectFeed)
 </template>
 
 <style scoped>
+/* Mobile-first approach: Base styles for mobile devices */
 .main-page {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 10px;
   box-sizing: border-box;
 }
+
+.header-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 10px;
+}
+
+.title-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
 h1 {
-  margin-bottom: 20px;
+  margin: 0;
   text-align: center;
 }
-.controls {
-  margin-bottom: 20px;
-  text-align: center;
+
+.header-controls {
   display: flex;
-  gap: 10px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
 }
 
 .clear-focus-btn, .clear-filter-btn {
@@ -92,6 +110,7 @@ h1 {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  width: 100%;
 }
 
 .clear-focus-btn:hover, .clear-filter-btn:hover {
@@ -108,29 +127,124 @@ h1 {
   background: #3a6ba5;
 }
 
+/* Mobile: Stack columns vertically */
 .columns-container {
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
+  flex-direction: column;
+  gap: 15px;
   flex: 1;
-  overflow: hidden; /* Prevent full page scroll, allow columns to scroll */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
+
 .column {
-  flex: 1;
+  width: 100%;
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: var(--card-bg);
   display: flex;
   flex-direction: column;
+  min-height: 200px;
   overflow: hidden;
   transition: all 0.3s ease;
 }
+
 .column.focused {
-  flex-grow: 2;
+  min-height: 300px;
 }
+
 .column.unfocused {
-  flex-grow: 0.5;
-  opacity: 0.5;
+  opacity: 0.7;
+  min-height: 150px;
+}
+
+/* Tablet: 2-column layout */
+@media (min-width: 768px) {
+  .main-page {
+    padding: 15px;
+  }
+
+  .header-container {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .title-wrapper {
+    flex-direction: row;
+    width: auto;
+  }
+
+  .header-controls {
+    flex-direction: row;
+    gap: 10px;
+    width: auto;
+  }
+
+  .clear-focus-btn, .clear-filter-btn {
+    width: auto;
+  }
+
+  .columns-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 15px;
+    overflow: hidden;
+  }
+
+  .column {
+    flex: 1 1 calc(50% - 10px);
+    min-width: 0;
+  }
+
+  .column.focused {
+    flex: 1 1 60%;
+  }
+
+  .column.unfocused {
+    flex: 1 1 calc(40% - 15px);
+  }
+}
+
+/* Desktop: 4-column layout */
+@media (min-width: 1200px) {
+  .main-page {
+    padding: 20px;
+  }
+
+  .header-container {
+    justify-content: center;
+  }
+
+  .title-wrapper {
+    position: relative;
+  }
+
+  .header-controls {
+    position: absolute;
+    left: 100%;
+    margin-left: 20px;
+    white-space: nowrap;
+  }
+
+  .columns-container {
+    flex-wrap: nowrap;
+    gap: 20px;
+  }
+
+  .column {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .column.focused {
+    flex-grow: 2;
+  }
+
+  .column.unfocused {
+    flex-grow: 0.5;
+    opacity: 0.5;
+  }
 }
 </style>

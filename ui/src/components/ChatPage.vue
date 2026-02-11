@@ -39,6 +39,8 @@ const loadSettings = () => {
     
     if (currentLlmEndpoint.value === 'openai') {
         currentModel.value = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
+    } else if (currentLlmEndpoint.value === 'gemini') {
+        currentModel.value = localStorage.getItem('moirai_gemini_model') || 'gemini-1.5-pro'
     } else {
         currentModel.value = localStorage.getItem('moirai_model') || 'llama3.1:latest'
     }
@@ -69,6 +71,29 @@ const loadSession = (session: ChatSession) => {
 const newChat = () => {
   sessionId.value = null
   messages.value = []
+}
+
+const getHeaders = () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (currentLlmEndpoint.value === 'openai') {
+      const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
+      if (openaiApiKey) {
+        headers['x-openai-api-key'] = openaiApiKey
+      }
+    } else if (currentLlmEndpoint.value === 'gemini') {
+      const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+      if (geminiApiKey) {
+        headers['x-gemini-api-key'] = geminiApiKey
+      }
+    } else {
+      const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
+      if (ollamaEndpointUrl) {
+        headers['x-ollama-base-url'] = ollamaEndpointUrl
+      }
+    }
+    return headers
 }
 
 const sendMessage = async () => {
@@ -103,20 +128,7 @@ const sendMessage = async () => {
       content: m.content
     }))
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    if (currentLlmEndpoint.value === 'openai') {
-      const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
-      if (openaiApiKey) {
-        headers['x-openai-api-key'] = openaiApiKey
-      }
-    } else {
-      const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
-      if (ollamaEndpointUrl) {
-        headers['x-ollama-base-url'] = ollamaEndpointUrl
-      }
-    }
+    const headers = getHeaders()
 
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -156,7 +168,96 @@ const sendMessage = async () => {
 
 const downloadChat = () => {
   if (!sessionId.value) return
-  window.location.href = `/api/chat/history/${sessionId.value}/export`
+  globalThis.location.href = `/api/chat/history/${sessionId.value}/export`
+}
+
+const filteredSessions = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return sessions.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return sessions.value.filter(session => 
+    session.title?.toLowerCase().includes(query) ||
+    session.model?.toLowerCase().includes(query) ||
+    session.llm_endpoint?.toLowerCase().includes(query)
+  )
+})
+
+const confirmDelete = (id: string, event: Event) => {
+  event.stopPropagation()
+  deleteConfirmId.value = id
+}
+
+const cancelDelete = () => {
+  deleteConfirmId.value = null
+}
+
+const deleteSession = async (id: string, event: Event) => {
+  event.stopPropagation()
+  try {
+    const response = await fetch(`/api/chat/history/${id}`, {
+      method: 'DELETE'
+    })
+    if (response.ok) {
+      sessions.value = sessions.value.filter(s => s._id !== id)
+      if (sessionId.value === id) {
+        newChat()
+      }
+      deleteConfirmId.value = null
+    } else {
+      console.error('Failed to delete session')
+    }
+  } catch (error) {
+    console.error('Error deleting session:', error)
+  }
+}
+
+const getProviderColor = (provider?: string) => {
+  if (!provider) return '#444'
+  switch (provider.toLowerCase()) {
+    case 'openai': return '#0d8a68'  // Darker green for better contrast
+    case 'ollama': return '#4651d9'  // Darker blue for better contrast
+    case 'gemini': return '#1a66c9'  // Darker blue for better contrast
+    default: return '#444'
+  }
+}
+
+const startRename = (session: ChatSession, event: Event) => {
+  event.stopPropagation()
+  renamingSessionId.value = session._id
+  newSessionTitle.value = session.title
+}
+
+const cancelRename = () => {
+  renamingSessionId.value = null
+  newSessionTitle.value = ''
+}
+
+const renameSession = async (session: ChatSession) => {
+  try {
+    const response = await fetch(`/api/chat/history/${session._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newSessionTitle.value,
+        messages: session.messages,
+        model: session.model,
+        llm_endpoint: session.llm_endpoint
+      })
+    })
+    if (response.ok) {
+      const updatedSession = await response.json()
+      const index = sessions.value.findIndex(s => s._id === updatedSession._id)
+      if (index !== -1) {
+        sessions.value[index] = updatedSession
+      }
+      cancelRename()
+    } else {
+      console.error('Failed to rename session')
+    }
+  } catch (error) {
+    console.error('Error renaming session:', error)
+  }
 }
 
 const filteredSessions = computed(() => {
@@ -628,7 +729,7 @@ const renameSession = async (session: ChatSession) => {
   overflow: hidden;
 }
 .chat-header {
-    margin-bottom: 10px;
+
     display: flex;
     justify-content: space-between;
     align-items: center;

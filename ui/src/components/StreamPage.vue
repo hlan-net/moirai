@@ -176,8 +176,8 @@ onMounted(async () => {
   // 5. Clean old cache
   articleCache.clearOldArticles().catch(console.error)
   
-  // 6. Periodic refresh (every 2 minutes)
-  refreshInterval = window.setInterval(fetchLatestUpdates, 120000)
+  // Periodic refresh (every 2 minutes)
+  refreshInterval = globalThis.setInterval(fetchLatestUpdates, 120000)
 })
 
 onUnmounted(() => {

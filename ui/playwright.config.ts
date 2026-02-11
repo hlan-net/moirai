@@ -10,10 +10,10 @@ export default defineConfig({
   use: {
     baseURL: process.env.CI ? 'http://localhost:8088' : 'http://localhost:5173',
     trace: 'on-first-retry',
-    httpCredentials: process.env.CI ? {
-      username: 'testuser',
-      password: 'testpassword',
-    } : undefined,
+    httpCredentials: {
+      username: process.env.API_USERNAME || 'testuser',
+      password: process.env.API_PASSWORD || 'testpassword',
+    },
   },
   projects: [
     {

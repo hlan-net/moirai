@@ -8,12 +8,13 @@
   --button-bg: #1a1a1a;
   --input-bg: #333;
   --input-text: #fff;
-  
+
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark; /* Default hint */
+  color-scheme: dark;
+  /* Default hint */
   color: var(--text-color);
   background-color: var(--bg-color);
 
@@ -34,7 +35,7 @@
   --button-bg: #f9f9f9;
   --input-bg: #ffffff;
   --input-text: #333;
-  
+
   color-scheme: light;
 }
 
@@ -50,7 +51,7 @@
     --button-bg: #f9f9f9;
     --input-bg: #ffffff;
     --input-text: #333;
-    
+
     color-scheme: light;
   }
 }
@@ -60,6 +61,7 @@ a {
   color: var(--primary-color);
   text-decoration: inherit;
 }
+
 a:hover {
   color: var(--primary-hover);
 }
@@ -72,7 +74,12 @@ body {
   color: var(--text-color);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--text-color);
 }
 
@@ -88,9 +95,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: var(--primary-color);
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -108,4 +117,159 @@ button:focus-visible {
   margin: 0 auto;
   padding: 0;
   text-align: center;
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 767px) {
+
+  /* Improve touch targets on mobile */
+  button,
+  .action-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better spacing on mobile */
+  .card {
+    padding: 1em;
+  }
+
+  /* Responsive typography - mobile */
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+  }
+}
+
+/* Tablet typography */
+@media (min-width: 768px) and (max-width: 1199px) {
+  h1 {
+    font-size: 1.8rem;
+  }
+}
+
+/* Desktop typography */
+@media (min-width: 1200px) {
+  h1 {
+    font-size: 2rem;
+  }
+}
+
+/* Shared Dashboard Column Styles */
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  margin-top: 0;
+}
+
+.search-container {
+  position: relative;
+  margin: 0.75rem 0;
+}
+
+.search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.clear-search-btn:hover {
+  color: var(--text-color);
+}
+
+.no-results {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: var(--button-bg);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.update-badge {
+  font-size: 0.9rem;
+  color: #666;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }

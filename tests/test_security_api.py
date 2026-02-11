@@ -56,6 +56,7 @@ def wait_for_bulk_rate_limit():
     wait_for_rate_limit()
     yield
 
+@pytest.mark.integration
 def test_feed_url_validation_http():
     """Test that creating a feed with invalid URL scheme fails"""
     url = f"{BASE_URL}/api/feeds"
@@ -73,6 +74,7 @@ def test_feed_url_validation_http():
     # Check for validation error (Pydantic or custom)
     assert "validation error" in response.text.lower() or "only http/https" in response.text.lower()
 
+@pytest.mark.integration
 def test_feed_url_validation_valid():
     """Test that creating a feed with valid URL scheme succeeds"""
     url = f"{BASE_URL}/api/feeds"
@@ -86,6 +88,7 @@ def test_feed_url_validation_valid():
     response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
     assert response.status_code in [200, 201]
 
+@pytest.mark.integration
 def test_xss_sanitization():
     """Test that HTML tags are stripped from titles"""
     url = f"{BASE_URL}/api/feeds"
@@ -110,6 +113,7 @@ def test_xss_sanitization():
     assert "<script>" not in created_feed["title"]
     assert "Safe Title" in created_feed["title"]
 
+@pytest.mark.integration
 def test_rate_limiting():
     """Test that rate limits are enforced (smoke test)"""
     # This might fail if run against a fresh instance with high limits, 
@@ -134,6 +138,7 @@ def test_rate_limiting():
     
     assert len(rate_limit_headers) > 0
 
+@pytest.mark.integration
 def test_bulk_import_successful(wait_for_bulk_rate_limit):
     """Test successful import of multiple feeds"""
     url = f"{BASE_URL}/api/feeds/bulk"
@@ -155,6 +160,7 @@ def test_bulk_import_successful(wait_for_bulk_rate_limit):
     assert result["skipped"] == 0
     assert len(result["errors"]) == 0
 
+@pytest.mark.integration
 def test_bulk_import_duplicates(wait_for_bulk_rate_limit):
     """Test that duplicate feeds are properly skipped"""
     url = f"{BASE_URL}/api/feeds/bulk"
@@ -182,6 +188,7 @@ def test_bulk_import_duplicates(wait_for_bulk_rate_limit):
     assert result["success"] == 1   # New URL should succeed
     assert result["failed"] == 0
 
+@pytest.mark.integration
 def test_bulk_import_invalid_urls(wait_for_bulk_rate_limit):
     """Test that invalid URLs are properly reported as errors"""
     url = f"{BASE_URL}/api/feeds/bulk"
@@ -212,6 +219,7 @@ def test_bulk_import_invalid_urls(wait_for_bulk_rate_limit):
         assert "error" in error
         assert "url" in error["error"].lower() or "invalid" in error["error"].lower()
 
+@pytest.mark.integration
 def test_bulk_import_dos_protection(wait_for_bulk_rate_limit):
     """Test that bulk import rejects too many URLs (DoS protection)"""
     url = f"{BASE_URL}/api/feeds/bulk"
@@ -225,6 +233,7 @@ def test_bulk_import_dos_protection(wait_for_bulk_rate_limit):
     response_text = response.text.lower()
     assert "too many" in response_text or "maximum" in response_text or "limit" in response_text
 
+@pytest.mark.integration
 def test_bulk_import_empty_request(wait_for_bulk_rate_limit):
     """Test that empty or missing URLs array is rejected"""
     url = f"{BASE_URL}/api/feeds/bulk"
@@ -245,6 +254,7 @@ def test_bulk_import_empty_request(wait_for_bulk_rate_limit):
     response = requests.post(url, json={"urls": "not-an-array"}, auth=(API_USERNAME, API_PASSWORD))
     assert response.status_code == 400
 
+@pytest.mark.integration
 def test_bulk_import_mixed_results(wait_for_bulk_rate_limit):
     """Test bulk import with a mix of valid, invalid, and duplicate URLs"""
     url = f"{BASE_URL}/api/feeds/bulk"

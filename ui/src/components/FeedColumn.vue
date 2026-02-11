@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch, nextTick, inject, type Ref } from 'vue'
+import { getHostname, isValidUrl } from '../utils/formatters'
 
 interface Feed {
   _id: string;
@@ -35,16 +36,6 @@ const modalContentRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
-
-// URL validation function
-const isValidUrl = (urlString: string): boolean => {
-  try {
-    const url = new URL(urlString)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
 
 // Extract and validate URLs from text
 const extractValidUrls = (text: string): string[] => {
@@ -170,16 +161,8 @@ onMounted(() => {
   fetchFeeds()
 })
 
-function getHostname(urlStr: string) {
-  try {
-    return new URL(urlStr).hostname
-  } catch (e) {
-    return urlStr
-  }
-}
-
 const openFeedInNewTab = (url: string) => {
-  window.open(url, '_blank')
+  globalThis.open(url, '_blank')
 }
 
 const handleFaviconError = (event: Event) => {
@@ -204,7 +187,7 @@ const openBulkImportModal = () => {
   bulkImportResults.value = null
 
   if (!bulkImportKeydownListenerAttached) {
-    window.addEventListener('keydown', handleBulkImportKeydown)
+    globalThis.addEventListener('keydown', handleBulkImportKeydown)
     bulkImportKeydownListenerAttached = true
   }
 }
@@ -216,7 +199,7 @@ const closeBulkImportModal = () => {
 
   // Remove keyboard event listener
   if (bulkImportKeydownListenerAttached) {
-    window.removeEventListener('keydown', handleBulkImportKeydown)
+    globalThis.removeEventListener('keydown', handleBulkImportKeydown)
     bulkImportKeydownListenerAttached = false
   }
 
@@ -443,7 +426,11 @@ const bulkImportFeeds = async () => {
     </div>
     <ul v-else-if="filteredFeeds.length" class="feed-list">
       <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item" 
-          @click="selectFeed(feed.url)" 
+          role="button"
+          tabindex="0"
+          @click="selectFeed(feed.url)"
+          @keydown.enter.prevent="selectFeed(feed.url)"
+          @keydown.space.prevent="selectFeed(feed.url)"
           :class="{ 'selected-feed': selectedFeedUrl === feed.url }">
         <div v-if="renamingFeedId === feed._id" class="feed-info">
           <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
@@ -573,101 +560,18 @@ const bulkImportFeeds = async () => {
 </template>
 
 <style scoped>
-.search-container {
-  position: relative;
-  margin: 0.75rem 0;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.6rem 2.5rem 0.6rem 0.75rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #2a2a2a;
-  color: #e0e0e0;
-  font-size: 0.9rem;
-  transition: border-color 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.search-input::placeholder {
-  color: #888;
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0 0.5rem;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.clear-search-btn:hover {
-  color: #e0e0e0;
-}
-
-.no-results {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #888;
-  font-style: italic;
-}
-
 .column-container {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
-.column-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-    margin-top: 0;
-}
+
 h2 {
   margin: 0;
   color: #42b983;
 }
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-.action-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-color);
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.action-btn:hover:not(:disabled) {
-    background: var(--button-bg);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-.action-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
-}
+
 .feed-list {
   list-style-type: none;
   padding: 0;
@@ -804,13 +708,7 @@ h2 {
     align-items: center;
     padding: 4px;
 }
-.spinning {
-    animation: spin 1s linear infinite;
-}
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
+
 .rename-actions {
   display: flex;
   gap: 5px;

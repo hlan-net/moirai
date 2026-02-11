@@ -7,68 +7,10 @@ import re
 from datetime import datetime
 import hashlib
 import json
+from api.db import fetch_from_couchdb, store_to_couchdb
+from api.enrichment import enrich_events_with_articles, enrich_trends_with_events
 
 mcp_blueprint = Blueprint('mcp', __name__)
-
-COUCHDB_URI = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
-user = os.environ.get("COUCHDB_USER")
-password = os.environ.get("COUCHDB_PASSWORD")
-if user and password and "@" not in COUCHDB_URI:
-    from urllib.parse import quote
-    if "://" in COUCHDB_URI:
-        scheme, host = COUCHDB_URI.split("://", 1)
-    else:
-        scheme, host = "http", COUCHDB_URI
-    COUCHDB_URI = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
-
-if not COUCHDB_URI.endswith("/"):
-    COUCHDB_URI += "/"
-
-def fetch_from_couchdb(db_name, doc_id=None):
-    """Fetches data from CouchDB. If doc_id is None, lists all documents in the database."""
-    allowed_dbs = {"feeds", "articles", "events", "trends"}
-    if db_name not in allowed_dbs:
-        abort(400, description="Invalid database name.")
-    if doc_id and not re.match(r'^[A-Za-z0-9\-_]+$', doc_id):
-        abort(400, description="Invalid document id.")
-    try:
-        if doc_id:
-            safe_db_name = urllib.parse.quote(db_name, safe="")
-            safe_doc_id = urllib.parse.quote(doc_id, safe="")
-            response = requests.get(f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
-        else:
-            response = requests.get(f"{COUCHDB_URI}{db_name}/_all_docs", params={"include_docs": "true"})
-
-        response.raise_for_status()
-        if doc_id:
-            return response.json()
-        else:
-            docs = [row["doc"] for row in response.json()["rows"]]
-            return docs
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching from CouchDB: {e}")
-        abort(500, description="Database error")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        abort(500, description="Unexpected error")
-
-def store_to_couchdb(db_name, doc):
-    """Stores a document to CouchDB."""
-    allowed_dbs = {"feeds", "articles", "events", "trends"}
-    if db_name not in allowed_dbs:
-        abort(400, description="Invalid database name.")
-    
-    try:
-        safe_db_name = urllib.parse.quote(db_name, safe="")
-        response = requests.post(f"{COUCHDB_URI}{safe_db_name}", json=doc)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error storing to CouchDB: {e}")
-        abort(500, description="Database error")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        abort(500, description="Unexpected error")
 
 # Articles Endpoints
 
@@ -158,6 +100,8 @@ def get_event(event_id):
     Query Parameters:
         - include_articles: Boolean to include full article objects
     """
+
+
     event = fetch_from_couchdb("events", event_id)
     if not event:
         abort(404, description="Event not found")
@@ -165,18 +109,8 @@ def get_event(event_id):
     # Check if we should include full article objects
     include_articles = request.args.get('include_articles', '').lower() == 'true'
     
-    if include_articles and 'article_ids' in event:
-        articles = []
-        for article_id in event['article_ids']:
-            try:
-                article = fetch_from_couchdb("articles", article_id)
-                if article:
-                    articles.append(article)
-            except Exception as e:
-                # Skip articles that don't exist or can't be fetched
-                print(f"Warning: Could not fetch article {article_id}: {e}")
-                continue
-        event['articles'] = articles
+    if include_articles:
+        enrich_events_with_articles([event], include_articles=True)
     
     return jsonify(event)
 
@@ -245,29 +179,7 @@ def get_trend(trend_id):
     include_events = request.args.get('include_events', '').lower() == 'true'
     include_articles = request.args.get('include_articles', '').lower() == 'true'
     
-    if include_events and 'event_ids' in trend:
-        events = []
-        for event_id in trend['event_ids']:
-            try:
-                event = fetch_from_couchdb("events", event_id)
-                if event:
-                    # If include_articles is also requested, fetch articles for each event
-                    if include_articles and 'article_ids' in event:
-                        articles = []
-                        for article_id in event['article_ids']:
-                            try:
-                                article = fetch_from_couchdb("articles", article_id)
-                                if article:
-                                    articles.append(article)
-                            except Exception as e:
-                                print(f"Warning: Could not fetch article {article_id}: {e}")
-                                continue
-                        event['articles'] = articles
-                    events.append(event)
-            except Exception as e:
-                # Skip events that don't exist or can't be fetched
-                print(f"Warning: Could not fetch event {event_id}: {e}")
-                continue
-        trend['events'] = events
+    if include_events:
+        enrich_trends_with_events([trend], include_events=True, include_articles=include_articles)
     
     return jsonify(trend)
