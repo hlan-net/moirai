@@ -163,3 +163,7 @@ cython_debug/
 
 # Chart.lock provides the same functionality
 helm/charts/tests/k6/load_test.js
+
+# Playwright
+ui/playwright-report/
+ui/test-results/

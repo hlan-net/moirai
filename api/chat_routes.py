@@ -181,7 +181,9 @@ def update_chat_session(session_id):
     if not session:
         abort(404, description=CHAT_SESSION_NOT_FOUND)
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        abort(400, description="Invalid or missing JSON body")
     
     # Update fields if provided
     if "messages" in data:
