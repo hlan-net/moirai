@@ -1,4 +1,49 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+// Constants for timeouts to avoid magic numbers
+const TIMEOUT = {
+  NEW_CHAT_DELAY: 500,
+  RESPONSE_WAIT: 2000,
+  SESSION_LOAD: 1000,
+  UI_UPDATE: 100,
+  SAVE_ACTION: 500
+} as const;
+
+// Helper functions to reduce code duplication
+async function createChatSession(page: Page, title: string): Promise<void> {
+  await page.click('.new-chat-btn');
+  await page.waitForTimeout(TIMEOUT.NEW_CHAT_DELAY);
+  
+  const input = page.locator('.input-area input');
+  await input.fill(title);
+  await input.press('Enter');
+  
+  // Wait for response and session creation
+  await page.waitForTimeout(TIMEOUT.RESPONSE_WAIT);
+}
+
+async function searchSessions(page: Page, query: string): Promise<void> {
+  const searchInput = page.locator('.search-input');
+  await searchInput.fill(query);
+  // Allow reactive filter to apply
+  await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+}
+
+async function startRename(page: Page): Promise<void> {
+  const sessionItem = page.locator('.session-item').first();
+  await sessionItem.hover();
+  const renameBtn = sessionItem.locator('.rename-btn');
+  await renameBtn.click();
+  await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+}
+
+async function confirmDelete(page: Page): Promise<void> {
+  const sessionItem = page.locator('.session-item').first();
+  await sessionItem.hover();
+  const deleteBtn = sessionItem.locator('.delete-btn');
+  await deleteBtn.click();
+  await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+}
 
 test.describe('Chat Session Management', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,26 +60,14 @@ test.describe('Chat Session Management', () => {
     ];
 
     for (const title of testChats) {
-      await page.click('.new-chat-btn');
-      await page.waitForTimeout(500);
-      
-      const input = page.locator('.input-area input');
-      await input.fill(title);
-      await input.press('Enter');
-      
-      // Wait for response
-      await page.waitForTimeout(2000);
+      await createChatSession(page, title);
     }
 
     // Wait for sessions to load
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(TIMEOUT.SESSION_LOAD);
 
     // Test search by title
-    const searchInput = page.locator('.search-input');
-    await searchInput.fill('Linux');
-    
-    // Wait for filter to apply (reactive, should be immediate)
-    await page.waitForTimeout(100);
+    await searchSessions(page, 'Linux');
 
     // Should show only the Linux chat
     const visibleSessions = page.locator('.session-item');
@@ -43,7 +76,7 @@ test.describe('Chat Session Management', () => {
 
     // Clear search
     await page.click('.clear-search-btn');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Should show all sessions
     await expect(visibleSessions).toHaveCount(testChats.length);
@@ -51,11 +84,7 @@ test.describe('Chat Session Management', () => {
 
   test('should search and filter chat sessions by model', async ({ page }) => {
     // Assuming there are sessions with different models
-    const searchInput = page.locator('.search-input');
-    
-    // Search for a common model name
-    await searchInput.fill('llama');
-    await page.waitForTimeout(100);
+    await searchSessions(page, 'llama');
 
     // Verify filtering works (sessions with 'llama' in model name should appear)
     const visibleSessions = page.locator('.session-item');
@@ -71,11 +100,7 @@ test.describe('Chat Session Management', () => {
   });
 
   test('should search and filter chat sessions by provider', async ({ page }) => {
-    const searchInput = page.locator('.search-input');
-    
-    // Search for provider name
-    await searchInput.fill('ollama');
-    await page.waitForTimeout(100);
+    await searchSessions(page, 'ollama');
 
     // Verify filtering works
     const visibleSessions = page.locator('.session-item');
@@ -90,11 +115,7 @@ test.describe('Chat Session Management', () => {
   });
 
   test('should show "no results" message when search has no matches', async ({ page }) => {
-    const searchInput = page.locator('.search-input');
-    
-    // Search for something that won't match
-    await searchInput.fill('xyznonexistent12345');
-    await page.waitForTimeout(100);
+    await searchSessions(page, 'xyznonexistent12345');
 
     // Should show no results message
     const noResults = page.locator('.no-results');
@@ -104,23 +125,10 @@ test.describe('Chat Session Management', () => {
 
   test('should rename a chat session via rename button', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Original chat title');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Original chat title');
 
     // Find the session and click rename button
-    const sessionItem = page.locator('.session-item').first();
-    await sessionItem.hover();
-    
-    const renameBtn = sessionItem.locator('.rename-btn');
-    await renameBtn.click();
-    await page.waitForTimeout(100);
+    await startRename(page);
 
     // Should show rename input
     const renameInput = page.locator('.rename-input');
@@ -133,9 +141,10 @@ test.describe('Chat Session Management', () => {
     // Save the rename
     const saveBtn = page.locator('.rename-save');
     await saveBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
 
     // Verify the title was updated
+    const sessionItem = page.locator('.session-item').first();
     await expect(sessionItem).toContainText('Updated chat title');
     await expect(sessionItem).not.toContainText('Original chat title');
 
@@ -145,20 +154,12 @@ test.describe('Chat Session Management', () => {
 
   test('should rename a chat session via double-click', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Double click test');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Double click test');
 
     // Find the session title and double-click
     const sessionTitle = page.locator('.session-title').first();
     await sessionTitle.dblclick();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Should show rename input
     const renameInput = page.locator('.rename-input');
@@ -167,7 +168,7 @@ test.describe('Chat Session Management', () => {
     // Change the title
     await renameInput.fill('After double click');
     await renameInput.press('Enter');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
 
     // Verify the title was updated
     const sessionItem = page.locator('.session-item').first();
@@ -176,21 +177,10 @@ test.describe('Chat Session Management', () => {
 
   test('should cancel rename via Cancel button', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Cancel test title');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Cancel test title');
 
     // Start rename
-    const sessionItem = page.locator('.session-item').first();
-    await sessionItem.hover();
-    await sessionItem.locator('.rename-btn').click();
-    await page.waitForTimeout(100);
+    await startRename(page);
 
     // Modify the input
     const renameInput = page.locator('.rename-input');
@@ -199,9 +189,10 @@ test.describe('Chat Session Management', () => {
     // Click cancel
     const cancelBtn = page.locator('.rename-cancel');
     await cancelBtn.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Verify the title was NOT updated
+    const sessionItem = page.locator('.session-item').first();
     await expect(sessionItem).toContainText('Cancel test title');
     await expect(sessionItem).not.toContainText('Should not save this');
     
@@ -211,52 +202,29 @@ test.describe('Chat Session Management', () => {
 
   test('should cancel rename via Escape key', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Escape test title');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Escape test title');
 
     // Start rename
-    const sessionItem = page.locator('.session-item').first();
-    await sessionItem.hover();
-    await sessionItem.locator('.rename-btn').click();
-    await page.waitForTimeout(100);
+    await startRename(page);
 
     // Modify the input and press Escape
     const renameInput = page.locator('.rename-input');
     await renameInput.fill('Should not save this either');
     await renameInput.press('Escape');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Verify the title was NOT updated
+    const sessionItem = page.locator('.session-item').first();
     await expect(sessionItem).toContainText('Escape test title');
     await expect(sessionItem).not.toContainText('Should not save this either');
   });
 
   test('should show delete confirmation overlay', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Delete overlay test');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Delete overlay test');
 
     // Click delete button
-    const sessionItem = page.locator('.session-item').first();
-    await sessionItem.hover();
-    
-    const deleteBtn = sessionItem.locator('.delete-btn');
-    await deleteBtn.click();
-    await page.waitForTimeout(100);
+    await confirmDelete(page);
 
     // Should show delete confirmation overlay
     const deleteConfirm = page.locator('.delete-confirm');
@@ -270,32 +238,21 @@ test.describe('Chat Session Management', () => {
 
   test('should cancel delete via Cancel button', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Cancel delete test');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Cancel delete test');
 
     // Start delete
-    const sessionItem = page.locator('.session-item').first();
     const initialCount = await page.locator('.session-item').count();
-    
-    await sessionItem.hover();
-    await sessionItem.locator('.delete-btn').click();
-    await page.waitForTimeout(100);
+    await confirmDelete(page);
 
     // Click cancel
     const cancelBtn = page.locator('.confirm-no');
     await cancelBtn.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Session should still exist
     const newCount = await page.locator('.session-item').count();
     expect(newCount).toBe(initialCount);
+    const sessionItem = page.locator('.session-item').first();
     await expect(sessionItem).toContainText('Cancel delete test');
     
     // Delete confirmation overlay should be hidden
@@ -304,15 +261,7 @@ test.describe('Chat Session Management', () => {
 
   test('should delete a chat session and create new chat if active', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('To be deleted');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'To be deleted');
 
     // Verify session is active
     const sessionItem = page.locator('.session-item').first();
@@ -321,13 +270,11 @@ test.describe('Chat Session Management', () => {
     const initialCount = await page.locator('.session-item').count();
 
     // Delete the session
-    await sessionItem.hover();
-    await sessionItem.locator('.delete-btn').click();
-    await page.waitForTimeout(100);
+    await confirmDelete(page);
 
     const confirmBtn = page.locator('.confirm-yes');
     await confirmBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
 
     // Session should be removed
     const newCount = await page.locator('.session-item').count();
@@ -349,21 +296,8 @@ test.describe('Chat Session Management', () => {
 
   test('should delete a non-active chat session without affecting current session', async ({ page }) => {
     // Create two test chat sessions
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    let input = page.locator('.input-area input');
-    await input.fill('First chat');
-    await input.press('Enter');
-    await page.waitForTimeout(2000);
-
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    input = page.locator('.input-area input');
-    await input.fill('Second chat - to keep active');
-    await input.press('Enter');
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'First chat');
+    await createChatSession(page, 'Second chat - to keep active');
 
     // Verify second session is active
     const sessions = page.locator('.session-item');
@@ -375,11 +309,11 @@ test.describe('Chat Session Management', () => {
     const firstSession = sessions.nth(1);
     await firstSession.hover();
     await firstSession.locator('.delete-btn').click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     const confirmBtn = page.locator('.confirm-yes');
     await confirmBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
 
     // First session should be removed
     const allSessions = page.locator('.session-item');
@@ -397,15 +331,7 @@ test.describe('Chat Session Management', () => {
 
   test('should display provider and model tags', async ({ page }) => {
     // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Tag test');
-    await input.press('Enter');
-    
-    // Wait for response and session creation
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Tag test');
 
     const sessionItem = page.locator('.session-item').first();
     
@@ -420,26 +346,11 @@ test.describe('Chat Session Management', () => {
 
   test('should maintain search filter when renaming a session', async ({ page }) => {
     // Create test sessions
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    let input = page.locator('.input-area input');
-    await input.fill('Unique search term alpha');
-    await input.press('Enter');
-    await page.waitForTimeout(2000);
-
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    input = page.locator('.input-area input');
-    await input.fill('Another chat beta');
-    await input.press('Enter');
-    await page.waitForTimeout(2000);
+    await createChatSession(page, 'Unique search term alpha');
+    await createChatSession(page, 'Another chat beta');
 
     // Search for specific term
-    const searchInput = page.locator('.search-input');
-    await searchInput.fill('alpha');
-    await page.waitForTimeout(100);
+    await searchSessions(page, 'alpha');
 
     // Should show only one session
     await expect(page.locator('.session-item')).toHaveCount(1);
@@ -448,12 +359,12 @@ test.describe('Chat Session Management', () => {
     const sessionItem = page.locator('.session-item').first();
     await sessionItem.hover();
     await sessionItem.locator('.rename-btn').click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     const renameInput = page.locator('.rename-input');
     await renameInput.fill('Renamed to gamma');
     await renameInput.press('Enter');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
 
     // Search filter should still be active, but now showing no results
     // (since we renamed "alpha" to "gamma")
@@ -461,23 +372,9 @@ test.describe('Chat Session Management', () => {
   });
 
   test('should stop event propagation when clicking rename/delete buttons', async ({ page }) => {
-    // Create a test chat session
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input = page.locator('.input-area input');
-    await input.fill('Event propagation test');
-    await input.press('Enter');
-    await page.waitForTimeout(2000);
-
-    // Create another session so we can test switching
-    await page.click('.new-chat-btn');
-    await page.waitForTimeout(500);
-    
-    const input2 = page.locator('.input-area input');
-    await input2.fill('Second session');
-    await input2.press('Enter');
-    await page.waitForTimeout(2000);
+    // Create two test chat sessions
+    await createChatSession(page, 'Event propagation test');
+    await createChatSession(page, 'Second session');
 
     // Click on the first (non-active) session's rename button
     const firstSession = page.locator('.session-item').nth(1);
@@ -485,7 +382,7 @@ test.describe('Chat Session Management', () => {
     
     const renameBtn = firstSession.locator('.rename-btn');
     await renameBtn.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Should show rename input
     await expect(page.locator('.rename-input')).toBeVisible();
@@ -495,12 +392,12 @@ test.describe('Chat Session Management', () => {
     
     // Cancel rename
     await page.locator('.rename-cancel').click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Now test delete button
     const deleteBtn = firstSession.locator('.delete-btn');
     await deleteBtn.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Should show delete confirmation
     await expect(page.locator('.delete-confirm')).toBeVisible();
