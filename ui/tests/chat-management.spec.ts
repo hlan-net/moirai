@@ -18,7 +18,7 @@ test.describe('Chat Session Management', () => {
       await page.click('.new-chat-btn');
       await page.waitForTimeout(500);
       
-      const input = page.locator('.message-input');
+      const input = page.locator('.input-area input');
       await input.fill(title);
       await input.press('Enter');
       
@@ -105,7 +105,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Original chat title');
     await input.press('Enter');
     
@@ -146,7 +146,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Double click test');
     await input.press('Enter');
     
@@ -177,7 +177,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Cancel test title');
     await input.press('Enter');
     
@@ -212,7 +212,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Escape test title');
     await input.press('Enter');
     
@@ -241,7 +241,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Delete overlay test');
     await input.press('Enter');
     
@@ -271,7 +271,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Cancel delete test');
     await input.press('Enter');
     
@@ -305,7 +305,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('To be deleted');
     await input.press('Enter');
     
@@ -350,7 +350,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    let input = page.locator('.message-input');
+    let input = page.locator('.input-area input');
     await input.fill('First chat');
     await input.press('Enter');
     await page.waitForTimeout(2000);
@@ -358,7 +358,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    input = page.locator('.message-input');
+    input = page.locator('.input-area input');
     await input.fill('Second chat - to keep active');
     await input.press('Enter');
     await page.waitForTimeout(2000);
@@ -398,7 +398,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Tag test');
     await input.press('Enter');
     
@@ -421,7 +421,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    let input = page.locator('.message-input');
+    let input = page.locator('.input-area input');
     await input.fill('Unique search term alpha');
     await input.press('Enter');
     await page.waitForTimeout(2000);
@@ -429,7 +429,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    input = page.locator('.message-input');
+    input = page.locator('.input-area input');
     await input.fill('Another chat beta');
     await input.press('Enter');
     await page.waitForTimeout(2000);
@@ -463,7 +463,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input = page.locator('.message-input');
+    const input = page.locator('.input-area input');
     await input.fill('Event propagation test');
     await input.press('Enter');
     await page.waitForTimeout(2000);
@@ -472,7 +472,7 @@ test.describe('Chat Session Management', () => {
     await page.click('.new-chat-btn');
     await page.waitForTimeout(500);
     
-    const input2 = page.locator('.message-input');
+    const input2 = page.locator('.input-area input');
     await input2.fill('Second session');
     await input2.press('Enter');
     await page.waitForTimeout(2000);
