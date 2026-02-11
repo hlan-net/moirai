@@ -1,32 +1,23 @@
 import { test, expect, Page } from '@playwright/test';
 
-// Constants for timeouts to avoid magic numbers
-const TIMEOUT = {
-  NEW_CHAT_DELAY: 500,
-  RESPONSE_WAIT: 2000,
-  SESSION_LOAD: 1000,
-  UI_UPDATE: 100,
-  SAVE_ACTION: 500
-} as const;
-
 // Helper functions to reduce code duplication
 async function createChatSession(page: Page, title: string): Promise<void> {
-  await page.click('.new-chat-btn');
-  await page.waitForTimeout(TIMEOUT.NEW_CHAT_DELAY);
+  const initialCount = await page.locator('.session-item').count();
   
+  await page.click('.new-chat-btn');
   const input = page.locator('.input-area input');
+  await input.waitFor({ state: 'visible' });
   await input.fill(title);
   await input.press('Enter');
   
-  // Wait for response and session creation
-  await page.waitForTimeout(TIMEOUT.RESPONSE_WAIT);
+  // Wait for new session to appear in the list
+  await expect(page.locator('.session-item')).toHaveCount(initialCount + 1, { timeout: 5000 });
 }
 
 async function searchSessions(page: Page, query: string): Promise<void> {
   const searchInput = page.locator('.search-input');
   await searchInput.fill(query);
-  // Allow reactive filter to apply
-  await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+  // No explicit wait needed - Playwright auto-waits for subsequent assertions
 }
 
 async function startRename(page: Page): Promise<void> {
@@ -34,7 +25,8 @@ async function startRename(page: Page): Promise<void> {
   await sessionItem.hover();
   const renameBtn = sessionItem.locator('.rename-btn');
   await renameBtn.click();
-  await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+  // Wait for rename input to appear
+  await page.locator('.rename-input').waitFor({ state: 'visible' });
 }
 
 async function confirmDelete(page: Page): Promise<void> {
@@ -42,7 +34,8 @@ async function confirmDelete(page: Page): Promise<void> {
   await sessionItem.hover();
   const deleteBtn = sessionItem.locator('.delete-btn');
   await deleteBtn.click();
-  await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+  // Wait for delete confirmation to appear
+  await page.locator('.delete-confirm').waitFor({ state: 'visible' });
 }
 
 test.describe('Chat Session Management', () => {
@@ -63,9 +56,6 @@ test.describe('Chat Session Management', () => {
       await createChatSession(page, title);
     }
 
-    // Wait for sessions to load
-    await page.waitForTimeout(TIMEOUT.SESSION_LOAD);
-
     // Test search by title
     await searchSessions(page, 'Linux');
 
@@ -76,42 +66,37 @@ test.describe('Chat Session Management', () => {
 
     // Clear search
     await page.click('.clear-search-btn');
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Should show all sessions
     await expect(visibleSessions).toHaveCount(testChats.length);
   });
 
   test('should search and filter chat sessions by model', async ({ page }) => {
-    // Assuming there are sessions with different models
     await searchSessions(page, 'llama');
 
-    // Verify filtering works (sessions with 'llama' in model name should appear)
+    // Verify filtering works - check if any sessions are visible
     const visibleSessions = page.locator('.session-item');
     const count = await visibleSessions.count();
     
-    // If no sessions match, that's also valid - just verify the filter is working
-    if (count > 0) {
-      // Check that visible sessions contain the search term
-      const firstSession = visibleSessions.first();
-      const text = await firstSession.textContent();
-      expect(text?.toLowerCase()).toContain('llama');
-    }
+    // Skip validation if no existing sessions match
+    test.skip(count === 0, 'No existing sessions with llama model');
+    
+    // Verify visible sessions contain the search term
+    await expect(visibleSessions.first()).toContainText(/llama/i);
   });
 
   test('should search and filter chat sessions by provider', async ({ page }) => {
     await searchSessions(page, 'ollama');
 
-    // Verify filtering works
+    // Verify filtering works - check if any sessions are visible
     const visibleSessions = page.locator('.session-item');
     const count = await visibleSessions.count();
     
-    if (count > 0) {
-      // Check that visible sessions contain the search term
-      const firstSession = visibleSessions.first();
-      const text = await firstSession.textContent();
-      expect(text?.toLowerCase()).toContain('ollama');
-    }
+    // Skip validation if no existing sessions match
+    test.skip(count === 0, 'No existing sessions with ollama provider');
+    
+    // Verify visible sessions contain the search term
+    await expect(visibleSessions.first()).toContainText(/ollama/i);
   });
 
   test('should show "no results" message when search has no matches', async ({ page }) => {
@@ -130,26 +115,21 @@ test.describe('Chat Session Management', () => {
     // Find the session and click rename button
     await startRename(page);
 
-    // Should show rename input
+    // Should show rename input with current value
     const renameInput = page.locator('.rename-input');
-    await expect(renameInput).toBeVisible();
     await expect(renameInput).toHaveValue('Original chat title');
 
-    // Change the title
+    // Change the title and save
     await renameInput.fill('Updated chat title');
-    
-    // Save the rename
-    const saveBtn = page.locator('.rename-save');
-    await saveBtn.click();
-    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
+    await page.locator('.rename-save').click();
+
+    // Wait for rename input to disappear (indicating save completed)
+    await expect(renameInput).not.toBeVisible();
 
     // Verify the title was updated
     const sessionItem = page.locator('.session-item').first();
     await expect(sessionItem).toContainText('Updated chat title');
     await expect(sessionItem).not.toContainText('Original chat title');
-
-    // Rename input should be hidden
-    await expect(renameInput).not.toBeVisible();
   });
 
   test('should rename a chat session via double-click', async ({ page }) => {
@@ -159,20 +139,20 @@ test.describe('Chat Session Management', () => {
     // Find the session title and double-click
     const sessionTitle = page.locator('.session-title').first();
     await sessionTitle.dblclick();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
 
     // Should show rename input
     const renameInput = page.locator('.rename-input');
     await expect(renameInput).toBeVisible();
 
-    // Change the title
+    // Change the title and save with Enter
     await renameInput.fill('After double click');
     await renameInput.press('Enter');
-    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
+
+    // Wait for rename to complete
+    await expect(renameInput).not.toBeVisible();
 
     // Verify the title was updated
-    const sessionItem = page.locator('.session-item').first();
-    await expect(sessionItem).toContainText('After double click');
+    await expect(page.locator('.session-item').first()).toContainText('After double click');
   });
 
   test('should cancel rename via Cancel button', async ({ page }) => {
@@ -182,22 +162,18 @@ test.describe('Chat Session Management', () => {
     // Start rename
     await startRename(page);
 
-    // Modify the input
+    // Modify the input and cancel
     const renameInput = page.locator('.rename-input');
     await renameInput.fill('Should not save this');
-    
-    // Click cancel
-    const cancelBtn = page.locator('.rename-cancel');
-    await cancelBtn.click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+    await page.locator('.rename-cancel').click();
+
+    // Rename input should be hidden
+    await expect(renameInput).not.toBeVisible();
 
     // Verify the title was NOT updated
     const sessionItem = page.locator('.session-item').first();
     await expect(sessionItem).toContainText('Cancel test title');
     await expect(sessionItem).not.toContainText('Should not save this');
-    
-    // Rename input should be hidden
-    await expect(renameInput).not.toBeVisible();
   });
 
   test('should cancel rename via Escape key', async ({ page }) => {
@@ -211,27 +187,24 @@ test.describe('Chat Session Management', () => {
     const renameInput = page.locator('.rename-input');
     await renameInput.fill('Should not save this either');
     await renameInput.press('Escape');
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+
+    // Rename input should be hidden
+    await expect(renameInput).not.toBeVisible();
 
     // Verify the title was NOT updated
-    const sessionItem = page.locator('.session-item').first();
-    await expect(sessionItem).toContainText('Escape test title');
-    await expect(sessionItem).not.toContainText('Should not save this either');
+    await expect(page.locator('.session-item').first()).toContainText('Escape test title');
   });
 
   test('should show delete confirmation overlay', async ({ page }) => {
     // Create a test chat session
     await createChatSession(page, 'Delete overlay test');
 
-    // Click delete button
+    // Click delete button - confirmDelete already waits for overlay
     await confirmDelete(page);
 
-    // Should show delete confirmation overlay
+    // Verify overlay is shown with correct content
     const deleteConfirm = page.locator('.delete-confirm');
-    await expect(deleteConfirm).toBeVisible();
     await expect(deleteConfirm).toContainText('Delete this chat?');
-    
-    // Should show confirm and cancel buttons
     await expect(page.locator('.confirm-yes')).toBeVisible();
     await expect(page.locator('.confirm-no')).toBeVisible();
   });
@@ -245,18 +218,14 @@ test.describe('Chat Session Management', () => {
     await confirmDelete(page);
 
     // Click cancel
-    const cancelBtn = page.locator('.confirm-no');
-    await cancelBtn.click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+    await page.locator('.confirm-no').click();
 
-    // Session should still exist
-    const newCount = await page.locator('.session-item').count();
-    expect(newCount).toBe(initialCount);
-    const sessionItem = page.locator('.session-item').first();
-    await expect(sessionItem).toContainText('Cancel delete test');
-    
     // Delete confirmation overlay should be hidden
     await expect(page.locator('.delete-confirm')).not.toBeVisible();
+
+    // Session should still exist
+    await expect(page.locator('.session-item')).toHaveCount(initialCount);
+    await expect(page.locator('.session-item').first()).toContainText('Cancel delete test');
   });
 
   test('should delete a chat session and create new chat if active', async ({ page }) => {
@@ -264,34 +233,26 @@ test.describe('Chat Session Management', () => {
     await createChatSession(page, 'To be deleted');
 
     // Verify session is active
-    const sessionItem = page.locator('.session-item').first();
-    await expect(sessionItem).toHaveClass(/active/);
+    await expect(page.locator('.session-item').first()).toHaveClass(/active/);
 
     const initialCount = await page.locator('.session-item').count();
 
     // Delete the session
     await confirmDelete(page);
+    await page.locator('.confirm-yes').click();
 
-    const confirmBtn = page.locator('.confirm-yes');
-    await confirmBtn.click();
-    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
-
-    // Session should be removed
-    const newCount = await page.locator('.session-item').count();
-    expect(newCount).toBe(initialCount - 1);
+    // Wait for session to be removed
+    await expect(page.locator('.session-item')).toHaveCount(initialCount - 1);
 
     // Should not find the deleted session
-    const sessions = page.locator('.session-item');
-    const texts = await sessions.allTextContents();
+    const texts = await page.locator('.session-item').allTextContents();
     expect(texts.join(' ')).not.toContain('To be deleted');
 
     // Should have created a new chat (no active session)
-    const activeSessions = page.locator('.session-item.active');
-    await expect(activeSessions).toHaveCount(0);
+    await expect(page.locator('.session-item.active')).toHaveCount(0);
     
     // Messages should be cleared
-    const chatMessages = page.locator('.message');
-    await expect(chatMessages).toHaveCount(0);
+    await expect(page.locator('.message')).toHaveCount(0);
   });
 
   test('should delete a non-active chat session without affecting current session', async ({ page }) => {
@@ -300,33 +261,28 @@ test.describe('Chat Session Management', () => {
     await createChatSession(page, 'Second chat - to keep active');
 
     // Verify second session is active
-    const sessions = page.locator('.session-item');
-    const secondSession = sessions.first(); // Most recent is first
+    const secondSession = page.locator('.session-item').first(); // Most recent is first
     await expect(secondSession).toHaveClass(/active/);
     await expect(secondSession).toContainText('Second chat');
 
     // Find and delete the first session (not active)
-    const firstSession = sessions.nth(1);
+    const firstSession = page.locator('.session-item').nth(1);
     await firstSession.hover();
     await firstSession.locator('.delete-btn').click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+    
+    // Wait for delete confirmation
+    await page.locator('.delete-confirm').waitFor({ state: 'visible' });
+    await page.locator('.confirm-yes').click();
 
-    const confirmBtn = page.locator('.confirm-yes');
-    await confirmBtn.click();
-    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
-
-    // First session should be removed
-    const allSessions = page.locator('.session-item');
-    const texts = await allSessions.allTextContents();
-    expect(texts.join(' ')).not.toContain('First chat');
+    // Wait for session to be removed
+    await expect(page.locator('.session-item')).not.toContainText('First chat');
 
     // Second session should still be active
     await expect(secondSession).toHaveClass(/active/);
     await expect(secondSession).toContainText('Second chat');
     
     // Messages should still be present
-    const chatMessages = page.locator('.message');
-    await expect(chatMessages.first()).toBeVisible();
+    await expect(page.locator('.message').first()).toBeVisible();
   });
 
   test('should display provider and model tags', async ({ page }) => {
@@ -335,13 +291,9 @@ test.describe('Chat Session Management', () => {
 
     const sessionItem = page.locator('.session-item').first();
     
-    // Should show provider tag
-    const providerTag = sessionItem.locator('.provider-tag');
-    await expect(providerTag).toBeVisible();
-    
-    // Should show model tag
-    const modelTag = sessionItem.locator('.model-tag');
-    await expect(modelTag).toBeVisible();
+    // Verify tags are displayed
+    await expect(sessionItem.locator('.provider-tag')).toBeVisible();
+    await expect(sessionItem.locator('.model-tag')).toBeVisible();
   });
 
   test('should maintain search filter when renaming a session', async ({ page }) => {
@@ -359,15 +311,17 @@ test.describe('Chat Session Management', () => {
     const sessionItem = page.locator('.session-item').first();
     await sessionItem.hover();
     await sessionItem.locator('.rename-btn').click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
-
+    
+    // Wait for rename input
     const renameInput = page.locator('.rename-input');
+    await renameInput.waitFor({ state: 'visible' });
     await renameInput.fill('Renamed to gamma');
     await renameInput.press('Enter');
-    await page.waitForTimeout(TIMEOUT.SAVE_ACTION);
+
+    // Wait for rename to complete
+    await expect(renameInput).not.toBeVisible();
 
     // Search filter should still be active, but now showing no results
-    // (since we renamed "alpha" to "gamma")
     await expect(page.locator('.no-results')).toBeVisible();
   });
 
@@ -379,10 +333,7 @@ test.describe('Chat Session Management', () => {
     // Click on the first (non-active) session's rename button
     const firstSession = page.locator('.session-item').nth(1);
     await firstSession.hover();
-    
-    const renameBtn = firstSession.locator('.rename-btn');
-    await renameBtn.click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+    await firstSession.locator('.rename-btn').click();
 
     // Should show rename input
     await expect(page.locator('.rename-input')).toBeVisible();
@@ -392,12 +343,10 @@ test.describe('Chat Session Management', () => {
     
     // Cancel rename
     await page.locator('.rename-cancel').click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+    await expect(page.locator('.rename-input')).not.toBeVisible();
 
     // Now test delete button
-    const deleteBtn = firstSession.locator('.delete-btn');
-    await deleteBtn.click();
-    await page.waitForTimeout(TIMEOUT.UI_UPDATE);
+    await firstSession.locator('.delete-btn').click();
 
     // Should show delete confirmation
     await expect(page.locator('.delete-confirm')).toBeVisible();
