@@ -590,8 +590,15 @@ def get_stats():
     except requests.exceptions.HTTPError as e:
         # CouchDB returned an HTTP error (401, 403, 5xx, etc.)
         # Log detailed error internally but return user-friendly message
-        logger.error(f"CouchDB HTTP error in /stats: {e.response.status_code} {e.response.text}")
-        abort(502, description="Statistics temporarily unavailable")
+        # Truncate response text to avoid excessive logging
+        response_preview = e.response.text[:200] if e.response.text else ''
+        logger.error(f"CouchDB HTTP error in /stats: {e.response.status_code} {response_preview}")
+        
+        # Return appropriate message based on error type
+        if 400 <= e.response.status_code < 500:
+            abort(502, description="Unable to retrieve statistics")
+        else:
+            abort(502, description="Statistics temporarily unavailable")
     except requests.exceptions.RequestException as e:
         # Network or connection error
         logger.error(f"CouchDB connection error in /stats: {e}")
