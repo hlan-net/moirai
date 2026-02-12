@@ -13,7 +13,9 @@ app = Flask(__name__, static_folder='ui/dist')
 
 # Initialize Telemetry
 from api.telemetry import configure_telemetry
-configure_telemetry(app, "moirai-api")
+# Don't configure telemetry if running in a test environment
+if os.environ.get('FLASK_ENV') != 'test' and not os.environ.get('PYTEST_CURRENT_TEST'):
+    configure_telemetry(app, "moirai-api")
 
 # CSRF protection is disabled to support the current API authentication design.
 # The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
