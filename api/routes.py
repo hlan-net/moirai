@@ -603,6 +603,18 @@ def get_stats():
         # Network or connection error
         logger.error(f"CouchDB connection error in /stats: {e}")
         abort(503, description="Database unavailable")
+    
+    # Fallback return to avoid implicit None; should be unreachable
+    return jsonify({
+        "articles": {
+            "by_language": {},
+            "total": 0
+        },
+        "feeds": {
+            "health": {},
+            "total": 0
+        }
+    })
 
 # --- Search Endpoints ---
 
