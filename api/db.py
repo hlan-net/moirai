@@ -168,6 +168,7 @@ def query_couchdb_view(db_name, design_doc, view_name, group=True):
         response = _request('GET', url, params=params)
         if response.status_code == 200:
             return response.json().get('rows', [])
+        logger.warning(f"Error querying CouchDB view: Received status {response.status_code} {response.text}")
         return []
     except requests.exceptions.RequestException as e:
         logger.error(f"Error querying CouchDB view: {e}")
