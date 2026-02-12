@@ -123,6 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
                     user.value = response.data
                     basicAuth.value = true
                 } catch (error) {
+                    console.warn('Basic auth check failed', error)
                     basicAuth.value = false
                 }
             }
