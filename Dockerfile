@@ -15,7 +15,7 @@ COPY ui/ .
 RUN yarn build
 
 # Stage 2: Build the Python application
-FROM python:3-slim AS final-stage
+FROM python:3.13-slim AS final-stage
 
 # Build arguments for version info
 ARG VERSION=0.1.0
