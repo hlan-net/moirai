@@ -21,6 +21,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+  await authStore.initialize()
 
   // Check if route requires auth
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

@@ -55,6 +55,20 @@ def get_auth_config():
         "github_client_secret": os.environ.get("GITHUB_CLIENT_SECRET") or config_doc.get("github_client_secret", "")
     }
 
+def get_public_auth_config():
+    """Returns auth config safe for unauthenticated clients."""
+    config = get_auth_config()
+    return {
+        "google_client_id": config.get("google_client_id", ""),
+        "entra_client_id": config.get("entra_client_id", ""),
+        "entra_tenant_id": config.get("entra_tenant_id", ""),
+        "github_client_id": config.get("github_client_id", "")
+    }
+
+@auth_blueprint.route("/config", methods=["GET"])
+def auth_config():
+    return jsonify(get_public_auth_config())
+
 @auth_blueprint.route("/login/github", methods=["POST"])
 def github_login():
     code = request.json.get("code")
@@ -211,10 +225,16 @@ def _verify_basic_auth(header):
         
         if API_USERNAME and API_PASSWORD:
             if username == API_USERNAME and password == API_PASSWORD:
-                # Basic Auth usually maps to an 'admin' or 'system' user context
-                g.user_id = "system"
-                g.user_email = API_USERNAME
-                g.user_role = "admin"
+                # Basic Auth maps to the configured admin user when available
+                user = get_user_by_email(username)
+                if user:
+                    g.user_id = user.get("_id")
+                    g.user_email = user.get("email", username)
+                    g.user_role = user.get("role", "admin")
+                else:
+                    g.user_id = "system"
+                    g.user_email = API_USERNAME
+                    g.user_role = "admin"
                 return True, None
                 
         return False, "Invalid Basic Auth credentials"

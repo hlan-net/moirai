@@ -502,6 +502,7 @@ def fetch_url(url):
 
 # --- Config ---
 @api_blueprint.route("/config", methods=["GET"])
+@admin_required
 def get_config():
     # Helper to return the effective config
     return jsonify({
