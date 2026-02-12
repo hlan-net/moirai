@@ -5,6 +5,11 @@ import os
 import requests
 from urllib.parse import quote
 from datetime import datetime, timedelta
+from langdetect import detect, DetectorFactory
+from langdetect.lang_detect_exception import LangDetectException
+
+# Ensure consistent results for language detection
+DetectorFactory.seed = 0
 
 class ArticleProcessor:
     def __init__(self):
@@ -21,6 +26,15 @@ class ArticleProcessor:
         self.couchdb_url = uri + "/articles"
         self.expiration_days = int(os.environ.get("ARTICLE_EXPIRATION_DAYS", 30))
 
+    def detect_language(self, text):
+        """Detect language of a given text."""
+        if not text or len(text.strip()) < 10:
+            return None
+        try:
+            return detect(text)
+        except LangDetectException:
+            return None
+
     def process_feed(self, feed_url, feed_content):
         """Parses the feed content using feedparser and extracts articles.
            Returns: tuple (feed_title, articles_list)
@@ -31,6 +45,7 @@ class ArticleProcessor:
         try:
             parsed_feed = feedparser.parse(feed_content)
             feed_title = parsed_feed.feed.get("title", "Unknown Feed")
+            feed_lang = parsed_feed.feed.get("language", "").split('-')[0].lower() if parsed_feed.feed.get("language") else None
 
             for entry in parsed_feed.entries:
                 published_date = None
@@ -49,13 +64,22 @@ class ArticleProcessor:
                 elif "summary" in entry:
                     content_value = entry.summary
 
+                # Detect language
+                text_to_detect = entry.get("title", "") + " " + entry.get("summary", "")
+                detected_lang = self.detect_language(text_to_detect)
+                
+                # Use feed language as fallback if detection is uncertain or fails
+                article_lang = detected_lang or feed_lang or "unknown"
+
                 article = {
                     "feed_url": feed_url,
+                    "feed_title": feed_title, # Added to avoid extra lookups in UI
                     "title": entry.get("title", "No Title"),
                     "link": entry.get("link", ""),
                     "published": published_date.isoformat() + "Z" if published_date else datetime.now().isoformat(),
                     "summary": entry.get("summary", ""),
                     "content": content_value,
+                    "language": article_lang
                 }
 
                 articles.append(article)

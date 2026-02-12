@@ -7,6 +7,7 @@ from .core import mcp
 from .tools import events
 from .tools import trends
 from .tools import search
+from .tools import feeds
 
 # Get the ASGI app
 app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()
