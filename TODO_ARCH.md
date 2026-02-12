@@ -1,15 +1,15 @@
 # Moirai Architectural Improvements TODO
 
 ## Priority 1: CouchDB Aggregations (MapReduce)
-- [ ] Create design documents for article counts by language.
-- [ ] Implement views for feed health statistics (success/error ratios).
-- [ ] Update API to query views instead of performing in-memory aggregations.
-- **Branch:** `feature/couchdb-mapreduce-stats`
+- [x] Create design documents for article counts by language.
+- [x] Implement views for feed health statistics (success/error ratios).
+- [x] Update API to query views instead of performing in-memory aggregations.
+- **Branch:** `feature/couchdb-mapreduce-stats` (Merged)
 
 ## Priority 2: Asynchronous Processing Pipeline
-- [ ] Refactor `FetchFeedTask` to be a "Raw Collector" (fetches and stores only).
-- [ ] Implement a `changes_listener` service to monitor CouchDB `_changes`.
-- [ ] Move language detection and metadata extraction to the asynchronous listener.
+- [x] Refactor `FetchFeedTask` to be a "Raw Collector" (fetches and stores only).
+- [x] Implement a `changes_listener` service to monitor CouchDB `_changes`.
+- [x] Move language detection and metadata extraction to the asynchronous listener.
 - **Branch:** `feature/async-enrichment-worker`
 
 ## Priority 3: Database-Level Validation

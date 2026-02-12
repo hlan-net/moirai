@@ -62,6 +62,11 @@ def start_services():
     print(f"{get_version_string()} starting...", flush=True)
     init.run()
     print("Moirai initialised.")
+
+    # Start the enrichment worker
+    from tasks.enrichment_worker import worker
+    worker.start()
+    print("Enrichment worker started.")
     
     # Start the scheduler
     interval = os.environ.get("ITERATION_INTERVAL", 600)
