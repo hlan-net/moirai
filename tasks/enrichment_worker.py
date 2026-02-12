@@ -121,7 +121,8 @@ class EnrichmentWorker(threading.Thread):
         """Update the feed title in the registry if it is currently 'Pending Enrichment...' or empty.
         
         Args:
-            registry_doc_id: The document ID in the feeds registry (same hash used for feed_content)
+            registry_doc_id: The document ID from the feed_content document's _id field.
+                            This corresponds to the hash of the original feed URL.
             feed_title: The title to set in the registry
         """
         try:
