@@ -166,9 +166,21 @@ def query_couchdb_view(db_name, design_doc, view_name, group=True):
     
     try:
         response = _request('GET', url, params=params)
-        if response.status_code == 200:
-            return response.json().get('rows', [])
-        return []
+        
+        # Handle 404 separately - design doc or view doesn't exist
+        if response.status_code == 404:
+            logger.warning(f"CouchDB view not found: {design_doc}/{view_name} in {db_name}")
+            return []
+        
+        # Raise for any other HTTP errors (401, 403, 5xx, etc.)
+        # This will propagate errors properly instead of silently returning empty list
+        response.raise_for_status()
+        
+        return response.json().get('rows', [])
+    except requests.exceptions.HTTPError as e:
+        # Log HTTP errors with full details before re-raising
+        logger.error(f"HTTP error querying CouchDB view {design_doc}/{view_name}: {e.response.status_code} {e.response.text}")
+        raise
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error querying CouchDB view: {e}")
-        return []
+        logger.error(f"Error querying CouchDB view {design_doc}/{view_name}: {e}")
+        raise

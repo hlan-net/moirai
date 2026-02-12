@@ -3,6 +3,7 @@ import os
 import hashlib
 import version
 import requests
+import logging
 from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
@@ -22,6 +23,9 @@ from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
 
 api_blueprint = Blueprint('api', __name__)
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 API_USERNAME = os.environ.get("API_USERNAME")
 API_PASSWORD = os.environ.get("API_PASSWORD")
@@ -564,22 +568,51 @@ def get_stats():
     """Retrieve aggregation statistics from CouchDB MapReduce views."""
     from .db import query_couchdb_view
     
-    # 1. Article Language Stats
-    lang_rows = query_couchdb_view("articles", "stats", "by_language", group=True)
-    lang_stats = {row["key"]: row["value"] for row in lang_rows}
+    try:
+        # 1. Article Language Stats
+        lang_rows = query_couchdb_view("articles", "stats", "by_language", group=True)
+        lang_stats = {row["key"]: row["value"] for row in lang_rows}
+        
+        # 2. Feed Health Stats
+        health_rows = query_couchdb_view("feeds", "health", "status", group=True)
+        health_stats = {row["key"]: row["value"] for row in health_rows}
+        
+        return jsonify({
+            "articles": {
+                "by_language": lang_stats,
+                "total": sum(lang_stats.values())
+            },
+            "feeds": {
+                "health": health_stats,
+                "total": sum(health_stats.values())
+            }
+        })
+    except requests.exceptions.HTTPError as e:
+        # CouchDB returned an HTTP error (401, 403, 5xx, etc.)
+        # Log detailed error internally but return user-friendly message
+        # Truncate response text to avoid excessive logging
+        response_preview = e.response.text[:200] if e.response.text else ''
+        logger.error(f"CouchDB HTTP error in /stats: {e.response.status_code} {response_preview}")
+        
+        # Return appropriate message based on error type
+        if 400 <= e.response.status_code < 500:
+            abort(502, description="Unable to retrieve statistics")
+        else:
+            abort(502, description="Statistics temporarily unavailable")
+    except requests.exceptions.RequestException as e:
+        # Network or connection error
+        logger.error(f"CouchDB connection error in /stats: {e}")
+        abort(503, description="Database unavailable")
     
-    # 2. Feed Health Stats
-    health_rows = query_couchdb_view("feeds", "health", "status", group=True)
-    health_stats = {row["key"]: row["value"] for row in health_rows}
-    
+    # Fallback return to avoid implicit None; should be unreachable
     return jsonify({
         "articles": {
-            "by_language": lang_stats,
-            "total": sum(lang_stats.values())
+            "by_language": {},
+            "total": 0
         },
         "feeds": {
-            "health": health_stats,
-            "total": sum(health_stats.values())
+            "health": {},
+            "total": 0
         }
     })
 
