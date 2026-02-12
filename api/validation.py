@@ -130,6 +130,11 @@ class ConfigUpdateRequest(BaseModel):
     """Validation for config updates"""
     allow_public_read: Optional[bool] = None
     iteration_interval: Optional[int] = Field(None, ge=60, le=86400)  # 1 minute to 24 hours
+    google_client_id: Optional[str] = None
+    entra_client_id: Optional[str] = None
+    entra_tenant_id: Optional[str] = None
+    github_client_id: Optional[str] = None
+    github_client_secret: Optional[str] = None
     
     @validator('iteration_interval')
     def validate_interval(cls, v):

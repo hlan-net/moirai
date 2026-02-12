@@ -12,8 +12,18 @@ from version import get_version_string
 app = Flask(__name__, static_folder='ui/dist')
 
 # Initialize Telemetry
-from api.telemetry import configure_telemetry
-configure_telemetry(app, "moirai-api")
+# Don't configure telemetry if running in a test environment
+import sys
+is_test_mode = (
+    "pytest" in sys.modules or 
+    "unittest" in sys.modules or 
+    os.environ.get("FLASK_ENV") == "test" or 
+    os.environ.get("TESTING") == "true"
+)
+
+if not is_test_mode:
+    from api.telemetry import configure_telemetry
+    configure_telemetry(app, "moirai-api")
 
 # CSRF protection is disabled to support the current API authentication design.
 # The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
@@ -32,6 +42,9 @@ metrics.info('app_info', 'Application info', version='1.0.0')
 app.register_blueprint(api_blueprint, url_prefix='/api')
 app.register_blueprint(mcp_blueprint, url_prefix='/mcp')
 app.register_blueprint(chat_blueprint, url_prefix='/api')
+
+from api.auth import auth_blueprint
+app.register_blueprint(auth_blueprint, url_prefix='/api/auth')
 
 @app.route("/")
 def index():

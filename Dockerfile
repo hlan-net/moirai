@@ -15,7 +15,7 @@ COPY ui/ .
 RUN yarn build
 
 # Stage 2: Build the Python application
-FROM python:3-slim AS final-stage
+FROM python:3.13-slim AS final-stage
 
 # Build arguments for version info
 ARG VERSION=0.1.0
@@ -31,8 +31,9 @@ RUN useradd -d /app appuser  && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p feeds && \
     chmod 777 feeds && \
-    chown -R appuser:appuser feeds
-    
+    mkdir -p ui/dist && \
+    chown -R appuser:appuser feeds ui
+
 USER appuser
 
 # Set build number as environment variable
@@ -48,6 +49,11 @@ COPY --chown=appuser:appuser mcp_service/ mcp_service/
 
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/
+# Create empty ui/dist to avoid FileNotFoundError in main.py. Do this BEFORE switching user or as root.
+# (But here we are already USER appuser from line 36).
+# So we should switch back to root or do it earlier.
+# Let's do it earlier.
+
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088

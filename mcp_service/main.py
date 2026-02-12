@@ -7,6 +7,7 @@ from .core import mcp
 from .tools import events
 from .tools import trends
 from .tools import search
+from .tools import users
 from .tools import feeds
 
 # Get the ASGI app

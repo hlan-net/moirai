@@ -32,7 +32,7 @@ def _request(method, url, **kwargs):
 
 
 # Allowed database names for security validation
-ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history"}
+ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history", "users"}
 
 # Error messages
 ERROR_INVALID_DB_NAME = "Invalid database name."
@@ -151,6 +151,36 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
     except requests.exceptions.RequestException as e:
         logger.error(f"Error querying CouchDB: {e}")
         return []
+
+def get_user_by_email(email):
+    """Retrieve a user document by email."""
+    users = query_couchdb("users", {"email": email}, limit=1)
+    return users[0] if users else None
+
+def create_user(user_doc):
+    """Create a new user in the users database.
+    user_doc must contain 'email' and 'password_hash'.
+    """
+    if "email" not in user_doc:
+        return False, "Email required"
+    
+    # Check if user exists
+    if get_user_by_email(user_doc["email"]):
+        return False, "User already exists"
+        
+    response = store_to_couchdb("users", user_doc)
+    if response and "id" in response:
+        return True, response["id"]
+    return False, "Database error"
+
+def update_user(user_id, updates):
+    """Update user document."""
+    user = fetch_from_couchdb("users", user_id)
+    if not user:
+        return False, "User not found"
+    
+    user.update(updates)
+    return update_couchdb_doc("users", user_id, user)
 
 def query_couchdb_view(db_name, design_doc, view_name, group=True):
     """Query a MapReduce view."""

@@ -2,6 +2,7 @@
 import { onMounted, ref, onUnmounted, computed, inject, type Ref } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 import { formatDate, stripHtml, getHostname } from '../utils/formatters'
+import { useAuthStore } from '../stores/auth'
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -14,6 +15,9 @@ const searchQuery = ref('')
 
 // Inject selected feed from parent
 const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 let observer: IntersectionObserver | null = null
 let refreshInterval: number | null = null
@@ -239,7 +243,7 @@ const handleRefresh = async () => {
         <span v-else-if="!loading">({{ filteredArticles.length }})</span>
         <span v-if="fetchingUpdates" class="update-badge">↻</span>
       </h2>
-      <div class="header-actions">
+      <div class="header-actions" v-if="isAdmin">
         <button 
           @click="handleRefresh" 
           :disabled="refreshingFeed"
@@ -276,7 +280,7 @@ const handleRefresh = async () => {
       <div v-for="article in filteredArticles" :key="article._id" class="article-card">
         <div class="card-header">
            <h3><a :href="article.link" target="_blank">{{ article.title }}</a></h3>
-           <button @click="deleteArticle(article._id)" class="delete-btn" title="Delete Article">×</button>
+           <button v-if="isAdmin" @click="deleteArticle(article._id)" class="delete-btn" title="Delete Article">×</button>
         </div>
         <p class="meta">{{ formatDate(article.published) }} | {{ getHostname(article.feed_url) }}</p>
         <p class="summary">{{ stripHtml(article.summary).substring(0, 200) }}...</p>

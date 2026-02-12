@@ -61,6 +61,7 @@ const toggleSection = (section: string) => {
     collapsedSections.value.add(section)
   }
 }
+
 const saveSettings = async () => {
   // Save User Settings
   try {
@@ -71,11 +72,11 @@ const saveSettings = async () => {
           moirai_openai_model: openaiModelName.value,
           moirai_gemini_api_key: geminiApiKey.value,
           moirai_gemini_model: geminiModelName.value,
-          moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
-          moirai_theme: theme.value
+          moirai_ollama_endpoint_url: ollamaEndpointUrl.value
       })
       
       // Save System Config (Admin only or if allowed)
+      // For now we try, and if 403 we just log it or notify user they aren't admin
       const configRes = await fetch('/api/config', {
           method: 'PUT',
           headers: authStore.token ? { 
@@ -327,7 +328,6 @@ onMounted(() => {
 
 <template>
   <div class="settings-page">
-
     <h1>Settings</h1>
     
     <div class="settings-section">

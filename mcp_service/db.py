@@ -19,6 +19,8 @@ def db_request(method, db_name, path="", json_data=None, params=None):
             response = requests.put(url, json=json_data)
         elif method == "HEAD":
             response = requests.head(url)
+        elif method == "DELETE":
+            response = requests.delete(url, params=params)
         
         # Don't raise for 404s if we want to handle them gracefully in callers
         if response.status_code >= 400 and response.status_code != 404:

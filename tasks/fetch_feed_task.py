@@ -49,93 +49,104 @@ class FetchFeedTask(threading.Thread):
             self.record_fetch_error(str(e))
 
     def handle_response(self, response):
-        if response.status_code == 200:
-            print(f"Successfully fetched: {self.url}")
-            
-            # Clear any previous fetch errors on success
-            self.clear_fetch_error()
-            
-            # Check for redirect
-            final_url = response.url
-            is_redirect = False
-            if final_url and final_url != self.url:
-                # Basic check, maybe ignore trailing slashes
-                if final_url.rstrip('/') != self.url.rstrip('/'):
-                    is_redirect = True
-                    print(f"Redirect detected: {self.url} -> {final_url}")
-
-            # 1. Update Registry (potentially new URL + favicon)
-            url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
-            try:
-                res = requests.get(f"{self.registry_url}/{url_hash}")
-                if res.status_code == 200:
-                    reg_doc = res.json()
-                    needs_update = False
-                    
-                    if is_redirect and reg_doc.get("url") != final_url:
-                        reg_doc["url"] = final_url
-                        needs_update = True
-                    
-                    # Fetch and store favicon if not already present
-                    if not reg_doc.get("favicon_url"):
-                        favicon_url = fetch_favicon_url(final_url if is_redirect else self.url)
-                        if favicon_url:
-                            reg_doc["favicon_url"] = favicon_url
-                            needs_update = True
-                        
-                    if needs_update:
-                        print(f"Updating registry for {self.url} (URL: {final_url})")
-                        requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
-                elif res.status_code == 404:
-                    print(f"Registering new feed: {self.url}")
-                    # Fetch favicon for new feed
-                    favicon_url = fetch_favicon_url(final_url if is_redirect else self.url)
-                    reg_doc = {
-                        "_id": url_hash,
-                        "url": final_url if is_redirect else self.url,
-                        "title": "Pending Enrichment...",
-                        "added_at": datetime.now(timezone.utc).isoformat(),
-                        "category": "auto-discovered",
-                        "favicon_url": favicon_url
-                    }
-                    requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
-            except Exception as e:
-                print(f"Error checking registry: {e}")
-
-            # 2. Store Content (latest only)
-            doc = {
-                "url": final_url if is_redirect else self.url, 
-                "headers": dict(response.headers),
-                "body": response.text,
-                "fetched_at": time.time()
-            }
-
-            # Check for changes using body hash
-            body_hash = hashlib.sha256(response.text.encode('utf-8')).hexdigest()
-            
-            try:
-                # Get current content doc to check revision and change
-                res = requests.get(f"{self.content_url}/{url_hash}")
-                if res.status_code == 200:
-                    current_doc = res.json()
-                    current_body_hash = hashlib.sha256(current_doc.get("body", "").encode('utf-8')).hexdigest()
-                    if body_hash == current_body_hash:
-                        print(f"No changes for {self.url}. Content up to date.")
-                        return
-                    doc["_rev"] = current_doc["_rev"]
-                
-                # Update latest content - This will trigger the enrichment worker via _changes
-                res = requests.put(f"{self.content_url}/{url_hash}", json=doc)
-                if res.status_code in (200, 201):
-                    print(f"Stored latest content for {self.url}")
-                else:
-                    print(f"Failed to store content: {res.text}")
-            except Exception as e:
-                print(f"Error updating content: {e}")
-        else:
+        if response.status_code != 200:
             error_msg = f"HTTP {response.status_code}"
             print(f"Failed to fetch: {self.url} with status code: {response.status_code}")
             self.record_fetch_error(error_msg)
+            return
+
+        print(f"Successfully fetched: {self.url}")
+        self.clear_fetch_error()
+        
+        # Process articles first to extract title
+        feed_title = self.process_articles(response.text)
+        
+        # Check for redirect
+        final_url = response.url
+        is_redirect = (final_url and final_url.rstrip('/') != self.url.rstrip('/'))
+        if is_redirect:
+            print(f"Redirect detected: {self.url} -> {final_url}")
+
+        url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
+        
+        self._update_registry(url_hash, feed_title, final_url, is_redirect)
+        self._store_content(url_hash, response, final_url, is_redirect)
+
+    def _update_registry(self, url_hash, feed_title, final_url, is_redirect):
+        """Update feed registry with title, resolved URL and favicon."""
+        try:
+            res = requests.get(f"{self.registry_url}/{url_hash}")
+            if res.status_code == 200:
+                self._update_existing_registry(url_hash, res.json(), feed_title, final_url, is_redirect)
+            elif res.status_code == 404:
+                self._create_new_registry(url_hash, feed_title, final_url, is_redirect)
+        except Exception as e:
+            print(f"Error checking registry: {e}")
+
+    def _update_existing_registry(self, url_hash, reg_doc, feed_title, final_url, is_redirect):
+        needs_update = False
+        if feed_title and not reg_doc.get("title"):
+            reg_doc["title"] = feed_title
+            needs_update = True
+        
+        if is_redirect and reg_doc.get("url") != final_url:
+            reg_doc["url"] = final_url
+            needs_update = True
+        
+        # Fetch and store favicon if not already present
+        if not reg_doc.get("favicon_url"):
+            favicon_url = fetch_favicon_url(final_url if is_redirect else self.url)
+            if favicon_url:
+                reg_doc["favicon_url"] = favicon_url
+                needs_update = True
+            
+        if needs_update:
+            print(f"Updating registry for {self.url} (Title: {feed_title}, URL: {final_url})")
+            requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
+
+    def _create_new_registry(self, url_hash, feed_title, final_url, is_redirect):
+        print(f"Registering new feed: {self.url}")
+        favicon_url = fetch_favicon_url(final_url if is_redirect else self.url)
+        reg_doc = {
+            "_id": url_hash,
+            "url": final_url if is_redirect else self.url,
+            "title": feed_title or "Unknown Feed",
+            "added_at": datetime.now(timezone.utc).isoformat(),
+            "category": "auto-discovered",
+            "favicon_url": favicon_url
+        }
+        requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
+
+    def _store_content(self, url_hash, response, final_url, is_redirect):
+        """Store the latest feed content if it has changed."""
+        doc = {
+            "url": final_url if is_redirect else self.url,
+            "headers": dict(response.headers),
+            "body": response.text,
+            "fetched_at": time.time()
+        }
+
+        body_hash = hashlib.sha256(response.text.encode('utf-8')).hexdigest()
+        
+        try:
+            # Get current content doc to check revision and change
+            res = requests.get(f"{self.content_url}/{url_hash}")
+            if res.status_code == 200:
+                current_doc = res.json()
+                current_body_hash = hashlib.sha256(current_doc.get("body", "").encode('utf-8')).hexdigest()
+                if body_hash == current_body_hash:
+                    print(f"No changes for {self.url}. Content up to date.")
+                    return
+                doc["_rev"] = current_doc["_rev"]
+            
+            # Update latest content
+            res = requests.put(f"{self.content_url}/{url_hash}", json=doc)
+            if res.status_code in (200, 201):
+                print(f"Stored latest content for {self.url}")
+            else:
+                print(f"Failed to store content: {res.text}")
+        except Exception as e:
+            print(f"Error updating content: {e}")
 
     def record_fetch_error(self, error_message):
         """Record a fetch error in the feed registry."""

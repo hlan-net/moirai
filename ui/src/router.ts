@@ -1,20 +1,33 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { useAuthStore } from './stores/auth'
 import MainPage from './components/MainPage.vue'
 import SettingsPage from './components/SettingsPage.vue'
 import ChatPage from './components/ChatPage.vue'
 import StreamPage from './components/StreamPage.vue'
+import LoginPage from './components/LoginPage.vue'
 
 const routes = [
-  { path: '/', redirect: '/stream' },
-  { path: '/stream', component: StreamPage, name: 'Stream' },
-  { path: '/dashboard', component: MainPage, name: 'Dashboard' },
-  { path: '/chat', component: ChatPage, name: 'Chat' },
-  { path: '/settings', component: SettingsPage, name: 'Settings' },
+  { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
+  { path: '/login', component: LoginPage, name: 'Login' },
+  { path: '/dashboard', component: MainPage, name: 'Dashboard', meta: { requiresAuth: true } },
+  { path: '/chat', component: ChatPage, name: 'Chat', meta: { requiresAuth: true } },
+  { path: '/settings', component: SettingsPage, name: 'Settings', meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(), 
+  history: createWebHashHistory(),
   routes,
+})
+
+router.beforeEach(async (to, _from, next) => {
+  const authStore = useAuthStore()
+
+  // Check if route requires auth
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    next('/login')
+  } else {
+    next()
+  }
 })
 
 export default router

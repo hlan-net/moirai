@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch, nextTick, inject, type Ref } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
+import { useAuthStore } from '../stores/auth'
 
 interface Feed {
   _id: string;
@@ -36,6 +37,9 @@ const modalContentRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
+
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Extract and validate URLs from text
 const extractValidUrls = (text: string): string[] => {
@@ -391,7 +395,7 @@ const bulkImportFeeds = async () => {
   <div class="column-container">
     <div class="column-header">
         <h2>Feeds ({{ filteredFeeds.length }})</h2>
-        <div class="header-actions">
+        <div class="header-actions" v-if="isAdmin">
           <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
@@ -426,13 +430,9 @@ const bulkImportFeeds = async () => {
     </div>
     <ul v-else-if="filteredFeeds.length" class="feed-list">
       <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item" 
-          role="button"
-          tabindex="0"
           @click="selectFeed(feed.url)"
-          @keydown.enter.prevent="selectFeed(feed.url)"
-          @keydown.space.prevent="selectFeed(feed.url)"
           :class="{ 'selected-feed': selectedFeedUrl === feed.url }">
-        <div v-if="renamingFeedId === feed._id" class="feed-info">
+        <div v-if="renamingFeedId === feed._id && isAdmin" class="feed-info">
           <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
           <div class="rename-actions">
             <button @click="renameFeed(feed)">Save</button>
@@ -442,8 +442,14 @@ const bulkImportFeeds = async () => {
         <div v-else class="feed-info">
           <div class="feed-name-container">
             <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="`${feed.title || getHostname(feed.url)} icon`" @error="handleFaviconError" />
-            <span v-else class="feed-favicon-placeholder" role="img" :aria-label="`${feed.title || getHostname(feed.url)} icon`">📰</span>
-            <span class="feed-name" :title="feed.url">{{ feed.title || getHostname(feed.url) }}</span>
+            <span v-else class="feed-favicon-placeholder" aria-label="No icon">📰</span>
+            <button 
+              class="feed-name-btn" 
+              @click.stop="selectFeed(feed.url)"
+              :title="feed.url"
+            >
+              {{ feed.title || getHostname(feed.url) }}
+            </button>
             <a :href="feed.url" target="_blank" class="feed-link-icon" :title="`Open ${feed.url}`" @click.stop>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
@@ -463,12 +469,12 @@ const bulkImportFeeds = async () => {
               <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
             </svg>
           </button>
-          <button @click="startRename(feed)" class="icon-btn" title="Rename Feed">
+          <button v-if="isAdmin" @click="startRename(feed)" class="icon-btn" title="Rename Feed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
             </svg>
           </button>
-          <button @click="deleteFeed(feed._id)" class="icon-btn delete" title="Delete Feed">
+          <button v-if="isAdmin" @click="deleteFeed(feed._id)" class="icon-btn delete" title="Delete Feed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
             </svg>
@@ -480,7 +486,7 @@ const bulkImportFeeds = async () => {
     
     <!-- Bulk Import Modal -->
     <div v-if="showBulkImportModal" class="modal-overlay" @click="closeBulkImportModal">
-      <div 
+        <div 
         ref="modalContentRef"
         class="modal-content" 
         role="dialog"
@@ -616,12 +622,22 @@ h2 {
   flex: 1;
 }
 
-.feed-name {
+.feed-name-btn {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #42b983;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+.feed-name-btn:hover {
+    text-decoration: underline;
 }
 
 .feed-link-icon {

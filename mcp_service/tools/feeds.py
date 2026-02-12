@@ -1,80 +1,120 @@
-import json
 import hashlib
-from datetime import datetime, timezone
 import requests
-from ..core import mcp
-from ..db import store_doc, db_request, get_doc, update_doc, delete_doc
+from datetime import datetime, timezone
+from ..core import mcp, auth_required, validate_namespace
+from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
 from tasks.fetch_feed_task import FetchFeedTask
 
-# --- Feeds Tools ---
-
 @mcp.tool()
-def add_feed(url: str, title: str = "", category: str = "general") -> str:
+@auth_required
+def add_feed(url: str, title: str, namespace: str, category: str = "general", api_key: str = None) -> str:
     """
-    Register a new RSS feed source.
+    Register a new RSS feed into a specific namespace.
     
     Args:
-        url: The full URL to the RSS/Atom feed
-        title: Optional title for the feed
-        category: Optional category (e.g., 'tech', 'news', 'linux')
+        url: The RSS feed URL.
+        title: Human-readable title for the feed.
+        namespace: GUID of the namespace.
+        category: Optional category (e.g., 'tech', 'finance').
+        api_key: Required for authentication.
     """
-    feed_id = hashlib.sha256(url.encode('utf-8')).hexdigest()
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
+    # Generate a unique ID based on URL and namespace to avoid duplicates within a namespace
+    feed_id = hashlib.sha256(f"{url}:{namespace}".encode('utf-8')).hexdigest()
     
     feed_doc = {
         "_id": feed_id,
         "url": url,
         "title": title,
         "category": category,
+        "namespace": namespace,
         "added_at": datetime.now(timezone.utc).isoformat(),
         "type": "feed"
     }
     
     try:
-        # Check if already exists
+        # Check if already exists in this namespace
         existing = get_doc("feeds", feed_id)
         if existing:
-            return f"Feed already exists: {url}"
+            return f"Feed already exists in namespace {namespace}."
             
-        res = store_doc("feeds", feed_doc)
-        return f"Feed registered successfully with ID: {res}"
+        doc_id = store_doc("feeds", feed_doc)
+        return f"Feed '{title}' added with ID: {doc_id} to namespace {namespace}"
     except Exception as e:
-        return f"Error registering feed: {e}"
+        return f"Error adding feed: {e}"
 
 @mcp.tool()
-def list_feeds() -> str:
-    """List all registered RSS feeds."""
-    res = db_request("GET", "feeds", path="/_all_docs", params={"include_docs": "true"})
-    if res.status_code != 200:
-        return "No feeds data found."
+@auth_required
+def list_feeds(namespace: str, api_key: str = None) -> str:
+    """
+    List all RSS feeds registered in a specific namespace.
     
-    rows = res.json().get("rows", [])
-    feeds = []
-    for row in rows:
-        doc = row["doc"]
-        # Skip design docs
-        if doc.get("_id", "").startswith("_design/"):
-            continue
-        feeds.append(f"Title: {doc.get('title', 'Untitled')}\nURL: {doc.get('url')}\nCategory: {doc.get('category', 'none')}\nID: {doc['_id']}\n")
-    
-    return "\n---\n".join(feeds) if feeds else "No feeds found."
+    Args:
+        namespace: GUID of the namespace.
+        api_key: Required for authentication.
+    """
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
+    selector = {"namespace": namespace}
+    try:
+        res = db_request("POST", "feeds", path="/_find", json_data={"selector": selector})
+        if res.status_code != 200:
+            return f"Error fetching feeds: {res.text}"
+            
+        docs = res.json().get("docs", [])
+        feeds = []
+        for doc in docs:
+            feeds.append(f"ID: {doc['_id']}\nTitle: {doc['title']}\nURL: {doc['url']}\nCategory: {doc.get('category', 'N/A')}\n")
+            
+        return "\n---\n".join(feeds) if feeds else f"No feeds found in namespace {namespace}."
+    except Exception as e:
+        return f"Error listing feeds: {e}"
 
 @mcp.tool()
-def read_feed(url: str, limit: int = 20) -> str:
+@auth_required
+def delete_feed(feed_id: str, namespace: str, api_key: str = None) -> str:
+    """
+    Remove a feed from a namespace.
+    
+    Args:
+        feed_id: The ID of the feed to delete.
+        namespace: GUID of the namespace.
+        api_key: Required for authentication.
+    """
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
+    existing = get_doc("feeds", feed_id)
+    if not existing or existing.get("namespace") != namespace:
+        return "Feed not found or access denied."
+        
+    success, msg = delete_doc("feeds", feed_id)
+    if success:
+        return f"Feed {feed_id} deleted successfully from namespace {namespace}."
+    else:
+        return f"Error deleting feed: {msg}"
+
+@mcp.tool()
+@auth_required
+def read_feed(url: str, namespace: str, limit: int = 20, api_key: str = None) -> str:
     """
     Fetch and process articles from a specific RSS feed URL.
     This triggers a live fetch and returns the latest articles.
     
     Args:
         url: The RSS feed URL to fetch
+        namespace: GUID of the namespace.
         limit: Max number of articles to return (default: 20)
+        api_key: Required for authentication.
     """
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
     try:
-        # We use FetchFeedTask logic but synchronously for the tool response
-        # or we trigger it and then fetch from articles DB?
-        # Actually, to be responsive, we should probably fetch it here or use ArticleProcessor directly.
-        
         from tasks.article_processor import ArticleProcessor
-        import requests
         
         headers = {'User-Agent': 'MoiraiBot/1.0'}
         response = requests.get(url, headers=headers, timeout=30)
@@ -83,18 +123,20 @@ def read_feed(url: str, limit: int = 20) -> str:
             return f"Failed to fetch feed: HTTP {response.status_code}"
             
         processor = ArticleProcessor()
+        
         feed_title, articles = processor.process_feed(url, response.text)
         
         # Store articles in background
         count = 0
         for article in articles:
+            article['namespace'] = namespace # Force namespace injection
             processor.store_article(article)
             count += 1
             
         # Return the latest few
         results = articles[:limit]
         
-        output = [f"Feed: {feed_title}", f"Processed {len(articles)} articles, stored {count}."]
+        output = [f"Feed: {feed_title}", f"Processed {len(articles)} articles, stored {count} in namespace {namespace}."]
         for a in results:
             output.append(f"- {a['title']} ({a['link']}) [{a.get('language', 'unknown')}]")
             
@@ -104,21 +146,26 @@ def read_feed(url: str, limit: int = 20) -> str:
         return f"Error reading feed: {e}"
 
 @mcp.tool()
-def update_feed_category(url: str, new_category: str) -> str:
-    """Update the category of an existing feed."""
-    feed_id = hashlib.sha256(url.encode('utf-8')).hexdigest()
+@auth_required
+def update_feed_category(feed_id: str, new_category: str, namespace: str, api_key: str = None) -> str:
+    """
+    Update the category of an existing feed.
+    
+    Args:
+        feed_id: The ID of the feed to update.
+        new_category: New category name.
+        namespace: GUID of the namespace.
+        api_key: Required for authentication.
+    """
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
+    existing = get_doc("feeds", feed_id)
+    if not existing or existing.get("namespace") != namespace:
+        return "Feed not found or access denied."
+
     success, msg = update_doc("feeds", feed_id, {"category": new_category})
     if success:
-        return f"Feed {url} category updated to {new_category}."
+        return f"Feed {feed_id} category updated to {new_category}."
     else:
         return f"Error updating feed: {msg}"
-
-@mcp.tool()
-def delete_feed(url: str) -> str:
-    """Unregister a feed source."""
-    feed_id = hashlib.sha256(url.encode('utf-8')).hexdigest()
-    success, msg = delete_doc("feeds", feed_id)
-    if success:
-        return f"Feed {url} deleted successfully."
-    else:
-        return f"Error deleting feed: {msg}"

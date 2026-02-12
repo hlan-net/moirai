@@ -21,10 +21,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Python 3.10
+    - name: Set up Python 3.13
       uses: actions/setup-python@v4
       with:
-        python-version: "3.10"
+        python-version: "3.13"
 
     - name: Install dependencies
       run: |
@@ -35,7 +35,7 @@ jobs:
     - name: Lint with Ruff
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        ruff check . --select=E9,F63,F7,F82 --target-version=py310
+        ruff check . --select=E9,F63,F7,F82 --target-version=py313
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         ruff check . --exit-zero --statistics
 
@@ -47,5 +47,7 @@ jobs:
         COUCHDB_PORT: 5984
         API_USERNAME: testuser
         API_PASSWORD: testpassword
+        FLASK_ENV: test
+        TESTING: true
       run: |
         pytest
