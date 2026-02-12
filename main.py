@@ -68,13 +68,15 @@ def start_services():
     # In production, WERKZEUG_RUN_MAIN won't be set, so worker starts normally
     # To disable worker entirely, set ENABLE_ENRICHMENT_WORKER='false'
     should_start_worker = os.environ.get('ENABLE_ENRICHMENT_WORKER', 'true').lower() == 'true'
-    is_reloader_parent = os.environ.get('WERKZEUG_RUN_MAIN') == 'false'
+    # In dev reloader mode, only start in the child process (when WERKZEUG_RUN_MAIN is 'true')
+    # In production (no reloader), WERKZEUG_RUN_MAIN is None, so we start the worker
+    is_dev_reloader_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    is_production = os.environ.get('WERKZEUG_RUN_MAIN') is None
     
-    if should_start_worker and not is_reloader_parent:
+    if should_start_worker and (is_production or is_dev_reloader_child):
         from tasks.enrichment_worker import worker
-        if not worker.is_alive():
-            worker.start()
-            print("Enrichment worker started.")
+        worker.start()
+        print("Enrichment worker started.")
     
     # Start the scheduler
     interval = os.environ.get("ITERATION_INTERVAL", 600)
