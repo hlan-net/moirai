@@ -3,6 +3,7 @@ import os
 import hashlib
 import version
 import requests
+import logging
 from datetime import datetime, timezone
 from functools import wraps
 from api.extensions import limiter
@@ -22,6 +23,9 @@ from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
 
 api_blueprint = Blueprint('api', __name__)
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 API_USERNAME = os.environ.get("API_USERNAME")
 API_PASSWORD = os.environ.get("API_PASSWORD")
@@ -585,9 +589,12 @@ def get_stats():
         })
     except requests.exceptions.HTTPError as e:
         # CouchDB returned an HTTP error (401, 403, 5xx, etc.)
-        abort(502, description=f"CouchDB error: {e.response.status_code}")
-    except requests.exceptions.RequestException:
+        # Log detailed error internally but return user-friendly message
+        logger.error(f"CouchDB HTTP error in /stats: {e.response.status_code} {e.response.text}")
+        abort(502, description="Statistics temporarily unavailable")
+    except requests.exceptions.RequestException as e:
         # Network or connection error
+        logger.error(f"CouchDB connection error in /stats: {e}")
         abort(503, description="Database unavailable")
 
 # --- Search Endpoints ---
