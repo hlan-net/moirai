@@ -137,7 +137,6 @@ class FetchFeedTask(threading.Thread):
             print(f"Failed to fetch: {self.url} with status code: {response.status_code}")
             self.record_fetch_error(error_msg)
 
-
     def record_fetch_error(self, error_message):
         """Record a fetch error in the feed registry."""
         url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
