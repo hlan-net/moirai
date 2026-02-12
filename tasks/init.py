@@ -47,23 +47,28 @@ def ensure_design_doc(db_name, design_doc_name, views):
     # Check if exists to get current rev
     try:
         response = _request('GET', url)
-        design_doc = {
-            "views": views
-        }
         
+        # Start from existing design doc (if present) to preserve other fields
         if response.status_code == 200:
             current = response.json()
             # Only update if views changed
             if current.get("views") == views:
                 return
-            design_doc["_rev"] = current["_rev"]
-            
+            design_doc = current
+            design_doc["views"] = views
+            # Ensure we keep the latest revision to avoid conflicts
+            design_doc["_rev"] = current.get("_rev", design_doc.get("_rev"))
+        else:
+            # Design doc does not exist (or other non-200) – create a new one
+            design_doc = {
+                "views": views
+            }
         response = _request('PUT', url, json=design_doc)
         if response.status_code in (200, 201):
             print(f"Design doc '{design_doc_name}' on '{db_name}' updated.")
         else:
             print(f"Failed to update design doc '{design_doc_name}': {response.text}")
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"Error ensuring design doc on '{db_name}': {e}")
 
 @retry(
