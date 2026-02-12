@@ -30,7 +30,7 @@ class EnrichmentWorker(threading.Thread):
             try:
                 self.process_changes()
             except Exception as e:
-                print(f"EnrichmentWorker error: {e}")
+                logger.error(f"EnrichmentWorker error: {e}")
                 time.sleep(5) # Backoff
 
     def get_last_seq(self):
