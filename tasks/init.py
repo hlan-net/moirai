@@ -82,7 +82,7 @@ def init_db():
   print("Assuming CouchDB is ready (handled by initContainer).")
   
   # Ensure all databases exist
-  allowed_dbs = ["feeds", "articles", "events", "trends", "config", "chat_history"]
+  allowed_dbs = ["feeds", "articles", "events", "trends", "config", "chat_history", "feed_content"]
   for db in allowed_dbs:
       ensure_db(db)
   
