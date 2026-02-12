@@ -7,7 +7,7 @@ import base64
 from functools import wraps
 from flask import Blueprint, request, jsonify, abort, g
 from passlib.hash import bcrypt
-from api.db import get_user_by_email, create_user, fetch_from_couchdb, update_user, update_couchdb_doc
+from api.db import get_user_by_email, create_user, fetch_from_couchdb, update_couchdb_doc
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import msal
