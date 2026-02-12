@@ -47,5 +47,7 @@ jobs:
         COUCHDB_PORT: 5984
         API_USERNAME: testuser
         API_PASSWORD: testpassword
+        FLASK_ENV: test
+        TESTING: true
       run: |
         pytest
