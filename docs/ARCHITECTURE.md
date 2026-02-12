@@ -9,10 +9,14 @@ Instead of the system autonomously deciding what to fetch and process, Moirai ac
 
 ### 2.1 Backend (Flask API)
 -   **Port:** `8088`
--   **Role:** Serves the Web UI, handles data persistence, and provides administrative REST APIs.
+-   **Role:** Serves the Web UI, handles data persistence, provides administrative REST APIs, and runs background services.
+-   **Background Services:**
+    -   **Scheduler:** Periodically triggers feed collection.
+    -   **EnrichmentWorker:** Monitors the CouchDB `_changes` feed to asynchronously process and enrich raw feed content into structured articles.
 -   **Security:** HTTP Basic Auth (`API_USERNAME` / `API_PASSWORD`).
 -   **Key Routes:**
     -   `/api/feeds`, `/api/articles` - Content management
+    -   `/api/stats` - Global system statistics via MapReduce views
     -   `/api/events`, `/api/trends` - Synthesis management
     -   `/api/chat` - Internal chat interface endpoints
 
@@ -37,10 +41,13 @@ Instead of the system autonomously deciding what to fetch and process, Moirai ac
 ### 2.4 Data Storage (CouchDB)
 -   **Databases:**
     -   `feeds`: RSS source URLs and metadata.
-    -   `articles`: Fetched news items.
+    -   `articles`: Fetched news items with auto-detected language.
+    -   `feed_content`: Raw RSS/Atom content (collection layer).
     -   `events`: Grouped articles (Level 1 synthesis).
     -   `trends`: Grouped events (Level 2 synthesis).
-    -   `config`: System configuration.
+    -   `config`: System configuration and worker state.
+-   **Integrity:** `validate_doc_update` functions enforce schema at the database layer.
+-   **Analytics:** Pre-aggregated statistics using MapReduce views (`articles/stats`, `feeds/health`).
 
 ## 3. Data Flow
 
