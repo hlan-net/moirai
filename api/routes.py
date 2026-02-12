@@ -586,7 +586,7 @@ def get_stats():
     except requests.exceptions.HTTPError as e:
         # CouchDB returned an HTTP error (401, 403, 5xx, etc.)
         abort(502, description=f"CouchDB error: {e.response.status_code}")
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         # Network or connection error
         abort(503, description="Database unavailable")
 
