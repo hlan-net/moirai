@@ -564,7 +564,7 @@ def update_config():
 # --- Stats ---
 
 @api_blueprint.route("/stats", methods=["GET"])
-@requires_auth
+@jwt_required
 def get_stats():
     """Retrieve aggregation statistics from CouchDB MapReduce views."""
     from .db import query_couchdb_view

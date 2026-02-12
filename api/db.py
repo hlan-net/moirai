@@ -152,7 +152,6 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
         logger.error(f"Error querying CouchDB: {e}")
         return []
 
-<<<<<<< HEAD
 def get_user_by_email(email):
     """Retrieve a user document by email."""
     users = query_couchdb("users", {"email": email}, limit=1)
