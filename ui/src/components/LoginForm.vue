@@ -68,7 +68,7 @@ const handleAuth = async () => {
 
 const fetchAuthConfig = async () => {
     try {
-        const res = await fetch('/api/config')
+        const res = await fetch('/api/auth/config')
         if (res.ok) {
             const data = await res.json()
             googleClientId.value = data.google_client_id

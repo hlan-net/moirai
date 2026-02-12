@@ -6,7 +6,10 @@ import router from '../router'
 export const useAuthStore = defineStore('auth', () => {
     const token = ref<string | null>(localStorage.getItem('token'))
     const user = ref<any>(null)
-    const isAuthenticated = computed(() => !!token.value)
+    const basicAuth = ref(false)
+    const initialized = ref(false)
+    let initPromise: Promise<void> | null = null
+    const isAuthenticated = computed(() => !!token.value || basicAuth.value)
 
     // Configure axios defaults
     if (token.value) {
@@ -90,6 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
     function logout() {
         token.value = null
         user.value = null
+        basicAuth.value = false
         localStorage.removeItem('token')
         delete axios.defaults.headers.common['Authorization']
         router.push('/login')
@@ -106,20 +110,41 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    // Initialize
-    if (token.value) {
-        fetchUser()
+    async function initialize() {
+        if (initialized.value) return
+        if (initPromise) return initPromise
+        initPromise = (async () => {
+            if (token.value) {
+                await fetchUser()
+            }
+            if (!token.value) {
+                try {
+                    const response = await axios.get('/api/auth/me')
+                    user.value = response.data
+                    basicAuth.value = true
+                } catch (error) {
+                    console.warn('Basic auth check failed', error)
+                    basicAuth.value = false
+                }
+            }
+            initialized.value = true
+        })()
+        return initPromise
     }
 
+    // Initialize when router guard runs
+    
     return {
         token,
         user,
         isAuthenticated,
+        initialized,
         login,
         loginWithGoogle,
         loginWithEntra,
         loginWithGithub,
         logout,
-        fetchUser
+        fetchUser,
+        initialize
     }
 })
