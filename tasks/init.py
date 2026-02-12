@@ -41,20 +41,19 @@ def create_index(db_name, fields, name):
     except Exception as e:
         print(f"Error creating index on '{db_name}': {e}")
 
-def ensure_design_doc(db_name, design_doc_name, views):
+def ensure_design_doc(db_name, design_doc_name, body):
     url = f"{COUCHDB_URI}/{db_name}/_design/{design_doc_name}"
     
     # Check if exists to get current rev
     try:
         response = _request('GET', url)
-        design_doc = {
-            "views": views
-        }
+        design_doc = body.copy()
         
         if response.status_code == 200:
             current = response.json()
-            # Only update if views changed
-            if current.get("views") == views:
+            # Only update if content changed (ignore _rev and _id in comparison)
+            current_filtered = {k: v for k, v in current.items() if k not in ("_rev", "_id")}
+            if current_filtered == body:
                 return
             design_doc["_rev"] = current["_rev"]
             
@@ -87,19 +86,26 @@ def init_db():
   create_index("events", ["article_links"], "events-links-index")
   create_index("trends", ["event_ids"], "trends-events-index")
 
-  # Create MapReduce views for statistics
+  # Create MapReduce views for statistics and validation for articles
   ensure_design_doc("articles", "stats", {
-      "by_language": {
-          "map": "function(doc) { if (doc.language) emit(doc.language, 1); }",
-          "reduce": "_count"
-      }
+      "views": {
+          "by_language": {
+              "map": "function(doc) { if (doc.language) emit(doc.language, 1); }",
+              "reduce": "_count"
+          }
+      },
+      "validate_doc_update": "function(newDoc, oldDoc, userCtx) { if (newDoc._deleted) return; if (!newDoc.title) throw({forbidden: 'Article must have a title'}); if (!newDoc.link) throw({forbidden: 'Article must have a link'}); if (!newDoc.feed_url) throw({forbidden: 'Article must have a feed_url'}); if (!newDoc.published) throw({forbidden: 'Article must have a published date'}); }"
   })
   
+  # Feed health views and validation for feeds
   ensure_design_doc("feeds", "health", {
-      "status": {
-          "map": "function(doc) { if (doc.last_fetch_error) { emit('error', 1); } else { emit('success', 1); } }",
-          "reduce": "_count"
-      }
+      "views": {
+          "status": {
+              "map": "function(doc) { if (doc.last_fetch_error) { emit('error', 1); } else { emit('success', 1); } }",
+              "reduce": "_count"
+          }
+      },
+      "validate_doc_update": "function(newDoc, oldDoc, userCtx) { if (newDoc._deleted) return; if (!newDoc.url) throw({forbidden: 'Feed must have a url'}); }"
   })
   
   return
