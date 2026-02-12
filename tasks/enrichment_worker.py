@@ -39,8 +39,8 @@ class EnrichmentWorker(threading.Thread):
             res = requests.get(f"{COUCHDB_URI}config/enrichment_last_seq")
             if res.status_code == 200:
                 return res.json().get("value", "0")
-        except:
-            pass
+        except requests.exceptions.RequestException as e:
+            print(f"Warning: Could not retrieve last_seq, starting from 'now'. Error: {e}")
         return "now"
 
     def save_last_seq(self, seq):
