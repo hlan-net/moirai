@@ -50,9 +50,10 @@ class EnrichmentWorker(threading.Thread):
             res = requests.get(f"{COUCHDB_URI}config/enrichment_last_seq")
             if res.status_code == 200:
                 doc["_rev"] = res.json()["_rev"]
-            requests.put(f"{COUCHDB_URI}config/enrichment_last_seq", json=doc)
-        except:
-            pass
+            put_res = requests.put(f"{COUCHDB_URI}config/enrichment_last_seq", json=doc)
+            put_res.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"ERROR: Failed to save last_seq '{seq}': {e}")
 
     def process_changes(self):
         params = {
