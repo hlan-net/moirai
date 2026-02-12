@@ -166,32 +166,3 @@ class FetchFeedTask(threading.Thread):
                 print(f"Cleared fetch error for {self.url}")
         except Exception as e:
             print(f"Failed to clear fetch error: {e}")
-
-    def record_fetch_error(self, error_message):
-        """Record a fetch error in the feed registry."""
-        url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
-        try:
-            res = requests.get(f"{self.registry_url}/{url_hash}")
-            if res.status_code == 200:
-                reg_doc = res.json()
-                reg_doc["last_fetch_error"] = error_message
-                reg_doc["last_fetch_at"] = datetime.now().isoformat()
-                requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
-                print(f"Recorded fetch error for {self.url}: {error_message}")
-        except Exception as e:
-            print(f"Failed to record fetch error: {e}")
-
-    def clear_fetch_error(self):
-        """Clear any previous fetch error in the feed registry."""
-        url_hash = hashlib.sha256(self.url.encode('utf-8')).hexdigest()
-        try:
-            res = requests.get(f"{self.registry_url}/{url_hash}")
-            if res.status_code == 200:
-                reg_doc = res.json()
-                if "last_fetch_error" in reg_doc:
-                    del reg_doc["last_fetch_error"]
-                reg_doc["last_fetch_at"] = datetime.now().isoformat()
-                requests.put(f"{self.registry_url}/{url_hash}", json=reg_doc)
-                print(f"Cleared fetch error for {self.url}")
-        except Exception as e:
-            print(f"Failed to clear fetch error: {e}")

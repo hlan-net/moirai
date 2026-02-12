@@ -1,7 +1,6 @@
 import requests
 import os
 import pytest
-from api.db_config import COUCHDB_URI
 
 # Use local environment variables or defaults
 API_BASE = os.environ.get("API_BASE_URL", "http://localhost:8088/api")
