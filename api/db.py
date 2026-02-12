@@ -152,6 +152,7 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
         logger.error(f"Error querying CouchDB: {e}")
         return []
 
+<<<<<<< HEAD
 def get_user_by_email(email):
     """Retrieve a user document by email."""
     users = query_couchdb("users", {"email": email}, limit=1)
@@ -182,3 +183,35 @@ def update_user(user_id, updates):
     user.update(updates)
     return update_couchdb_doc("users", user_id, user)
 
+def query_couchdb_view(db_name, design_doc, view_name, group=True):
+    """Query a MapReduce view."""
+    if db_name not in ALLOWED_DBS:
+        abort(400, description=ERROR_INVALID_DB_NAME)
+        
+    safe_db_name = urllib.parse.quote(db_name, safe="")
+    safe_design_doc = urllib.parse.quote(design_doc, safe="")
+    safe_view_name = urllib.parse.quote(view_name, safe="")
+    
+    url = f"{COUCHDB_URI}{safe_db_name}/_design/{safe_design_doc}/_view/{safe_view_name}"
+    params = {"group": "true" if group else "false"}
+    
+    try:
+        response = _request('GET', url, params=params)
+        
+        # Handle 404 separately - design doc or view doesn't exist
+        if response.status_code == 404:
+            logger.warning(f"CouchDB view not found: {design_doc}/{view_name} in {db_name}")
+            return []
+        
+        # Raise for any other HTTP errors (401, 403, 5xx, etc.)
+        # This will propagate errors properly instead of silently returning empty list
+        response.raise_for_status()
+        
+        return response.json().get('rows', [])
+    except requests.exceptions.HTTPError as e:
+        # Log HTTP errors with full details before re-raising
+        logger.error(f"HTTP error querying CouchDB view {design_doc}/{view_name}: {e.response.status_code} {e.response.text}")
+        raise
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error querying CouchDB view {design_doc}/{view_name}: {e}")
+        raise

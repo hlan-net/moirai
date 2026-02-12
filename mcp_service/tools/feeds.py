@@ -1,7 +1,9 @@
 import hashlib
+import requests
 from datetime import datetime, timezone
 from ..core import mcp, auth_required, validate_namespace
-from ..db import db_request, store_doc, get_doc, delete_doc
+from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
+from tasks.fetch_feed_task import FetchFeedTask
 
 @mcp.tool()
 @auth_required
@@ -94,3 +96,76 @@ def delete_feed(feed_id: str, namespace: str, api_key: str = None) -> str:
         return f"Feed {feed_id} deleted successfully from namespace {namespace}."
     else:
         return f"Error deleting feed: {msg}"
+
+@mcp.tool()
+@auth_required
+def read_feed(url: str, namespace: str, limit: int = 20, api_key: str = None) -> str:
+    """
+    Fetch and process articles from a specific RSS feed URL.
+    This triggers a live fetch and returns the latest articles.
+    
+    Args:
+        url: The RSS feed URL to fetch
+        namespace: GUID of the namespace.
+        limit: Max number of articles to return (default: 20)
+        api_key: Required for authentication.
+    """
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
+    try:
+        from tasks.article_processor import ArticleProcessor
+        
+        headers = {'User-Agent': 'MoiraiBot/1.0'}
+        response = requests.get(url, headers=headers, timeout=30)
+        
+        if response.status_code != 200:
+            return f"Failed to fetch feed: HTTP {response.status_code}"
+            
+        processor = ArticleProcessor()
+        
+        feed_title, articles = processor.process_feed(url, response.text)
+        
+        # Store articles in background
+        count = 0
+        for article in articles:
+            article['namespace'] = namespace # Force namespace injection
+            processor.store_article(article)
+            count += 1
+            
+        # Return the latest few
+        results = articles[:limit]
+        
+        output = [f"Feed: {feed_title}", f"Processed {len(articles)} articles, stored {count} in namespace {namespace}."]
+        for a in results:
+            output.append(f"- {a['title']} ({a['link']}) [{a.get('language', 'unknown')}]")
+            
+        return "\n".join(output)
+        
+    except Exception as e:
+        return f"Error reading feed: {e}"
+
+@mcp.tool()
+@auth_required
+def update_feed_category(feed_id: str, new_category: str, namespace: str, api_key: str = None) -> str:
+    """
+    Update the category of an existing feed.
+    
+    Args:
+        feed_id: The ID of the feed to update.
+        new_category: New category name.
+        namespace: GUID of the namespace.
+        api_key: Required for authentication.
+    """
+    valid, err = validate_namespace(namespace)
+    if not valid: return err
+
+    existing = get_doc("feeds", feed_id)
+    if not existing or existing.get("namespace") != namespace:
+        return "Feed not found or access denied."
+
+    success, msg = update_doc("feeds", feed_id, {"category": new_category})
+    if success:
+        return f"Feed {feed_id} category updated to {new_category}."
+    else:
+        return f"Error updating feed: {msg}"

@@ -1,5 +1,4 @@
 import hashlib
-import json
 import os
 import random
 import threading
@@ -7,7 +6,6 @@ import time
 import requests
 from urllib.parse import quote
 from datetime import datetime, timezone
-from .article_processor import ArticleProcessor
 from .favicon_fetcher import fetch_favicon_url
 
 class FetchFeedTask(threading.Thread):
@@ -149,47 +147,6 @@ class FetchFeedTask(threading.Thread):
                 print(f"Failed to store content: {res.text}")
         except Exception as e:
             print(f"Error updating content: {e}")
-
-    def is_duplicate(self, doc_hash):
-        """
-        Checks if a document with the given hash already exists in CouchDB.
-        """
-        try:
-            # Attempt to retrieve the document by its ID (hash)
-            response = requests.get(f"{self.couchdb_url}/{doc_hash}")
-            if response.status_code == 200:
-                # Document exists
-                return True
-            elif response.status_code == 404:
-                # Document does not exist
-                return False
-            else:
-                print(f"Error checking for duplicate: {response.text}")
-                return True
-        except requests.exceptions.RequestException as e:
-            print(f"Error checking for duplicate: {e}")
-            return True
-    
-    def process_articles(self, feed_content):
-        """
-        Process individual articles from the RSS feed.
-        Returns: feed_title (str)
-        """
-        try:
-            processor = ArticleProcessor()
-            feed_title, articles = processor.process_feed(self.url, feed_content)
-            
-            print(f"Processed {len(articles)} articles from {self.url} ('{feed_title}')")
-            
-            # Store each article
-            for article in articles:
-                processor.store_article(article)
-            
-            return feed_title
-                
-        except Exception as e:
-            print(f"Error processing articles from {self.url}: {e}")
-            return None
 
     def record_fetch_error(self, error_message):
         """Record a fetch error in the feed registry."""

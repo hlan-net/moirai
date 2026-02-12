@@ -65,6 +65,19 @@ def start_services():
     print(f"{get_version_string()} starting...", flush=True)
     init.run()
     print("Moirai initialised.")
+
+    # Start the enrichment worker only once
+    # In dev mode with reloader, only start in the reloaded process (WERKZEUG_RUN_MAIN='true')
+    # In production, WERKZEUG_RUN_MAIN won't be set, so worker starts normally
+    # To disable worker entirely, set ENABLE_ENRICHMENT_WORKER='false'
+    should_start_worker = os.environ.get('ENABLE_ENRICHMENT_WORKER', 'true').lower() == 'true'
+    is_dev_reloader_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    is_production = os.environ.get('WERKZEUG_RUN_MAIN') is None
+    
+    if should_start_worker and (is_production or is_dev_reloader_child):
+        from tasks.enrichment_worker import worker
+        worker.start()
+        print("Enrichment worker started.")
     
     # Start the scheduler
     interval = os.environ.get("ITERATION_INTERVAL", 600)
