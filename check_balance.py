@@ -26,7 +26,7 @@ def check_balance(filename):
     
     void_elements = set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'])
     
-    tag_pattern = re.compile(r'</?([a-zA-Z0-9-]+)(?:\s+[^>]*)?/?>')
+    tag_pattern = re.compile(r'</?([a-zA-Z0-9-]+)(?:\s[^>]*)?/?>')
     
     offset_line = content[:start_idx].count('\n') + 1
 
