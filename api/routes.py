@@ -556,6 +556,33 @@ def update_config():
     else:
         abort(500, description="Failed to update config")
 
+# --- Stats ---
+
+@api_blueprint.route("/stats", methods=["GET"])
+@requires_auth
+def get_stats():
+    """Retrieve aggregation statistics from CouchDB MapReduce views."""
+    from .db import query_couchdb_view
+    
+    # 1. Article Language Stats
+    lang_rows = query_couchdb_view("articles", "stats", "by_language", group=True)
+    lang_stats = {row["key"]: row["value"] for row in lang_rows}
+    
+    # 2. Feed Health Stats
+    health_rows = query_couchdb_view("feeds", "health", "status", group=True)
+    health_stats = {row["key"]: row["value"] for row in health_rows}
+    
+    return jsonify({
+        "articles": {
+            "by_language": lang_stats,
+            "total": sum(lang_stats.values())
+        },
+        "feeds": {
+            "health": health_stats,
+            "total": sum(health_stats.values())
+        }
+    })
+
 # --- Search Endpoints ---
 
 @api_blueprint.route("/articles/search", methods=["GET"])

@@ -151,3 +151,24 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
     except requests.exceptions.RequestException as e:
         logger.error(f"Error querying CouchDB: {e}")
         return []
+
+def query_couchdb_view(db_name, design_doc, view_name, group=True):
+    """Query a MapReduce view."""
+    if db_name not in ALLOWED_DBS:
+        abort(400, description=ERROR_INVALID_DB_NAME)
+        
+    safe_db_name = urllib.parse.quote(db_name, safe="")
+    safe_design_doc = urllib.parse.quote(design_doc, safe="")
+    safe_view_name = urllib.parse.quote(view_name, safe="")
+    
+    url = f"{COUCHDB_URI}{safe_db_name}/_design/{safe_design_doc}/_view/{safe_view_name}"
+    params = {"group": "true" if group else "false"}
+    
+    try:
+        response = _request('GET', url, params=params)
+        if response.status_code == 200:
+            return response.json().get('rows', [])
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error querying CouchDB view: {e}")
+        return []
