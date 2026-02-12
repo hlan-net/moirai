@@ -63,7 +63,7 @@ def ensure_design_doc(db_name, design_doc_name, views):
             print(f"Design doc '{design_doc_name}' on '{db_name}' updated.")
         else:
             print(f"Failed to update design doc '{design_doc_name}': {response.text}")
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"Error ensuring design doc on '{db_name}': {e}")
 
 @retry(
