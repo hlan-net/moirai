@@ -43,11 +43,11 @@ def create_index(db_name, fields, name):
 
 def ensure_design_doc(db_name, design_doc_name, views):
     url = f"{COUCHDB_URI}/{db_name}/_design/{design_doc_name}"
-
+    
     # Check if exists to get current rev
     try:
         response = _request('GET', url)
-
+        
         # Start from existing design doc (if present) to preserve other fields
         if response.status_code == 200:
             current = response.json()
