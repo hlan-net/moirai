@@ -395,9 +395,15 @@ def _create_mock_tool_calls(extracted_tools):
     return tool_calls, mock_tool_calls_data
 
 async def _execute_tool_calls(session, tool_calls, messages):
+    # Get API password for MCP tool authentication
+    API_PASSWORD = os.environ.get("API_PASSWORD", "password")
+    
     for tool_call in tool_calls:
         func_name = tool_call.function.name
         func_args = json.loads(tool_call.function.arguments)
+        
+        # Inject api_key for MCP tool authentication
+        func_args["api_key"] = API_PASSWORD
         
         try:
             print(f"Agent calling tool: {func_name} with args: {func_args}")
