@@ -12,13 +12,13 @@ from api.chat_routes import _execute_tool_calls
 
 
 @pytest.fixture
-def api_password_env(monkeypatch):
-    """Fixture to set API_PASSWORD environment variable."""
+def setup_api_password_env(monkeypatch):
+    """Fixture to set API_PASSWORD environment variable for testing."""
     monkeypatch.setenv('API_PASSWORD', 'test_password_123')
 
 
 @pytest.mark.asyncio
-async def test_api_key_injection(api_password_env):
+async def test_api_key_injection(setup_api_password_env):
     """Test that _execute_tool_calls injects api_key into function arguments."""
     
     # Create mock session
@@ -65,7 +65,7 @@ async def test_api_key_injection(api_password_env):
 
 
 @pytest.mark.asyncio
-async def test_api_key_injection_multiple_tools(api_password_env):
+async def test_api_key_injection_multiple_tools(setup_api_password_env):
     """Test that api_key is injected for multiple tool calls."""
     
     mock_session = AsyncMock()
@@ -103,7 +103,7 @@ async def test_api_key_injection_multiple_tools(api_password_env):
 
 
 @pytest.mark.asyncio
-async def test_api_key_not_overwritten_if_present(api_password_env):
+async def test_api_key_not_overwritten_if_present(setup_api_password_env):
     """Test that existing api_key in arguments is not overwritten."""
     
     mock_session = AsyncMock()

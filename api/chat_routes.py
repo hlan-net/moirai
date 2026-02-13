@@ -396,8 +396,8 @@ def _create_mock_tool_calls(extracted_tools):
 
 async def _execute_tool_calls(session, tool_calls, messages):
     # Get API password for MCP tool authentication
-    API_PASSWORD = os.environ.get("API_PASSWORD")
-    if not API_PASSWORD:
+    api_password = os.environ.get("API_PASSWORD")
+    if not api_password:
         logger.error("API_PASSWORD environment variable not set - MCP tool calls will fail")
     
     for tool_call in tool_calls:
@@ -405,8 +405,8 @@ async def _execute_tool_calls(session, tool_calls, messages):
         func_args = json.loads(tool_call.function.arguments)
         
         # Inject api_key for MCP tool authentication if not already present
-        if API_PASSWORD and "api_key" not in func_args:
-            func_args["api_key"] = API_PASSWORD
+        if api_password and "api_key" not in func_args:
+            func_args["api_key"] = api_password
         
         try:
             print(f"Agent calling tool: {func_name} with args: {func_args}")
