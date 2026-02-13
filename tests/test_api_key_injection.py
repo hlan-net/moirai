@@ -3,7 +3,6 @@ Test that the chat agent properly injects API key into MCP tool calls.
 """
 import pytest
 import json
-import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
