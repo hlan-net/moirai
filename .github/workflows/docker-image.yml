@@ -51,6 +51,7 @@ jobs:
         env:
           API_USERNAME: testuser
           API_PASSWORD: testpassword
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: docker compose up -d
 
       - name: Wait for services to be ready
