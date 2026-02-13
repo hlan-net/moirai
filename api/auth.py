@@ -449,6 +449,14 @@ def entra_login():
 @auth_blueprint.route("/me", methods=["GET"])
 @jwt_required
 def get_me():
+    if g.user_id == "system":
+        return jsonify({
+            "_id": "system",
+            "email": g.user_email,
+            "role": g.user_role,
+            "settings": {}
+        })
+
     user = fetch_from_couchdb("users", g.user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
