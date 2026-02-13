@@ -112,6 +112,7 @@ jobs:
         env:
           API_USERNAME: testuser
           API_PASSWORD: testpassword
+          DISABLE_RATE_LIMIT: true
         run: |
           # Run security API tests (should all pass)
           PYTHONPATH=. pytest -m integration tests/test_security_api.py

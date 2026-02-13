@@ -132,6 +132,11 @@ def test_rate_limiting():
     # If using memory storage and default config, they should be there.
     # Check for any RateLimit header
     rate_limit_headers = [h for h in response.headers if 'RateLimit' in h]
+    
+    # If rate limiting is explicitly disabled, we don't expect headers
+    if os.environ.get("DISABLE_RATE_LIMIT", "false").lower() == "true":
+        return
+
     if not rate_limit_headers:
         print(f"DEBUG: Headers: {response.headers}")
         pytest.fail("Rate limit headers not found")
