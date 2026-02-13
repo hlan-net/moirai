@@ -139,7 +139,10 @@ def create_feed():
 @limiter.limit("10 per minute")
 def list_feeds():
     if not check_public_read_access():
-        return jsonify({"message": "Unauthorized"}), 401
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
+        return response
     feeds = fetch_from_couchdb("feeds")
     return jsonify(feeds)
 
@@ -256,7 +259,10 @@ def bulk_import_feeds():
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
     if not check_public_read_access():
-        return jsonify({"message": "Unauthorized"}), 401
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
+        return response
     # Pagination parameters
     try:
         limit = int(request.args.get('limit', 50))
@@ -365,7 +371,10 @@ def delete_article(article_id):
 @api_blueprint.route("/events", methods=["GET"])
 def list_events():
     if not check_public_read_access():
-        return jsonify({"message": "Unauthorized"}), 401
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
+        return response
     feed_url = request.args.get('feed_url')
     
     if feed_url:
@@ -422,7 +431,10 @@ def remove_event_link(event_id):
 @api_blueprint.route("/trends", methods=["GET"])
 def list_trends():
     if not check_public_read_access():
-        return jsonify({"message": "Unauthorized"}), 401
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
+        return response
     feed_url = request.args.get('feed_url')
     
     if feed_url:

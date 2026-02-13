@@ -250,7 +250,10 @@ def jwt_required(f):
     def decorated(*args, **kwargs):
         success, message = verify_request_auth()
         if not success:
-            return jsonify({"message": message}), 401
+            response = jsonify({"message": message})
+            response.status_code = 401
+            response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
+            return response
         
         return f(*args, **kwargs)
     return decorated
