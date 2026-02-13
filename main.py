@@ -1,5 +1,5 @@
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from flask_wtf import CSRFProtect
 from api.extensions import limiter, metrics
 from api.routes import api_blueprint
@@ -57,6 +57,9 @@ def serve_ui(path):
 # Catch-all route for SPA client-side routing
 @app.route('/<path:path>')
 def catch_all(path):
+    if path.startswith('api/') or path.startswith('mcp/'):
+        return jsonify({"message": "Not Found"}), 404
+        
     # If the path has a file extension, try to serve it as a static file
     if '.' in path.split('/')[-1]:
         try:
