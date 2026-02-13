@@ -8,14 +8,17 @@ import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# Set environment variable before importing
-os.environ['API_PASSWORD'] = 'test_password_123'
-
 from api.chat_routes import _execute_tool_calls
 
 
+@pytest.fixture
+def api_password_env(monkeypatch):
+    """Fixture to set API_PASSWORD environment variable."""
+    monkeypatch.setenv('API_PASSWORD', 'test_password_123')
+
+
 @pytest.mark.asyncio
-async def test_api_key_injection():
+async def test_api_key_injection(api_password_env):
     """Test that _execute_tool_calls injects api_key into function arguments."""
     
     # Create mock session
@@ -62,7 +65,7 @@ async def test_api_key_injection():
 
 
 @pytest.mark.asyncio
-async def test_api_key_injection_multiple_tools():
+async def test_api_key_injection_multiple_tools(api_password_env):
     """Test that api_key is injected for multiple tool calls."""
     
     mock_session = AsyncMock()
@@ -97,6 +100,70 @@ async def test_api_key_injection_multiple_tools():
     
     # Verify all results were added to messages
     assert len(messages) == 3
+
+
+@pytest.mark.asyncio
+async def test_api_key_not_overwritten_if_present(api_password_env):
+    """Test that existing api_key in arguments is not overwritten."""
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.content = [MagicMock(text="Success")]
+    mock_session.call_tool.return_value = mock_result
+    
+    # Create tool call with existing api_key
+    mock_tool_call = SimpleNamespace(
+        id="call_123",
+        function=SimpleNamespace(
+            name="search_articles",
+            arguments=json.dumps({
+                "query": "test",
+                "namespace": "test-guid",
+                "api_key": "existing_key"  # Already has api_key
+            })
+        )
+    )
+    
+    messages = []
+    
+    await _execute_tool_calls(mock_session, [mock_tool_call], messages)
+    
+    # Verify that existing api_key was preserved
+    call_args = mock_session.call_tool.call_args[0][1]
+    assert call_args["api_key"] == "existing_key", "Existing api_key should not be overwritten"
+
+
+@pytest.mark.asyncio
+async def test_api_key_missing_env_var(monkeypatch):
+    """Test behavior when API_PASSWORD is not set."""
+    
+    # Remove API_PASSWORD from environment
+    monkeypatch.delenv('API_PASSWORD', raising=False)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.content = [MagicMock(text="Success")]
+    mock_session.call_tool.return_value = mock_result
+    
+    mock_tool_call = SimpleNamespace(
+        id="call_123",
+        function=SimpleNamespace(
+            name="search_articles",
+            arguments=json.dumps({"query": "test", "namespace": "test-guid"})
+        )
+    )
+    
+    messages = []
+    
+    # Should still execute but log error and not inject api_key
+    await _execute_tool_calls(mock_session, [mock_tool_call], messages)
+    
+    # Verify call_tool was still called
+    mock_session.call_tool.assert_called_once()
+    
+    # Verify api_key was NOT injected
+    call_args = mock_session.call_tool.call_args[0][1]
+    assert "api_key" not in call_args, "api_key should not be injected when API_PASSWORD is missing"
 
 
 if __name__ == "__main__":
