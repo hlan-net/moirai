@@ -45,8 +45,8 @@ async def test_api_key_injection(setup_api_password_env):
     mock_session.call_tool.assert_called_once()
     call_args = mock_session.call_tool.call_args
     
-    # Extract the arguments dictionary
-    func_args = call_args[0][1]  # Second positional argument
+    # Extract the arguments dictionary (second positional argument to call_tool)
+    func_args = call_args.args[1]
     
     # Verify api_key was injected
     assert "api_key" in func_args, "api_key should be injected into tool arguments"
@@ -93,7 +93,7 @@ async def test_api_key_injection_multiple_tools(setup_api_password_env):
     assert mock_session.call_tool.call_count == 3
     
     for i, call in enumerate(mock_session.call_tool.call_args_list):
-        func_args = call[0][1]
+        func_args = call.args[1]  # Second positional argument
         assert "api_key" in func_args
         assert func_args["api_key"] == "test_password_123"
         assert func_args["param"] == f"value_{i}"
@@ -129,8 +129,9 @@ async def test_api_key_not_overwritten_if_present(setup_api_password_env):
     await _execute_tool_calls(mock_session, [mock_tool_call], messages)
     
     # Verify that existing api_key was preserved
-    call_args = mock_session.call_tool.call_args[0][1]
-    assert call_args["api_key"] == "existing_key", "Existing api_key should not be overwritten"
+    call_args = mock_session.call_tool.call_args
+    func_args = call_args.args[1]  # Second positional argument
+    assert func_args["api_key"] == "existing_key", "Existing api_key should not be overwritten"
 
 
 @pytest.mark.asyncio
@@ -162,8 +163,9 @@ async def test_api_key_missing_env_var(monkeypatch):
     mock_session.call_tool.assert_called_once()
     
     # Verify api_key was NOT injected
-    call_args = mock_session.call_tool.call_args[0][1]
-    assert "api_key" not in call_args, "api_key should not be injected when API_PASSWORD is missing"
+    call_args = mock_session.call_tool.call_args
+    func_args = call_args.args[1]  # Second positional argument
+    assert "api_key" not in func_args, "api_key should not be injected when API_PASSWORD is missing"
 
 
 if __name__ == "__main__":
