@@ -8,7 +8,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: process.env.CI ? 'http://localhost:8088' : 'http://localhost:5173',
+    baseURL: (process.env.CI || process.env.TEST_TARGET === 'docker') ? 'http://localhost:8088' : 'http://localhost:5173',
     trace: 'on-first-retry',
     httpCredentials: {
       username: process.env.API_USERNAME || 'testuser',
@@ -21,9 +21,9 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: process.env.CI ? undefined : {
+  webServer: process.env.TEST_TARGET === 'docker' ? undefined : (process.env.CI ? undefined : {
     command: 'yarnpkg dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
-  },
+  }),
 });

@@ -30,9 +30,34 @@ const currentLlmEndpoint = ref('ollama')
 const currentModel = ref('llama3.1:latest')
 
 onMounted(() => {
+    fetchConfig()
     fetchSessions()
     loadSettings()
 })
+
+const fetchConfig = async () => {
+  try {
+    const response = await fetch('/api/config')
+    if (response.ok) {
+      const config = await response.json()
+      // Use server defaults if no local override
+      if (!localStorage.getItem('moirai_llm_endpoint') && config.default_llm_provider) {
+        currentLlmEndpoint.value = config.default_llm_provider
+        
+        // Also update model if not overridden
+        if (config.default_llm_provider === 'gemini' && !localStorage.getItem('moirai_gemini_model')) {
+           currentModel.value = config.default_model_name
+        } else if (config.default_llm_provider === 'ollama' && !localStorage.getItem('moirai_model')) {
+           currentModel.value = config.default_model_name
+        } else if (config.default_llm_provider === 'openai' && !localStorage.getItem('moirai_openai_model')) {
+           currentModel.value = config.default_model_name
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching config:', error)
+  }
+}
 
 const loadSettings = () => {
     currentLlmEndpoint.value = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
@@ -71,6 +96,7 @@ const loadSession = (session: ChatSession) => {
 const newChat = () => {
   sessionId.value = null
   messages.value = []
+  loading.value = false
 }
 
 const getHeaders = () => {

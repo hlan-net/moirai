@@ -156,12 +156,21 @@ class GeminiProvider(LLMProvider):
             # Handle tool calls
             if 'tool_calls' in msg and msg['tool_calls']:
                 for tc in msg['tool_calls']:
-                    func = tc['function']
+                    if isinstance(tc, dict):
+                        func = tc['function']
+                        func_name = func['name']
+                        func_args = json.loads(func['arguments'])
+                    else:
+                        # SimpleNamespace (mock or from previous turn)
+                        func = tc.function
+                        func_name = func.name
+                        func_args = json.loads(func.arguments)
+
                     # FunctionCall part
                     parts.append({
                         'function_call': {
-                            'name': func['name'],
-                            'args': json.loads(func['arguments'])
+                            'name': func_name,
+                            'args': func_args
                         }
                     })
             

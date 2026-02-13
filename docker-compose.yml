@@ -16,9 +16,11 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - API_USERNAME=${API_USERNAME:-username}
       - API_PASSWORD=${API_PASSWORD:-password}
-      - MODEL_NAME=llama3.1:latest
+      - MODEL_NAME=${MODEL_NAME:-llama3.1:latest}
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-ollama}
       - ALLOW_PUBLIC_READ=true
       - ARTICLE_EXPIRATION_DAYS=30
+      - DISABLE_RATE_LIMIT=true
     depends_on:
       - couchdb
     volumes:

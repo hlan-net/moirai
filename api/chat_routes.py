@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, abort
 import os
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from .llm.factory import LLMProviderFactory
@@ -21,6 +21,7 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8090/sse")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1")
+DEFAULT_LLM_PROVIDER = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
 CHAT_HISTORY_LIMIT = 6
@@ -157,7 +158,7 @@ def chat():
     user_message = data.get("message")
     history = data.get("history", [])
     model = data.get("model")
-    llm_endpoint = data.get("llm_endpoint")
+    llm_endpoint = data.get("llm_endpoint") or DEFAULT_LLM_PROVIDER
     
     # Get user settings
     user = fetch_from_couchdb("users", g.user_id)
@@ -213,7 +214,7 @@ def create_chat_session():
         "messages": [],
         "model": data.get("model"),
         "llm_endpoint": data.get("llm_endpoint"),
-        "created_at": datetime.now(datetime.timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)

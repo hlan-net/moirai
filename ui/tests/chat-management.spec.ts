@@ -45,11 +45,12 @@ test.describe('Chat Session Management', () => {
   });
 
   test('should search and filter chat sessions by title', async ({ page }) => {
-    // Create a few test chat sessions
+    // Create a few test chat sessions with unique identifiers
+    const uniqueId = Date.now().toString();
     const testChats = [
-      'Linux kernel updates discussion',
-      'Python best practices',
-      'JavaScript frameworks comparison'
+      `Linux kernel updates discussion ${uniqueId}`,
+      `Python best practices ${uniqueId}`,
+      `JavaScript frameworks comparison ${uniqueId}`
     ];
 
     for (const title of testChats) {
@@ -57,18 +58,23 @@ test.describe('Chat Session Management', () => {
     }
 
     // Test search by title
-    await searchSessions(page, 'Linux');
+    await searchSessions(page, `Linux kernel updates discussion ${uniqueId}`);
 
     // Should show only the Linux chat
     const visibleSessions = page.locator('.session-item');
     await expect(visibleSessions).toHaveCount(1);
-    await expect(visibleSessions.first()).toContainText('Linux');
+    await expect(visibleSessions.first()).toContainText(`Linux kernel updates discussion ${uniqueId}`);
 
     // Clear search
     await page.click('.clear-search-btn');
 
-    // Should show all sessions
-    await expect(visibleSessions).toHaveCount(testChats.length);
+    // Should show all sessions (at least the ones we created)
+    await expect(page.locator('.session-item')).not.toHaveCount(1);
+    
+    // Verify our created sessions are present
+    for (const title of testChats) {
+      await expect(page.locator('.session-item', { hasText: title })).toBeVisible();
+    }
   });
 
   test('should search and filter chat sessions by model', async ({ page }) => {
@@ -275,7 +281,7 @@ test.describe('Chat Session Management', () => {
     await page.locator('.confirm-yes').click();
 
     // Wait for session to be removed
-    await expect(page.locator('.session-item')).not.toContainText('First chat');
+    await expect(page.locator('.session-item', { hasText: 'First chat' })).toHaveCount(0);
 
     // Second session should still be active
     await expect(secondSession).toHaveClass(/active/);

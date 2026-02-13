@@ -521,6 +521,8 @@ def get_config():
         "allow_public_read": get_public_read_setting(),
         "iteration_interval": get_iteration_interval_setting(),
         "version": version.get_version_string(),
+        "default_llm_provider": os.environ.get("DEFAULT_LLM_PROVIDER", "ollama"),
+        "default_model_name": os.environ.get("MODEL_NAME", "llama3.1"),
         # Include public auth config
         **get_auth_config()
     })

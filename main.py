@@ -33,6 +33,8 @@ csrf.init_app(app)
 app.config['WTF_CSRF_ENABLED'] = False
 
 # Configure rate limiting
+if os.environ.get("DISABLE_RATE_LIMIT", "false").lower() == "true":
+    app.config["RATELIMIT_ENABLED"] = False
 limiter.init_app(app)
 
 # Configure metrics

@@ -7,6 +7,7 @@ import requests
 from urllib.parse import quote
 from datetime import datetime, timezone
 from .favicon_fetcher import fetch_favicon_url
+import feedparser
 
 class FetchFeedTask(threading.Thread):
     def __init__(self, url, delay_ignored=0):
@@ -71,6 +72,15 @@ class FetchFeedTask(threading.Thread):
         
         self._update_registry(url_hash, feed_title, final_url, is_redirect)
         self._store_content(url_hash, response, final_url, is_redirect)
+
+    def process_articles(self, content):
+        """Extract feed title using feedparser."""
+        try:
+            feed = feedparser.parse(content)
+            return feed.feed.get('title', '')
+        except Exception as e:
+            print(f"Error parsing feed for title: {e}")
+            return ""
 
     def _update_registry(self, url_hash, feed_title, final_url, is_redirect):
         """Update feed registry with title, resolved URL and favicon."""
