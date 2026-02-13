@@ -5,7 +5,7 @@ import pytest
 import json
 import os
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from api.chat_routes import _execute_tool_calls
 
