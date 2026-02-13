@@ -117,7 +117,9 @@ jobs:
         
       - name: Run Playwright tests
         working-directory: ui
-        run: yarn playwright test
+        env:
+          DEBUG: pw:api
+        run: yarn playwright test --reporter=list
         
       - name: Stop backend services
         run: docker compose down
