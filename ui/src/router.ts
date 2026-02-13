@@ -8,6 +8,7 @@ import LoginPage from './components/LoginPage.vue'
 
 const routes = [
   { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
+  { path: '/stream', component: StreamPage, name: 'StreamExplicit' }, // Explicit /stream route for navigation
   { path: '/login', component: LoginPage, name: 'Login' },
   { path: '/dashboard', component: MainPage, name: 'Dashboard', meta: { requiresAuth: true } },
   { path: '/chat', component: ChatPage, name: 'Chat', meta: { requiresAuth: true } },
