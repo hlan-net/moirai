@@ -70,20 +70,22 @@ body, html, #app {
   flex-direction: column;
   align-items: center;
   padding: 10px;
-  background-color: #333;
-  color: white;
+  background-color: var(--card-bg); /* Using card background for navigation */
+  color: var(--text-color);
   gap: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Add shadow for depth */
 }
 
 .brand {
   font-weight: bold;
-  font-size: 1.1rem;
-  color: white;
+  font-size: 1.2rem; /* Slightly larger brand font */
+  color: var(--primary-color);
   text-decoration: none;
 }
 
 .brand:hover {
-  text-decoration: underline;
+  text-decoration: none;
+  color: var(--primary-hover);
 }
 
 .links {
@@ -95,16 +97,19 @@ body, html, #app {
 }
 
 .nav-link {
-  color: #ddd;
+  color: var(--text-color);
   text-decoration: none;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.95rem; /* Slightly larger nav links */
   padding: 5px 10px;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .nav-link:hover, .nav-link.router-link-active {
   color: white;
-  text-decoration: underline;
+  background-color: var(--primary-color);
+  text-decoration: none;
 }
 
 .content {
@@ -124,7 +129,7 @@ body, html, #app {
   }
 
   .brand {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
   }
 
   .links {
@@ -136,6 +141,13 @@ body, html, #app {
   .nav-link {
     font-size: 1rem;
     padding: 0;
+    background-color: transparent; /* Remove background for horizontal nav */
+  }
+
+  .nav-link:hover, .nav-link.router-link-active {
+    color: var(--primary-hover);
+    background-color: transparent;
+    text-decoration: underline;
   }
 }
 </style>
