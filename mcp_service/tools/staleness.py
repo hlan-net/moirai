@@ -1,5 +1,5 @@
+from mcp_service.core import mcp
 from api.db import fetch_from_couchdb, update_couchdb_doc, query_couchdb, delete_from_couchdb
-from mcp_service.core import mcp_tool
 from pydantic import ValidationError
 from typing import Literal
 
@@ -7,7 +7,7 @@ from typing import Literal
 EVENTS_DB = "events"
 TRENDS_DB = "trends"
 
-@mcp_tool(name="mark_entity_stale", description="Marks an event or trend as stale or not stale.")
+@mcp.tool(name="mark_entity_stale", description="Marks an event or trend as stale or not stale.")
 def mark_entity_stale(entity_type: Literal["event", "trend"], entity_id: str, is_stale: bool) -> dict:
     """
     Marks a specific event or trend entity with a stale flag.

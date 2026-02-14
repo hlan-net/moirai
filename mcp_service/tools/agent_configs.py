@@ -1,5 +1,5 @@
 from api.db import query_couchdb, fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb
-from mcp_service.core import mcp_tool
+from mcp_service.core import mcp
 from api.validation import AgentConfigCreateRequest, AgentConfigUpdateRequest
 from pydantic import ValidationError
 import uuid
@@ -7,7 +7,7 @@ import uuid
 # Database name for agent configurations
 AGENT_CONFIGS_DB = "agent_configs"
 
-@mcp_tool(name="add_agent_config", description="Adds a new agent configuration.")
+@mcp.tool(name="add_agent_config", description="Adds a new agent configuration.")
 def add_agent_config(user_id: str, name: str, trigger_type: str, target_db: str, logic_module: str,
                        schedule_interval: str = None, llm_model_config: dict = None,
                        parameters: dict = None, linked_entity_id: str = None) -> dict:
