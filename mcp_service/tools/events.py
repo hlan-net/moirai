@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from ..core.mcp import mcp, mcp_tool, auth_required, validate_namespace
+from ..core import mcp, auth_required, validate_namespace
 from ..db import store_doc, db_request, get_doc, update_doc, delete_doc
 
 # --- Events Tools ---
