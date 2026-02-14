@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from api.db_constants import MONGO_GT, MONGO_IN, MONGO_ELEM_MATCH, MONGO_AND, MONGO_OR
+from api.db_constants import MONGO_GT, MONGO_IN
 from api.db import query_couchdb
 
 def build_article_selector(since=None, feed_id=None, event_id=None, trend_id=None):
