@@ -32,10 +32,19 @@ class FeedCreateRequest(BaseModel):
 class FeedUpdateRequest(BaseModel):
     """Validation for feed updates"""
     title: str = Field(..., min_length=1, max_length=200)
+    new_url: Optional[HttpUrl] = None # Added field
     
     @validator('title')
     def sanitize_title(cls, v):
         return bleach.clean(v, tags=[], strip=True)
+    
+    @validator('new_url') # New validator for new_url
+    def validate_new_feed_url(cls, v):
+        if v is None:
+            return v
+        if not str(v).startswith(('http://', 'https://')):
+            raise ValueError('Only HTTP/HTTPS URLs are allowed for new_url')
+        return str(v)
 
 
 class EventCreateRequest(BaseModel):

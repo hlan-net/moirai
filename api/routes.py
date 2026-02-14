@@ -20,6 +20,8 @@ from .validation import (
 )
 from .auth import get_auth_config
 
+import uuid # Import uuid
+
 from api.enrichment import enrich_articles_with_events_and_trends
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
@@ -115,15 +117,22 @@ def create_feed():
         abort(400, description=str(e))
         
     feed_url = str(validated.url)
-    # Generate ID
-    feed_id = hashlib.sha256(feed_url.encode('utf-8')).hexdigest()
+
+    # Check if feed with this URL already exists
+    existing_feed = query_couchdb("feeds", selector={"original_url": feed_url}, limit=1)
+    if existing_feed:
+        abort(409, description="Feed with this URL already exists.")
+        
+    # Generate a GUID for the feed_id
+    feed_id = str(uuid.uuid4())
     
     # Fetch favicon for the feed
     favicon_url = fetch_favicon_url(feed_url)
     
     feed_doc = {
         "_id": feed_id,
-        "url": feed_url,
+        "url": feed_url, # Current URL, can change due to redirects
+        "original_url": feed_url, # Original URL, for uniqueness check and reference
         "title": validated.title,
         "category": validated.category or "general",
         "added_at": datetime.now(timezone.utc).isoformat(),
@@ -173,6 +182,10 @@ def update_feed(feed_id):
     
     feed["title"] = validated.title
     
+    # If a new URL is provided (e.g., from a redirect), update it
+    if validated.new_url:
+        feed["url"] = str(validated.new_url)
+    
     if update_couchdb_doc("feeds", feed_id, feed):
         return jsonify(feed)
     else:
@@ -188,10 +201,12 @@ def refresh_feeds():
     
     count = 0
     for feed in feeds:
+        feed_id = feed.get("_id")
         url = feed.get("url")
-        if url:
+        original_url = feed.get("original_url")
+        if feed_id and url and original_url:
             # Run in background thread (FetchFeedTask inherits from threading.Thread)
-            task = FetchFeedTask(url)
+            task = FetchFeedTask(feed_id, url, original_url)
             task.start()
             count += 1
             
@@ -207,10 +222,19 @@ def refresh_single_feed(feed_url):
     existing_feeds = query_couchdb("feeds", selector=selector, limit=1)
     
     if not existing_feeds:
-        abort(404, description=ERROR_FEED_NOT_FOUND)
+        # Also check original_url if not found by current url
+        selector = {"original_url": feed_url}
+        existing_feeds = query_couchdb("feeds", selector=selector, limit=1)
+        if not existing_feeds:
+            abort(404, description=ERROR_FEED_NOT_FOUND)
     
+    feed = existing_feeds[0]
+    feed_id = feed.get("_id")
+    current_url = feed.get("url")
+    original_url = feed.get("original_url")
+
     # Run in background thread
-    task = FetchFeedTask(feed_url)
+    task = FetchFeedTask(feed_id, current_url, original_url)
     task.start()
     
     return jsonify({"status": "started", "url": feed_url})
