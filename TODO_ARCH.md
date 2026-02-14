@@ -17,3 +17,6 @@
 - [x] Enforce required fields and data types (ISO dates, 2-char language codes).
 - [x] Test rejection of malformed agent tool calls at the DB level.
 - **Branch:** `feature/db-schema-validation`
+
+## Priority 4: Automated Testing for CouchDB Design Documents
+- [ ] Implement automated unit/integration tests for CouchDB `validate_doc_update` and other design document functions. This could involve using a test harness or setting up a temporary CouchDB instance in CI to verify validation logic.

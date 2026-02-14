@@ -59,25 +59,24 @@ The UI includes a Chat interface to interact with the Agent.
 
 If you want to run components individually without Docker:
 
-1. **Create/Use a Virtualenv:**
+1. **Create/Use a Conda Environment:**
 
     ```bash
-    python3 -m venv my_venv
-    ./my_venv/bin/python -m ensurepip --upgrade
-    ./my_venv/bin/pip install -r requirements.txt
+    conda env create -f environment.yml
+    conda activate moirai
     ```
 
 1. **Database:** Ensure CouchDB is running (e.g., via `docker compose up couchdb`).
 2. **API:**
 
     ```bash
-    ./my_venv/bin/python main.py
+    conda run -n moirai python main.py
     ```
 
 3. **MCP Server:**
 
     ```bash
-    ./my_venv/bin/python mcp_server.py
+    conda run -n moirai python mcp_server.py
     ```
 
 4. **UI:**

@@ -36,3 +36,6 @@ google-auth-oauthlib
 msal
 cryptography
 langdetect
+pre-commit
+black
+ruff
