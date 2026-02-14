@@ -28,7 +28,7 @@ services:
 
   mcp-server:
     build: .
-    command: [ "sh", "-c", "chmod +x /app/create_dbs.sh && /app/create_dbs.sh && python mcp_server.py" ]
+    command: [ "sh", "-c", "/app/create_dbs.sh && python mcp_server.py" ]
     ports:
       - "8090:8090"
     environment:
@@ -39,8 +39,6 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password} # Explicitly set COUCHDB_PASSWORD for create_dbs.sh
     depends_on:
       - couchdb
-    volumes:
-      - ./create_dbs.sh:/app/create_dbs.sh
 
   couchdb:
     image: couchdb:3

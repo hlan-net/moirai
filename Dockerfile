@@ -34,6 +34,10 @@ RUN useradd -d /app appuser  && \
     mkdir -p ui/dist && \
     chown -R appuser:appuser feeds ui
 
+# Copy and make executable the database initialization script
+COPY create_dbs.sh /app/create_dbs.sh
+RUN chmod +x /app/create_dbs.sh
+
 USER appuser
 
 # Set build number as environment variable
