@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, inject, onUnmounted, watch, type Ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useFilterStore } from '../stores/filter' // Import the new filter store
 
 interface Event {
   _id: string
@@ -25,10 +26,11 @@ const expandedEvents = ref<Set<string>>(new Set())
 const searchQuery = ref('')
 let refreshInterval: number | null = null
 
-// Inject selected feed from parent
-const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+// Inject selected feed from parent - NO LONGER USED DIRECTLY FOR FILTERING
+// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
 const authStore = useAuthStore()
+const filterStore = useFilterStore() // Initialize the filter store
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 const normalizeEvent = (event: any): Event => ({
@@ -42,17 +44,17 @@ const normalizeEvent = (event: any): Event => ({
 // Computed: Filtered events based on search query
 const filteredEvents = computed(() => {
   let filtered = events.value
-  
+
   // Filter by search query
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(event => {
+    filtered = filtered.filter((event) => {
       const name = event.name.toLowerCase()
       const description = event.description.toLowerCase()
       return name.includes(query) || description.includes(query)
     })
   }
-  
+
   return filtered
 })
 
@@ -60,10 +62,10 @@ const processEventsResponse = async (response: Response, isRefresh: boolean) => 
   if (response.ok) {
     const eventsData = await response.json()
     const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
-    events.value = allEvents.filter(e => !e._id.startsWith('_design/'))
+    events.value = allEvents.filter((e) => !e._id.startsWith('_design/'))
     return
   }
-  
+
   if (!isRefresh) {
     events.value = []
   }
@@ -79,7 +81,7 @@ const processTrendsResponse = async (response: Response, isRefresh: boolean) => 
       console.error('Error parsing trends:', e)
     }
   }
-  
+
   if (!isRefresh) {
     trends.value = []
   }
@@ -91,11 +93,12 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
   } else {
     loading.value = true
   }
-  
+
   try {
     const params = new URLSearchParams()
-    if (selectedFeedUrl.value) {
-      params.append('feed_url', selectedFeedUrl.value)
+    if (filterStore.selectedFeedId) {
+      // Use filterStore.selectedFeedId
+      params.append('feed_id', filterStore.selectedFeedId)
     }
     const queryString = params.toString() ? `?${params.toString()}` : ''
 
@@ -106,7 +109,7 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
 
     await Promise.all([
       processEventsResponse(eventsResponse, isRefresh),
-      processTrendsResponse(trendsResponse, isRefresh)
+      processTrendsResponse(trendsResponse, isRefresh),
     ])
   } catch (error) {
     console.error('Error fetching events or trends:', error)
@@ -121,18 +124,30 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
   }
 }
 
+const selectEvent = (eventId: string) => {
+  filterStore.setSelectedEventId(filterStore.selectedEventId === eventId ? null : eventId)
+}
+
 // Watch for feed selection changes to refresh data
-watch(selectedFeedUrl, () => {
-  fetchEventsAndTrends()
-})
+watch(
+  () => filterStore.selectedFeedId,
+  () => {
+    // Watch filterStore.selectedFeedId
+    fetchEventsAndTrends()
+  }
+)
 
 const deleteEvent = async (id: string) => {
   if (!confirm('Delete this event?')) return
   try {
     const res = await fetch(`/api/events/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      events.value = events.value.filter(e => e._id !== id)
+      events.value = events.value.filter((e) => e._id !== id)
       expandedEvents.value.delete(id)
+      if (filterStore.selectedEventId === id) {
+        // Clear selection if deleted
+        filterStore.setSelectedEventId(null)
+      }
     }
   } catch (error) {
     console.error(error)
@@ -149,7 +164,7 @@ const removeLink = async (eventId: string, link: string) => {
     })
     if (res.ok) {
       const updatedEvent = normalizeEvent(await res.json())
-      const index = events.value.findIndex(e => e._id === eventId)
+      const index = events.value.findIndex((e) => e._id === eventId)
       if (index !== -1) {
         events.value[index] = updatedEvent
       }
@@ -171,7 +186,7 @@ const getTrendDisplayName = (trendId?: string) => {
   if (!trendId) {
     return ''
   }
-  const trend = trends.value.find(t => t._id === trendId)
+  const trend = trends.value.find((t) => t._id === trendId)
   return trend?.name || trend?.title || trendId
 }
 
@@ -195,27 +210,41 @@ onUnmounted(() => {
         Events ({{ filteredEvents.length }})
         <span v-if="refreshing" class="update-badge">↻</span>
       </h2>
-      <button v-if="isAdmin" 
-        @click="() => fetchEventsAndTrends(true)" 
+      <button
+        v-if="isAdmin"
+        @click="() => fetchEventsAndTrends(true)"
         :disabled="refreshing"
         class="action-btn"
         title="Refresh events"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
-          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          :class="{ spinning: refreshing }"
+        >
+          <path
+            d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+          />
         </svg>
       </button>
     </div>
 
     <!-- Search Input -->
     <div class="search-container">
-      <input 
-        v-model="searchQuery" 
-        type="text" 
-        placeholder="Search events by name or description..." 
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Search events by name or description..."
         class="search-input"
       />
-      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+      <button
+        v-if="searchQuery"
+        @click="searchQuery = ''"
+        class="clear-search-btn"
+        title="Clear search"
+      >
         ×
       </button>
     </div>
@@ -226,10 +255,23 @@ onUnmounted(() => {
       <span v-else>No events found yet.</span>
     </div>
     <div v-else class="event-list">
-      <div v-for="event in filteredEvents" :key="event._id" class="event-card">
+      <div
+        v-for="event in filteredEvents"
+        :key="event._id"
+        class="event-card"
+        @click="selectEvent(event._id)"
+        :class="{ 'selected-event': filterStore.selectedEventId === event._id }"
+      >
         <div class="card-header">
-          <h3 @click="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
-          <button v-if="isAdmin" @click="deleteEvent(event._id)" class="delete-btn" title="Delete Event">×</button>
+          <h3 @click.stop="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
+          <button
+            v-if="isAdmin"
+            @click="deleteEvent(event._id)"
+            class="delete-btn"
+            title="Delete Event"
+          >
+            ×
+          </button>
         </div>
         <p v-if="event.description" class="summary">{{ event.description }}</p>
         <div v-if="event.trend_id" class="trend-link">
@@ -240,7 +282,7 @@ onUnmounted(() => {
         <div v-if="expandedEvents.has(event._id)" class="links-section">
           <h4>Linked Articles ({{ (event.article_links || []).length }})</h4>
           <ul>
-            <li v-for="link in (event.article_links || [])" :key="link">
+            <li v-for="link in event.article_links || []" :key="link">
               <a :href="link" target="_blank" rel="noopener noreferrer">{{ link }}</a>
               <button
                 v-if="isAdmin"
@@ -293,6 +335,21 @@ h2 {
   border-bottom: 1px solid var(--border-color);
   padding: 15px 0;
   text-align: left;
+  cursor: pointer; /* Add cursor pointer for selectable events */
+  transition:
+    background-color 0.2s,
+    border-left 0.2s;
+  border-left: 3px solid transparent;
+}
+.event-card:hover {
+  background-color: #3a3a3a;
+}
+.event-card.selected-event {
+  background-color: #5a2e00; /* Darker background for selected event */
+  border-left: 3px solid #d83b01; /* Highlight with event color */
+}
+.event-card.selected-event:hover {
+  background-color: #6a3e00;
 }
 
 .card-header {

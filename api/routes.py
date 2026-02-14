@@ -271,12 +271,27 @@ def list_articles():
         abort(400, description="limit and skip must be integers")
     since = request.args.get('since')  # ISO timestamp to fetch only newer articles
     
+    # New filtering parameters
+    feed_id = request.args.get('feed_id')
+    event_id = request.args.get('event_id')
+    trend_id = request.args.get('trend_id')
+
     # Validate pagination params
     limit = min(max(limit, 1), 200)  # Clamp between 1-200
     skip = max(skip, 0)
     
     
-    selector = build_article_selector(since)
+    selector = build_article_selector(since, feed_id, event_id, trend_id)
+
+    # If selector indicates no match (e.g., non-existent event/trend), return empty
+    if selector.get("_id", {}).get("$eq") == "no_match":
+        return jsonify({
+            "articles": [],
+            "total_count": 0,
+            "has_more": False,
+            "limit": limit,
+            "skip": skip
+        })
 
     # Query CouchDB directly with pagination and sorting
     # We fetch limit + 1 to determine if there are more results

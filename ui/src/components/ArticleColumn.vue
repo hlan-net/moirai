@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted, computed, inject, type Ref } from 'vue'
+import { onMounted, ref, onUnmounted, computed, inject, watch, type Ref } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
+import { useFilterStore } from '../stores/filter' // Import the new filter store
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -13,10 +14,11 @@ const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
 
-// Inject selected feed from parent
-const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+// Inject selected feed from parent - NO LONGER USED DIRECTLY FOR FILTERING
+// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
 const authStore = useAuthStore()
+const filterStore = useFilterStore() // Initialize the filter store
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 let observer: IntersectionObserver | null = null
@@ -24,14 +26,29 @@ let refreshInterval: number | null = null
 
 const PAGE_SIZE = 50
 
-const fetchArticles = async (skip = 0, since?: string) => {
+const fetchArticles = async (
+  skip = 0,
+  since?: string,
+  feedId: string | null = null,
+  eventId: string | null = null,
+  trendId: string | null = null
+) => {
   try {
     const params = new URLSearchParams({
       limit: PAGE_SIZE.toString(),
-      skip: skip.toString()
+      skip: skip.toString(),
     })
     if (since) {
       params.append('since', since)
+    }
+    if (feedId) {
+      params.append('feed_id', feedId)
+    }
+    if (eventId) {
+      params.append('event_id', eventId)
+    }
+    if (trendId) {
+      params.append('trend_id', trendId)
     }
 
     const response = await fetch(`/api/articles?${params}`)
@@ -40,7 +57,7 @@ const fetchArticles = async (skip = 0, since?: string) => {
       return {
         articles: data.articles || [],
         hasMore: data.has_more || false,
-        totalCount: data.total_count || 0
+        totalCount: data.total_count || 0,
       }
     }
   } catch (error) {
@@ -50,12 +67,17 @@ const fetchArticles = async (skip = 0, since?: string) => {
 }
 
 const loadFromCache = async () => {
+  // Clear cache if any filter is active
+  if (filterStore.selectedFeedId || filterStore.selectedEventId || filterStore.selectedTrendId) {
+    articles.value = []
+    loading.value = false
+    return // Don't load from cache if filtered, fetch fresh
+  }
   try {
     const cached = await articleCache.getArticles()
     if (cached.length > 0) {
       articles.value = cached
       loading.value = false
-      console.log(`Loaded ${cached.length} articles from cache`)
     }
   } catch (error) {
     console.error('Error loading from cache:', error)
@@ -63,24 +85,33 @@ const loadFromCache = async () => {
 }
 
 const fetchLatestUpdates = async () => {
+  // Skip fetching updates if any filter is active, as we re-fetch completely
+  if (filterStore.selectedFeedId || filterStore.selectedEventId || filterStore.selectedTrendId) {
+    fetchingUpdates.value = false
+    return
+  }
+
   fetchingUpdates.value = true
   try {
     const newestTimestamp = await articleCache.getNewestTimestamp()
-    const result = await fetchArticles(0, newestTimestamp || undefined)
-    
+    const result = await fetchArticles(
+      0,
+      newestTimestamp || undefined,
+      filterStore.selectedFeedId,
+      filterStore.selectedEventId,
+      filterStore.selectedTrendId
+    )
+
     if (result.articles.length > 0) {
-      // Merge new articles with existing (deduplicate by _id)
       const existingIds = new Set(articles.value.map((a: Article) => a._id))
       const newArticles = result.articles.filter((a: Article) => !existingIds.has(a._id))
-      
+
       if (newArticles.length > 0) {
         articles.value = [...newArticles, ...articles.value]
         await articleCache.saveArticles(result.articles)
-        // Debug log removed for production
-        // console.log(`Fetched ${newArticles.length} new articles`)
       }
     }
-    
+
     totalCount.value = result.totalCount
   } catch (error) {
     console.error('Error fetching updates:', error)
@@ -91,16 +122,29 @@ const fetchLatestUpdates = async () => {
 
 const loadMore = async () => {
   if (loadingMore.value || !hasMore.value) return
-  
+
   loadingMore.value = true
   try {
-    const result = await fetchArticles(articles.value.length)
-    
+    const result = await fetchArticles(
+      articles.value.length,
+      undefined,
+      filterStore.selectedFeedId,
+      filterStore.selectedEventId,
+      filterStore.selectedTrendId
+    )
+
     if (result.articles.length > 0) {
       articles.value = [...articles.value, ...result.articles]
-      await articleCache.saveArticles(result.articles)
+      // Only cache if no filters are active
+      if (
+        !filterStore.selectedFeedId &&
+        !filterStore.selectedEventId &&
+        !filterStore.selectedTrendId
+      ) {
+        await articleCache.saveArticles(result.articles)
+      }
     }
-    
+
     hasMore.value = result.hasMore
     totalCount.value = result.totalCount
   } catch (error) {
@@ -110,38 +154,83 @@ const loadMore = async () => {
   }
 }
 
+// Watch for changes in filter store and re-fetch articles
+watch(
+  [
+    () => filterStore.selectedFeedId,
+    () => filterStore.selectedEventId,
+    () => filterStore.selectedTrendId,
+  ],
+  async () => {
+    loading.value = true
+    articles.value = [] // Clear current articles
+    hasMore.value = true
+    totalCount.value = 0
+    if (observer) {
+      observer.disconnect() // Disconnect old observer
+    }
+    await loadFromCache() // Try to load from cache first if no filters
+    await fetchArticlesAndCache(0) // Fetch fresh based on new filters
+    loading.value = false
+    setupIntersectionObserver() // Re-setup observer
+  }
+)
+
+const fetchArticlesAndCache = async (skip = 0) => {
+  const result = await fetchArticles(
+    skip,
+    undefined,
+    filterStore.selectedFeedId,
+    filterStore.selectedEventId,
+    filterStore.selectedTrendId
+  )
+  if (skip === 0) {
+    // Initial load
+    articles.value = result.articles
+  } else {
+    // Load more
+    articles.value = [...articles.value, ...result.articles]
+  }
+  hasMore.value = result.hasMore
+  totalCount.value = result.totalCount
+  // Only cache if no filters are active
+  if (!filterStore.selectedFeedId && !filterStore.selectedEventId && !filterStore.selectedTrendId) {
+    await articleCache.saveArticles(result.articles)
+  }
+}
+
 // Computed: Filtered articles based on search query
 const filteredArticles = computed(() => {
   let filtered = articles.value
-  
-  // Filter by selected feed
-  if (selectedFeedUrl.value) {
-    filtered = filtered.filter(article => article.feed_url === selectedFeedUrl.value)
-  }
-  
-  // Filter by search query
+
+  // No longer filtering by selectedFeedUrl here, as it's handled by API now
+  // if (selectedFeedUrl.value) {
+  //   filtered = filtered.filter(article => article.feed_url === selectedFeedUrl.value)
+  // }
+
+  // Filter by search query (local client-side filter)
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(article => {
+    filtered = filtered.filter((article) => {
       const title = (article.title || '').toLowerCase()
       const summary = (article.summary || '').toLowerCase()
       const feedTitle = (article.feed_title || '').toLowerCase()
       return title.includes(query) || summary.includes(query) || feedTitle.includes(query)
     })
   }
-  
+
   return filtered
 })
 
 const deleteArticle = async (id: string) => {
-  if (!confirm("Delete this article?")) return;
+  if (!confirm('Delete this article?')) return
   try {
     const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      articles.value = articles.value.filter(a => a._id !== id)
+      articles.value = articles.value.filter((a) => a._id !== id)
       // Note: We don't remove from cache as it will auto-expire
     } else {
-      alert("Failed to delete article")
+      alert('Failed to delete article')
     }
   } catch (e) {
     console.error(e)
@@ -150,7 +239,7 @@ const deleteArticle = async (id: string) => {
 
 const setupIntersectionObserver = () => {
   if (!sentinelEl.value) return
-  
+
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && hasMore.value && !loadingMore.value) {
@@ -159,36 +248,35 @@ const setupIntersectionObserver = () => {
     },
     { rootMargin: '200px' }
   )
-  
+
   observer.observe(sentinelEl.value)
 }
 
 onMounted(async () => {
-  // 1. Load cached articles immediately
+  // 1. Load cached articles immediately (only if no filters initially active)
   await loadFromCache()
-  
-  // 2. Fetch latest updates
-  await fetchLatestUpdates()
-  
-  // 3. If no cached articles, do initial fetch
-  if (articles.value.length === 0) {
-    const result = await fetchArticles(0)
-    articles.value = result.articles
-    hasMore.value = result.hasMore
-    totalCount.value = result.totalCount
-    await articleCache.saveArticles(result.articles)
-  }
-  
+
+  // 2. Fetch initial articles (might include latest updates or filtered)
+  await fetchArticlesAndCache(0)
+
   loading.value = false
-  
-  // 4. Set up infinite scroll
+
+  // 3. Set up infinite scroll
   setupIntersectionObserver()
-  
-  // 5. Clean old cache
+
+  // 4. Clean old cache
   articleCache.clearOldArticles().catch(console.error)
-  
-  // 6. Periodic refresh (every 2 minutes)
-  refreshInterval = globalThis.setInterval(fetchLatestUpdates, 120000)
+
+  // 5. Periodic refresh (every 2 minutes) - only if no filters are active
+  refreshInterval = globalThis.setInterval(() => {
+    if (
+      !filterStore.selectedFeedId &&
+      !filterStore.selectedEventId &&
+      !filterStore.selectedTrendId
+    ) {
+      fetchLatestUpdates()
+    }
+  }, 120000)
 })
 
 onUnmounted(() => {
@@ -204,17 +292,22 @@ const refreshingFeed = ref(false)
 
 const handleRefresh = async () => {
   refreshingFeed.value = true
-  
+
   try {
-    if (selectedFeedUrl.value) {
+    // Determine which feed to refresh based on filter store
+    const feedToRefresh = filterStore.selectedFeedId
+      ? articles.value.find((a) => a._id === filterStore.selectedFeedId)?.feed_url
+      : null
+
+    if (feedToRefresh) {
       // Refresh specific feed
-      const encodedUrl = encodeURIComponent(selectedFeedUrl.value)
+      const encodedUrl = encodeURIComponent(feedToRefresh)
       const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
-      
+
       if (response.ok) {
         // Wait a bit for the feed to be fetched
         setTimeout(async () => {
-          await fetchLatestUpdates()
+          await fetchArticlesAndCache(0) // Re-fetch all based on current filters
           refreshingFeed.value = false
         }, 2000)
       } else {
@@ -222,8 +315,9 @@ const handleRefresh = async () => {
         refreshingFeed.value = false
       }
     } else {
-      // Just fetch latest updates from DB
-      await fetchLatestUpdates()
+      // If no specific feed is selected, or if feedToRefresh is null, just fetch latest updates
+      // This will respect current filters
+      await fetchArticlesAndCache(0) // Re-fetch all based on current filters
       refreshingFeed.value = false
     }
   } catch (error) {
@@ -231,27 +325,40 @@ const handleRefresh = async () => {
     refreshingFeed.value = false
   }
 }
-
 </script>
 
 <template>
   <div class="article-column">
     <div class="column-header">
       <h2>
-        Articles 
+        Articles
         <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
         <span v-else-if="!loading">({{ filteredArticles.length }})</span>
         <span v-if="fetchingUpdates" class="update-badge">↻</span>
       </h2>
       <div class="header-actions" v-if="isAdmin">
-        <button 
-          @click="handleRefresh" 
+        <button
+          @click="handleRefresh"
           :disabled="refreshingFeed"
           class="action-btn"
-          :title="refreshingFeed ? 'Refreshing...' : (selectedFeedUrl ? 'Refresh selected feed' : 'Check for updates')"
+          :title="
+            refreshingFeed
+              ? 'Refreshing...'
+              : filterStore.selectedFeedId
+                ? 'Refresh selected feed'
+                : 'Check for updates'
+          "
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshingFeed }">
-            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            :class="{ spinning: refreshingFeed }"
+          >
+            <path
+              d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+            />
           </svg>
           {{ refreshingFeed ? 'Refreshing' : 'Refresh' }}
         </button>
@@ -260,35 +367,51 @@ const handleRefresh = async () => {
 
     <!-- Search Input -->
     <div class="search-container">
-      <input 
-        v-model="searchQuery" 
-        type="text" 
-        placeholder="Search articles by title, description, or source..." 
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Search articles by title, description, or source..."
         class="search-input"
       />
-      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+      <button
+        v-if="searchQuery"
+        @click="searchQuery = ''"
+        class="clear-search-btn"
+        title="Clear search"
+      >
         ×
       </button>
     </div>
 
-    <div v-if="loading" class="loading-state">Loading cached articles...</div>
+    <div v-if="loading" class="loading-state">Loading articles...</div>
     <div v-else-if="!filteredArticles.length" class="no-results">
       <span v-if="searchQuery">No articles match "{{ searchQuery }}"</span>
-      <span v-else>No articles found yet.</span>
+      <span v-else>No articles found yet for the current filters.</span>
     </div>
     <div v-else class="article-list">
       <div v-for="article in filteredArticles" :key="article._id" class="article-card">
         <div class="card-header">
-           <h3><a :href="article.link" target="_blank">{{ article.title }}</a></h3>
-           <button v-if="isAdmin" @click="deleteArticle(article._id)" class="delete-btn" title="Delete Article">×</button>
+          <h3>
+            <a :href="article.link" target="_blank">{{ article.title }}</a>
+          </h3>
+          <button
+            v-if="isAdmin"
+            @click="deleteArticle(article._id)"
+            class="delete-btn"
+            title="Delete Article"
+          >
+            ×
+          </button>
         </div>
-        <p class="meta">{{ formatDate(article.published) }} | {{ getHostname(article.feed_url) }}</p>
+        <p class="meta">
+          {{ formatDate(article.published) }} | {{ getHostname(article.feed_url) }}
+        </p>
         <p class="summary">{{ stripHtml(article.summary).substring(0, 200) }}...</p>
         <div v-if="article.events" class="event-tags">
           <span v-for="event in article.events" :key="event" class="tag">{{ event }}</span>
         </div>
       </div>
-      
+
       <!-- Sentinel element for infinite scroll -->
       <div ref="sentinelEl" class="sentinel">
         <div v-if="loadingMore" class="loading-more">Loading more articles...</div>

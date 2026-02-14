@@ -2,15 +2,16 @@
 import { onMounted, ref, computed, watch, nextTick, inject, type Ref } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
+import { useFilterStore } from '../stores/filter' // Import the new filter store
 
 interface Feed {
-  _id: string;
-  url: string;
-  title?: string;
-  category?: string;
-  favicon_url?: string;
-  last_fetch_error?: string;
-  last_fetch_at?: string;
+  _id: string
+  url: string
+  title?: string
+  category?: string
+  favicon_url?: string
+  last_fetch_error?: string
+  last_fetch_at?: string
 }
 
 const feeds = ref<Feed[]>([])
@@ -25,12 +26,16 @@ const bulkImportResults = ref<any>(null)
 const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
 const searchQuery = ref('')
 
-// Inject feed selection from parent (used in template)
-const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
-const selectFeed = inject<(url: string | null) => void>('selectFeed', () => {})
+// Inject feed selection from parent (used in template) - NO LONGER USED, replaced by filterStore
+// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+// const selectFeed = inject<(url: string | null) => void>('selectFeed', () => {})
 // Prevent TS warnings - these are used in template
-void selectedFeedUrl
-void selectFeed
+// void selectedFeedUrl
+// void selectFeed
+
+const authStore = useAuthStore()
+const filterStore = useFilterStore() // Initialize the filter store
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Refs for modal accessibility
 const modalContentRef = ref<HTMLElement | null>(null)
@@ -38,15 +43,12 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
 
-const authStore = useAuthStore()
-const isAdmin = computed(() => authStore.user?.role === 'admin')
-
 // Extract and validate URLs from text
 const extractValidUrls = (text: string): string[] => {
   return text
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => line && isValidUrl(line))
+    .map((line) => line.trim())
+    .filter((line) => line && isValidUrl(line))
 }
 
 // Computed: Check if import button should be enabled
@@ -64,9 +66,9 @@ const urlCount = computed(() => {
 // Computed: Filtered feeds based on search query
 const filteredFeeds = computed(() => {
   if (!searchQuery.value.trim()) return feeds.value
-  
+
   const query = searchQuery.value.toLowerCase()
-  return feeds.value.filter(feed => {
+  return feeds.value.filter((feed) => {
     const title = (feed.title || '').toLowerCase()
     const url = feed.url.toLowerCase()
     const category = (feed.category || '').toLowerCase()
@@ -85,7 +87,7 @@ const fetchFeeds = async () => {
   try {
     const response = await fetch('/api/feeds')
     if (response.ok) {
-        feeds.value = await response.json()
+      feeds.value = await response.json()
     }
   } catch (error) {
     console.error('Error fetching feeds:', error)
@@ -95,36 +97,41 @@ const fetchFeeds = async () => {
 }
 
 const triggerRefresh = async () => {
-    refreshing.value = true
-    try {
-        const res = await fetch('/api/feeds/refresh', { method: 'POST' })
-        if (res.ok) {
-            const data = await res.json()
-            alert(`Started refreshing ${data.count} feeds.`)
-        } else {
-            alert("Failed to trigger refresh.")
-        }
-    } catch (e) {
-        console.error(e)
-        alert("Error triggering refresh.")
-    } finally {
-        refreshing.value = false
-    }
-}
-
-const deleteFeed = async (id: string) => {
-  if (!confirm("Are you sure you want to delete this feed?")) return;
-  
+  refreshing.value = true
   try {
-    const res = await fetch(`/api/feeds/${id}`, { method: 'DELETE' })
+    const res = await fetch('/api/feeds/refresh', { method: 'POST' })
     if (res.ok) {
-      feeds.value = feeds.value.filter(f => f._id !== id)
+      const data = await res.json()
+      showNotification(`Started refreshing ${data.count} feeds.`, 'success')
     } else {
-      alert("Failed to delete feed")
+      showNotification('Failed to trigger refresh.', 'error')
     }
   } catch (e) {
     console.error(e)
-    alert("Error deleting feed")
+    showNotification('Error triggering refresh.', 'error')
+  } finally {
+    refreshing.value = false
+  }
+}
+
+const deleteFeed = async (id: string) => {
+  if (!confirm('Are you sure you want to delete this feed?')) return
+
+  try {
+    const res = await fetch(`/api/feeds/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      feeds.value = feeds.value.filter((f) => f._id !== id)
+      // If the deleted feed was selected, clear the selection
+      if (filterStore.selectedFeedId === id) {
+        filterStore.setSelectedFeedId(null)
+      }
+      showNotification('Feed deleted successfully.', 'success')
+    } else {
+      showNotification('Failed to delete feed', 'error')
+    }
+  } catch (e) {
+    console.error(e)
+    showNotification('Error deleting feed', 'error')
   }
 }
 
@@ -143,21 +150,22 @@ const renameFeed = async (feed: Feed) => {
     const res = await fetch(`/api/feeds/${feed._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newFeedTitle.value })
+      body: JSON.stringify({ title: newFeedTitle.value }),
     })
     if (res.ok) {
       const updatedFeed = await res.json()
-      const index = feeds.value.findIndex(f => f._id === updatedFeed._id)
+      const index = feeds.value.findIndex((f) => f._id === updatedFeed._id)
       if (index !== -1) {
         feeds.value[index] = updatedFeed
       }
       cancelRename()
+      showNotification('Feed renamed successfully.', 'success')
     } else {
-      alert("Failed to rename feed")
+      showNotification('Failed to rename feed', 'error')
     }
   } catch (e) {
     console.error(e)
-    alert("Error renaming feed")
+    showNotification('Error renaming feed', 'error')
   }
 }
 
@@ -217,24 +225,24 @@ const parseOpmlFile = (xmlContent: string): string[] => {
   try {
     const parser = new DOMParser()
     const xmlDoc = parser.parseFromString(xmlContent, 'text/xml')
-    
+
     // Check for parsing errors
     const parserError = xmlDoc.querySelector('parsererror')
     if (parserError) {
       throw new Error('Invalid OPML/XML format')
     }
-    
+
     // Extract feed URLs from <outline> elements with xmlUrl attribute
     const outlines = xmlDoc.querySelectorAll('outline[xmlUrl]')
     const urls: string[] = []
-    
-    outlines.forEach(outline => {
+
+    outlines.forEach((outline) => {
       const xmlUrl = outline.getAttribute('xmlUrl')
       if (xmlUrl && isValidUrl(xmlUrl)) {
         urls.push(xmlUrl)
       }
     })
-    
+
     return urls
   } catch (error) {
     console.error('OPML parsing error:', error)
@@ -245,13 +253,13 @@ const parseOpmlFile = (xmlContent: string): string[] => {
 // Focus trap: handle Tab key to keep focus within modal
 const handleModalKeydown = (event: KeyboardEvent) => {
   if (!modalContentRef.value) return
-  
+
   // Close modal on Escape
   if (event.key === 'Escape') {
     closeBulkImportModal()
     return
   }
-  
+
   // Focus trap: keep focus within modal when pressing Tab
   if (event.key === 'Tab') {
     const focusableElements = modalContentRef.value.querySelectorAll(
@@ -259,7 +267,7 @@ const handleModalKeydown = (event: KeyboardEvent) => {
     )
     const firstElement = focusableElements[0] as HTMLElement
     const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
-    
+
     if (event.shiftKey) {
       // Shift + Tab: if focus is on first element, move to last
       if (document.activeElement === firstElement) {
@@ -291,11 +299,11 @@ const handleFileUpload = (event: Event) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  
+
   const reader = new FileReader()
   reader.onload = (e) => {
     const content = e.target?.result as string
-    
+
     // Check if file is OPML based on extension
     if (file.name.toLowerCase().endsWith('.opml')) {
       try {
@@ -304,10 +312,16 @@ const handleFileUpload = (event: Event) => {
           showNotification('No valid feed URLs found in OPML file', 'warning')
         } else {
           bulkImportText.value = urls.join('\n')
-          showNotification(`Found ${urls.length} feed URL${urls.length !== 1 ? 's' : ''} in OPML file`, 'success')
+          showNotification(
+            `Found ${urls.length} feed URL${urls.length !== 1 ? 's' : ''} in OPML file`,
+            'success'
+          )
         }
       } catch (error) {
-        showNotification(error instanceof Error ? error.message : 'Failed to parse OPML file', 'error')
+        showNotification(
+          error instanceof Error ? error.message : 'Failed to parse OPML file',
+          'error'
+        )
         // Clear the file input
         input.value = ''
       }
@@ -321,40 +335,52 @@ const handleFileUpload = (event: Event) => {
 
 const bulkImportFeeds = async () => {
   const urls = extractValidUrls(bulkImportText.value)
-  
+
   if (urls.length === 0) {
-    showNotification('No valid URLs found. Please enter URLs starting with http:// or https://', 'warning')
+    showNotification(
+      'No valid URLs found. Please enter URLs starting with http:// or https://',
+      'warning'
+    )
     return
   }
-  
+
   // Client-side validation: match server limit
   const MAX_BULK_IMPORT_SIZE = 100
   if (urls.length > MAX_BULK_IMPORT_SIZE) {
-    showNotification(`Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`, 'warning')
+    showNotification(
+      `Too many URLs! Maximum ${MAX_BULK_IMPORT_SIZE} URLs per import. You have ${urls.length} URLs. Please split into multiple imports.`,
+      'warning'
+    )
     return
   }
-  
+
   bulkImporting.value = true
   try {
     const res = await fetch('/api/feeds/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls })
+      body: JSON.stringify({ urls }),
     })
-    
+
     if (res.ok) {
       const results = await res.json()
       bulkImportResults.value = results
-      
+
       // Show success notification
       if (results.success > 0) {
-        showNotification(`Successfully imported ${results.success} feed${results.success > 1 ? 's' : ''}!`, 'success')
+        showNotification(
+          `Successfully imported ${results.success} feed${results.success > 1 ? 's' : ''}!`,
+          'success'
+        )
         await fetchFeeds()
       }
-      
+
       // Show warning if some failed
       if (results.failed > 0 && results.success === 0) {
-        showNotification(`Failed to import ${results.failed} feed${results.failed > 1 ? 's' : ''}. See details below.`, 'error')
+        showNotification(
+          `Failed to import ${results.failed} feed${results.failed > 1 ? 's' : ''}. See details below.`,
+          'error'
+        )
       }
     } else {
       const errorText = await res.text()
@@ -370,7 +396,7 @@ const bulkImportFeeds = async () => {
         success: 0,
         failed: urls.length,
         skipped: 0,
-        errors: [{ url: 'Request failed', error: errorMessage }]
+        errors: [{ url: 'Request failed', error: errorMessage }],
       }
       showNotification(errorMessage, 'error')
     }
@@ -382,7 +408,7 @@ const bulkImportFeeds = async () => {
       success: 0,
       failed: urls.length,
       skipped: 0,
-      errors: [{ url: 'Network error', error: errorMessage }]
+      errors: [{ url: 'Network error', error: errorMessage }],
     }
     showNotification(`Error importing feeds: ${errorMessage}`, 'error')
   } finally {
@@ -394,32 +420,50 @@ const bulkImportFeeds = async () => {
 <template>
   <div class="column-container">
     <div class="column-header">
-        <h2>Feeds ({{ filteredFeeds.length }})</h2>
-        <div class="header-actions" v-if="isAdmin">
-          <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-            </svg>
-            Import
-          </button>
-          <button @click="triggerRefresh" :disabled="refreshing" class="action-btn" title="Refresh All Feeds">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
-              <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-            </svg>
-            {{ refreshing ? 'Refreshing' : 'Refresh' }}
-          </button>
-        </div>
+      <h2>Feeds ({{ filteredFeeds.length }})</h2>
+      <div class="header-actions" v-if="isAdmin">
+        <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+          </svg>
+          Import
+        </button>
+        <button
+          @click="triggerRefresh"
+          :disabled="refreshing"
+          class="action-btn"
+          title="Refresh All Feeds"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            :class="{ spinning: refreshing }"
+          >
+            <path
+              d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+            />
+          </svg>
+          {{ refreshing ? 'Refreshing' : 'Refresh' }}
+        </button>
+      </div>
     </div>
 
     <!-- Search Input -->
     <div class="search-container">
-      <input 
-        v-model="searchQuery" 
-        type="text" 
-        placeholder="Search feeds by title, URL, or category..." 
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Search feeds by title, URL, or category..."
         class="search-input"
       />
-      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+      <button
+        v-if="searchQuery"
+        @click="searchQuery = ''"
+        class="clear-search-btn"
+        title="Clear search"
+      >
         ×
       </button>
     </div>
@@ -429,9 +473,15 @@ const bulkImportFeeds = async () => {
       No feeds match "{{ searchQuery }}"
     </div>
     <ul v-else-if="filteredFeeds.length" class="feed-list">
-      <li v-for="feed in filteredFeeds" :key="feed._id" class="feed-item" 
-          @click="selectFeed(feed.url)"
-          :class="{ 'selected-feed': selectedFeedUrl === feed.url }">
+      <li
+        v-for="feed in filteredFeeds"
+        :key="feed._id"
+        class="feed-item"
+        @click="
+          filterStore.setSelectedFeedId(filterStore.selectedFeedId === feed._id ? null : feed._id)
+        "
+        :class="{ 'selected-feed': filterStore.selectedFeedId === feed._id }"
+      >
         <div v-if="renamingFeedId === feed._id && isAdmin" class="feed-info">
           <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
           <div class="rename-actions">
@@ -441,54 +491,87 @@ const bulkImportFeeds = async () => {
         </div>
         <div v-else class="feed-info">
           <div class="feed-name-container">
-            <img v-if="feed.favicon_url" :src="feed.favicon_url" class="feed-favicon" :alt="`${feed.title || getHostname(feed.url)} icon`" @error="handleFaviconError" />
+            <img
+              v-if="feed.favicon_url"
+              :src="feed.favicon_url"
+              class="feed-favicon"
+              :alt="`${feed.title || getHostname(feed.url)} icon`"
+              @error="handleFaviconError"
+            />
             <span v-else class="feed-favicon-placeholder" aria-label="No icon">📰</span>
-            <button 
-              class="feed-name-btn" 
-              @click.stop="selectFeed(feed.url)"
+            <button
+              class="feed-name-btn"
+              @click.stop="
+                filterStore.setSelectedFeedId(
+                  filterStore.selectedFeedId === feed._id ? null : feed._id
+                )
+              "
               :title="feed.url"
             >
               {{ feed.title || getHostname(feed.url) }}
             </button>
-            <a :href="feed.url" target="_blank" class="feed-link-icon" :title="`Open ${feed.url}`" @click.stop>
+            <a
+              :href="feed.url"
+              target="_blank"
+              class="feed-link-icon"
+              :title="`Open ${feed.url}`"
+              @click.stop
+            >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                <path
+                  d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+                />
               </svg>
             </a>
           </div>
           <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions" @click.stop>
-          <div v-if="feed.last_fetch_error" class="warning-icon" :title="`Fetch error: ${feed.last_fetch_error}`">
+          <div
+            v-if="feed.last_fetch_error"
+            class="warning-icon"
+            :title="`Fetch error: ${feed.last_fetch_error}`"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
             </svg>
           </div>
           <button @click="openFeedInNewTab(feed.url)" class="icon-btn" title="Open Feed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+              <path
+                d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
+              />
             </svg>
           </button>
           <button v-if="isAdmin" @click="startRename(feed)" class="icon-btn" title="Rename Feed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+              <path
+                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+              />
             </svg>
           </button>
-          <button v-if="isAdmin" @click="deleteFeed(feed._id)" class="icon-btn delete" title="Delete Feed">
+          <button
+            v-if="isAdmin"
+            @click="deleteFeed(feed._id)"
+            class="icon-btn delete"
+            title="Delete Feed"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+              <path
+                d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+              />
             </svg>
           </button>
         </div>
       </li>
     </ul>
     <div v-else>No feeds found.</div>
-    
+
     <!-- Bulk Import Modal -->
     <div v-if="showBulkImportModal" class="modal-overlay" @click="closeBulkImportModal">
-        <div 
+      <div
         ref="modalContentRef"
-        class="modal-content" 
+        class="modal-content"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
@@ -499,65 +582,77 @@ const bulkImportFeeds = async () => {
           <h3 id="modal-title">Bulk Import Feeds</h3>
           <button @click="closeBulkImportModal" class="modal-close" aria-label="Close">×</button>
         </div>
-        
+
         <div v-if="!bulkImportResults" class="modal-body">
           <p>Paste feed URLs below (one per line) or upload a text file:</p>
           <p class="import-limit-notice">⚠️ Maximum 50 URLs per import (security limit)</p>
-          
+
           <div class="file-upload-section">
             <input ref="fileInputRef" type="file" accept=".txt,.opml" @change="handleFileUpload" />
           </div>
-          
-          <textarea 
+
+          <textarea
             ref="textareaRef"
-            v-model="bulkImportText" 
+            v-model="bulkImportText"
             placeholder="https://example.com/feed.xml&#10;https://another.com/rss&#10;..."
             rows="10"
             class="bulk-import-textarea"
           ></textarea>
-          
+
           <div v-if="bulkImportText.trim()" class="url-preview">
             <span v-if="urlCount > 0" class="url-count-valid">
               {{ urlCount }} valid URL{{ urlCount !== 1 ? 's' : '' }} found
             </span>
-            <span v-else class="url-count-invalid">
-              No valid URLs found
-            </span>
+            <span v-else class="url-count-invalid"> No valid URLs found </span>
           </div>
-          
+
           <div class="modal-actions">
-            <button @click="bulkImportFeeds" :disabled="bulkImporting || !canImport" class="import-btn">
+            <button
+              @click="bulkImportFeeds"
+              :disabled="bulkImporting || !canImport"
+              class="import-btn"
+            >
               {{ bulkImporting ? 'Importing...' : 'Import Feeds' }}
             </button>
             <button @click="closeBulkImportModal" class="cancel-btn">Cancel</button>
           </div>
         </div>
-        
+
         <div v-else class="modal-body">
           <h4>Import Results</h4>
           <div class="import-results">
             <p><strong>Total URLs:</strong> {{ bulkImportResults.total }}</p>
-            <p class="success-text"><strong>Successfully imported:</strong> {{ bulkImportResults.success }}</p>
-            <p v-if="bulkImportResults.skipped > 0" class="warning-text"><strong>Skipped (already exist):</strong> {{ bulkImportResults.skipped }}</p>
-            <p v-if="bulkImportResults.failed > 0" class="error-text"><strong>Failed:</strong> {{ bulkImportResults.failed }}</p>
-            
-            <div v-if="bulkImportResults.errors && bulkImportResults.errors.length > 0" class="error-details">
+            <p class="success-text">
+              <strong>Successfully imported:</strong> {{ bulkImportResults.success }}
+            </p>
+            <p v-if="bulkImportResults.skipped > 0" class="warning-text">
+              <strong>Skipped (already exist):</strong> {{ bulkImportResults.skipped }}
+            </p>
+            <p v-if="bulkImportResults.failed > 0" class="error-text">
+              <strong>Failed:</strong> {{ bulkImportResults.failed }}
+            </p>
+
+            <div
+              v-if="bulkImportResults.errors && bulkImportResults.errors.length > 0"
+              class="error-details"
+            >
               <h5>Errors:</h5>
               <ul>
                 <li v-for="(err, idx) in bulkImportResults.errors" :key="idx">
-                  <strong>{{ err.url }}</strong>: {{ err.error }}
+                  <strong>{{ err.url }}</strong
+                  >: {{ err.error }}
                 </li>
               </ul>
             </div>
           </div>
-          
+
           <div class="modal-actions">
             <button @click="closeBulkImportModal" class="close-btn">Close</button>
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- Toast Notification -->
     <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
       {{ notification.message }}
@@ -592,7 +687,9 @@ h2 {
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  transition: background-color 0.2s, border-left 0.2s;
+  transition:
+    background-color 0.2s,
+    border-left 0.2s;
   border-left: 3px solid transparent;
 }
 
@@ -637,7 +734,7 @@ h2 {
   font-family: inherit;
 }
 .feed-name-btn:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .feed-link-icon {
@@ -696,33 +793,33 @@ h2 {
   align-items: center;
 }
 .icon-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-color);
-    opacity: 0.7;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
 .icon-btn:hover {
-    background: var(--button-bg);
-    opacity: 1;
-    color: var(--primary-color);
+  background: var(--button-bg);
+  opacity: 1;
+  color: var(--primary-color);
 }
 .icon-btn.delete:hover {
-    color: #cc0000;
-    background: rgba(204, 0, 0, 0.1);
+  color: #cc0000;
+  background: rgba(204, 0, 0, 0.1);
 }
 .warning-icon {
-    color: #ff9800;
-    cursor: help;
-    display: flex;
-    align-items: center;
-    padding: 4px;
+  color: #ff9800;
+  cursor: help;
+  display: flex;
+  align-items: center;
+  padding: 4px;
 }
 
 .rename-actions {
@@ -823,7 +920,9 @@ h2 {
   justify-content: flex-end;
   margin-top: 20px;
 }
-.import-btn, .cancel-btn, .close-btn {
+.import-btn,
+.cancel-btn,
+.close-btn {
   padding: 8px 16px;
   border: none;
   border-radius: 4px;

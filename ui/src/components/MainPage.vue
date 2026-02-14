@@ -4,23 +4,34 @@ import FeedColumn from './FeedColumn.vue'
 import ArticleColumn from './ArticleColumn.vue'
 import EventColumn from './EventColumn.vue'
 import TrendColumn from './TrendColumn.vue'
+import { useFilterStore } from '../stores/filter' // Import the new filter store
 
 defineProps<{ msg: string }>()
 
 const focusedColumn = ref<string | null>(null)
-const selectedFeedUrl = ref<string | null>(null)
+// const selectedFeedUrl = ref<string | null>(null) // NO LONGER USED, replaced by filterStore
+
+const filterStore = useFilterStore() // Initialize the filter store
 
 const setFocus = (column: string | null) => {
   focusedColumn.value = column
 }
 
-const selectFeed = (feedUrl: string | null) => {
-  selectedFeedUrl.value = feedUrl
-}
+// const selectFeed = (feedUrl: string | null) => { // NO LONGER USED, replaced by filterStore
+//   selectedFeedUrl.value = feedUrl
+// }
 
-// Provide selectedFeedUrl to child components
-provide('selectedFeedUrl', selectedFeedUrl)
-provide('selectFeed', selectFeed)
+// Provide selectedFeedUrl to child components - NO LONGER NEEDED
+// provide('selectedFeedUrl', selectedFeedUrl)
+// provide('selectFeed', selectFeed)
+
+const hasActiveFilters = computed(() => {
+  return (
+    filterStore.selectedFeedId !== null ||
+    filterStore.selectedEventId !== null ||
+    filterStore.selectedTrendId !== null
+  )
+})
 </script>
 
 <template>
@@ -29,33 +40,65 @@ provide('selectFeed', selectFeed)
       <div class="title-wrapper">
         <h1>{{ msg }}</h1>
         <div class="header-controls">
-          <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">Clear Focus</button>
-          <button v-if="selectedFeedUrl" @click="selectFeed(null)" class="clear-filter-btn">Clear Feed Filter</button>
+          <button v-if="focusedColumn" @click="setFocus(null)" class="clear-focus-btn">
+            Clear Focus
+          </button>
+          <button
+            v-if="hasActiveFilters"
+            @click="filterStore.clearAllFilters()"
+            class="clear-filter-btn"
+          >
+            Clear All Filters
+          </button>
         </div>
       </div>
     </div>
 
     <div class="columns-container">
-      <div 
-        :class="['column', { focused: focusedColumn === 'feeds', unfocused: focusedColumn && focusedColumn !== 'feeds' }]"
+      <div
+        :class="[
+          'column',
+          {
+            focused: focusedColumn === 'feeds',
+            unfocused: focusedColumn && focusedColumn !== 'feeds',
+          },
+        ]"
         @click="setFocus('feeds')"
       >
         <FeedColumn />
       </div>
-      <div 
-        :class="['column', { focused: focusedColumn === 'articles', unfocused: focusedColumn && focusedColumn !== 'articles' }]"
+      <div
+        :class="[
+          'column',
+          {
+            focused: focusedColumn === 'articles',
+            unfocused: focusedColumn && focusedColumn !== 'articles',
+          },
+        ]"
         @click="setFocus('articles')"
       >
         <ArticleColumn />
       </div>
-      <div 
-        :class="['column', { focused: focusedColumn === 'events', unfocused: focusedColumn && focusedColumn !== 'events' }]"
+      <div
+        :class="[
+          'column',
+          {
+            focused: focusedColumn === 'events',
+            unfocused: focusedColumn && focusedColumn !== 'events',
+          },
+        ]"
         @click="setFocus('events')"
       >
         <EventColumn />
       </div>
-      <div 
-        :class="['column', { focused: focusedColumn === 'trends', unfocused: focusedColumn && focusedColumn !== 'trends' }]"
+      <div
+        :class="[
+          'column',
+          {
+            focused: focusedColumn === 'trends',
+            unfocused: focusedColumn && focusedColumn !== 'trends',
+          },
+        ]"
         @click="setFocus('trends')"
       >
         <TrendColumn />
@@ -102,7 +145,8 @@ h1 {
   max-width: 300px;
 }
 
-.clear-focus-btn, .clear-filter-btn {
+.clear-focus-btn,
+.clear-filter-btn {
   padding: 8px 16px;
   background: #2c3e50;
   color: #42b983;
@@ -113,7 +157,8 @@ h1 {
   width: 100%;
 }
 
-.clear-focus-btn:hover, .clear-filter-btn:hover {
+.clear-focus-btn:hover,
+.clear-filter-btn:hover {
   background: #34495e;
 }
 
@@ -182,7 +227,8 @@ h1 {
     width: auto;
   }
 
-  .clear-focus-btn, .clear-filter-btn {
+  .clear-focus-btn,
+  .clear-filter-btn {
     width: auto;
   }
 

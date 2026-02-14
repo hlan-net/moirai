@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, inject, onUnmounted, watch, type Ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useFilterStore } from '../stores/filter' // Import the new filter store
 
 interface Trend {
   _id: string
@@ -16,26 +17,27 @@ const expandedTrends = ref<Set<string>>(new Set())
 const searchQuery = ref('')
 let refreshInterval: number | null = null
 
-// Inject selected feed from parent
-const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
+// Inject selected feed from parent - NO LONGER USED DIRECTLY FOR FILTERING
+// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
 
 const authStore = useAuthStore()
+const filterStore = useFilterStore() // Initialize the filter store
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Computed: Filtered trends based on search query
 const filteredTrends = computed(() => {
   let filtered = trends.value
-  
+
   // Filter by search query
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(trend => {
+    filtered = filtered.filter((trend) => {
       const name = trend.name.toLowerCase()
       const description = trend.description.toLowerCase()
       return name.includes(query) || description.includes(query)
     })
   }
-  
+
   return filtered
 })
 
@@ -45,11 +47,16 @@ const fetchTrends = async (isRefresh = false) => {
   } else {
     loading.value = true
   }
-  
+
   try {
     const params = new URLSearchParams()
-    if (selectedFeedUrl.value) {
-      params.append('feed_url', selectedFeedUrl.value)
+    if (filterStore.selectedFeedId) {
+      // Use filterStore.selectedFeedId
+      params.append('feed_id', filterStore.selectedFeedId)
+    }
+    if (filterStore.selectedEventId) {
+      // Use filterStore.selectedEventId
+      params.append('event_id', filterStore.selectedEventId)
     }
     const queryString = params.toString() ? `?${params.toString()}` : ''
 
@@ -73,8 +80,13 @@ const fetchTrends = async (isRefresh = false) => {
   }
 }
 
-// Watch for feed selection changes to refresh data
-watch(selectedFeedUrl, () => {
+const selectTrend = (trendId: string) => {
+  filterStore.setSelectedTrendId(filterStore.selectedTrendId === trendId ? null : trendId)
+}
+
+// Watch for filter changes to refresh data
+watch([() => filterStore.selectedFeedId, () => filterStore.selectedEventId], () => {
+  // Watch filterStore.selectedFeedId and selectedEventId
   fetchTrends()
 })
 
@@ -83,8 +95,12 @@ const deleteTrend = async (id: string) => {
   try {
     const res = await fetch(`/api/trends/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      trends.value = trends.value.filter(t => t._id !== id)
+      trends.value = trends.value.filter((t) => t._id !== id)
       expandedTrends.value.delete(id)
+      if (filterStore.selectedTrendId === id) {
+        // Clear selection if deleted
+        filterStore.setSelectedTrendId(null)
+      }
     }
   } catch (error) {
     console.error(error)
@@ -101,7 +117,7 @@ const removeEvent = async (trendId: string, eventId: string) => {
     })
     if (res.ok) {
       const updatedTrend = await res.json()
-      const index = trends.value.findIndex(t => t._id === trendId)
+      const index = trends.value.findIndex((t) => t._id === trendId)
       if (index !== -1) {
         trends.value[index] = updatedTrend
       }
@@ -139,27 +155,41 @@ onUnmounted(() => {
         Trends ({{ filteredTrends.length }})
         <span v-if="refreshing" class="update-badge">↻</span>
       </h2>
-      <button v-if="isAdmin" 
-        @click="() => fetchTrends(true)" 
+      <button
+        v-if="isAdmin"
+        @click="() => fetchTrends(true)"
         :disabled="refreshing"
         class="action-btn"
         title="Refresh trends"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" :class="{ 'spinning': refreshing }">
-          <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          :class="{ spinning: refreshing }"
+        >
+          <path
+            d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14 .69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+          />
         </svg>
       </button>
     </div>
 
     <!-- Search Input -->
     <div class="search-container">
-      <input 
-        v-model="searchQuery" 
-        type="text" 
-        placeholder="Search trends by name or description..." 
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Search trends by name or description..."
         class="search-input"
       />
-      <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+      <button
+        v-if="searchQuery"
+        @click="searchQuery = ''"
+        class="clear-search-btn"
+        title="Clear search"
+      >
         ×
       </button>
     </div>
@@ -170,17 +200,30 @@ onUnmounted(() => {
       <span v-else>No trends found yet.</span>
     </div>
     <div v-else class="trend-list">
-      <div v-for="trend in filteredTrends" :key="trend._id" class="trend-card">
+      <div
+        v-for="trend in filteredTrends"
+        :key="trend._id"
+        class="trend-card"
+        @click="selectTrend(trend._id)"
+        :class="{ 'selected-trend': filterStore.selectedTrendId === trend._id }"
+      >
         <div class="card-header">
-          <h3 @click="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
-          <button v-if="isAdmin" @click="deleteTrend(trend._id)" class="delete-btn" title="Delete Trend">×</button>
+          <h3 @click.stop="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
+          <button
+            v-if="isAdmin"
+            @click="deleteTrend(trend._id)"
+            class="delete-btn"
+            title="Delete Trend"
+          >
+            ×
+          </button>
         </div>
         <p class="summary">{{ trend.description }}</p>
 
         <div v-if="expandedTrends.has(trend._id)" class="events-section">
           <h4>Linked Events ({{ (trend.event_ids || []).length }})</h4>
           <ul>
-            <li v-for="eid in (trend.event_ids || [])" :key="eid">
+            <li v-for="eid in trend.event_ids || []" :key="eid">
               <span class="event-id">{{ eid.substring(0, 8) }}...</span>
               <button
                 v-if="isAdmin"
@@ -233,6 +276,21 @@ h2 {
   border-bottom: 1px solid var(--border-color);
   padding: 15px 0;
   text-align: left;
+  cursor: pointer; /* Add cursor pointer for selectable trends */
+  transition:
+    background-color 0.2s,
+    border-left 0.2s;
+  border-left: 3px solid transparent;
+}
+.trend-card:hover {
+  background-color: #3a3a3a;
+}
+.trend-card.selected-trend {
+  background-color: #4a0d7f; /* Darker background for selected trend */
+  border-left: 3px solid #6a0dad; /* Highlight with trend color */
+}
+.trend-card.selected-trend:hover {
+  background-color: #5a1d8f;
 }
 
 .card-header {
