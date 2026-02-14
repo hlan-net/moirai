@@ -1,11 +1,81 @@
 """
 Input validation utilities for Moirai API
 """
-from typing import Optional
+from typing import Optional, Dict, Any
+from enum import Enum # Import Enum
 from pydantic import BaseModel, Field, validator, HttpUrl
 import validators
 import bleach
 import uuid
+
+
+# Enums for AgentConfig
+class AgentTriggerType(str, Enum):
+    ON_NEW_ARTICLE = "on_new_article"
+    SCHEDULED = "scheduled"
+
+class AgentStatus(str, Enum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    ERROR = "error"
+
+class AgentTargetDB(str, Enum):
+    ARTICLES = "articles"
+    EVENTS = "events"
+    TRENDS = "trends"
+
+class AgentConfigBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    status: AgentStatus = Field(AgentStatus.ACTIVE)
+    trigger_type: AgentTriggerType
+    schedule_interval: Optional[str] = Field(None, description="e.g., '1h', '1d', 'every 30m'")
+    target_db: AgentTargetDB
+    logic_module: str = Field(..., description="Reference to Python module/function (e.g., 'tasks.agent_logic.create_event')")
+    llm_model_config: Optional[Dict[str, Any]] = Field(None, description="LLM specific configs like model_name, provider, etc.")
+    parameters: Optional[Dict[str, Any]] = Field(None, description="User-defined parameters for agent logic")
+    linked_entity_id: Optional[str] = Field(None, description="ID of a specific event or trend this agent is managing")
+
+    @validator('linked_entity_id')
+    def validate_linked_entity_id(cls, v):
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except ValueError:
+            raise ValueError('Linked entity ID must be a valid UUID/GUID')
+
+class AgentConfigCreateRequest(AgentConfigBase):
+    user_id: str = Field(..., description="The user who created this configuration (GUID)")
+
+    @validator('user_id')
+    def validate_user_id(cls, v):
+        try:
+            uuid.UUID(v)
+            return v
+        except ValueError:
+            raise ValueError('User ID must be a valid UUID/GUID')
+
+class AgentConfigUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    status: Optional[AgentStatus] = None
+    trigger_type: Optional[AgentTriggerType] = None
+    schedule_interval: Optional[str] = Field(None, description="e.g., '1h', '1d', 'every 30m'")
+    target_db: Optional[AgentTargetDB] = None
+    logic_module: Optional[str] = Field(None, description="Reference to Python module/function (e.g., 'tasks.agent_logic.create_event')")
+    llm_model_config: Optional[Dict[str, Any]] = Field(None, description="LLM specific configs like model_name, provider, etc.")
+    parameters: Optional[Dict[str, Any]] = Field(None, description="User-defined parameters for agent logic")
+    linked_entity_id: Optional[str] = Field(None, description="ID of a specific event or trend this agent is managing")
+
+    @validator('linked_entity_id')
+    def validate_linked_entity_id(cls, v):
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except ValueError:
+            raise ValueError('Linked entity ID must be a valid UUID/GUID')
 
 
 class FeedCreateRequest(BaseModel):

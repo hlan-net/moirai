@@ -11,8 +11,8 @@ const router = useRouter()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 const handleLogout = () => {
-    authStore.logout()
-    router.push('/login')
+  authStore.logout()
+  router.push('/login')
 }
 
 onMounted(() => {
@@ -27,17 +27,18 @@ onMounted(() => {
       <div class="links">
         <router-link to="/stream" class="nav-link">Stream</router-link>
         <template v-if="isAuthenticated">
-            <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
-            <router-link to="/chat" class="nav-link">Chat</router-link>
-            <router-link to="/settings" class="nav-link">Settings</router-link>
-            <a href="#" @click.prevent="handleLogout" class="nav-link logout-link">Logout</a>
+          <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
+          <router-link to="/chat" class="nav-link">Chat</router-link>
+          <router-link to="/settings" class="nav-link">Settings</router-link>
+          <router-link to="/agents" class="nav-link">Agents</router-link>
+          <a href="#" @click.prevent="handleLogout" class="nav-link logout-link">Logout</a>
         </template>
         <template v-else>
-            <router-link to="/login" class="nav-link">Login</router-link>
+          <router-link to="/login" class="nav-link">Login</router-link>
         </template>
       </div>
     </nav>
-    
+
     <div class="content">
       <router-view v-slot="{ Component }">
         <keep-alive>
@@ -50,7 +51,9 @@ onMounted(() => {
 
 <style>
 /* Global reset for full height */
-body, html, #app {
+body,
+html,
+#app {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -103,10 +106,13 @@ body, html, #app {
   font-size: 0.95rem; /* Slightly larger nav links */
   padding: 5px 10px;
   border-radius: 4px;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
-.nav-link:hover, .nav-link.router-link-active {
+.nav-link:hover,
+.nav-link.router-link-active {
   color: white;
   background-color: var(--primary-color);
   text-decoration: none;
@@ -144,7 +150,8 @@ body, html, #app {
     background-color: transparent; /* Remove background for horizontal nav */
   }
 
-  .nav-link:hover, .nav-link.router-link-active {
+  .nav-link:hover,
+  .nav-link.router-link-active {
     color: var(--primary-hover);
     background-color: transparent;
     text-decoration: underline;

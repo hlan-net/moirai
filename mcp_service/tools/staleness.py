@@ -1,0 +1,87 @@
+from mcp_service.db import fetch_from_couchdb, update_couchdb_doc
+from mcp_service.core import mcp_tool
+from pydantic import ValidationError
+from typing import Literal
+
+# Database names
+EVENTS_DB = "events"
+TRENDS_DB = "trends"
+
+@mcp_tool(name="mark_entity_stale", description="Marks an event or trend as stale or not stale.")
+def mark_entity_stale(entity_type: Literal["event", "trend"], entity_id: str, is_stale: bool) -> dict:
+    """
+    Marks a specific event or trend entity with a stale flag.
+    Args:
+        entity_type: The type of entity to mark ('event' or 'trend').
+        entity_id: The GUID of the event or trend.
+        is_stale: Boolean value to set the staleness flag.
+    Returns:
+        A dictionary indicating success or failure.
+    """
+    db_name = ""
+    if entity_type == "event":
+        db_name = EVENTS_DB
+    elif entity_type == "trend":
+        db_name = TRENDS_DB
+    else:
+        return {"status": "error", "message": "Invalid entity_type. Must be 'event' or 'trend'."}
+
+    entity_doc = fetch_from_couchdb(db_name, entity_id)
+    if not entity_doc:
+        return {"status": "error", "message": f"{entity_type.capitalize()} {entity_id} not found."}
+
+    entity_doc["is_stale"] = is_stale
+
+    if update_couchdb_doc(db_name, entity_id, entity_doc):
+        return {"status": "success", "message": f"{entity_type.capitalize()} {entity_id} staleness updated to {is_stale}."}
+    else:
+        return {"status": "error", "message": f"Failed to update staleness for {entity_type} {entity_id}."}
+
+@mcp_tool(name="delete_stale_entities", description="Deletes all entities marked as stale for a given type.")
+def delete_stale_entities(entity_type: Literal["event", "trend"]) -> dict:
+    """
+    Deletes all events or trends that are currently marked as stale.
+    This tool requires admin privileges to be effective.
+    Args:
+        entity_type: The type of entity to delete ('event' or 'trend').
+    Returns:
+        A dictionary indicating the number of entities deleted or an error message.
+    """
+    db_name = ""
+    if entity_type == "event":
+        db_name = EVENTS_DB
+    elif entity_type == "trend":
+        db_name = TRENDS_DB
+    else:
+        return {"status": "error", "message": "Invalid entity_type. Must be 'event' or 'trend'."}
+    
+    # Query for all stale entities
+    stale_entities = query_couchdb(db_name, selector={"is_stale": True})
+    
+    deleted_count = 0
+    errors = []
+    
+    for entity in stale_entities:
+        try:
+            # MCP tools typically handle authentication and permissions
+            # Assuming the caller of this tool has admin privileges to delete.
+            result = mcp_tool_delete_entity(db_name, entity["_id"], entity["_rev"]) # Using a hypothetical internal delete function
+            if result.get("status") == "success":
+                deleted_count += 1
+            else:
+                errors.append(f"Failed to delete {entity_type} {entity['_id']}: {result.get('message', 'Unknown error')}")
+        except Exception as e:
+            errors.append(f"Error deleting {entity_type} {entity['_id']}: {e}")
+            
+    if errors:
+        return {"status": "error", "message": f"Deleted {deleted_count} {entity_type}s with errors: {'; '.join(errors)}"}
+    else:
+        return {"status": "success", "message": f"Successfully deleted {deleted_count} stale {entity_type}s."}
+
+# Placeholder for internal delete tool call, as MCP tools are designed for external calls
+def mcp_tool_delete_entity(db_name: str, doc_id: str, doc_rev: str) -> dict:
+    """Simulates an internal call to a delete tool."""
+    if delete_from_couchdb(db_name, doc_id, doc_rev):
+        return {"status": "success", "message": f"Entity {doc_id} deleted from {db_name}."}
+    else:
+        return {"status": "error", "message": f"Failed to delete entity {doc_id} from {db_name}."}
