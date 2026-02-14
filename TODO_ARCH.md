@@ -14,6 +14,6 @@
 
 ## Priority 3: Database-Level Validation
 - [x] Write `validate_doc_update` JavaScript functions for `articles` and `feeds`.
-- [ ] Enforce required fields and data types (ISO dates, 2-char language codes).
-- [ ] Test rejection of malformed agent tool calls at the DB level.
+- [x] Enforce required fields and data types (ISO dates, 2-char language codes).
+- [x] Test rejection of malformed agent tool calls at the DB level.
 - **Branch:** `feature/db-schema-validation`
