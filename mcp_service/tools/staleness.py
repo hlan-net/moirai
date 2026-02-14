@@ -1,4 +1,4 @@
-from mcp_service.db import fetch_from_couchdb, update_couchdb_doc
+from api.db import fetch_from_couchdb, update_couchdb_doc, query_couchdb, delete_from_couchdb
 from mcp_service.core import mcp_tool
 from pydantic import ValidationError
 from typing import Literal
@@ -65,11 +65,11 @@ def delete_stale_entities(entity_type: Literal["event", "trend"]) -> dict:
         try:
             # MCP tools typically handle authentication and permissions
             # Assuming the caller of this tool has admin privileges to delete.
-            result = mcp_tool_delete_entity(db_name, entity["_id"], entity["_rev"]) # Using a hypothetical internal delete function
-            if result.get("status") == "success":
+            success = delete_from_couchdb(db_name, entity["_id"], entity["_rev"])
+            if success:
                 deleted_count += 1
             else:
-                errors.append(f"Failed to delete {entity_type} {entity['_id']}: {result.get('message', 'Unknown error')}")
+                errors.append(f"Failed to delete {entity_type} {entity['_id']}: Unknown error")
         except Exception as e:
             errors.append(f"Error deleting {entity_type} {entity['_id']}: {e}")
             
@@ -77,11 +77,3 @@ def delete_stale_entities(entity_type: Literal["event", "trend"]) -> dict:
         return {"status": "error", "message": f"Deleted {deleted_count} {entity_type}s with errors: {'; '.join(errors)}"}
     else:
         return {"status": "success", "message": f"Successfully deleted {deleted_count} stale {entity_type}s."}
-
-# Placeholder for internal delete tool call, as MCP tools are designed for external calls
-def mcp_tool_delete_entity(db_name: str, doc_id: str, doc_rev: str) -> dict:
-    """Simulates an internal call to a delete tool."""
-    if delete_from_couchdb(db_name, doc_id, doc_rev):
-        return {"status": "success", "message": f"Entity {doc_id} deleted from {db_name}."}
-    else:
-        return {"status": "error", "message": f"Failed to delete entity {doc_id} from {db_name}."}

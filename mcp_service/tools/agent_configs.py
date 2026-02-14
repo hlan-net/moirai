@@ -1,4 +1,4 @@
-from mcp_service.db import query_couchdb, fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb
+from api.db import query_couchdb, fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb
 from mcp_service.core import mcp_tool
 from api.validation import AgentConfigCreateRequest, AgentConfigUpdateRequest
 from pydantic import ValidationError
