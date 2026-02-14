@@ -1,2 +1,7 @@
 cd ui
-yarnpkg lint-staged
+
+if command -v yarn >/dev/null 2>&1; then
+  yarn lint-staged
+else
+  yarnpkg lint-staged
+fi
