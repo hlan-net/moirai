@@ -33,8 +33,11 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 - [x] **Data Persistence:** Added `trends` database support and conflict handling.
 - [x] **Namespace Filtering:** Added namespace selector to the dashboard and API filtering.
 - [x] **Chat Integration:** Implemented GenAI Chat with MCP tools, model configuration, and UI persistence.
-- [ ] **Polishing:** Finalize UI styling.
+- [x] **Polishing:** Finalize UI styling.
+- [x] **Database-Level Validation:** Implemented `validate_doc_update` functions for data integrity.
+- [x] **Housekeeping Improvements:** Standardized frontend tooling (Yarn) and backend dependency management (Miniforge/Conda), and implemented pre-commit hooks for consistent styling/formatting.
+- [x] **Article Filtering:** Implemented filtering articles by selected feeds, events, and trends.
 
 ## How to Build and Run
 1.  **App & DB:** `docker compose up --build` (Port 8088).
-2.  **MCP Server:** `python mcp_server.py` (Port 8090).
+2.  **MCP Server:** Activate conda environment, then `conda run -n moirai python mcp_server.py` (Port 8090).
