@@ -45,8 +45,9 @@ mcpServer:
   enabled: true
   # -- MCP server command
   command:
-    - python
-    - mcp_server.py
+    - /bin/sh
+    - -c
+    - "/app/create_dbs.sh && uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090"
   # -- MCP server service configuration
   service:
     # -- MCP server service type
