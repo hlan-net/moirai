@@ -5,8 +5,10 @@ import datetime
 import threading
 from urllib.parse import quote
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api.db_config import COUCHDB_URI
+
 
 def get_all_docs(db_name):
     try:
@@ -18,6 +20,7 @@ def get_all_docs(db_name):
         print(f"Cleanup: Error fetching {db_name}: {e}")
     return []
 
+
 def delete_doc(db_name, doc_id, rev):
     try:
         url = f"{COUCHDB_URI}{db_name}/{quote(doc_id, safe='')}?rev={rev}"
@@ -26,6 +29,7 @@ def delete_doc(db_name, doc_id, rev):
     except Exception as e:
         print(f"Cleanup: Error deleting {doc_id} from {db_name}: {e}")
     return False
+
 
 def parse_date(date_str):
     if not date_str:
@@ -36,12 +40,13 @@ def parse_date(date_str):
         return datetime.datetime.fromisoformat(date_str.replace("Z", "+00:00"))
     except ValueError:
         pass
-    
+
     return datetime.datetime.now()
+
 
 def run_cleanup():
     print("Cleanup: Starting maintenance cycle...")
-    
+
     now = datetime.datetime.now(datetime.timezone.utc)
 
     # 1. Fetch Trends to find active Events
@@ -51,8 +56,10 @@ def run_cleanup():
         if "event_ids" in t and isinstance(t["event_ids"], list):
             for eid in t["event_ids"]:
                 linked_event_ids.add(eid)
-    
-    print(f"Cleanup: Found {len(trends)} trends referencing {len(linked_event_ids)} events.")
+
+    print(
+        f"Cleanup: Found {len(trends)} trends referencing {len(linked_event_ids)} events."
+    )
 
     # 2. Fetch Events, Delete Orphans, and Collect Active Article Links
     events = get_all_docs("events")
@@ -63,7 +70,7 @@ def run_cleanup():
     for e in events:
         eid = e.get("_id")
         created_at = e.get("created_at")
-        
+
         dt = parse_date(created_at)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone.utc)
@@ -82,17 +89,19 @@ def run_cleanup():
                 for link in e["article_links"]:
                     active_article_links.add(link)
 
-    print(f"Cleanup: Events processed. Deleted: {events_deleted}. Kept: {events_kept}. Active referenced articles: {len(active_article_links)}")
+    print(
+        f"Cleanup: Events processed. Deleted: {events_deleted}. Kept: {events_kept}. Active referenced articles: {len(active_article_links)}"
+    )
 
     # 3. Fetch Articles and Delete Orphans
     articles = get_all_docs("articles")
     articles_deleted = 0
-    
+
     for a in articles:
         link = a.get("link")
         aid = a.get("_id")
         published = a.get("published")
-        
+
         dt = parse_date(published)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone.utc)
@@ -106,10 +115,13 @@ def run_cleanup():
             if delete_doc("articles", aid, a.get("_rev")):
                 articles_deleted += 1
 
-    print(f"Cleanup: Finished. Deleted {events_deleted} events and {articles_deleted} articles.")
+    print(
+        f"Cleanup: Finished. Deleted {events_deleted} events and {articles_deleted} articles."
+    )
+
 
 class CleanupTask(threading.Thread):
-    def __init__(self, interval=86400): # Default 24 hours
+    def __init__(self, interval=86400):  # Default 24 hours
         threading.Thread.__init__(self)
         self.interval = interval
         self.daemon = True

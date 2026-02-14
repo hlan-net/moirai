@@ -7,8 +7,7 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     headers_enabled=True,
     storage_uri="memory://",
-    strategy="fixed-window"
+    strategy="fixed-window",
 )
 
 metrics = PrometheusMetrics(app=None)
-

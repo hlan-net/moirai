@@ -11,6 +11,7 @@ from langdetect.lang_detect_exception import LangDetectException
 # Ensure consistent results for language detection
 DetectorFactory.seed = 0
 
+
 class ArticleProcessor:
     def __init__(self):
         uri = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
@@ -22,7 +23,7 @@ class ArticleProcessor:
             else:
                 scheme, host = "http", uri
             uri = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
-        
+
         self.couchdb_url = uri + "/articles"
         self.expiration_days = int(os.environ.get("ARTICLE_EXPIRATION_DAYS", 30))
 
@@ -37,7 +38,7 @@ class ArticleProcessor:
 
     def process_feed(self, feed_url, feed_content):
         """Parses the feed content using feedparser and extracts articles.
-           Returns: tuple (feed_title, articles_list)
+        Returns: tuple (feed_title, articles_list)
         """
         articles = []
         feed_title = "Unknown Feed"
@@ -45,7 +46,11 @@ class ArticleProcessor:
         try:
             parsed_feed = feedparser.parse(feed_content)
             feed_title = parsed_feed.feed.get("title", "Unknown Feed")
-            feed_lang = parsed_feed.feed.get("language", "").split('-')[0].lower() if parsed_feed.feed.get("language") else None
+            feed_lang = (
+                parsed_feed.feed.get("language", "").split("-")[0].lower()
+                if parsed_feed.feed.get("language")
+                else None
+            )
 
             for entry in parsed_feed.entries:
                 published_date = None
@@ -53,9 +58,13 @@ class ArticleProcessor:
                     try:
                         published_date = datetime(*entry.published_parsed[:6])
                     except (ValueError, TypeError) as err:
-                        print(f"Warning: Could not parse date for article '{entry.get('title', 'No Title')}': {err}")
+                        print(
+                            f"Warning: Could not parse date for article '{entry.get('title', 'No Title')}': {err}"
+                        )
 
-                if published_date and (datetime.now() - published_date) > timedelta(days=self.expiration_days):
+                if published_date and (datetime.now() - published_date) > timedelta(
+                    days=self.expiration_days
+                ):
                     continue
 
                 content_value = ""
@@ -67,19 +76,21 @@ class ArticleProcessor:
                 # Detect language
                 text_to_detect = entry.get("title", "") + " " + entry.get("summary", "")
                 detected_lang = self.detect_language(text_to_detect)
-                
+
                 # Use feed language as fallback if detection is uncertain or fails
                 article_lang = detected_lang or feed_lang or "unknown"
 
                 article = {
                     "feed_url": feed_url,
-                    "feed_title": feed_title, # Added to avoid extra lookups in UI
+                    "feed_title": feed_title,  # Added to avoid extra lookups in UI
                     "title": entry.get("title", "No Title"),
                     "link": entry.get("link", ""),
-                    "published": published_date.isoformat() + "Z" if published_date else datetime.now().isoformat(),
+                    "published": published_date.isoformat() + "Z"
+                    if published_date
+                    else datetime.now().isoformat(),
                     "summary": entry.get("summary", ""),
                     "content": content_value,
-                    "language": article_lang
+                    "language": article_lang,
                 }
 
                 articles.append(article)
@@ -97,7 +108,9 @@ class ArticleProcessor:
             "link": article["link"],
             "feed_url": article["feed_url"],
         }
-        article_hash = hashlib.sha256(json.dumps(hash_payload, sort_keys=True).encode("utf-8")).hexdigest()
+        article_hash = hashlib.sha256(
+            json.dumps(hash_payload, sort_keys=True).encode("utf-8")
+        ).hexdigest()
         article["_id"] = article_hash
 
         try:
@@ -107,7 +120,9 @@ class ArticleProcessor:
 
             response = requests.post(self.couchdb_url, json=article)
             if response.status_code not in (200, 201):
-                print(f"Failed to store article {article_hash}: {response.status_code} {response.text}")
+                print(
+                    f"Failed to store article {article_hash}: {response.status_code} {response.text}"
+                )
         except requests.exceptions.RequestException as err:
             print(f"Error storing article {article_hash}: {err}")
         except Exception as err:

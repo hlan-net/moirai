@@ -3,6 +3,7 @@ from .base import LLMProvider
 
 OPENAI_TIMEOUT_SECONDS = 120.0
 
+
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key):
         # Explicit timeout for OpenAI API
@@ -14,8 +15,5 @@ class OpenAIProvider(LLMProvider):
 
     def create_chat_completion(self, messages, model, tools, tool_choice):
         return self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=tools,
-            tool_choice=tool_choice
+            model=model, messages=messages, tools=tools, tool_choice=tool_choice
         )

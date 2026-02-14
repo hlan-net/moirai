@@ -1,4 +1,9 @@
-from api.db import query_couchdb, fetch_from_couchdb, update_couchdb_doc, delete_from_couchdb
+from api.db import (
+    query_couchdb,
+    fetch_from_couchdb,
+    update_couchdb_doc,
+    delete_from_couchdb,
+)
 from mcp_service.core import mcp
 from api.validation import AgentConfigCreateRequest, AgentConfigUpdateRequest
 from pydantic import ValidationError
@@ -7,10 +12,19 @@ import uuid
 # Database name for agent configurations
 AGENT_CONFIGS_DB = "agent_configs"
 
+
 @mcp.tool(name="add_agent_config", description="Adds a new agent configuration.")
-def add_agent_config(user_id: str, name: str, trigger_type: str, target_db: str, logic_module: str,
-                       schedule_interval: str = None, llm_model_config: dict = None,
-                       parameters: dict = None, linked_entity_id: str = None) -> dict:
+def add_agent_config(
+    user_id: str,
+    name: str,
+    trigger_type: str,
+    target_db: str,
+    logic_module: str,
+    schedule_interval: str = None,
+    llm_model_config: dict = None,
+    parameters: dict = None,
+    linked_entity_id: str = None,
+) -> dict:
     """
     Adds a new agent configuration to monitor and act on data.
     Args:
@@ -43,23 +57,23 @@ def add_agent_config(user_id: str, name: str, trigger_type: str, target_db: str,
             agent_config_data["parameters"] = parameters
         if linked_entity_id is not None:
             agent_config_data["linked_entity_id"] = linked_entity_id
-            
+
         validated_data = AgentConfigCreateRequest(**agent_config_data).dict()
     except ValidationError as e:
         return {"status": "error", "message": str(e)}
 
     agent_id = str(uuid.uuid4())
-    doc = {
-        "_id": agent_id,
-        **validated_data
-    }
+    doc = {"_id": agent_id, **validated_data}
 
     if update_couchdb_doc(AGENT_CONFIGS_DB, agent_id, doc):
         return {"status": "success", "agent_config": doc}
     else:
         return {"status": "error", "message": "Failed to add agent configuration."}
 
-@mcp.tool(name="get_agent_config", description="Retrieves an agent configuration by ID.")
+
+@mcp.tool(
+    name="get_agent_config", description="Retrieves an agent configuration by ID."
+)
 def get_agent_config(agent_id: str) -> dict:
     """
     Retrieves a specific agent configuration.
@@ -72,9 +86,16 @@ def get_agent_config(agent_id: str) -> dict:
     if config:
         return {"status": "success", "agent_config": config}
     else:
-        return {"status": "error", "message": f"Agent configuration {agent_id} not found."}
+        return {
+            "status": "error",
+            "message": f"Agent configuration {agent_id} not found.",
+        }
 
-@mcp.tool(name="list_agent_configs", description="Lists agent configurations, optionally filtered by user_id.")
+
+@mcp.tool(
+    name="list_agent_configs",
+    description="Lists agent configurations, optionally filtered by user_id.",
+)
 def list_agent_configs(user_id: str = None) -> list[dict]:
     """
     Lists all agent configurations, or those belonging to a specific user.
@@ -86,15 +107,26 @@ def list_agent_configs(user_id: str = None) -> list[dict]:
     selector = {}
     if user_id:
         selector["user_id"] = user_id
-    
+
     configs = query_couchdb(AGENT_CONFIGS_DB, selector=selector)
     return {"status": "success", "agent_configs": configs}
 
-@mcp.tool(name="update_agent_config", description="Updates an existing agent configuration.")
-def update_agent_config(agent_id: str, name: str = None, status: str = None,
-                         trigger_type: str = None, target_db: str = None, logic_module: str = None,
-                         schedule_interval: str = None, llm_model_config: dict = None,
-                         parameters: dict = None, linked_entity_id: str = None) -> dict:
+
+@mcp.tool(
+    name="update_agent_config", description="Updates an existing agent configuration."
+)
+def update_agent_config(
+    agent_id: str,
+    name: str = None,
+    status: str = None,
+    trigger_type: str = None,
+    target_db: str = None,
+    logic_module: str = None,
+    schedule_interval: str = None,
+    llm_model_config: dict = None,
+    parameters: dict = None,
+    linked_entity_id: str = None,
+) -> dict:
     """
     Updates an existing agent configuration.
     Args:
@@ -113,13 +145,22 @@ def update_agent_config(agent_id: str, name: str = None, status: str = None,
     """
     existing_config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
     if not existing_config:
-        return {"status": "error", "message": f"Agent configuration {agent_id} not found."}
+        return {
+            "status": "error",
+            "message": f"Agent configuration {agent_id} not found.",
+        }
 
-    update_data = {k: v for k, v in locals().items() if v is not None and k not in ['agent_id', 'existing_config', 'update_data']}
+    update_data = {
+        k: v
+        for k, v in locals().items()
+        if v is not None and k not in ["agent_id", "existing_config", "update_data"]
+    }
 
     # Validate update data using Pydantic model
     try:
-        validated_data = AgentConfigUpdateRequest(**update_data).dict(exclude_unset=True)
+        validated_data = AgentConfigUpdateRequest(**update_data).dict(
+            exclude_unset=True
+        )
     except ValidationError as e:
         return {"status": "error", "message": str(e)}
 
@@ -130,6 +171,7 @@ def update_agent_config(agent_id: str, name: str = None, status: str = None,
         return {"status": "success", "agent_config": existing_config}
     else:
         return {"status": "error", "message": "Failed to update agent configuration."}
+
 
 @mcp.tool(name="delete_agent_config", description="Deletes an agent configuration.")
 def delete_agent_config(agent_id: str) -> dict:
@@ -142,9 +184,15 @@ def delete_agent_config(agent_id: str) -> dict:
     """
     config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
     if not config:
-        return {"status": "error", "message": f"Agent configuration {agent_id} not found."}
+        return {
+            "status": "error",
+            "message": f"Agent configuration {agent_id} not found.",
+        }
 
     if delete_from_couchdb(AGENT_CONFIGS_DB, agent_id, config["_rev"]):
-        return {"status": "success", "message": f"Agent configuration {agent_id} deleted."}
+        return {
+            "status": "success",
+            "message": f"Agent configuration {agent_id} deleted.",
+        }
     else:
         return {"status": "error", "message": "Failed to delete agent configuration."}

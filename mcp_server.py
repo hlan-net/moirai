@@ -1,5 +1,3 @@
-from mcp_service.main import app
-
 if __name__ == "__main__":
     from version import get_version_string
     import uvicorn

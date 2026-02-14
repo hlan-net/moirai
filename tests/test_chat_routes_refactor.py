@@ -1,33 +1,36 @@
-
 import unittest
 import sys
 from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
-import json
+
 
 class TestChatRoutesRefactor(unittest.TestCase):
     def setUp(self):
         # Patch sys.modules to mock dependencies dynamically
-        self.modules_patcher = patch.dict(sys.modules, {
-            'flask': MagicMock(),
-            'mcp': MagicMock(),
-            'mcp.client.sse': MagicMock(),
-            'api.llm.factory': MagicMock(),
-            'api.db': MagicMock(),
-            'httpx': MagicMock(),
-        })
+        self.modules_patcher = patch.dict(
+            sys.modules,
+            {
+                "flask": MagicMock(),
+                "mcp": MagicMock(),
+                "mcp.client.sse": MagicMock(),
+                "api.llm.factory": MagicMock(),
+                "api.db": MagicMock(),
+                "httpx": MagicMock(),
+            },
+        )
         self.modules_patcher.start()
-        
+
         # Now import the module under test inside the test method or setup
         # We need to reload it if it was already imported, or import it fresh
         # But standard import caching makes this tricky.
         # Since we want to test logic that doesn't depend on the mocks at module level,
         # we can perhaps import the specific functions.
-        
+
         # However, api.chat_routes imports these things at top level.
         # So we must import it AFTER patching.
         import api.chat_routes
         import importlib
+
         importlib.reload(api.chat_routes)
         self.chat_routes = api.chat_routes
 
@@ -36,12 +39,10 @@ class TestChatRoutesRefactor(unittest.TestCase):
 
     def test_convert_to_openai_tools(self):
         mcp_tool = SimpleNamespace(
-            name="test", 
-            description="desc", 
-            inputSchema={"type": "object"}
+            name="test", description="desc", inputSchema={"type": "object"}
         )
         mcp_tools = SimpleNamespace(tools=[mcp_tool])
-        
+
         openai_tools = self.chat_routes._convert_to_openai_tools(mcp_tools)
         self.assertEqual(len(openai_tools), 1)
         self.assertEqual(openai_tools[0]["function"]["name"], "test")
@@ -66,22 +67,23 @@ class TestChatRoutesRefactor(unittest.TestCase):
         tools = self.chat_routes.extract_tool_calls_from_content(content)
         self.assertEqual(len(tools), 1)
         self.assertEqual(tools[0]["name"], "test_tool")
-        
+
     def test_create_mock_tool_calls(self):
         extracted = [{"name": "test_tool", "parameters": {"arg": 1}}]
         tool_calls, mock_data = self.chat_routes._create_mock_tool_calls(extracted)
-        
+
         self.assertEqual(len(tool_calls), 1)
         self.assertEqual(tool_calls[0].function.name, "test_tool")
         self.assertIsInstance(tool_calls[0], SimpleNamespace)
-        
+
         self.assertEqual(len(mock_data), 1)
         self.assertEqual(mock_data[0]["function"]["name"], "test_tool")
-        
+
     def test_create_http_client(self):
         # httpx is mocked
         client = self.chat_routes._create_http_client()
         self.assertTrue(client)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -8,17 +8,19 @@ from opentelemetry.sdk.trace.export import (
 )
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
 try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 except ModuleNotFoundError:
     FastAPIInstrumentor = None
+
 
 def configure_telemetry(app=None, service_name="moirai"):
     """
     Configures OpenTelemetry and Structlog.
     If 'app' is provided, it instruments the specific framework (Flask or FastAPI/Starlette).
     """
-    
+
     # 1. Configure OpenTelemetry
     provider = TracerProvider()
     processor = BatchSpanProcessor(ConsoleSpanExporter())
@@ -30,10 +32,10 @@ def configure_telemetry(app=None, service_name="moirai"):
 
     if app:
         # Check if it's Flask
-        if hasattr(app, 'extensions') or hasattr(app, 'url_map'):
+        if hasattr(app, "extensions") or hasattr(app, "url_map"):
             FlaskInstrumentor().instrument_app(app)
         # Check if it's FastAPI/Starlette (ASGI)
-        elif hasattr(app, 'routes'):
+        elif hasattr(app, "routes"):
             if FastAPIInstrumentor is None:
                 logging.warning(
                     "FastAPI instrumentation unavailable; install "
@@ -50,7 +52,7 @@ def configure_telemetry(app=None, service_name="moirai"):
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ],
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,

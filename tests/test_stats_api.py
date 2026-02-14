@@ -10,26 +10,29 @@ BASE_URL = os.environ.get("BASE_URL", "http://localhost:8088")
 API_USERNAME = os.environ.get("API_USERNAME") or f"test_user_{secrets.token_hex(8)}"
 API_PASSWORD = os.environ.get("API_PASSWORD") or secrets.token_urlsafe(32)
 
+
 @pytest.mark.integration
 def test_stats_endpoint_auth():
     """Verify that the /stats endpoint requires authentication."""
     res = requests.get(f"{BASE_URL}/api/stats")
     assert res.status_code == 401
 
+
 @pytest.mark.integration
 def test_stats_endpoint_data():
     """Verify the structure of the /stats response."""
     res = requests.get(f"{BASE_URL}/api/stats", auth=(API_USERNAME, API_PASSWORD))
     assert res.status_code == 200
-    
+
     data = res.json()
     assert "articles" in data
     assert "by_language" in data["articles"]
     assert "total" in data["articles"]
-    
+
     assert "feeds" in data
     assert "health" in data["feeds"]
     assert "total" in data["feeds"]
+
 
 if __name__ == "__main__":
     # Manual test run
@@ -39,6 +42,7 @@ if __name__ == "__main__":
         if res.status_code == 200:
             print("SUCCESS: Stats API returned data:")
             import json
+
             print(json.dumps(res.json(), indent=2))
         else:
             print(f"FAILED: {res.status_code} {res.text}")

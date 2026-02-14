@@ -1,36 +1,40 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
-import hashlib
 import version
 import requests
 import logging
 from datetime import datetime, timezone
-from functools import wraps
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
-from .db import fetch_from_couchdb, delete_from_couchdb, update_couchdb_doc, query_couchdb
+from .db import (
+    fetch_from_couchdb,
+    delete_from_couchdb,
+    update_couchdb_doc,
+    query_couchdb,
+)
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
-from .validation import (
-    FeedCreateRequest, FeedUpdateRequest,
-    EventCreateRequest, EventUpdateRequest,
-    TrendCreateRequest, TrendUpdateRequest,
-    ConfigUpdateRequest
-)
+from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest
 from .auth import get_auth_config
 
-import uuid # Import uuid
+import uuid  # Import uuid
 
 from api.enrichment import enrich_articles_with_events_and_trends
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
 from api.article_ops import build_article_selector, paginate_results
 from api.db_constants import (
-    MONGO_ELEM_MATCH, MONGO_REGEX, MONGO_OR, MONGO_IN, MONGO_GT, MONGO_GTE, MONGO_LTE
+    MONGO_ELEM_MATCH,
+    MONGO_REGEX,
+    MONGO_OR,
+    MONGO_IN,
+    MONGO_GT,
+    MONGO_GTE,
+    MONGO_LTE,
 )
 
-api_blueprint = Blueprint('api', __name__)
+api_blueprint = Blueprint("api", __name__)
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -47,10 +51,11 @@ ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
 
 # Mongo Constants are now imported from api.db_constants
 
+
 def parse_datetime_safe(date_str):
     """Parse datetime and ensure it's timezone-aware for comparison."""
     try:
-        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
         # If naive (no timezone), assume UTC
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
@@ -59,17 +64,20 @@ def parse_datetime_safe(date_str):
         # Return a very old date for invalid dates so they sort last
         return datetime.min.replace(tzinfo=timezone.utc)
 
+
 # Auth helpers
 def check_public_read_access():
     if get_public_read_setting():
         return True
-    
+
     success, _ = verify_jwt_in_request()
     return success
+
 
 def get_config_doc():
     """Helper to get the main config doc. Returns None if config doesn't exist or DB is unavailable."""
     return fetch_from_couchdb("config", "main")
+
 
 def get_public_read_setting():
     """Checks DB for config, falls back to env var."""
@@ -77,6 +85,7 @@ def get_public_read_setting():
     if config and "allow_public_read" in config:
         return config["allow_public_read"]
     return ALLOW_PUBLIC_READ_ENV
+
 
 def get_iteration_interval_setting():
     """Checks DB for config, falls back to env var."""
@@ -88,24 +97,32 @@ def get_iteration_interval_setting():
             pass
     return ITERATION_INTERVAL_ENV
 
+
 @api_blueprint.after_request
 def add_security_headers(response):
     """Add security headers to all responses."""
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: *; connect-src 'self';"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: *; connect-src 'self';"
+    )
     return response
+
 
 @api_blueprint.route("/health", methods=["GET"])
 @limiter.exempt
 def health_check():
     return jsonify({"status": "healthy"})
 
+
 # Removed before_request_auth as we use explicit decorators now
 # But we need to handle OPTIONS requests generally or via CORS ext
 # api_blueprint.before_request ... (Skipping, existing logic was mainly for Basic Auth)
+
 
 # --- Feeds ---
 @api_blueprint.route("/feeds", methods=["POST"])
@@ -115,34 +132,35 @@ def create_feed():
         validated = FeedCreateRequest(**request.json)
     except ValidationError as e:
         abort(400, description=str(e))
-        
+
     feed_url = str(validated.url)
 
     # Check if feed with this URL already exists
     existing_feed = query_couchdb("feeds", selector={"original_url": feed_url}, limit=1)
     if existing_feed:
         abort(409, description="Feed with this URL already exists.")
-        
+
     # Generate a GUID for the feed_id
     feed_id = str(uuid.uuid4())
-    
+
     # Fetch favicon for the feed
     favicon_url = fetch_favicon_url(feed_url)
-    
+
     feed_doc = {
         "_id": feed_id,
-        "url": feed_url, # Current URL, can change due to redirects
-        "original_url": feed_url, # Original URL, for uniqueness check and reference
+        "url": feed_url,  # Current URL, can change due to redirects
+        "original_url": feed_url,  # Original URL, for uniqueness check and reference
         "title": validated.title,
         "category": validated.category or "general",
         "added_at": datetime.now(timezone.utc).isoformat(),
-        "favicon_url": favicon_url
+        "favicon_url": favicon_url,
     }
-    
+
     if update_couchdb_doc("feeds", feed_id, feed_doc):
         return jsonify(feed_doc), 201
     else:
         abort(500, description="Failed to create feed")
+
 
 @api_blueprint.route("/feeds", methods=["GET"])
 @limiter.limit("10 per minute")
@@ -155,17 +173,19 @@ def list_feeds():
     feeds = fetch_from_couchdb("feeds")
     return jsonify(feeds)
 
+
 @api_blueprint.route("/feeds/<feed_id>", methods=["DELETE"])
 @admin_required
 def delete_feed(feed_id):
     feed = fetch_from_couchdb("feeds", feed_id)
     if not feed:
         abort(404, description=ERROR_FEED_NOT_FOUND)
-    
+
     if delete_from_couchdb("feeds", feed_id, feed["_rev"]):
         return jsonify({"status": "deleted"})
     else:
         abort(500, description="Failed to delete feed")
+
 
 @api_blueprint.route("/feeds/<feed_id>", methods=["PUT"])
 @admin_required
@@ -173,23 +193,24 @@ def update_feed(feed_id):
     feed = fetch_from_couchdb("feeds", feed_id)
     if not feed:
         abort(404, description=ERROR_FEED_NOT_FOUND)
-    
+
     # Validate input
     try:
         validated = FeedUpdateRequest(**request.json)
     except ValidationError as e:
         abort(400, description=str(e))
-    
+
     feed["title"] = validated.title
-    
+
     # If a new URL is provided (e.g., from a redirect), update it
     if validated.new_url:
         feed["url"] = str(validated.new_url)
-    
+
     if update_couchdb_doc("feeds", feed_id, feed):
         return jsonify(feed)
     else:
         abort(500, description="Failed to update feed")
+
 
 @api_blueprint.route("/feeds/refresh", methods=["POST"])
 @admin_required
@@ -198,7 +219,7 @@ def refresh_feeds():
     feeds = fetch_from_couchdb("feeds")
     if not feeds:
         return jsonify({"status": "no feeds found", "count": 0})
-    
+
     count = 0
     for feed in feeds:
         feed_id = feed.get("_id")
@@ -209,8 +230,9 @@ def refresh_feeds():
             task = FetchFeedTask(feed_id, url, original_url)
             task.start()
             count += 1
-            
+
     return jsonify({"status": "started", "count": count})
+
 
 @api_blueprint.route("/feeds/refresh/<path:feed_url>", methods=["POST"])
 @admin_required
@@ -220,14 +242,14 @@ def refresh_single_feed(feed_url):
     # Validate the feed exists efficiently
     selector = {"url": feed_url}
     existing_feeds = query_couchdb("feeds", selector=selector, limit=1)
-    
+
     if not existing_feeds:
         # Also check original_url if not found by current url
         selector = {"original_url": feed_url}
         existing_feeds = query_couchdb("feeds", selector=selector, limit=1)
         if not existing_feeds:
             abort(404, description=ERROR_FEED_NOT_FOUND)
-    
+
     feed = existing_feeds[0]
     feed_id = feed.get("_id")
     current_url = feed.get("url")
@@ -236,8 +258,9 @@ def refresh_single_feed(feed_url):
     # Run in background thread
     task = FetchFeedTask(feed_id, current_url, original_url)
     task.start()
-    
+
     return jsonify({"status": "started", "url": feed_url})
+
 
 @api_blueprint.route("/feeds/bulk", methods=["POST"])
 @admin_required
@@ -247,26 +270,29 @@ def bulk_import_feeds():
     # Validate request body
     if not request.json:
         abort(400, description="Request body must be JSON")
-    
+
     data = request.json
     urls = data.get("urls", [])
-    
+
     if not urls or not isinstance(urls, list):
         abort(400, description="Expected 'urls' as an array")
-    
+
     # Security: Limit bulk import size to prevent DoS
     MAX_BULK_IMPORT_SIZE = 50
     if len(urls) > MAX_BULK_IMPORT_SIZE:
-        abort(400, description=f"Too many URLs. Maximum {MAX_BULK_IMPORT_SIZE} URLs per request.")
-    
+        abort(
+            400,
+            description=f"Too many URLs. Maximum {MAX_BULK_IMPORT_SIZE} URLs per request.",
+        )
+
     results = {
         "total": len(urls),
         "success": 0,
         "failed": 0,
         "skipped": 0,
-        "errors": []
+        "errors": [],
     }
-    
+
     for url_str in urls:
         result = process_bulk_import_url(url_str)
         if result["status"] == "success":
@@ -276,8 +302,9 @@ def bulk_import_feeds():
         elif result["status"] == "failed":
             results["failed"] += 1
             results["errors"].append({"url": url_str, "error": result["error"]})
-    
+
     return jsonify(results), 200
+
 
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
@@ -289,94 +316,97 @@ def list_articles():
         return response
     # Pagination parameters
     try:
-        limit = int(request.args.get('limit', 50))
-        skip = int(request.args.get('skip', 0))
+        limit = int(request.args.get("limit", 50))
+        skip = int(request.args.get("skip", 0))
     except ValueError:
         abort(400, description="limit and skip must be integers")
-    since = request.args.get('since')  # ISO timestamp to fetch only newer articles
-    
+    since = request.args.get("since")  # ISO timestamp to fetch only newer articles
+
     # New filtering parameters
-    feed_id = request.args.get('feed_id')
-    event_id = request.args.get('event_id')
-    trend_id = request.args.get('trend_id')
+    feed_id = request.args.get("feed_id")
+    event_id = request.args.get("event_id")
+    trend_id = request.args.get("trend_id")
 
     # Validate pagination params
     limit = min(max(limit, 1), 200)  # Clamp between 1-200
     skip = max(skip, 0)
-    
-    
+
     selector = build_article_selector(since, feed_id, event_id, trend_id)
 
     # If selector indicates no match (e.g., non-existent event/trend), return empty
     if selector.get("_id", {}).get("$eq") == "no_match":
-        return jsonify({
-            "articles": [],
-            "total_count": 0,
-            "has_more": False,
-            "limit": limit,
-            "skip": skip
-        })
+        return jsonify(
+            {
+                "articles": [],
+                "total_count": 0,
+                "has_more": False,
+                "limit": limit,
+                "skip": skip,
+            }
+        )
 
     # Query CouchDB directly with pagination and sorting
     # We fetch limit + 1 to determine if there are more results
     articles = query_couchdb(
-        "articles", 
-        selector=selector, 
-        limit=limit + 1, 
-        skip=skip, 
-        sort=[{"published": "desc"}]
+        "articles",
+        selector=selector,
+        limit=limit + 1,
+        skip=skip,
+        sort=[{"published": "desc"}],
     )
 
     paginated_articles, has_more, total_count = paginate_results(articles, limit, skip)
-    
+
     # Enrichment
     enrich_articles_with_events_and_trends(paginated_articles)
-    
-    return jsonify({
-        "articles": paginated_articles,
-        "total_count": total_count,
-        "has_more": has_more,
-        "limit": limit,
-        "skip": skip
-    })
+
+    return jsonify(
+        {
+            "articles": paginated_articles,
+            "total_count": total_count,
+            "has_more": has_more,
+            "limit": limit,
+            "skip": skip,
+        }
+    )
+
 
 @api_blueprint.route("/stream.rss", methods=["GET"])
 def rss_feed():
     """Generate RSS 2.0 feed for the aggregated article stream. Public endpoint (no auth required)."""
-    from xml.sax.saxutils import escape
-    
-    # Fetch all data (reuse logic from list_articles)
-    limit = int(request.args.get('limit', 100))  # Default to 100 items for RSS
-    limit = min(max(limit, 1), 500)  # Clamp between 1-500
-    
 
+    # Fetch all data (reuse logic from list_articles)
+    limit = int(request.args.get("limit", 100))  # Default to 100 items for RSS
+    limit = min(max(limit, 1), 500)  # Clamp between 1-500
 
     # Query CouchDB directly for RSS
     # Requires index on 'published' field
     rss_articles = query_couchdb(
-        "articles", 
-        selector={"published": {MONGO_GT: None}}, 
-        limit=limit, 
-        sort=[{"published": "desc"}]
+        "articles",
+        selector={"published": {MONGO_GT: None}},
+        limit=limit,
+        sort=[{"published": "desc"}],
     )
-    
+
     # Enrichment
     enrich_articles_with_events_and_trends(rss_articles)
-    
+
     # Build RSS XML
     rss_items = []
-    
+
     # Pre-fetch feed info for title mapping
     feeds = fetch_from_couchdb("feeds")
-    feed_title_map = {feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")}
-    
+    feed_title_map = {
+        feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
+    }
+
     for article in rss_articles:
         item_xml = generate_rss_item_xml(article, feed_title_map, parse_datetime_safe)
         rss_items.append(item_xml)
-    
+
     # Get current datetime for feed metadata
     build_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")
-    
+
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
@@ -391,8 +421,9 @@ def rss_feed():
 
   </channel>
 </rss>"""
-    
-    return Response(rss_xml, mimetype='application/rss+xml')
+
+    return Response(rss_xml, mimetype="application/rss+xml")
+
 
 @api_blueprint.route("/articles/<article_id>", methods=["DELETE"])
 @admin_required
@@ -400,11 +431,12 @@ def delete_article(article_id):
     article = fetch_from_couchdb("articles", article_id)
     if not article:
         abort(404, description="Article not found")
-        
+
     if delete_from_couchdb("articles", article_id, article["_rev"]):
         return jsonify({"status": "deleted"})
     else:
-         abort(500, description="Failed to delete article")
+        abort(500, description="Failed to delete article")
+
 
 # --- Events ---
 @api_blueprint.route("/events", methods=["GET"])
@@ -414,29 +446,32 @@ def list_events():
         response.status_code = 401
         response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
         return response
-    feed_url = request.args.get('feed_url')
-    
+    feed_url = request.args.get("feed_url")
+
     if feed_url:
         # 1. Get all article links for this feed
-        articles = query_couchdb("articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000)
+        articles = query_couchdb(
+            "articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000
+        )
         links = [a.get("link") for a in articles if a.get("link")]
-        
+
         if not links:
             return jsonify([])
-            
+
         # 2. Find events containing any of these links
         # Using $elemMatch with $in for efficient array searching
         selector = {
             "type": "event",
-            "article_links": {MONGO_ELEM_MATCH: {MONGO_IN: links}}
+            "article_links": {MONGO_ELEM_MATCH: {MONGO_IN: links}},
         }
         events = query_couchdb("events", selector=selector, limit=1000)
         return jsonify(events)
-        
+
     events = fetch_from_couchdb("events")
     # Filter only actual events (legacy docs might not have 'type')
-    events = [e for e in events if e.get('type', 'event') == 'event']
+    events = [e for e in events if e.get("type", "event") == "event"]
     return jsonify(events)
+
 
 @api_blueprint.route("/events/<event_id>", methods=["DELETE"])
 @admin_required
@@ -448,23 +483,29 @@ def delete_event(event_id):
         return jsonify({"status": "deleted"})
     abort(500)
 
+
 @api_blueprint.route("/events/<event_id>/links", methods=["DELETE"])
 @admin_required
 def remove_event_link(event_id):
     """Remove a specific article link from an event."""
     data = request.json
     link_to_remove = data.get("link")
-    
+
     event = fetch_from_couchdb("events", event_id)
     if not event:
         abort(404)
-        
+
     if "article_links" in event:
-        event["article_links"] = [l for l in event["article_links"] if l != link_to_remove]
+        event["article_links"] = [
+            link_item
+            for link_item in event["article_links"]
+            if link_item != link_to_remove
+        ]
         if update_couchdb_doc("events", event_id, event):
             return jsonify(event)
-            
+
     abort(500, description="Failed to update event")
+
 
 # --- Trends ---
 @api_blueprint.route("/trends", methods=["GET"])
@@ -474,27 +515,34 @@ def list_trends():
         response.status_code = 401
         response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
         return response
-    feed_url = request.args.get('feed_url')
-    
+    feed_url = request.args.get("feed_url")
+
     if feed_url:
         # 1. Get all article links for this feed
-        articles = query_couchdb("articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000)
+        articles = query_couchdb(
+            "articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000
+        )
         links = [a.get("link") for a in articles if a.get("link")]
-        
+
         if not links:
             return jsonify([])
-            
+
         # 2. Find event IDs containing any of these links
-        event_docs = query_couchdb("events", selector={"article_links": {"$elemMatch": {"$in": links}}}, fields=["_id"], limit=1000)
+        event_docs = query_couchdb(
+            "events",
+            selector={"article_links": {"$elemMatch": {"$in": links}}},
+            fields=["_id"],
+            limit=1000,
+        )
         event_ids = [e.get("_id") for e in event_docs if e.get("_id")]
-        
+
         if not event_ids:
             return jsonify([])
-            
+
         # 3. Find trends containing any of these event IDs
         selector = {
             "type": "trend",
-            "event_ids": {MONGO_ELEM_MATCH: {MONGO_IN: event_ids}}
+            "event_ids": {MONGO_ELEM_MATCH: {MONGO_IN: event_ids}},
         }
         trends = query_couchdb("trends", selector=selector, limit=1000)
         return jsonify(trends)
@@ -503,8 +551,9 @@ def list_trends():
     if not trends:
         trends = []
     # Ensure we only return trend documents
-    trends = [t for t in trends if t.get('type', 'trend') == 'trend']
+    trends = [t for t in trends if t.get("type", "trend") == "trend"]
     return jsonify(trends)
+
 
 @api_blueprint.route("/trends/<trend_id>", methods=["GET"])
 def get_trend(trend_id):
@@ -512,6 +561,7 @@ def get_trend(trend_id):
     if not trend:
         abort(404, description="Trend not found")
     return jsonify(trend)
+
 
 @api_blueprint.route("/trends/<trend_id>", methods=["DELETE"])
 @admin_required
@@ -523,23 +573,27 @@ def delete_trend(trend_id):
         return jsonify({"status": "deleted"})
     abort(500)
 
+
 @api_blueprint.route("/trends/<trend_id>/events", methods=["DELETE"])
 @admin_required
 def remove_trend_event(trend_id):
     """Remove a specific event ID from a trend."""
     data = request.json
     event_id_to_remove = data.get("event_id")
-    
+
     trend = fetch_from_couchdb("trends", trend_id)
     if not trend:
         abort(404)
-        
+
     if "event_ids" in trend:
-        trend["event_ids"] = [eid for eid in trend["event_ids"] if eid != event_id_to_remove]
+        trend["event_ids"] = [
+            eid for eid in trend["event_ids"] if eid != event_id_to_remove
+        ]
         if update_couchdb_doc("trends", trend_id, trend):
             return jsonify(trend)
-            
+
     abort(500, description="Failed to update trend")
+
 
 def fetch_url(url):
     try:
@@ -551,20 +605,24 @@ def fetch_url(url):
     except requests.exceptions.RequestException as e:
         return {"url": url, "status": "error", "message": str(e)}
 
+
 # --- Config ---
 @api_blueprint.route("/config", methods=["GET"])
 @admin_required
 def get_config():
     # Helper to return the effective config
-    return jsonify({
-        "allow_public_read": get_public_read_setting(),
-        "iteration_interval": get_iteration_interval_setting(),
-        "version": version.get_version_string(),
-        "default_llm_provider": os.environ.get("DEFAULT_LLM_PROVIDER", "ollama"),
-        "default_model_name": os.environ.get("MODEL_NAME", "llama3.1"),
-        # Include public auth config
-        **get_auth_config()
-    })
+    return jsonify(
+        {
+            "allow_public_read": get_public_read_setting(),
+            "iteration_interval": get_iteration_interval_setting(),
+            "version": version.get_version_string(),
+            "default_llm_provider": os.environ.get("DEFAULT_LLM_PROVIDER", "ollama"),
+            "default_model_name": os.environ.get("MODEL_NAME", "llama3.1"),
+            # Include public auth config
+            **get_auth_config(),
+        }
+    )
+
 
 @api_blueprint.route("/config", methods=["PUT"])
 @admin_required
@@ -574,81 +632,82 @@ def update_config():
         validated = ConfigUpdateRequest(**request.json)
     except ValidationError as e:
         abort(400, description=str(e))
-    
+
     # Fetch existing to get rev
     current_doc = get_config_doc()
-    
-    new_doc = {
-        "_id": "main"
-    }
-    
+
+    new_doc = {"_id": "main"}
+
     if current_doc:
         new_doc.update(current_doc)
-        
+
     if validated.allow_public_read is not None:
         new_doc["allow_public_read"] = validated.allow_public_read
-        
+
     if validated.iteration_interval is not None:
         new_doc["iteration_interval"] = validated.iteration_interval
-        
+
     # Handle extra fields that might not be in ConfigUpdateRequest strict model yet
-    # We can allow dynamic fields for now or update the model. 
+    # We can allow dynamic fields for now or update the model.
     # Let's assume request.json has them if passed.
-    
+
     if "google_client_id" in request.json:
         new_doc["google_client_id"] = request.json["google_client_id"]
-        
+
     if "entra_client_id" in request.json:
         new_doc["entra_client_id"] = request.json["entra_client_id"]
-        
+
     if "entra_tenant_id" in request.json:
         new_doc["entra_tenant_id"] = request.json["entra_tenant_id"]
-        
+
     if "github_client_id" in request.json:
         new_doc["github_client_id"] = request.json["github_client_id"]
 
     if "github_client_secret" in request.json:
         new_doc["github_client_secret"] = request.json["github_client_secret"]
-        
+
     if update_couchdb_doc("config", "main", new_doc):
         return jsonify({"status": "updated", "config": new_doc})
     else:
         abort(500, description="Failed to update config")
 
+
 # --- Stats ---
+
 
 @api_blueprint.route("/stats", methods=["GET"])
 @jwt_required
 def get_stats():
     """Retrieve aggregation statistics from CouchDB MapReduce views."""
     from .db import query_couchdb_view
-    
+
     try:
         # 1. Article Language Stats
         lang_rows = query_couchdb_view("articles", "stats", "by_language", group=True)
         lang_stats = {row["key"]: row["value"] for row in lang_rows}
-        
+
         # 2. Feed Health Stats
         health_rows = query_couchdb_view("feeds", "health", "status", group=True)
         health_stats = {row["key"]: row["value"] for row in health_rows}
-        
-        return jsonify({
-            "articles": {
-                "by_language": lang_stats,
-                "total": sum(lang_stats.values())
-            },
-            "feeds": {
-                "health": health_stats,
-                "total": sum(health_stats.values())
+
+        return jsonify(
+            {
+                "articles": {
+                    "by_language": lang_stats,
+                    "total": sum(lang_stats.values()),
+                },
+                "feeds": {"health": health_stats, "total": sum(health_stats.values())},
             }
-        })
+        )
     except requests.exceptions.HTTPError as e:
         # CouchDB returned an HTTP error (401, 403, 5xx, etc.)
         # Log detailed error internally but return user-friendly message
         # Truncate response text to avoid excessive logging
-        response_preview = e.response.text[:200] if e.response.text else ''
-        logger.error(f"CouchDB HTTP error in /stats: {e.response.status_code} {response_preview}")
-        
+        response_preview = e.response.text[:200] if e.response.text else ""
+        logger.error(
+            f"CouchDB HTTP error in /stats: {e.response.status_code} {response_preview}"
+        )
+
         # Return appropriate message based on error type
         if 400 <= e.response.status_code < 500:
             abort(502, description="Unable to retrieve statistics")
@@ -658,61 +717,64 @@ def get_stats():
         # Network or connection error
         logger.error(f"CouchDB connection error in /stats: {e}")
         abort(503, description="Database unavailable")
-    
+
     # Fallback return to avoid implicit None; should be unreachable
-    return jsonify({
-        "articles": {
-            "by_language": {},
-            "total": 0
-        },
-        "feeds": {
-            "health": {},
-            "total": 0
+    return jsonify(
+        {
+            "articles": {"by_language": {}, "total": 0},
+            "feeds": {"health": {}, "total": 0},
         }
-    })
+    )
+
 
 # --- Search Endpoints ---
+
 
 @api_blueprint.route("/articles/search", methods=["GET"])
 @jwt_required
 @limiter.limit("20 per minute")
 def search_articles_endpoint():
     """Search articles by keyword with optional date filters"""
-    query = request.args.get('q', '').strip()
+    query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
-    
+
     import re
+
     safe_query = re.escape(query)
-    
-    date_from = request.args.get('from', '')
-    date_to = request.args.get('to', '')
-    
+
+    date_from = request.args.get("from", "")
+    date_to = request.args.get("to", "")
+
     try:
-        limit = int(request.args.get('limit', 50))
+        limit = int(request.args.get("limit", 50))
     except ValueError:
         abort(400, description=ERROR_LIMIT_INTEGER)
-    
+
     if limit > 200:
         limit = 200
-    
+
     # Build Mango selector for efficient querying
     selector = {
         MONGO_OR: [
             {"title": {MONGO_REGEX: f"(?i){safe_query}"}},
             {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"content": {MONGO_REGEX: f"(?i){safe_query}"}}
+            {"content": {MONGO_REGEX: f"(?i){safe_query}"}},
         ]
     }
-    
+
     # Add date range filters if provided
     if date_from:
         try:
             from_dt = datetime.fromisoformat(date_from)
             selector["published"] = {MONGO_GTE: from_dt.isoformat()}
         except ValueError:
-            return jsonify({"error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"}), 400
-    
+            return jsonify(
+                {
+                    "error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
+                }
+            ), 400
+
     if date_to:
         try:
             to_dt = datetime.fromisoformat(date_to)
@@ -722,27 +784,30 @@ def search_articles_endpoint():
             else:
                 selector["published"] = {MONGO_LTE: to_dt.isoformat()}
         except ValueError:
-            return jsonify({"error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"}), 400
-    
+            return jsonify(
+                {
+                    "error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
+                }
+            ), 400
+
     # Query CouchDB with selector
     articles = query_couchdb("articles", selector=selector, limit=limit)
-    
+
     results = []
     for article in articles:
-        results.append({
-            "_id": article.get("_id"),
-            "title": article.get("title", "Untitled"),
-            "link": article.get("link", ""),
-            "published": article.get("published", ""),
-            "feed_title": article.get("feed_title", "Unknown"),
-            "description": article.get("description", "")[:200]
-        })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
-        "results": results
-    })
+        results.append(
+            {
+                "_id": article.get("_id"),
+                "title": article.get("title", "Untitled"),
+                "link": article.get("link", ""),
+                "published": article.get("published", ""),
+                "feed_title": article.get("feed_title", "Unknown"),
+                "description": article.get("description", "")[:200],
+            }
+        )
+
+    return jsonify({"total": len(results), "query": query, "results": results})
+
 
 @api_blueprint.route("/articles/recent", methods=["GET"])
 @jwt_required
@@ -750,35 +815,33 @@ def search_articles_endpoint():
 def get_recent_articles_endpoint():
     """Get most recent articles"""
     try:
-        hours = int(request.args.get('hours', 24))
-        limit = int(request.args.get('limit', 50))
+        hours = int(request.args.get("hours", 24))
+        limit = int(request.args.get("limit", 50))
     except ValueError:
         abort(400, description="hours and limit must be integers")
-    
+
     if hours > 168:  # Max 1 week
         hours = 168
     if limit > 200:
         limit = 200
-    
+
     from datetime import timedelta
-    
+
     # Calculate cutoff timestamp
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     cutoff_str = cutoff.isoformat()
-    
+
     # Use Mango query to filter at database level
-    selector = {
-        "published": {MONGO_GTE: cutoff_str}
-    }
-    
+    selector = {"published": {MONGO_GTE: cutoff_str}}
+
     # Query with sort by published date descending
     articles = query_couchdb(
         "articles",
         selector=selector,
         limit=limit * 2,  # Fetch extra to account for parsing issues
-        sort=[{"published": "desc"}]
+        sort=[{"published": "desc"}],
     )
-    
+
     results = []
     for article in articles:
         pub_str = article.get("published", "")
@@ -787,121 +850,122 @@ def get_recent_articles_endpoint():
                 pub_dt = parse_datetime_safe(pub_str)
                 # Double-check in case CouchDB string comparison differs from parsed date
                 if pub_dt >= cutoff:
-                    results.append({
-                        "_id": article.get("_id"),
-                        "title": article.get("title", "Untitled"),
-                        "link": article.get("link", ""),
-                        "published": pub_str,
-                        "feed_title": article.get("feed_title", "Unknown"),
-                        "description": article.get("description", "")[:200],
-                        "_sort_date": pub_dt
-                    })
+                    results.append(
+                        {
+                            "_id": article.get("_id"),
+                            "title": article.get("title", "Untitled"),
+                            "link": article.get("link", ""),
+                            "published": pub_str,
+                            "feed_title": article.get("feed_title", "Unknown"),
+                            "description": article.get("description", "")[:200],
+                            "_sort_date": pub_dt,
+                        }
+                    )
             except (ValueError, AttributeError):
                 # Skip articles with invalid/unparseable date formats rather than failing the entire request.
                 # This allows the API to return valid articles even if some have malformed timestamps.
                 pass
-        
+
         if len(results) >= limit:
             break
-    
+
     # Sort by published date descending (in case CouchDB sort isn't perfect)
-    results.sort(key=lambda x: x.get("_sort_date", datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+    results.sort(
+        key=lambda x: x.get("_sort_date", datetime.min.replace(tzinfo=timezone.utc)),
+        reverse=True,
+    )
     for r in results:
         r.pop("_sort_date", None)
-    
-    return jsonify({
-        "total": len(results),
-        "hours": hours,
-        "results": results[:limit]
-    })
+
+    return jsonify({"total": len(results), "hours": hours, "results": results[:limit]})
+
 
 @api_blueprint.route("/events/search", methods=["GET"])
 @jwt_required
 @limiter.limit("20 per minute")
 def search_events_endpoint():
     """Search events by keyword using CouchDB query"""
-    query = request.args.get('q', '').strip()
+    query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
-    
+
     import re
+
     safe_query = re.escape(query)
-    
+
     try:
-        limit = int(request.args.get('limit', 20))
+        limit = int(request.args.get("limit", 20))
     except ValueError:
         abort(400, description=ERROR_LIMIT_INTEGER)
 
     if limit > 100:
         limit = 100
-    
+
     # Use Mango query with regex for case-insensitive search
     # Note: For better performance at scale, consider using a full-text search engine
     selector = {
         "$or": [
             {"name": {"$regex": f"(?i){safe_query}"}},
-            {"description": {"$regex": f"(?i){safe_query}"}}
+            {"description": {"$regex": f"(?i){safe_query}"}},
         ]
     }
-    
+
     events = query_couchdb("events", selector=selector, limit=limit)
-    
+
     results = []
     for event in events:
-        results.append({
-            "_id": event.get("_id"),
-            "name": event.get("name", "Untitled"),
-            "description": event.get("description", "")
-        })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
-        "results": results
-    })
+        results.append(
+            {
+                "_id": event.get("_id"),
+                "name": event.get("name", "Untitled"),
+                "description": event.get("description", ""),
+            }
+        )
+
+    return jsonify({"total": len(results), "query": query, "results": results})
+
 
 @api_blueprint.route("/trends/search", methods=["GET"])
 @jwt_required
 @limiter.limit("20 per minute")
 def search_trends_endpoint():
     """Search trends by keyword using CouchDB query"""
-    query = request.args.get('q', '').strip()
+    query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
-    
+
     import re
+
     safe_query = re.escape(query)
-    
+
     try:
-        limit = int(request.args.get('limit', 20))
+        limit = int(request.args.get("limit", 20))
     except ValueError:
         abort(400, description=ERROR_LIMIT_INTEGER)
 
     if limit > 100:
         limit = 100
-    
+
     # Use Mango query with regex for case-insensitive search
     # Note: For better performance at scale, consider using a full-text search engine
     selector = {
         "$or": [
             {"name": {"$regex": f"(?i){safe_query}"}},
-            {"description": {"$regex": f"(?i){safe_query}"}}
+            {"description": {"$regex": f"(?i){safe_query}"}},
         ]
     }
-    
+
     trends = query_couchdb("trends", selector=selector, limit=limit)
-    
+
     results = []
     for trend in trends:
-        results.append({
-            "_id": trend.get("_id"),
-            "name": trend.get("name", "Untitled"),
-            "description": trend.get("description", ""),
-            "event_count": len(trend.get("event_ids", []))
-        })
-    
-    return jsonify({
-        "total": len(results),
-        "query": query,
-        "results": results
-    })
+        results.append(
+            {
+                "_id": trend.get("_id"),
+                "name": trend.get("name", "Untitled"),
+                "description": trend.get("description", ""),
+                "event_count": len(trend.get("event_ids", [])),
+            }
+        )
+
+    return jsonify({"total": len(results), "query": query, "results": results})

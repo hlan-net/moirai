@@ -6,6 +6,7 @@ user = os.environ.get("COUCHDB_USER")
 password = os.environ.get("COUCHDB_PASSWORD")
 if user and password and "@" not in COUCHDB_URI:
     from urllib.parse import quote
+
     if "://" in COUCHDB_URI:
         scheme, host = COUCHDB_URI.split("://", 1)
     else:

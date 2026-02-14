@@ -9,8 +9,10 @@ mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
 # Auth Configuration
 API_PASSWORD = os.environ.get("API_PASSWORD", "password")
 
+
 def auth_required(func):
     """Decorator to require API_PASSWORD for a tool call."""
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # We expect 'api_key' to be passed in kwargs for top-level tools
@@ -18,7 +20,9 @@ def auth_required(func):
         if api_key != API_PASSWORD:
             return "Error: Unauthorized. Valid 'api_key' is required."
         return func(*args, **kwargs)
+
     return wrapper
+
 
 def validate_namespace(namespace_guid: str):
     """Validate that the namespace is a valid GUID/UUID."""

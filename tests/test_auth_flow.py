@@ -1,15 +1,13 @@
 import unittest
-import os
-import json
 import secrets
 import logging
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from main import app
-from api import db
 
 # Disable logging during tests
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
-logging.getLogger('api.db').setLevel(logging.ERROR)
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
+logging.getLogger("api.db").setLevel(logging.ERROR)
+
 
 class MockDB:
     def __init__(self):
@@ -28,7 +26,7 @@ class MockDB:
         email = user_doc.get("email")
         if self.get_user_by_email(email):
             return False, "User already exists"
-        
+
         user_id = secrets.token_hex(8)
         user_doc["_id"] = user_id
         self.users[user_id] = user_doc
@@ -64,8 +62,10 @@ class MockDB:
         if db_name == "users":
             return self.create_user(doc)
         return None
-    
-    def query_couchdb(self, db_name, selector, limit=None, skip=0, sort=None, fields=None):
+
+    def query_couchdb(
+        self, db_name, selector, limit=None, skip=0, sort=None, fields=None
+    ):
         # Very basic mock for query
         if db_name == "users" and "email" in selector:
             email = selector["email"]
@@ -73,51 +73,56 @@ class MockDB:
             return [user] if user else []
         return []
 
+
 mock_db = MockDB()
+
 
 # Mock functions to replace api.db imports
 def side_effect_get_user(email):
     return mock_db.get_user_by_email(email)
 
+
 def side_effect_create_user(user_doc):
     return mock_db.create_user(user_doc)
+
 
 def side_effect_fetch(db_name, doc_id=None):
     return mock_db.fetch_from_couchdb(db_name, doc_id)
 
+
 def side_effect_update(db_name, doc_id, doc):
     return mock_db.update_couchdb_doc(db_name, doc_id, doc)
 
+
 def side_effect_query(db_name, selector, limit=None, skip=0, sort=None, fields=None):
     return mock_db.query_couchdb(db_name, selector, limit, skip, sort, fields)
+
 
 class TestAuthFlow(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Patch init.init_db to do nothing
-        cls.init_patcher = patch('tasks.init.init_db')
+        cls.init_patcher = patch("tasks.init.init_db")
         cls.init_patcher.start()
 
         # Patch api.db functions in both api.db and api.auth/api.routes
         cls.patches = [
-            patch('api.db.get_user_by_email', side_effect=side_effect_get_user),
-            patch('api.db.create_user', side_effect=side_effect_create_user),
-            patch('api.db.fetch_from_couchdb', side_effect=side_effect_fetch),
-            patch('api.db.update_couchdb_doc', side_effect=side_effect_update),
-            patch('api.db.query_couchdb', side_effect=side_effect_query),
-            
+            patch("api.db.get_user_by_email", side_effect=side_effect_get_user),
+            patch("api.db.create_user", side_effect=side_effect_create_user),
+            patch("api.db.fetch_from_couchdb", side_effect=side_effect_fetch),
+            patch("api.db.update_couchdb_doc", side_effect=side_effect_update),
+            patch("api.db.query_couchdb", side_effect=side_effect_query),
             # Patch where imported
-            patch('api.auth.get_user_by_email', side_effect=side_effect_get_user),
-            patch('api.auth.create_user', side_effect=side_effect_create_user),
-            patch('api.auth.fetch_from_couchdb', side_effect=side_effect_fetch),
-            patch('api.auth.update_couchdb_doc', side_effect=side_effect_update),
-            
-            patch('api.routes.fetch_from_couchdb', side_effect=side_effect_fetch),
-            patch('api.routes.update_couchdb_doc', side_effect=side_effect_update),
-             # Note: api.routes imports query_couchdb too
-            patch('api.routes.query_couchdb', side_effect=side_effect_query),
+            patch("api.auth.get_user_by_email", side_effect=side_effect_get_user),
+            patch("api.auth.create_user", side_effect=side_effect_create_user),
+            patch("api.auth.fetch_from_couchdb", side_effect=side_effect_fetch),
+            patch("api.auth.update_couchdb_doc", side_effect=side_effect_update),
+            patch("api.routes.fetch_from_couchdb", side_effect=side_effect_fetch),
+            patch("api.routes.update_couchdb_doc", side_effect=side_effect_update),
+            # Note: api.routes imports query_couchdb too
+            patch("api.routes.query_couchdb", side_effect=side_effect_query),
         ]
-        
+
         for p in cls.patches:
             p.start()
 
@@ -125,11 +130,11 @@ class TestAuthFlow(unittest.TestCase):
         cls.unique_suffix = secrets.token_hex(4)
         cls.user_credentials = {
             "email": f"test_user_{cls.unique_suffix}@example.com",
-            "password": "SecurePassword123!"
+            "password": "SecurePassword123!",
         }
         cls.admin_credentials = {
             "email": f"admin_user_{cls.unique_suffix}@example.com",
-            "password": "SecureAdminPassword123!"
+            "password": "SecureAdminPassword123!",
         }
 
     @classmethod
@@ -163,16 +168,16 @@ class TestAuthFlow(unittest.TestCase):
         response = self.client.post("/api/auth/register", json=self.admin_credentials)
         self.assertEqual(response.status_code, 201)
         user_id = response.get_json().get("user_id")
-        
+
         # 2. Promote to Admin (Direct DB manipulation using mock DB)
         # We access mock_db directly here to simulate 'admin/backend' access
         user_doc = mock_db.fetch_from_couchdb("users", user_id)
         self.assertIsNotNone(user_doc, "Failed to fetch user doc for promotion")
-        
+
         user_doc["role"] = "admin"
         success = mock_db.update_couchdb_doc("users", user_id, user_doc)
         self.assertTrue(success, "Failed to update user role in DB")
-        
+
         # 3. Login to get Admin Token
         response = self.client.post("/api/auth/login", json=self.admin_credentials)
         self.assertEqual(response.status_code, 200)
@@ -182,12 +187,12 @@ class TestAuthFlow(unittest.TestCase):
         """Test access to protected routes with and without token"""
         # Access protected route (e.g. /api/auth/me)
         headers = {"Authorization": f"Bearer {self.__class__.user_token}"}
-        
+
         # With token
         response = self.client.get("/api/auth/me", headers=headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["email"], self.user_credentials["email"])
-        
+
         # Without token
         response = self.client.get("/api/auth/me")
         self.assertEqual(response.status_code, 401)
@@ -196,32 +201,41 @@ class TestAuthFlow(unittest.TestCase):
         """Test RBAC on admin routes"""
         user_headers = {"Authorization": f"Bearer {self.__class__.user_token}"}
         admin_headers = {"Authorization": f"Bearer {self.__class__.admin_token}"}
-        
+
         # User should fail to PUT config
-        response = self.client.put("/api/config", headers=user_headers, json={"allow_public_read": True})
+        response = self.client.put(
+            "/api/config", headers=user_headers, json={"allow_public_read": True}
+        )
         self.assertEqual(response.status_code, 403)
-        
+
         # Admin should succeed
-        response = self.client.put("/api/config", headers=admin_headers, json={"allow_public_read": True})
+        response = self.client.put(
+            "/api/config", headers=admin_headers, json={"allow_public_read": True}
+        )
         self.assertEqual(response.status_code, 200)
 
     def test_06_public_read_access_control(self):
         """verify allow_public_read setting controls access"""
         admin_headers = {"Authorization": f"Bearer {self.__class__.admin_token}"}
-        
+
         # 1. Disable Public Read
-        self.client.put("/api/config", headers=admin_headers, json={"allow_public_read": False})
-        
+        self.client.put(
+            "/api/config", headers=admin_headers, json={"allow_public_read": False}
+        )
+
         # 2. Access Public Route without token -> 401
         resp = self.client.get("/api/articles")
         self.assertEqual(resp.status_code, 401)
-        
+
         # 3. Enable Public Read
-        self.client.put("/api/config", headers=admin_headers, json={"allow_public_read": True})
-        
+        self.client.put(
+            "/api/config", headers=admin_headers, json={"allow_public_read": True}
+        )
+
         # 4. Access Public Route without token -> 200
         resp = self.client.get("/api/articles")
         self.assertEqual(resp.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
