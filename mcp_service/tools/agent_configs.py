@@ -59,7 +59,7 @@ def add_agent_config(user_id: str, name: str, trigger_type: str, target_db: str,
     else:
         return {"status": "error", "message": "Failed to add agent configuration."}
 
-@mcp_tool(name="get_agent_config", description="Retrieves an agent configuration by ID.")
+@mcp.tool(name="get_agent_config", description="Retrieves an agent configuration by ID.")
 def get_agent_config(agent_id: str) -> dict:
     """
     Retrieves a specific agent configuration.
@@ -74,7 +74,7 @@ def get_agent_config(agent_id: str) -> dict:
     else:
         return {"status": "error", "message": f"Agent configuration {agent_id} not found."}
 
-@mcp_tool(name="list_agent_configs", description="Lists agent configurations, optionally filtered by user_id.")
+@mcp.tool(name="list_agent_configs", description="Lists agent configurations, optionally filtered by user_id.")
 def list_agent_configs(user_id: str = None) -> list[dict]:
     """
     Lists all agent configurations, or those belonging to a specific user.
@@ -90,7 +90,7 @@ def list_agent_configs(user_id: str = None) -> list[dict]:
     configs = query_couchdb(AGENT_CONFIGS_DB, selector=selector)
     return {"status": "success", "agent_configs": configs}
 
-@mcp_tool(name="update_agent_config", description="Updates an existing agent configuration.")
+@mcp.tool(name="update_agent_config", description="Updates an existing agent configuration.")
 def update_agent_config(agent_id: str, name: str = None, status: str = None,
                          trigger_type: str = None, target_db: str = None, logic_module: str = None,
                          schedule_interval: str = None, llm_model_config: dict = None,
@@ -131,7 +131,7 @@ def update_agent_config(agent_id: str, name: str = None, status: str = None,
     else:
         return {"status": "error", "message": "Failed to update agent configuration."}
 
-@mcp_tool(name="delete_agent_config", description="Deletes an agent configuration.")
+@mcp.tool(name="delete_agent_config", description="Deletes an agent configuration.")
 def delete_agent_config(agent_id: str) -> dict:
     """
     Deletes a specific agent configuration.

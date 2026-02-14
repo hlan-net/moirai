@@ -37,7 +37,7 @@ def mark_entity_stale(entity_type: Literal["event", "trend"], entity_id: str, is
     else:
         return {"status": "error", "message": f"Failed to update staleness for {entity_type} {entity_id}."}
 
-@mcp_tool(name="delete_stale_entities", description="Deletes all entities marked as stale for a given type.")
+@mcp.tool(name="delete_stale_entities", description="Deletes all entities marked as stale for a given type.")
 def delete_stale_entities(entity_type: Literal["event", "trend"]) -> dict:
     """
     Deletes all events or trends that are currently marked as stale.
