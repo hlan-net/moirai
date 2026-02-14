@@ -32,7 +32,7 @@ def _request(method, url, **kwargs):
 
 
 # Allowed database names for security validation
-ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history", "users"}
+ALLOWED_DBS = {"feeds", "articles", "events", "trends", "config", "chat_history", "users", "agent_configs"}
 
 # Error messages
 ERROR_INVALID_DB_NAME = "Invalid database name."
