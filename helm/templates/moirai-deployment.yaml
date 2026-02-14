@@ -91,6 +91,22 @@ spec:
                   http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name/_index
               }
 
+              # Function to create a design document with a validate_doc_update function
+              create_design_document() {
+                db_name=$1
+                doc_id=$2
+                doc_json=$3
+                echo "Creating design document '$doc_id' for database '$db_name'..."
+                until curl -X PUT -u "$COUCHDB_USER:$COUCHDB_PASSWORD" \
+                  -H "Content-Type: application/json" \
+                  -d "$doc_json" \
+                  http://$MOIRAI_SVC_COUCHDB_SERVICE_HOST:5984/$db_name/$doc_id; do
+                  echo "Failed to create design document '$doc_id' for '$db_name', retrying..."
+                  sleep 5
+                done
+                echo "Design document '$doc_id' for '$db_name' created successfully."
+              }
+
               # Check CouchDB readiness
               check_couchdb_ready
 
@@ -100,6 +116,16 @@ spec:
               create_database "articles"
               create_database "events"
               create_database "trends"
+
+              # Deploy validation design documents
+              create_design_document "feeds" "_design/feeds" '{
+                "_id": "_design/feeds",
+                "validate_doc_update": "function(newDoc, oldDoc, userCtx, secObj) {\\n      if (newDoc._deleted === true) {\\n        // allow deletes by anybody\\n        return;\\n      }\\n\\n      // Type checks\\n      if (typeof newDoc._id !== \\'string\\') throw({forbidden: \\'Document _id must be a string.\\'});\\n      if (typeof newDoc.url !== \\'string\\') throw({forbidden: \\'Feed URL must be a string.\\'});\\n      if (typeof newDoc.title !== \\'string\\') throw({forbidden: \\'Feed title must be a string.\\'});\\n      if (typeof newDoc.category !== \\'string\\') throw({forbidden: \\'Feed category must be a string.\\'});\\n      if (typeof newDoc.added_at !== \\'string\\') throw({forbidden: \\'Feed added_at must be a string.\\'});\\n\\n      // Required fields\\n      if (!newDoc.url) throw({forbidden: \\'Feed URL is required.\\'});\\n      if (!newDoc.title) throw({forbidden: \\'Feed title is required.\\'});\\n      if (!newDoc.category) throw({forbidden: \\'Feed category is required.\\'});\\n      if (!newDoc.added_at) throw({forbidden: \\'Feed added_at date is required.\\'});\\n\\n      // Format validation\\n      if (!/^(https?|ftp):\\\\/\\\\/[^\\\\s/$.?#].[^\\\\s]*$/.test(newDoc.url)) {\\n        throw({forbidden: \\'Feed URL is not a valid URL format.\\'});\\n      }\\n      if (!/^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?(?:Z|[+-]\\\\d{2}:\\\\d{2})$/.test(newDoc.added_at)) {\\n        throw({forbidden: \\'Feed added_at date must be in ISO 8601 format.\\'});\\n      }\\n\\n      // Optional fields\\n      if (newDoc.favicon_url && typeof newDoc.favicon_url !== \\'string\\') {\\n        throw({forbidden: \\'Favicon URL must be a string or null.\\'});\\n      }\\n      if (newDoc.favicon_url && !/^(https?|ftp):\\\\/\\\\/[^\\\\s/$.?#].[^\\\\s]*$/.test(newDoc.favicon_url)) {\\n        throw({forbidden: \\'Favicon URL is not a valid URL format.\\'});\\n      }\\n    }"
+              }'
+              create_design_document "articles" "_design/articles" '{
+                "_id": "_design/articles",
+                "validate_doc_update": "function(newDoc, oldDoc, userCtx, secObj) {\\n      if (newDoc._deleted === true) {\\n        // allow deletes by anybody\\n        return;\\n      }\\n\\n      // Type checks\\n      if (typeof newDoc._id !== \\'string\\') throw({forbidden: \\'Document _id must be a string.\\'});\\n      if (typeof newDoc.feed_id !== \\'string\\') throw({forbidden: \\'Article feed_id must be a string.\\'});\\n      if (typeof newDoc.url !== \\'string\\') throw({forbidden: \\'Article URL must be a string.\\'});\\n      if (typeof newDoc.title !== \\'string\\') throw({forbidden: \\'Article title must be a string.\\'});\\n      if (typeof newDoc.published !== \\'string\\') throw({forbidden: \\'Article published date must be a string.\\'});\\n\\n      // Required fields\\n      if (!newDoc.feed_id) throw({forbidden: \\'Article feed_id is required.\\'});\\n      if (!newDoc.url) throw({forbidden: \\'Article URL is required.\\'});\\n      if (!newDoc.title) throw({forbidden: \\'Article title is required.\\'});\\n      if (!newDoc.published) throw({forbidden: \\'Article published date is required.\\'});\\n\\n      // Format validation\\n      if (!/^(https?|ftp):\\\\/\\\\/[^\\\\s/$.?#].[^\\\\s]*$/.test(newDoc.url)) {\\n        throw({forbidden: \\'Article URL is not a valid URL format.\\'});\\n      }\\n      if (!/^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?(?:Z|[+-]\\\\d{2}:\\\\d{2})$/.test(newDoc.published)) {\\n        throw({forbidden: \\'Article published date must be in ISO 8601 format.\\'});\\n      }\\n\\n      // Optional fields\\n      if (newDoc.summary && typeof newDoc.summary !== \\'string\\') {\\n        throw({forbidden: \\'Summary must be a string or null.\\'});\\n      }\\n      if (newDoc.content && typeof newDoc.content !== \\'string\\') {\\n        throw({forbidden: \\'Content must be a string or null.\\'});\\n      }\\n      if (newDoc.image_url && typeof newDoc.image_url !== \\'string\\') {\\n        throw({forbidden: \\'Image URL must be a string or null.\\'});\\n      }\\n      if (newDoc.image_url && !/^(https?|ftp):\\\\/\\\\/[^\\\\s/$.?#].[^\\\\s]*$/.test(newDoc.image_url)) {\\n        throw({forbidden: \\'Image URL is not a valid URL format.\\'});\\n      }\\n    }"
+              }'
 
               # Create indexes
               create_index "articles" '{"index": {"fields": ["published"]}, "name": "published-index", "type": "json"}'
