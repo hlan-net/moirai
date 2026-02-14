@@ -26,7 +26,7 @@ WORKDIR /app
 
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 RUN useradd -d /app appuser  && \
     pip install --no-cache-dir -r requirements.txt && \
     mkdir -p feeds && \
