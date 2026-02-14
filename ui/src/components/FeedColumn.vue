@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch, nextTick, inject, type Ref } from 'vue'
+import { onMounted, ref, computed, watch, nextTick } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter' // Import the new filter store

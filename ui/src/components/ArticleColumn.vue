@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted, computed, inject, watch, type Ref } from 'vue'
+import { onMounted, ref, onUnmounted, computed, watch } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide } from 'vue'
+import { ref, computed } from 'vue'
 import FeedColumn from './FeedColumn.vue'
 import ArticleColumn from './ArticleColumn.vue'
 import EventColumn from './EventColumn.vue'
