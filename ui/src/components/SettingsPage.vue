@@ -305,6 +305,7 @@ const fetchConfig = async () => {
         })
         if (res.ok) {
             const config = await res.json()
+            if (config.version) appVersion.value = config.version
             if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
             if (config.iteration_interval !== undefined) iterationInterval.value = config.iteration_interval
             if (config.google_client_id) googleClientId.value = config.google_client_id
