@@ -1,8 +1,8 @@
 services:
   moirai:
     build: .
-    ports:
-      - "8088:8088"
+    entrypoint: [ "sh" ]
+    command: [ "-c", ". /opt/conda/bin/activate moirai && gunicorn --bind 0.0.0.0:8088 main:app" ]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -25,10 +25,12 @@ services:
       - couchdb
     volumes:
       - ./feeds:/app/feeds
+    ports:
+      - "8089:8088" # Changed host port to 8089
 
   mcp-server:
     build: .
-    command: [ "sh", "-c", "/app/create_dbs.sh && uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090" ]
+    command: [ "sh", "-c", "/app/create_dbs.sh && conda run --name moirai uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090" ]
     ports:
       - "8090:8090"
     environment:

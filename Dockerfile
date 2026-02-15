@@ -14,29 +14,42 @@ RUN yarn install
 COPY ui/ .
 RUN yarn build
 
-# Stage 2: Build the Python application
-FROM python:3.13-slim AS final-stage
+# Stage 2: Build the Python application using Miniforge
+FROM condaforge/miniforge3:latest AS final-stage
 
 # Build arguments for version info
-ARG VERSION=0.1.0
+ARG VERSION=0.3.0
 ARG BUILD_NUMBER=unknown
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file and install dependencies
-COPY requirements.txt .
-RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
-RUN useradd -d /app appuser  && \
-    pip install --no-cache-dir -r requirements.txt && \
-    mkdir -p feeds && \
-    chmod 777 feeds && \
-    mkdir -p ui/dist && \
-    chown -R appuser:appuser feeds ui
+# Install curl
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Copy and make executable the database initialization script
+# Install mamba (faster conda operations)
+RUN conda install -y mamba
+
+# Copy environment.yml and install dependencies
+COPY environment.yml .
+RUN mamba env create -f environment.yml && \
+    mamba clean --all
+
+# Copy and make executable the database initialization script (as root)
 COPY create_dbs.sh /app/create_dbs.sh
 RUN chmod +x /app/create_dbs.sh
+
+# Activate the environment and set up appuser
+# Use a non-root user (appuser) for security
+RUN useradd -ms /bin/bash appuser && \
+    chown -R appuser:appuser /app && \
+    mkdir -p /app/feeds && \
+    chmod 777 /app/feeds && \
+    mkdir -p /app/ui/dist && \
+    chown -R appuser:appuser /app/ui/dist
+
+# Set the PATH to include the conda environment's bin directory
+ENV PATH="/opt/conda/envs/moirai/bin:$PATH"
 
 USER appuser
 
@@ -53,14 +66,9 @@ COPY --chown=appuser:appuser mcp_service/ mcp_service/
 
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/
-# Create empty ui/dist to avoid FileNotFoundError in main.py. Do this BEFORE switching user or as root.
-# (But here we are already USER appuser from line 36).
-# So we should switch back to root or do it earlier.
-# Let's do it earlier.
-
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088
 
 # Run the application
-CMD ["python", "/app/main.py"]
+CMD ["conda", "run", "--name", "moirai", "python", "/app/main.py"]
