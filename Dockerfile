@@ -1,20 +1,4 @@
-# Stage 1: Build the Vue.js application
-FROM node:20 AS build-stage
-
-# Set the working directory in the container
-WORKDIR /app
-
-# Copy the package.json and yarn.lock
-COPY ui/package.json ui/yarn.lock ./
-
-# Install dependencies - this layer is cached unless package.json or yarn.lock changes
-RUN yarn install
-
-# Copy the rest of the UI code and build it
-COPY ui/ .
-RUN yarn build
-
-# Stage 2: Build the Python application using Miniforge
+# Build the Python application using Miniforge
 FROM condaforge/miniforge3:latest AS final-stage
 
 # Build arguments for version info
@@ -65,8 +49,7 @@ COPY --chown=appuser:appuser tasks/ tasks/
 COPY --chown=appuser:appuser mcp_service/ mcp_service/
 COPY --chown=appuser:appuser gunicorn.conf.py .
 
-# Copy the built UI from the previous stage
-COPY --from=build-stage /app/dist/ ./ui/dist/
+
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088
