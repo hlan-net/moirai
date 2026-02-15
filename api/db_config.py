@@ -39,5 +39,4 @@ def get_couchdb_uri():
     return couchdb_uri
 
 
-# Module-level constant for convenience
-COUCHDB_URI = get_couchdb_uri()
+

@@ -44,7 +44,7 @@ RUN chmod +x /app/create_dbs.sh
 RUN useradd -ms /bin/bash appuser && \
     chown -R appuser:appuser /app && \
     mkdir -p /app/feeds && \
-    chmod 777 /app/feeds && \
+    chmod 775 /app/feeds && \
     mkdir -p /app/ui/dist && \
     chown -R appuser:appuser /app/ui/dist
 
@@ -63,6 +63,7 @@ COPY --chown=appuser:appuser version.py .
 COPY --chown=appuser:appuser api/ api/
 COPY --chown=appuser:appuser tasks/ tasks/
 COPY --chown=appuser:appuser mcp_service/ mcp_service/
+COPY --chown=appuser:appuser gunicorn.conf.py .
 
 # Copy the built UI from the previous stage
 COPY --from=build-stage /app/dist/ ./ui/dist/

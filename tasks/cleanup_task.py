@@ -7,12 +7,12 @@ from urllib.parse import quote
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from api.db_config import COUCHDB_URI
+from api.db_config import get_couchdb_uri
 
 
 def get_all_docs(db_name):
     try:
-        url = f"{COUCHDB_URI}{db_name}/_all_docs?include_docs=true"
+        url = f"{get_couchdb_uri()}{db_name}/_all_docs?include_docs=true"
         res = requests.get(url)
         if res.status_code == 200:
             return [row["doc"] for row in res.json().get("rows", [])]
@@ -23,7 +23,7 @@ def get_all_docs(db_name):
 
 def delete_doc(db_name, doc_id, rev):
     try:
-        url = f"{COUCHDB_URI}{db_name}/{quote(doc_id, safe='')}?rev={rev}"
+        url = f"{get_couchdb_uri()}{quote(db_name, safe='')}?rev={rev}"
         res = requests.delete(url)
         return res.status_code in (200, 202)
     except Exception as e:

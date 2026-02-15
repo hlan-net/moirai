@@ -107,14 +107,12 @@ def start_services():
     print(f"Scheduler started with interval {interval}s")
 
 
+# Conditional Flask run for local development
 if __name__ == "__main__":
-    start_services()
-
-    # Start the application
-    port = int(os.environ.get("HTTP_PORT", 8088))
-    print(f"Starting Moirai on port {port}")
-    app.run(host="0.0.0.0", port=port)
-else:
-    # Production mode startup (e.g. Uvicorn/Gunicorn)
-    if os.environ.get("ENABLE_PROD_STARTUP", "").lower() == "true":
-        start_services()
+    start_services() # Call start_services in main process only
+    # Check if this is the main process and not a reloader child in development
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        port = int(os.environ.get("HTTP_PORT", 8088))
+        print(f"Starting Moirai on port {port}")
+        app.run(host="0.0.0.0", port=port)
+# No need for else block here, as gunicorn handles the app startup (and calls start_services via hook)

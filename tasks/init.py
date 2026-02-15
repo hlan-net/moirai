@@ -1,7 +1,8 @@
 import os
 import requests
 import datetime
-from api.db import COUCHDB_URI, _request, get_user_by_email, create_user
+from api.db_config import get_couchdb_uri
+from api.db import _request, get_user_by_email, create_user
 from api.auth import hash_password
 from .cleanup_task import CleanupTask
 from tenacity import retry, stop_after_delay, wait_fixed, retry_if_exception_type
@@ -11,7 +12,7 @@ from tenacity import retry, stop_after_delay, wait_fixed, retry_if_exception_typ
 
 def ensure_db(db_name):
     try:
-        response = _request("PUT", f"{COUCHDB_URI}/{db_name}")
+        response = _request("PUT", f"{get_couchdb_uri()}{db_name}")
         if response.status_code in (200, 201):
             print(f"Database '{db_name}' created.")
         elif response.status_code == 412:
@@ -24,7 +25,7 @@ def ensure_db(db_name):
 
 
 def create_index(db_name, fields, name):
-    url = f"{COUCHDB_URI}/{db_name}/_index"
+    url = f"{get_couchdb_uri()}{db_name}/_index"
     payload = {"index": {"fields": fields}, "name": name, "type": "json"}
     try:
         # Ensure DB exists before index creation
@@ -40,7 +41,7 @@ def create_index(db_name, fields, name):
 
 
 def ensure_design_doc(db_name, design_doc_name, views):
-    url = f"{COUCHDB_URI}/{db_name}/_design/{design_doc_name}"
+    url = f"{get_couchdb_uri()}{db_name}/_design/{design_doc_name}"
 
     # Check if exists to get current rev
     try:
