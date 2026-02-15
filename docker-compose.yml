@@ -39,8 +39,12 @@ services:
       - API_PASSWORD=${API_PASSWORD}
       - COUCHDB_USER=admin # Explicitly set COUCHDB_USER for create_dbs.sh
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-password} # Explicitly set COUCHDB_PASSWORD for create_dbs.sh
+      - REDIS_HOST=redis # Added Redis host
+      - REDIS_PORT=6379 # Added Redis port
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-} # Added Redis password
     depends_on:
       - couchdb
+      - redis # Added dependency on redis
 
   couchdb:
     image: couchdb:3
@@ -53,5 +57,14 @@ services:
     volumes:
       - couchdb_data:/opt/couchdb/data
 
+  redis: # Added Redis service
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-} # Use password if provided
+    volumes:
+      - redis_data:/data # Persistent data for Redis
+
 volumes:
   couchdb_data:
+  redis_data: # Added Redis data volume

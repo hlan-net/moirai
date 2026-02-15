@@ -3,14 +3,20 @@ import threading
 import importlib
 from datetime import datetime, timedelta, timezone
 import logging
+import uuid # Added for unique leader ID
+import redis # Added for Redis client
+
 from api.db import query_couchdb, update_couchdb_doc
 from api.validation import AgentStatus, AgentTriggerType
 
 logger = logging.getLogger(__name__)
 
+# Constants for Redis lock
+REDIS_LOCK_NAME = "agent_orchestrator_lock"
+
 
 class AgentOrchestrator(threading.Thread):
-    def __init__(self, interval=60):
+    def __init__(self, interval=60, redis_client: redis.Redis = None):
         super().__init__()
         self.interval = interval  # Interval in seconds to check for agents to run
         self.running = False
@@ -22,16 +28,104 @@ class AgentOrchestrator(threading.Thread):
         self.trends_db = "trends"
         self.mcp_client = None  # To be initialized with an MCP client for tool calls
 
+        # Redis distributed locking
+        self.redis_client: redis.Redis = redis_client # Assigned here
+        self.leader_id = str(uuid.uuid4()) # Unique ID for this orchestrator instance
+        self.is_leader = False
+        self.lock_name = REDIS_LOCK_NAME
+        self.lock_expiry = self.interval * 2 # Lock expiry is twice the check interval, to allow for renewal
+
+    def _acquire_lock(self) -> bool:
+        """Attempts to acquire the distributed lock."""
+        if not self.redis_client:
+            logger.error("Redis client not initialized for AgentOrchestrator.")
+            return False
+
+        # Attempt to set the lock key if it doesn't exist.
+        # Set expiry to prevent deadlocks if an orchestrator crashes.
+        # Store self.leader_id as the value to identify the lock owner.
+        return self.redis_client.set(self.lock_name, self.leader_id, nx=True, ex=self.lock_expiry)
+
+    def _renew_lock(self) -> bool:
+        """Attempts to renew the distributed lock if this instance is the leader."""
+        if not self.redis_client:
+            return False
+
+        # Only renew if we are the current owner of the lock.
+        # Use a Lua script for atomic check-and-set to prevent race conditions.
+        # Script: if value of key is leader_id, then set new expiry.
+        lua_script = """
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("expire", KEYS[1], ARGV[2])
+            else
+                return 0
+            end
+        """
+        return self.redis_client.eval(lua_script, 1, self.lock_name, self.leader_id, self.lock_expiry) == 1
+
+    def _release_lock(self):
+        """Attempts to release the distributed lock if this instance is the leader."""
+        if not self.redis_client:
+            return
+
+        lua_script = """
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("del", KEYS[1])
+            else
+                return 0
+            end
+        """
+        self.redis_client.eval(lua_script, 1, self.lock_name, self.leader_id)
+        self.is_leader = False
+        logger.info(f"Agent Orchestrator {self.leader_id} released lock.")
+
     def run(self):
         self.running = True
-        logger.info("Agent Orchestrator started.")
+        logger.info(f"Agent Orchestrator {self.leader_id} started.")
+        
         while self.running:
             try:
-                self.check_and_run_agents()
+                if not self.redis_client:
+                    logger.error("Redis client not available. Cannot perform distributed locking. Exiting.")
+                    self.stop()
+                    break
+
+                if not self.is_leader:
+                    # Not a leader, try to acquire lock
+                    if self._acquire_lock():
+                        self.is_leader = True
+                        logger.info(f"Agent Orchestrator {self.leader_id} acquired leadership.")
+                    else:
+                        logger.debug(f"Agent Orchestrator {self.leader_id} is not leader. Waiting.")
+                else:
+                    # We are the leader, try to renew lock
+                    if not self._renew_lock():
+                        self.is_leader = False # Lost leadership
+                        logger.warning(f"Agent Orchestrator {self.leader_id} lost leadership.")
+                        # Try to acquire again in next loop iteration
+                    else:
+                        logger.debug(f"Agent Orchestrator {self.leader_id} renewed leadership.")
+
+                if self.is_leader:
+                    logger.info(f"Agent Orchestrator {self.leader_id} is leader. Checking and running agents.")
+                    self.check_and_run_agents()
+                else:
+                    logger.debug(f"Agent Orchestrator {self.leader_id} is not leader, skipping agent checks.")
+
             except Exception as e:
-                logger.error(f"Error in Agent Orchestrator loop: {e}")
+                logger.error(f"Error in Agent Orchestrator loop: {e}", exc_info=True)
+                # If an unexpected error occurs, try to release lock to allow another instance to take over
+                if self.is_leader:
+                    self._release_lock()
+            
             time.sleep(self.interval)
-        logger.info("Agent Orchestrator stopped.")
+        
+        # Ensure lock is released on graceful shutdown
+        if self.is_leader:
+            self._release_lock()
+        logger.info(f"Agent Orchestrator {self.leader_id} stopped.")
+
+
 
     def stop(self):
         self.running = False
