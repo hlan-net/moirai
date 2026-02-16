@@ -19,6 +19,7 @@ const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
 const expandedArticles = ref<Set<string>>(new Set())
 const showLoginModal = ref(false)
+const isHighDensity = ref(true)
 
 const authStore = useAuthStore()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -243,6 +244,17 @@ const handleFaviconError = (event: Event) => {
         </div>
         <div class="header-actions">
             <!-- Login Button for Public View -->
+            <button @click="isHighDensity = !isHighDensity" class="density-btn" :title="isHighDensity ? 'Switch to Expanded View' : 'Switch to High Density View'">
+                <svg v-if="isHighDensity" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/>
+                </svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 4h18v4H3V4zm0 7h18v4H3v-4zm0 7h18v4H3v-4z"/>
+                </svg>
+                {{ isHighDensity ? 'Compact' : 'Expanded' }}
+            </button>
+
+            <!-- Login Button for Public View -->
             <button v-if="!isAuthenticated" @click="showLoginModal = true" class="login-btn">
                 Sign In
             </button>
@@ -261,50 +273,68 @@ const handleFaviconError = (event: Event) => {
 
     <div v-if="loading" class="loading">Loading stream...</div>
     
-    <div v-else-if="articles.length" class="stream-container">
+    <div v-else-if="articles.length" class="stream-container" :class="{ 'high-density': isHighDensity }">
       <div v-for="(group, index) in groupedArticles" :key="index" class="feed-group">
         <h3 class="group-title">
           <img v-if="group.favicon" :src="group.favicon" class="group-favicon" :alt="`${group.title} icon`" @error="handleFaviconError" />
           <span v-else class="group-favicon-placeholder" role="img" :aria-label="`${group.title} icon`">📰</span>
           {{ group.title }}
         </h3>
-        <div v-for="article in group.articles" :key="article._id" class="stream-item">
-          <h4 class="item-title">
-              <a :href="article.link" target="_blank">{{ article.title }}</a>
-          </h4>
-          <div class="item-summary">
-            <span v-if="!expandedArticles.has(article._id)">
-              {{ stripHtml(article.summary).substring(0, 300) }}
-              <button 
-                v-if="stripHtml(article.summary).length > 300" 
-                @click="toggleExpand(article._id)"
-                class="read-more-btn"
-              >
-                ... Read More
-              </button>
-            </span>
-            <span v-else>
-              {{ stripHtml(article.summary) }}
-              <button @click="toggleExpand(article._id)" class="read-more-btn">
-                Show Less
-              </button>
-            </span>
-          </div>
-          <div v-if="article.events || article.trends" class="item-tags">
-            <div v-if="article.events && article.events.length > 0" class="tag-group">
-              <span class="tag-label">Events:</span>
-              <span v-for="event in article.events" :key="event" class="tag tag-event">{{ event }}</span>
+        
+        <div v-for="article in group.articles" :key="article._id" 
+             :class="['stream-item', { 'compact-item': isHighDensity }]">
+          
+          <!-- High Density (River) View -->
+          <template v-if="isHighDensity">
+            <div class="compact-row">
+              <span class="compact-time">{{ new Date(article.published).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}</span>
+              <h4 class="item-title compact-title">
+                <a :href="article.link" target="_blank">{{ article.title }}</a>
+              </h4>
+              <div class="compact-tags">
+                <span v-if="article.events?.length" class="dot-tag event-dot" title="Has Events"></span>
+                <span v-if="article.trends?.length" class="dot-tag trend-dot" title="Has Trends"></span>
+              </div>
             </div>
-            <div v-if="article.trends && article.trends.length > 0" class="tag-group">
-              <span class="tag-label">Trends:</span>
-              <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+          </template>
+
+          <!-- Expanded View -->
+          <template v-else>
+            <h4 class="item-title">
+                <a :href="article.link" target="_blank">{{ article.title }}</a>
+            </h4>
+            <div class="item-summary">
+              <span v-if="!expandedArticles.has(article._id)">
+                {{ stripHtml(article.summary).substring(0, 300) }}
+                <button 
+                  v-if="stripHtml(article.summary).length > 300" 
+                  @click="toggleExpand(article._id)"
+                  class="read-more-btn"
+                >
+                  ... Read More
+                </button>
+              </span>
+              <span v-else>
+                {{ stripHtml(article.summary) }}
+                <button @click="toggleExpand(article._id)" class="read-more-btn">
+                  Show Less
+                </button>
+              </span>
             </div>
-          </div>
-          <div class="item-meta">
-              <span class="date">{{ formatDate(article.published) }}</span>
-          </div>
+            <div v-if="article.events || article.trends" class="item-tags">
+              <div v-if="article.events && article.events.length > 0" class="tag-group">
+                <span v-for="event in article.events" :key="event" class="tag tag-event">{{ event }}</span>
+              </div>
+              <div v-if="article.trends && article.trends.length > 0" class="tag-group">
+                <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+              </div>
+            </div>
+            <div class="item-meta">
+                <span class="date">{{ formatDate(article.published) }}</span>
+            </div>
+          </template>
         </div>
-        <hr v-if="index < groupedArticles.length - 1" class="group-divider">
+        <hr v-if="index < groupedArticles.length - 1 && !isHighDensity" class="group-divider">
       </div>
       
       <!-- Sentinel element for infinite scroll -->
@@ -417,6 +447,25 @@ const handleFaviconError = (event: Event) => {
     cursor: wait;
 }
 
+.density-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.density-btn:hover {
+    background: var(--button-bg);
+    border-color: var(--primary-color);
+}
+
 .login-btn {
     background: var(--primary-color);
     color: white;
@@ -440,6 +489,10 @@ const handleFaviconError = (event: Event) => {
   margin-bottom: 20px;
 }
 
+.high-density .feed-group {
+  margin-bottom: 10px;
+}
+
 .group-title {
   font-size: 1.2rem;
   color: var(--text-color);
@@ -450,6 +503,12 @@ const handleFaviconError = (event: Event) => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.high-density .group-title {
+  font-size: 1rem;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
 }
 
 .group-favicon {
@@ -474,6 +533,47 @@ const handleFaviconError = (event: Event) => {
     margin-bottom: 10px;
     text-align: left; /* Ensure stream items are left-aligned */
 }
+
+.compact-item {
+    padding: 2px 0;
+    margin-bottom: 2px;
+}
+
+.compact-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.compact-time {
+    font-size: 0.8rem;
+    color: #95a5a6;
+    min-width: 60px;
+    flex-shrink: 0;
+}
+
+.compact-title {
+    margin: 0 !important;
+    font-size: 1rem !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compact-tags {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.dot-tag {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.event-dot { background-color: #1565c0; }
+.trend-dot { background-color: #7b1fa2; }
 
 .item-meta {
     font-size: 0.8rem;

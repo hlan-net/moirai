@@ -137,6 +137,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - image: ghcr.io/${{ github.repository }}-api
+            context: .
+            file: Dockerfile
+          - image: ghcr.io/${{ github.repository }}-ui
+            context: ui
+            file: ui/Dockerfile
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -145,8 +154,7 @@ jobs:
         uses: docker/metadata-action@v5
         id: docker_meta
         with:
-          images: |
-            ghcr.io/${{ github.repository }}
+          images: ${{ matrix.image }}
           tags: |
             type=schedule
             type=ref,event=branch
@@ -173,7 +181,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.docker_meta.outputs.tags }}
