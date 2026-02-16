@@ -22,10 +22,8 @@ logger = logging.getLogger(__name__)
 # Configuration
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 if not JWT_SECRET_KEY:
-    JWT_SECRET_KEY = "dev_secret_key_change_me"
-    if os.environ.get("FLASK_ENV") == "production":
-        logger.critical("JWT_SECRET_KEY not set in production environment!")
-        raise RuntimeError("JWT_SECRET_KEY must be set in production")
+    logger.critical("JWT_SECRET_KEY not set! This is required for secure authentication.")
+    raise RuntimeError("JWT_SECRET_KEY environment variable must be set")
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days for now

@@ -1,6 +1,6 @@
 import hashlib
 import os
-import random
+import secrets
 import threading
 import time
 import requests
@@ -28,7 +28,7 @@ class FetchFeedTask(threading.Thread):
     def run(self):
         # Add random jitter to avoid thundering herd and be polite
         # Sleep between 1 and 30 seconds
-        time.sleep(random.uniform(1, 30))
+        time.sleep(1 + secrets.randbelow(29))
         self.fetch_url()
 
     def fetch_url(self):

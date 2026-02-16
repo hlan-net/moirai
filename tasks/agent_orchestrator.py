@@ -245,6 +245,17 @@ class AgentOrchestrator(threading.Thread):
             )
             return
 
+        # Security: Whitelist allowed logic modules to prevent arbitrary code execution
+        ALLOWED_LOGIC_MODULES = [
+            "tasks.agent_logic.create_event_from_articles",
+            "tasks.agent_logic.add_articles_to_event",
+            "tasks.agent_logic.check_event_staleness",
+        ]
+
+        if logic_module_path not in ALLOWED_LOGIC_MODULES:
+            logger.error(f"Logic module {logic_module_path} is not in the allowed whitelist.")
+            return
+
         try:
             module_name, func_name = logic_module_path.rsplit(".", 1)
             module = importlib.import_module(module_name)

@@ -28,12 +28,12 @@ is_test_mode = (
 if not is_test_mode:
     configure_telemetry(app, "moirai-api")
 
-# CSRF protection is disabled to support the current API authentication design.
-# The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
-# Note: If adding session-based authentication in the future, re-enable CSRF protection.
+# CSRF protection is enabled for web security.
+# It is only disabled in test mode or if explicitly requested via environment variable.
 csrf = CSRFProtect()
 csrf.init_app(app)
-app.config["WTF_CSRF_ENABLED"] = False
+if is_test_mode or os.environ.get("DISABLE_CSRF", "false").lower() == "true":
+    app.config["WTF_CSRF_ENABLED"] = False
 
 # Configure rate limiting
 if os.environ.get("DISABLE_RATE_LIMIT", "false").lower() == "true":
