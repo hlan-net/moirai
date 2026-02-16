@@ -41,15 +41,25 @@ USER appuser
 ENV BUILD_NUMBER=${BUILD_NUMBER}
 
 # Copy the rest of the application code into the container
-COPY --chown=appuser:appuser main.py .
-COPY --chown=appuser:appuser mcp_server.py .
-COPY --chown=appuser:appuser version.py .
-COPY --chown=appuser:appuser api/ api/
-COPY --chown=appuser:appuser tasks/ tasks/
-COPY --chown=appuser:appuser mcp_service/ mcp_service/
-COPY --chown=appuser:appuser gunicorn.conf.py .
+# Use root to set permissions then switch back
+USER root
+COPY main.py .
+COPY mcp_server.py .
+COPY version.py .
+COPY api/ api/
+COPY tasks/ tasks/
+COPY mcp_service/ mcp_service/
+COPY gunicorn.conf.py .
 
+# Set read-only permissions for application code
+# appuser (group) gets read+execute, owner (root) gets read+write+execute
+RUN chown -R root:appuser /app && \
+    chmod -R 550 /app && \
+    chmod -R 700 /app/feeds && \
+    mkdir -p /app/ui/dist && \
+    chmod -R 770 /app/ui/dist
 
+USER appuser
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088
