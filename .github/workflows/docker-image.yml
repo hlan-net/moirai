@@ -54,6 +54,9 @@ jobs:
         env:
           API_USERNAME: testuser
           API_PASSWORD: testpassword
+          COUCHDB_PASSWORD: testpassword
+          REDIS_PASSWORD: testpassword
+          JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DEFAULT_LLM_PROVIDER: gemini
           MODEL_NAME: gemini-2.0-flash
@@ -82,7 +85,7 @@ jobs:
           
           if [ "$API_READY" = false ]; then
             echo "❌ Backend API failed to become ready"
-            docker compose logs moirai
+            docker compose logs api
             exit 1
           fi
           
