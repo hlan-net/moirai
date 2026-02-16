@@ -29,70 +29,54 @@ class ArticleProcessor:
         except LangDetectException:
             return None
 
-    def process_feed(self, feed_url, feed_content):
-        """Parses the feed content using feedparser and extracts articles.
-        Returns: tuple (feed_title, articles_list)
-        """
-        articles = []
-        feed_title = "Unknown Feed"
+    def _extract_entry_data(self, entry, feed_url, feed_title, feed_lang):
+        """Helper to extract data from a single feed entry."""
+        published_date = None
+        if hasattr(entry, "published_parsed") and entry.published_parsed:
+            try:
+                published_date = datetime(*entry.published_parsed[:6])
+            except (ValueError, TypeError) as err:
+                logger.warning(f"Could not parse date for article '{entry.get('title', 'No Title')}': {err}")
 
+        if published_date and (datetime.now() - published_date) > timedelta(days=self.expiration_days):
+            return None
+
+        content_value = entry.content[0].value if "content" in entry else entry.get("summary", "")
+        text_to_detect = entry.get("title", "") + " " + entry.get("summary", "")
+        detected_lang = self.detect_language(text_to_detect)
+        article_lang = detected_lang or feed_lang or "unknown"
+
+        return {
+            "feed_url": feed_url,
+            "feed_title": feed_title,
+            "title": entry.get("title", "No Title"),
+            "link": entry.get("link", ""),
+            "published": published_date.isoformat() + "Z" if published_date else datetime.now().isoformat(),
+            "summary": entry.get("summary", ""),
+            "content": content_value,
+            "language": article_lang,
+        }
+
+    def process_feed(self, feed_url, feed_content):
+        """Parses the feed content and extracts articles."""
+        articles = []
         try:
             parsed_feed = feedparser.parse(feed_content)
             feed_title = parsed_feed.feed.get("title", "Unknown Feed")
             feed_lang = (
                 parsed_feed.feed.get("language", "").split("-")[0].lower()
-                if parsed_feed.feed.get("language")
-                else None
+                if parsed_feed.feed.get("language") else None
             )
 
             for entry in parsed_feed.entries:
-                published_date = None
-                if hasattr(entry, "published_parsed") and entry.published_parsed:
-                    try:
-                        published_date = datetime(*entry.published_parsed[:6])
-                    except (ValueError, TypeError) as err:
-                        logger.warning(
-                            f"Could not parse date for article '{entry.get('title', 'No Title')}': {err}"
-                        )
-
-                if published_date and (datetime.now() - published_date) > timedelta(
-                    days=self.expiration_days
-                ):
-                    continue
-
-                content_value = ""
-                if "content" in entry:
-                    content_value = entry.content[0].value
-                elif "summary" in entry:
-                    content_value = entry.summary
-
-                # Detect language
-                text_to_detect = entry.get("title", "") + " " + entry.get("summary", "")
-                detected_lang = self.detect_language(text_to_detect)
-
-                # Use feed language as fallback if detection is uncertain or fails
-                article_lang = detected_lang or feed_lang or "unknown"
-
-                article = {
-                    "feed_url": feed_url,
-                    "feed_title": feed_title,  # Added to avoid extra lookups in UI
-                    "title": entry.get("title", "No Title"),
-                    "link": entry.get("link", ""),
-                    "published": published_date.isoformat() + "Z"
-                    if published_date
-                    else datetime.now().isoformat(),
-                    "summary": entry.get("summary", ""),
-                    "content": content_value,
-                    "language": article_lang,
-                }
-
-                articles.append(article)
-        except (ValueError, TypeError) as err:
-            logger.error(f"Error parsing feed content for {feed_url}: {err}")
+                article = self._extract_entry_data(entry, feed_url, feed_title, feed_lang)
+                if article:
+                    articles.append(article)
+                    
+            return feed_title, articles
         except Exception as err:
-            logger.error(f"Unexpected error parsing feed for {feed_url}: {err}")
-
-        return feed_title, articles
+            logger.error(f"Error parsing feed {feed_url}: {err}")
+            return "Unknown Feed", []
 
     def store_article(self, article):
         """Stores the article in CouchDB if it doesn't already exist."""

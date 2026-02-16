@@ -57,9 +57,8 @@ RUN chown -R root:appuser /app && \
     chmod -R 550 /app && \
     chmod -R 700 /app/feeds && \
     mkdir -p /app/ui/dist && \
-    chmod -R 770 /app/ui/dist
-
-USER appuser
+    chmod -R 770 /app/ui/dist && \
+    chmod +x /app/create_dbs.sh
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088

@@ -21,49 +21,39 @@ def get_dynamic_interval(default_interval):
     return default_interval
 
 
+def _process_feeds(feeds_db_url):
+    """Fetch and trigger feed tasks."""
+    try:
+        response = requests.get(feeds_db_url, timeout=10)
+        response.raise_for_status()
+        feeds = response.json().get("rows", [])
+
+        for feed_item in feeds:
+            doc = feed_item.get("doc")
+            if doc and doc.get("_id") and doc.get("url") and doc.get("original_url"):
+                FetchFeedTask(doc["_id"], doc["url"], doc["original_url"]).start()
+            elif doc:
+                logger.warning(f"Scheduler: Skipping invalid feed document: {doc}")
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Scheduler: Error fetching feeds from CouchDB: {e}")
+    except Exception as e:
+        logger.error(f"Scheduler: An unexpected error occurred: {e}")
+
 def scheduler_loop(initial_interval):
-    current_interval = initial_interval
     db_url = get_couchdb_uri()
     feeds_db_url = f"{db_url}feeds/_all_docs?include_docs=true"
     
-    # Run tasks once per iteration interval.
     while True:
-        # Check for dynamic interval update
         current_interval = get_dynamic_interval(initial_interval)
 
         if current_interval <= 0:
-            logger.info(
-                f"Scheduler paused (Interval: {current_interval}). Checking again in 60s."
-            )
+            logger.info(f"Scheduler paused. Checking again in 60s.")
             time.sleep(60)
             continue
 
-        logger.info(f"Scheduler: Starting fetch cycle (Interval: {current_interval}s)")
-
-        try:
-            # Credentials are now handled in get_couchdb_uri() via basic auth in URL
-            response = requests.get(feeds_db_url, timeout=10)
-            response.raise_for_status()
-            feeds = response.json().get("rows", [])
-
-            for feed_item in feeds:
-                doc = feed_item.get("doc")
-                if doc:
-                    feed_id = doc.get("_id")
-                    url = doc.get("url")
-                    original_url = doc.get("original_url")
-                    
-                    if feed_id and url and original_url:
-                        FetchFeedTask(feed_id, url, original_url).start()
-                    else:
-                        logger.warning(f"Scheduler: Skipping invalid feed document: {doc}")
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Scheduler: Error fetching feeds from CouchDB: {e}")
-        except Exception as e:
-            logger.error(f"Scheduler: An unexpected error occurred: {e}")
-
-
+        logger.info(f"Scheduler: Starting fetch cycle ({current_interval}s)")
+        _process_feeds(feeds_db_url)
         time.sleep(current_interval)
 
 
