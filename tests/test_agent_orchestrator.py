@@ -87,17 +87,21 @@ def test_is_scheduled_agent_due(orchestrator):
 def test_execute_agent_logic(mock_update, mock_import, orchestrator):
     mock_module = MagicMock()
     mock_func = MagicMock()
-    setattr(mock_module, 'test_func', mock_func)
+    # Use a whitelisted module name
+    whitelisted_module = "tasks.agent_logic"
+    whitelisted_func = "create_event_from_articles"
+    
+    setattr(mock_module, whitelisted_func, mock_func)
     mock_import.return_value = mock_module
     
     agent_config = {
         "_id": "agent1",
-        "logic_module": "mymodule.test_func"
+        "logic_module": f"{whitelisted_module}.{whitelisted_func}"
     }
     
     orchestrator.execute_agent_logic(agent_config)
     
-    mock_import.assert_called_once_with("mymodule")
+    mock_import.assert_called_once_with(whitelisted_module)
     mock_func.assert_called_once()
     mock_update.assert_called_once()
     assert "last_run_at" in agent_config

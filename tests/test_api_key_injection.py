@@ -1,6 +1,7 @@
-"""
-Test that the chat agent properly injects API key into MCP tool calls.
-"""
+import os
+# Set environment variables BEFORE importing application code
+os.environ["JWT_SECRET_KEY"] = "super_secret_test_key_that_is_at_least_32_chars_long"
+os.environ["API_PASSWORD"] = "test_password_123"
 
 import pytest
 import json
@@ -14,7 +15,7 @@ from api.chat_routes import _execute_tool_calls
 def setup_api_password_env(monkeypatch):
     """Fixture to set environment variables for testing."""
     monkeypatch.setenv("API_PASSWORD", "test_password_123")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test_jwt_secret_123")
+    monkeypatch.setenv("JWT_SECRET_KEY", "super_secret_test_key_that_is_at_least_32_chars_long")
 
 
 @pytest.fixture
