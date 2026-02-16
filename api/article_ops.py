@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from api.db_constants import MONGO_GT, MONGO_IN, MONGO_ELEM_MATCH
+from api.db_constants import MONGO_GT, MONGO_IN
 from api.db import query_couchdb
 
 
