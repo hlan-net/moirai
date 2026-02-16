@@ -12,20 +12,24 @@ spec:
   initContainers:
     - name: wait-for-service
       image: busybox
-      command: ['sh', '-c', 'until nc -z -v -w30 {{ include "moirai.fullname" . }} {{ .Values.service.port }}; do echo "Waiting for service..."; sleep 5; done']
+      command: ['sh', '-c', 'until nc -z -v -w30 {{ include "moirai.fullname" . }}-nginx {{ .Values.nginx.service.port }}; do echo "Waiting for service..."; sleep 5; done']
       resources:
         requests:
-          memory: 64Mi
+          cpu: 10m
+          memory: 32Mi
         limits:
-          memory: 128Mi
+          cpu: 50m
+          memory: 64Mi
   containers:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "moirai.fullname" . }}:{{ .Values.service.port }}']
+      args: ['{{ include "moirai.fullname" . }}-nginx:{{ .Values.nginx.service.port }}']
       resources:
         requests:
-          memory: 64Mi
+          cpu: 10m
+          memory: 32Mi
         limits:
-          memory: 128Mi
+          cpu: 50m
+          memory: 64Mi
   restartPolicy: Never
