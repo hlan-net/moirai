@@ -2,31 +2,45 @@ import hashlib
 import json
 import requests
 import logging
-from .config import COUCHDB_URI
+from api.db_config import get_couchdb_uri
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 logger = logging.getLogger(__name__)
 
 # --- DB Helpers ---
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type(
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.ChunkedEncodingError,
+        )
+    ),
+    reraise=True,
+)
+def _request(method, url, **kwargs):
+    """Helper to make HTTP requests with retry logic."""
+    if "timeout" not in kwargs:
+        kwargs["timeout"] = 10
+    return requests.request(method, url, **kwargs)
+
 
 def get_db_url(db_name):
-    return f"{COUCHDB_URI}{db_name}"
+    return f"{get_couchdb_uri()}{db_name}"
 
 
 def db_request(method, db_name, path="", json_data=None, params=None):
     url = f"{get_db_url(db_name)}{path}"
-    timeout = 10
     try:
-        if method == "GET":
-            response = requests.get(url, params=params, timeout=timeout)
-        elif method == "POST":
-            response = requests.post(url, json=json_data, timeout=timeout)
-        elif method == "PUT":
-            response = requests.put(url, json=json_data, timeout=timeout)
-        elif method == "HEAD":
-            response = requests.head(url, timeout=timeout)
-        elif method == "DELETE":
-            response = requests.delete(url, params=params, timeout=timeout)
+        response = _request(method, url, json=json_data, params=params)
 
         # Don't raise for 404s if we want to handle them gracefully in callers
         if response.status_code >= 400 and response.status_code != 404:

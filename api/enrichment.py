@@ -1,5 +1,6 @@
 import logging
 from api.db import query_couchdb, fetch_from_couchdb
+from api.db_constants import MONGO_ELEM_MATCH, MONGO_IN
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def _fetch_related_data(article_links):
     if article_links:
         events = query_couchdb(
             "events",
-            selector={"article_links": {"$elemMatch": {"$in": article_links}}},
+            selector={"article_links": {MONGO_ELEM_MATCH: {MONGO_IN: article_links}}},
             limit=1000,
         )
 
@@ -51,7 +52,7 @@ def _fetch_related_data(article_links):
     if event_ids:
         trends = query_couchdb(
             "trends",
-            selector={"event_ids": {"$elemMatch": {"$in": event_ids}}},
+            selector={"event_ids": {MONGO_ELEM_MATCH: {MONGO_IN: event_ids}}},
             limit=1000,
         )
 

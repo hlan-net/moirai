@@ -31,11 +31,14 @@ except redis.exceptions.ConnectionError as e:
 
 # Initialize and start the Agent Orchestrator
 # Pass the mcp client so it can make tool calls
-agent_orchestrator = AgentOrchestrator(interval=60, redis_client=redis_client) # Pass redis_client
-agent_orchestrator.mcp_client = mcp  # Assign mcp client
-agent_orchestrator.daemon = True  # Allow main program to exit even if thread is running
-agent_orchestrator.start()
-logger.info("Agent Orchestrator thread started.")
+try:
+    agent_orchestrator = AgentOrchestrator(interval=60, redis_client=redis_client) # Pass redis_client
+    agent_orchestrator.mcp_client = mcp  # Assign mcp client
+    agent_orchestrator.daemon = True  # Allow main program to exit even if thread is running
+    agent_orchestrator.start()
+    logger.info("Agent Orchestrator thread started.")
+except Exception as orchestrator_err:
+    logger.error(f"Failed to start Agent Orchestrator: {orchestrator_err}")
 
 
 async def health_check(request):  # Moved definition here
