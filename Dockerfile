@@ -2,7 +2,7 @@
 FROM condaforge/miniforge3:24.3.0-0 AS final-stage
 
 # Build arguments for version info
-ARG VERSION=0.3.0
+ARG VERSION=0.3.1
 ARG BUILD_NUMBER=unknown
 
 # Set the working directory in the container

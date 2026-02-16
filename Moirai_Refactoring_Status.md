@@ -20,7 +20,7 @@ The Helm chart (`helm/`) has been extensively refactored to support the new serv
 *   **`helm/values.yaml`:**
     *   Removed top-level `image` and `service` configurations.
     *   Introduced new, granular configuration sections for `api`, `ui`, and `nginx` services, each with its own `image`, `replicaCount`, and `service` settings.
-    *   `appVersion` was corrected back to `0.3.0` as no new application release has occurred yet, while the chart `version` was incremented to `0.3.1`.
+    *   `appVersion` was corrected back to `0.3.1` as no new application release has occurred yet, while the chart `version` was incremented to `0.3.1`.
 *   **`helm/templates/api-deployment.yaml` & `helm/templates/api-service.yaml`:**
     *   The former `moirai-deployment.yaml` and `moirai-service.yaml` were renamed and modified to specifically deploy and expose the `api` service.
     *   The `app.kubernetes.io/component` label was updated to `api`.
@@ -40,7 +40,7 @@ The Helm chart (`helm/`) has been extensively refactored to support the new serv
     *   Updated to include new helper definitions for generating names and labels specific to the `api`, `ui`, and `nginx` components.
 *   **`helm/Chart.yaml`:**
     *   `version` incremented to `0.3.1`.
-    *   `appVersion` set to `0.3.0`.
+    *   `appVersion` set to `0.3.1`.
 
 ### 3. Verification
 *   **Local Docker Compose:** The refactored Docker Compose setup starts all services (`api`, `ui`, `nginx`, `mcp-server`, `couchdb`, `redis`) correctly. The application is fully accessible via the `nginx` proxy on `http://localhost:8088`.
