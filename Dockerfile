@@ -1,5 +1,5 @@
 # Build the Python application using Miniforge
-FROM condaforge/miniforge3:latest AS final-stage
+FROM condaforge/miniforge3:24.3.0-0 AS final-stage
 
 # Build arguments for version info
 ARG VERSION=0.3.0
@@ -28,7 +28,7 @@ RUN chmod +x /app/create_dbs.sh
 RUN useradd -ms /bin/bash appuser && \
     chown -R appuser:appuser /app && \
     mkdir -p /app/feeds && \
-    chmod 775 /app/feeds && \
+    chmod 700 /app/feeds && \
     mkdir -p /app/ui/dist && \
     chown -R appuser:appuser /app/ui/dist
 

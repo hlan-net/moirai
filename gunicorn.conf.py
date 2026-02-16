@@ -1,7 +1,6 @@
 # gunicorn.conf.py
 # In gunicorn.conf.py
 import multiprocessing
-import os
 from main import start_services
 
 # Server socket
