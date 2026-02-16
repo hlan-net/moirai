@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 
 # Install dependencies (resolutions in package.json will handle entities)
-RUN yarn install --frozen-lockfile
+RUN yarn install
 
 # Copy the rest of the UI source code
 COPY . .
