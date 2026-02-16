@@ -48,7 +48,7 @@ def scheduler_loop(initial_interval):
         current_interval = get_dynamic_interval(initial_interval)
 
         if current_interval <= 0:
-            logger.info(f"Scheduler paused. Checking again in 60s.")
+            logger.info("Scheduler paused. Checking again in 60s.")
             time.sleep(60)
             continue
 

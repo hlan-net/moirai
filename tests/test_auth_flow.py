@@ -1,7 +1,13 @@
 import unittest
 import secrets
 import logging
+import os
 from unittest.mock import patch
+
+# Set environment variables BEFORE importing app
+os.environ["JWT_SECRET_KEY"] = "test_jwt_secret_123"
+os.environ["API_PASSWORD"] = "test_password_123"
+
 from main import app
 
 # Disable logging during tests

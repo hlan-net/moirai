@@ -112,6 +112,7 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
       processTrendsResponse(trendsResponse, isRefresh),
     ])
   } catch (error) {
+    console.error('Error fetching events and trends:', error)
     // Only clear events if we failed to fetch them and it's not a refresh
     if (!isRefresh) {
       events.value = []

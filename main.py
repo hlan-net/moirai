@@ -6,7 +6,7 @@ from api.extensions import limiter, metrics
 from api.routes import api_blueprint
 from api.mcp_routes import mcp_blueprint
 from api.chat_routes import chat_blueprint
-from api.auth import auth_blueprint  # Moved to top
+from api.auth import auth_blueprint, JWT_SECRET_KEY  # Import JWT_SECRET_KEY
 from api.telemetry import configure_telemetry  # Moved to top
 
 from tasks.scheduler import scheduler
@@ -15,6 +15,7 @@ from tasks.enrichment_worker import worker  # Moved to top
 from version import get_version_string
 
 app = Flask(__name__, static_folder="ui/dist")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or JWT_SECRET_KEY
 
 # Initialize Telemetry
 # Don't configure telemetry if running in a test environment
@@ -113,6 +114,7 @@ if __name__ == "__main__":
     # Check if this is the main process and not a reloader child in development
     if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
         port = int(os.environ.get("HTTP_PORT", 8088))
-        app.logger.info(f"Starting Moirai on port {port}")
-        app.run(host="0.0.0.0", port=port)
+        host = os.environ.get("HTTP_HOST", "0.0.0.0")
+        app.logger.info(f"Starting Moirai on {host}:{port}")
+        app.run(host=host, port=port)
 # No need for else block here, as gunicorn handles the app startup (and calls start_services via hook)
