@@ -26,10 +26,7 @@ jobs:
       with:
         miniforge-variant: Miniforge3
         miniforge-version: 'latest'
-        python-version: '3.10' # Match python version in environment.yml
         environment-file: environment.yml
-        auto-activate-base: false # Don't auto-activate base env
-        activate-environment: moirai # Activate the created env named 'moirai'
         use-mamba: true # Use mamba for faster dependency resolution
 
     - name: Install dependencies (Conda)
