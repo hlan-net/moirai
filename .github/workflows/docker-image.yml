@@ -145,7 +145,7 @@ jobs:
             file: Dockerfile
           - image: ghcr.io/${{ github.repository }}-ui
             context: ui
-            file: ui/Dockerfile
+            file: Dockerfile
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
