@@ -25,14 +25,7 @@ ENV BUILD_NUMBER=${BUILD_NUMBER}
 
 # Use root to copy files and set final permissions
 USER root
-COPY create_dbs.sh .
-COPY main.py .
-COPY mcp_server.py .
-COPY version.py .
-COPY api/ api/
-COPY tasks/ tasks/
-COPY mcp_service/ mcp_service/
-COPY gunicorn.conf.py .
+COPY . .
 
 # Final permission lockdown
 RUN chown -R root:appuser /app && \
