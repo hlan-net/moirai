@@ -3,7 +3,7 @@ import requests
 import urllib.parse
 import re
 import logging
-from api.db_config import COUCHDB_URI
+from api.db_config import get_couchdb_uri
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -71,11 +71,11 @@ def fetch_from_couchdb(db_name, doc_id=None):
         if doc_id:
             safe_db_name = urllib.parse.quote(db_name, safe="")
             safe_doc_id = urllib.parse.quote(doc_id, safe="")
-            response = _request("GET", f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}")
+            response = _request("GET", f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}")
         else:
             response = _request(
                 "GET",
-                f"{COUCHDB_URI}{db_name}/_all_docs",
+                f"{get_couchdb_uri()}{db_name}/_all_docs",
                 params={"include_docs": "true"},
             )
 
@@ -101,7 +101,7 @@ def store_to_couchdb(db_name, doc):
 
     try:
         safe_db_name = urllib.parse.quote(db_name, safe="")
-        response = _request("POST", f"{COUCHDB_URI}{safe_db_name}", json=doc)
+        response = _request("POST", f"{get_couchdb_uri()}{safe_db_name}", json=doc)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
@@ -118,7 +118,7 @@ def delete_from_couchdb(db_name, doc_id, rev):
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
         response = _request(
-            "DELETE", f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", params={"rev": rev}
+            "DELETE", f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}", params={"rev": rev}
         )
         return response.status_code in (200, 202)
     except requests.exceptions.RequestException as e:
@@ -135,7 +135,7 @@ def update_couchdb_doc(db_name, doc_id, doc):
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
         response = _request(
-            "PUT", f"{COUCHDB_URI}{safe_db_name}/{safe_doc_id}", json=doc
+            "PUT", f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}", json=doc
         )
         if response.status_code in (200, 201):
             return True
@@ -168,7 +168,7 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
 
         response = _request(
             "POST",
-            f"{COUCHDB_URI}{safe_db_name}/_find",
+            f"{get_couchdb_uri()}{safe_db_name}/_find",
             json=query,
             headers={"Content-Type": "application/json"},
         )
@@ -226,7 +226,7 @@ def query_couchdb_view(db_name, design_doc, view_name, group=True):
     safe_view_name = urllib.parse.quote(view_name, safe="")
 
     url = (
-        f"{COUCHDB_URI}{safe_db_name}/_design/{safe_design_doc}/_view/{safe_view_name}"
+        f"{get_couchdb_uri()}{safe_db_name}/_design/{safe_design_doc}/_view/{safe_view_name}"
     )
     params = {"group": "true" if group else "false"}
 

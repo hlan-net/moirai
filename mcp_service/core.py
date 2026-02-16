@@ -7,7 +7,9 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
 
 # Auth Configuration
-API_PASSWORD = os.environ.get("API_PASSWORD", "password")
+API_PASSWORD = os.environ.get("API_PASSWORD")
+if not API_PASSWORD:
+    raise RuntimeError("API_PASSWORD environment variable must be set for MCP server")
 
 
 def auth_required(func):

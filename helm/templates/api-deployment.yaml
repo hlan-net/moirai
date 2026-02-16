@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "moirai.fullname" . }}-api
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "moirai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      annotations:
+        checksum/couchdb-secret: {{ include (print $.Template.BasePath "/couchdb-secret.yaml") . | sha256sum }}
+        checksum/moirai-secret: {{ include (print $.Template.BasePath "/moirai-secret.yaml") . | sha256sum }}
+        checksum/openai-secret: {{ include (print $.Template.BasePath "/openai-secret.yaml") . | sha256sum }}
+        checksum/feed-configmap: {{ include (print $.Template.BasePath "/feed-list-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "moirai.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: {{ include "moirai.serviceAccountName" . }}
+      containers:
+        - name: {{ include "moirai.name" . }}-api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+            - /opt/conda/envs/moirai/bin/gunicorn
+            - --config
+            - gunicorn.conf.py
+            - main:app
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.service.port }}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: "1Gi"
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: "2Gi"
+          env:
+          - name: ENVIRONMENT
+            value: {{ .Values.environment | quote }}
+          - name: OLLAMA_BASE_URL
+            value: {{ .Values.ollama.endpoint | quote }}
+          - name: OPEN_WEBUI_ENDPOINT
+            value: {{ .Values.openWebui.endpoint | quote }}
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb
+                key: adminUsername
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb
+                key: adminPassword
+          - name: COUCHDB_URI
+            value: "http://{{ include "moirai.fullname" . }}-couchdb:5984/"
+          - name: HTTP_PORT
+            value: {{ .Values.api.service.port | quote }}
+          - name: ALLOW_PUBLIC_READ
+            value: "false"
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-openai-secret
+                key: apiKey
+          - name: API_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: apiUsername
+          - name: API_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: apiPassword
+          - name: COUCHDB_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb
+                key: cookieAuthSecret
+          - name: ENABLE_PROD_STARTUP
+            value: {{ .Values.api.enableProdStartup | quote }}
+          - name: MCP_SERVER_URL
+            value: "http://{{ include "moirai.fullname" . }}-mcp-server:{{ .Values.mcpServer.service.port }}/sse"
+          - name: ARTICLE_EXPIRATION_DAYS
+            value: {{ .Values.api.articleExpirationDays | quote }}
+          volumeMounts:
+            - name: feeds-volume
+              mountPath: /app/feeds
+      volumes:
+        - name: feeds-volume
+          configMap:
+            name: {{ include "moirai.fullname" . }}-feed-lists

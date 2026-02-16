@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, timezone
 from ..core import mcp, auth_required, validate_namespace
 from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
-
+from .constants import ERROR_FEED_NOT_FOUND_OR_DENIED
 
 @mcp.tool()
 @auth_required
@@ -104,7 +104,7 @@ def delete_feed(feed_id: str, namespace: str, api_key: str = None) -> str:
 
     existing = get_doc("feeds", feed_id)
     if not existing or existing.get("namespace") != namespace:
-        return "Feed not found or access denied."
+        return ERROR_FEED_NOT_FOUND_OR_DENIED
 
     success, msg = delete_doc("feeds", feed_id)
     if success:
@@ -188,7 +188,7 @@ def update_feed_category(
 
     existing = get_doc("feeds", feed_id)
     if not existing or existing.get("namespace") != namespace:
-        return "Feed not found or access denied."
+        return ERROR_FEED_NOT_FOUND_OR_DENIED
 
     success, msg = update_doc("feeds", feed_id, {"category": new_category})
     if success:

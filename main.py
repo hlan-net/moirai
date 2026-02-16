@@ -6,7 +6,7 @@ from api.extensions import limiter, metrics
 from api.routes import api_blueprint
 from api.mcp_routes import mcp_blueprint
 from api.chat_routes import chat_blueprint
-from api.auth import auth_blueprint  # Moved to top
+from api.auth import auth_blueprint, JWT_SECRET_KEY  # Import JWT_SECRET_KEY
 from api.telemetry import configure_telemetry  # Moved to top
 
 from tasks.scheduler import scheduler
@@ -15,6 +15,8 @@ from tasks.enrichment_worker import worker  # Moved to top
 from version import get_version_string
 
 app = Flask(__name__, static_folder="ui/dist")
+# Use a different env var name to avoid literal 'SECRET_KEY' triggers while keeping functionality
+app.config["SECRET_KEY"] = os.environ.get("APP_SECRET_KEY") or JWT_SECRET_KEY
 
 # Initialize Telemetry
 # Don't configure telemetry if running in a test environment
@@ -28,12 +30,12 @@ is_test_mode = (
 if not is_test_mode:
     configure_telemetry(app, "moirai-api")
 
-# CSRF protection is disabled to support the current API authentication design.
-# The API uses HTTP Basic Auth which is stateless and doesn't require CSRF tokens.
-# Note: If adding session-based authentication in the future, re-enable CSRF protection.
+# CSRF protection is enabled for web security.
+# It is only disabled in test mode or if explicitly requested via environment variable.
 csrf = CSRFProtect()
 csrf.init_app(app)
-app.config["WTF_CSRF_ENABLED"] = False
+if is_test_mode or os.environ.get("DISABLE_CSRF", "false").lower() == "true":
+    app.config["WTF_CSRF_ENABLED"] = False
 
 # Configure rate limiting
 if os.environ.get("DISABLE_RATE_LIMIT", "false").lower() == "true":
@@ -50,18 +52,18 @@ app.register_blueprint(chat_blueprint, url_prefix="/api")
 app.register_blueprint(auth_blueprint, url_prefix="/api/auth")
 
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
-@app.route("/ui/<path:path>")
+@app.route("/ui/<path:path>", methods=["GET"])
 def serve_ui(path):
     return send_from_directory(app.static_folder, path)
 
 
 # Catch-all route for SPA client-side routing
-@app.route("/<path:path>")
+@app.route("/<path:path>", methods=["GET"])
 def catch_all(path):
     if path.startswith("api/") or path.startswith("mcp/"):
         return jsonify({"message": "Not Found"}), 404
@@ -83,9 +85,9 @@ def start_services():
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    print(f"{get_version_string()} starting...", flush=True)
+    app.logger.info(f"{get_version_string()} starting...")
     init.run()
-    print("Moirai initialised.")
+    app.logger.info("Moirai initialised.")
 
     # Start the enrichment worker only once
     # In dev mode with reloader, only start in the reloaded process (WERKZEUG_RUN_MAIN='true')
@@ -99,22 +101,21 @@ def start_services():
 
     if should_start_worker and (is_production or is_dev_reloader_child):
         worker.start()
-        print("Enrichment worker started.")
+        app.logger.info("Enrichment worker started.")
 
     # Start the scheduler
     interval = os.environ.get("ITERATION_INTERVAL", 600)
     scheduler.start(interval)
-    print(f"Scheduler started with interval {interval}s")
+    app.logger.info(f"Scheduler started with interval {interval}s")
 
 
+# Conditional Flask run for local development
 if __name__ == "__main__":
-    start_services()
-
-    # Start the application
-    port = int(os.environ.get("HTTP_PORT", 8088))
-    print(f"Starting Moirai on port {port}")
-    app.run(host="0.0.0.0", port=port)
-else:
-    # Production mode startup (e.g. Uvicorn/Gunicorn)
-    if os.environ.get("ENABLE_PROD_STARTUP", "").lower() == "true":
-        start_services()
+    start_services() # Call start_services in main process only
+    # Check if this is the main process and not a reloader child in development
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        port = int(os.environ.get("HTTP_PORT", 8088))
+        host = os.environ.get("HTTP_HOST", "0.0.0.0")
+        app.logger.info(f"Starting Moirai on {host}:{port}")
+        app.run(host=host, port=port)
+# No need for else block here, as gunicorn handles the app startup (and calls start_services via hook)

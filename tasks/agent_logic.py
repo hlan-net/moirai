@@ -5,6 +5,8 @@ import validators
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_AGENT_NAME = "Unnamed Agent"
+
 
 # Placeholder for LLM interaction - this would typically use mcp_client.call_tool('llm_chat', ...)
 # or directly interact with the LLM API using user-specific keys.
@@ -29,7 +31,7 @@ def create_event_from_articles(
     Agent logic to analyze new articles and potentially create new events.
     """
     user_id = agent_config.get("user_id")
-    agent_name = agent_config.get("name", "Unnamed Agent")
+    agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     llm_config = agent_config.get("llm_model_config", {})
     params = agent_config.get("parameters", {})
 
@@ -100,7 +102,7 @@ def add_articles_to_event(
     Agent logic to analyze new articles and add relevant ones to a specific event.
     """
     user_id = agent_config.get("user_id")
-    agent_name = agent_config.get("name", "Unnamed Agent")
+    agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     llm_config = agent_config.get("llm_model_config", {})
     event_id = agent_config.get("linked_entity_id")
     params = agent_config.get("parameters", {})
@@ -183,103 +185,68 @@ Identify which new articles are relevant to this event. List the full URLs of re
                 )
 
 
+def _update_staleness_status(mcp_client, agent_name: str, user_id: str, event_id: str, should_be_stale: bool):
+    """Helper to update event staleness via MCP tool."""
+    action = "marking it as stale" if should_be_stale else "unmarking it"
+    logger.info(f"Agent '{agent_name}' ({user_id}) - Event {event_id} status change: {action}.")
+    
+    result = mcp_client.call_tool(
+        "mark_entity_stale",
+        entity_type="event",
+        entity_id=event_id,
+        is_stale=should_be_stale,
+    )
+    
+    if result.get("status") == "success":
+        logger.info(f"Agent '{agent_name}' ({user_id}) - Successfully updated event {event_id}.")
+    else:
+        logger.error(f"Agent '{agent_name}' ({user_id}) - Failed to update event {event_id}: {result.get('message', 'Unknown error')}")
+
 def check_event_staleness(agent_config: Dict[str, Any], mcp_client):
     """
     Agent logic to check if a linked event is stale and mark it as such.
     """
     user_id = agent_config.get("user_id")
-    agent_name = agent_config.get("name", "Unnamed Agent")
+    agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     event_id = agent_config.get("linked_entity_id")
     params = agent_config.get("parameters", {})
-    staleness_threshold_days = params.get(
-        "staleness_threshold_days", 30
-    )  # Default to 30 days
+    staleness_threshold_days = params.get("staleness_threshold_days", 30)
 
     if not event_id:
-        logger.warning(
-            f"Agent '{agent_name}' ({user_id}) - No linked_entity_id (event_id) specified for staleness check."
-        )
+        logger.warning(f"Agent '{agent_name}' ({user_id}) - No event_id specified for staleness check.")
         return
-
-    logger.info(
-        f"Agent '{agent_name}' ({user_id}) - Checking staleness for event {event_id}."
-    )
 
     # Fetch the event
     event_doc_result = mcp_client.call_tool("get_event", event_id=event_id)
     if event_doc_result.get("status") != "success":
-        logger.error(
-            f"Agent '{agent_name}' ({user_id}) - Failed to retrieve event {event_id}: {event_doc_result.get('message')}"
-        )
+        logger.error(f"Agent '{agent_name}' ({user_id}) - Failed to retrieve event {event_id}: {event_doc_result.get('message')}")
         return
+    
     event_doc = event_doc_result["event"]
-
-    # Determine last activity date. Prioritize 'updated_at', then 'created_at'.
     last_activity_at_str = event_doc.get("updated_at") or event_doc.get("created_at")
+    
     if not last_activity_at_str:
-        logger.warning(
-            f"Agent '{agent_name}' ({user_id}) - Event {event_id} has no 'updated_at' or 'created_at'. Cannot determine staleness."
-        )
+        logger.warning(f"Agent '{agent_name}' ({user_id}) - Event {event_id} missing activity timestamps.")
         return
 
     try:
-        last_activity_date = datetime.fromisoformat(
-            last_activity_at_str.replace("Z", "+00:00")
-        )
+        last_activity_date = datetime.fromisoformat(last_activity_at_str.replace("Z", "+00:00"))
         if last_activity_date.tzinfo is None:
             last_activity_date = last_activity_date.replace(tzinfo=timezone.utc)
     except ValueError:
-        logger.error(
-            f"Agent '{agent_name}' ({user_id}) - Invalid date format for 'last_activity_at' in event {event_id}: {last_activity_at_str}"
-        )
+        logger.error(f"Agent '{agent_name}' ({user_id}) - Invalid date format in event {event_id}")
         return
 
     now = datetime.now(timezone.utc)
     days_since_activity = (now - last_activity_date).days
+    is_currently_stale = event_doc.get("is_stale", False)
+    is_beyond_threshold = days_since_activity > staleness_threshold_days
 
-    if days_since_activity > staleness_threshold_days:
-        if not event_doc.get("is_stale", False):  # Only mark if not already stale
-            logger.info(
-                f"Agent '{agent_name}' ({user_id}) - Event {event_id} is stale ({days_since_activity} days since last activity). Marking it."
-            )
-            mark_result = mcp_client.call_tool(
-                "mark_entity_stale",
-                entity_type="event",
-                entity_id=event_id,
-                is_stale=True,
-            )
-            if mark_result.get("status") == "success":
-                logger.info(
-                    f"Agent '{agent_name}' ({user_id}) - Successfully marked event {event_id} as stale."
-                )
-            else:
-                logger.error(
-                    f"Agent '{agent_name}' ({user_id}) - Failed to mark event {event_id} as stale: {mark_result.get('message', 'Unknown error')}"
-                )
-        else:
-            logger.info(
-                f"Agent '{agent_name}' ({user_id}) - Event {event_id} is already marked as stale."
-            )
+    if is_beyond_threshold and not is_currently_stale:
+        _update_staleness_status(mcp_client, agent_name, user_id, event_id, True)
+    elif not is_beyond_threshold and is_currently_stale:
+        _update_staleness_status(mcp_client, agent_name, user_id, event_id, False)
     else:
-        if event_doc.get("is_stale", False):  # Unmark if it became active again
-            logger.info(
-                f"Agent '{agent_name}' ({user_id}) - Event {event_id} is no longer stale. Unmarking it."
-            )
-            mark_result = mcp_client.call_tool(
-                "mark_entity_stale",
-                entity_type="event",
-                entity_id=event_id,
-                is_stale=False,
-            )
-            if mark_result.get("status") == "success":
-                logger.info(
-                    f"Agent '{agent_name}' ({user_id}) - Successfully unmarked event {event_id}."
-                )
-            else:
-                logger.error(
-                    f"Agent '{agent_name}' ({user_id}) - Failed to unmark event {event_id}: {mark_result.get('message', 'Unknown error')}"
-                )
-        else:
-            logger.info(
-                f"Agent '{agent_name}' ({user_id}) - Event {event_id} is not stale ({days_since_activity} days since last activity)."
-            )
+        status_msg = "stale" if is_currently_stale else "active"
+        logger.info(f"Agent '{agent_name}' ({user_id}) - Event {event_id} remains {status_msg} ({days_since_activity} days).")
+

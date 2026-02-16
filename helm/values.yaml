@@ -1,64 +1,63 @@
 # Default values for GenAI Press Review service
 
-# -- Number of replicas to deploy
-replicaCount: 1
+replicaCount: 1 # This can be overridden per-service if needed
 
-# -- Allow public read access to the API
-allowPublicRead: false
+api:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/hlan-net/moirai-api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  command:
+    - /opt/conda/envs/moirai/bin/gunicorn 
+    - --config
+    - gunicorn.conf.py
+    - main:app
+  service:
+    type: ClusterIP
+    port: 8088
+    targetPort: 8088
+  enableProdStartup: "true"
+  articleExpirationDays: 30
 
-# -- Image configuration
-image:
-  # -- Image repository
-  repository: ghcr.io/hlan-net/moirai
-  # -- Image tag
-  tag: "latest"
-  # -- Image pull policy
-  pullPolicy: Always
+ui:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/hlan-net/moirai-ui
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
 
-# -- Ingress configuration
-ingress:
-  # -- Enable ingress
-  enabled: true
-  # -- Ingress host
-  host: moirai.hlan.net
-  # -- Ingress annotations
-  annotations: {}
-  # -- Ingress TLS configuration
-  tls: []
+nginx:
+  replicaCount: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP # Or LoadBalancer/NodePort if you want to expose it directly
+    port: 80
+    targetPort: 80
+  ingress:
+    enabled: true
+    host: moirai.hlan.net
+    annotations: {}
+    tls: []
 
-# -- Service configuration
-service:
-  # -- Service type
-  type: ClusterIP
-  # -- Service port
-  port: 8088
-  # -- Service target port
-  targetPort: 8088
-  # -- Metrics port
-  metricsPort: 9000
-  # -- Metrics target port
-  metricsTargetPort: 9000
-
-# -- MCP server configuration
 mcpServer:
-  # -- Enable MCP server
   enabled: true
-  # -- MCP server command
   command:
     - /bin/sh
     - -c
-    - "/app/create_dbs.sh && uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090"
-  # -- MCP server service configuration
+    - "/app/create_dbs.sh && conda run --name moirai uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090"
   service:
-    # -- MCP server service type
     type: ClusterIP
-    # -- MCP server service port
     port: 8090
-    # -- MCP server service target port
     targetPort: 8090
-    # -- MCP server metrics port
     metricsPort: 9000
-    # -- MCP server metrics target port
     metricsTargetPort: 9000
 
 # -- Environment to run the application in
@@ -96,14 +95,6 @@ couchdb:
 moirai:
   apiUsername: ""
   apiPassword: ""
-  # -- Command to run the application (overrides Dockerfile CMD)
-  command:
-    - python
-    - main.py
-  # -- Enable production startup logic (scheduler, init)
-  enableProdStartup: "true"
-  # -- Number of days after which an article is considered expired
-  articleExpirationDays: 30
 
 # -- OpenAI API key
 openai:

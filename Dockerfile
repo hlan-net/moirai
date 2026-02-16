@@ -1,66 +1,50 @@
-# Stage 1: Build the Vue.js application
-FROM node:20 AS build-stage
-
-# Set the working directory in the container
-WORKDIR /app
-
-# Copy the package.json and yarn.lock
-COPY ui/package.json ui/yarn.lock ./
-
-# Install dependencies - this layer is cached unless package.json or yarn.lock changes
-RUN yarn install
-
-# Copy the rest of the UI code and build it
-COPY ui/ .
-RUN yarn build
-
-# Stage 2: Build the Python application
-FROM python:3.13-slim AS final-stage
+# Build the Python application using Miniforge
+FROM condaforge/miniforge3:24.3.0-0 AS final-stage
 
 # Build arguments for version info
-ARG VERSION=0.1.0
+ARG VERSION=0.3.0
 ARG BUILD_NUMBER=unknown
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file and install dependencies
-COPY requirements.txt .
-RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
-RUN useradd -d /app appuser  && \
-    pip install --no-cache-dir -r requirements.txt && \
-    mkdir -p feeds && \
-    chmod 777 feeds && \
-    mkdir -p ui/dist && \
-    chown -R appuser:appuser feeds ui
+# Combine system and environment setup
+COPY environment.yml .
+RUN apt-get update && apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    conda install -y mamba && \
+    mamba env create -f environment.yml && \
+    mamba clean --all && \
+    useradd -ms /bin/bash appuser && \
+    mkdir -p /app/feeds /app/ui/dist && \
+    chown -R appuser:appuser /app/feeds /app/ui/dist
 
-# Copy and make executable the database initialization script
-COPY create_dbs.sh /app/create_dbs.sh
-RUN chmod +x /app/create_dbs.sh
-
-USER appuser
-
-# Set build number as environment variable
+# Set the PATH to include the conda environment's bin directory
+ENV PATH="/opt/conda/envs/moirai/bin:$PATH"
 ENV BUILD_NUMBER=${BUILD_NUMBER}
 
-# Copy the rest of the application code into the container
-COPY --chown=appuser:appuser main.py .
-COPY --chown=appuser:appuser mcp_server.py .
-COPY --chown=appuser:appuser version.py .
-COPY --chown=appuser:appuser api/ api/
-COPY --chown=appuser:appuser tasks/ tasks/
-COPY --chown=appuser:appuser mcp_service/ mcp_service/
+# Use root to copy files and set final permissions
+USER root
+COPY create_dbs.sh .
+COPY main.py .
+COPY mcp_server.py .
+COPY version.py .
+COPY api/ api/
+COPY tasks/ tasks/
+COPY mcp_service/ mcp_service/
+COPY gunicorn.conf.py .
 
-# Copy the built UI from the previous stage
-COPY --from=build-stage /app/dist/ ./ui/dist/
-# Create empty ui/dist to avoid FileNotFoundError in main.py. Do this BEFORE switching user or as root.
-# (But here we are already USER appuser from line 36).
-# So we should switch back to root or do it earlier.
-# Let's do it earlier.
+# Final permission lockdown
+RUN chown -R root:appuser /app && \
+    chmod -R 550 /app && \
+    chmod -R 700 /app/feeds && \
+    chmod -R 770 /app/ui/dist && \
+    chmod +x /app/create_dbs.sh
 
+USER appuser
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088
 
 # Run the application
-CMD ["python", "/app/main.py"]
+CMD ["conda", "run", "--name", "moirai", "python", "/app/main.py"]

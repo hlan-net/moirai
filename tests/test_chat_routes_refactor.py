@@ -15,6 +15,7 @@ class TestChatRoutesRefactor(unittest.TestCase):
                 "mcp.client.sse": MagicMock(),
                 "api.llm.factory": MagicMock(),
                 "api.db": MagicMock(),
+                "api.auth": MagicMock(),
                 "httpx": MagicMock(),
             },
         )

@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from ..core import mcp, auth_required, validate_namespace
 from ..db import store_doc, db_request, get_doc, update_doc, delete_doc
+from .constants import ERROR_EVENT_NOT_FOUND_OR_DENIED
 
 # --- Events Tools ---
 
@@ -97,7 +98,7 @@ def read_event(event_id: str, namespace: str, api_key: str = None) -> str:
 
     doc = get_doc("events", event_id)
     if not doc or doc.get("namespace") != namespace:
-        return "Event not found or access denied."
+        return ERROR_EVENT_NOT_FOUND_OR_DENIED
 
     return json.dumps(doc, indent=2)
 
@@ -126,7 +127,7 @@ def update_event(
 
     existing = get_doc("events", event_id)
     if not existing or existing.get("namespace") != namespace:
-        return "Event not found or access denied."
+        return ERROR_EVENT_NOT_FOUND_OR_DENIED
 
     updates = {}
     if name:
@@ -160,7 +161,7 @@ def delete_event(event_id: str, namespace: str, api_key: str = None) -> str:
 
     existing = get_doc("events", event_id)
     if not existing or existing.get("namespace") != namespace:
-        return "Event not found or access denied."
+        return ERROR_EVENT_NOT_FOUND_OR_DENIED
 
     success, msg = delete_doc("events", event_id)
     if success:

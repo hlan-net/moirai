@@ -19,13 +19,15 @@ import requests
 auth_blueprint = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
 
+# Constants
+JSON_CONTENT_TYPE = "application/json"
+ERROR_FAILED_TO_CREATE_USER = "Failed to create user"
+
 # Configuration
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 if not JWT_SECRET_KEY:
-    JWT_SECRET_KEY = "dev_secret_key_change_me"
-    if os.environ.get("FLASK_ENV") == "production":
-        logger.critical("JWT_SECRET_KEY not set in production environment!")
-        raise RuntimeError("JWT_SECRET_KEY must be set in production")
+    logger.critical("JWT_SECRET_KEY not set! This is required for secure authentication.")
+    raise RuntimeError("JWT_SECRET_KEY environment variable must be set")
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days for now
@@ -96,11 +98,11 @@ def github_login():
 
     # Exchange code for access token
     token_url = "https://github.com/login/oauth/access_token"
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": JSON_CONTENT_TYPE}
     payload = {"client_id": client_id, "client_secret": client_secret, "code": code}
 
     try:
-        res = requests.post(token_url, json=payload, headers=headers)
+        res = requests.post(token_url, json=payload, headers=headers, timeout=10)
         res.raise_for_status()
         token_data = res.json()
 
@@ -118,8 +120,9 @@ def github_login():
             "https://api.github.com/user",
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
+                "Accept": JSON_CONTENT_TYPE,
             },
+            timeout=10
         )
         user_res.raise_for_status()
         github_user = user_res.json()
@@ -132,8 +135,9 @@ def github_login():
                 "https://api.github.com/user/emails",
                 headers={
                     "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/json",
+                    "Accept": JSON_CONTENT_TYPE,
                 },
+                timeout=10
             )
             if emails_res.ok:
                 emails = emails_res.json()
@@ -162,7 +166,7 @@ def github_login():
             }
             success, result = create_user(user_doc)
             if not success:
-                return jsonify({"message": "Failed to create user"}), 500
+                return jsonify({"message": ERROR_FAILED_TO_CREATE_USER}), 500
             user_id = result
             role = "user"
         else:
@@ -392,7 +396,7 @@ def google_login():
             }
             success, result = create_user(user_doc)
             if not success:
-                return jsonify({"message": "Failed to create user"}), 500
+                return jsonify({"message": ERROR_FAILED_TO_CREATE_USER}), 500
             user_id = result
             role = "user"
         else:
@@ -428,8 +432,6 @@ def entra_login():
     # For MVP, we decode unverified (if safe env) or use msal/pyjwt with fetched keys.
     # We will use simple decoding for now but in prod should verify signature against keys from discovery endpoint.
 
-    # config = get_auth_config() # Commented out due to F841 and unimplemented robust usage
-
     try:
         # Sign-in keys should be verified against Microsoft's OIDC discovery endpoint
         # For this fix, we ensure that if we don't have full verification logic yet,
@@ -440,8 +442,6 @@ def entra_login():
         # but here we are validating a token passed from frontend.
         # Note: In a real production system, you MUST use a library like msal or python-jose
         # to fetch the JWKS and verify the signature.
-
-        # tenant_id = config.get("entra_tenant_id") or "common" # Commented out due to F841 and unimplemented robust usage
 
         # We will use MSAL to validate if possible, otherwise we decode carefully.
         # For now, we fix the "unverified" decode by requiring signature verification
@@ -456,10 +456,10 @@ def entra_login():
             decoded = jwt.decode(
                 token, options={"verify_signature": True}, algorithms=["RS256"]
             )
-        except jwt.PyJWTError:
+        except jwt.PyJWTError as e:
             # Fallback for dev if needed, or re-raise
             logger.warning(
-                "Entra ID Signature verification failed. Ensure OIDC discovery is configured."
+                f"Entra ID Signature verification failed: {e}. Ensure OIDC discovery is configured."
             )
             # For the sake of fixing the "High" finding, we MUST NOT use verify_signature=False
             raise
@@ -482,7 +482,7 @@ def entra_login():
             }
             success, result = create_user(user_doc)
             if not success:
-                return jsonify({"message": "Failed to create user"}), 500
+                return jsonify({"message": ERROR_FAILED_TO_CREATE_USER}), 500
             user_id = result
             role = "user"
         else:
@@ -504,7 +504,7 @@ def entra_login():
 
     except Exception as e:
         logger.error(f"Entra Login Error: {e}")
-        return jsonify({"message": "Invalid Token"}), 401
+        return jsonify({"message": f"Invalid Token: {e}"}), 401
 
 
 @auth_blueprint.route("/me", methods=["GET"])

@@ -1,18 +1,18 @@
-{{- if .Values.ingress.enabled -}}
+{{- if .Values.nginx.ingress.enabled -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "moirai.fullname" . }}
   labels:
     {{- include "moirai.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with .Values.nginx.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if .Values.ingress.tls }}
+  {{- if .Values.nginx.ingress.tls }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range .Values.nginx.ingress.tls }}
     - hosts:
         {{- range .hosts }}
         - {{ . | quote }}
@@ -21,14 +21,14 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    - host: {{ .Values.ingress.host | quote }}
+    - host: {{ .Values.nginx.ingress.host | quote }}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ include "moirai.fullname" . }}
+                name: {{ include "moirai.fullname" . }}-nginx
                 port:
-                  number: {{ .Values.service.port }}
+                  number: {{ .Values.nginx.service.port }}
 {{- end }}

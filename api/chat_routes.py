@@ -38,6 +38,7 @@ CHAT_HISTORY_LIMIT = 6
 MAX_AGENT_TURNS = 5
 LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
+ERROR_ACCESS_DENIED = "Access denied"
 
 SYSTEM_PROMPT = (
     "You are Moirai, a GenAI-native press review agent. "
@@ -189,7 +190,7 @@ def list_models():
         model_names = llm_provider.list_models()
         return jsonify(model_names)
     except Exception as e:
-        print(f"Error fetching models: {e}")
+        logger.error(f"Error fetching models: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -245,7 +246,7 @@ def get_chat_session(session_id):
 
     # Check ownership
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     return jsonify(session)
 
@@ -279,7 +280,7 @@ def update_chat_session(session_id):
         abort(404, description=CHAT_SESSION_NOT_FOUND)
 
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     data = request.json
 
@@ -307,7 +308,7 @@ def export_chat_session(session_id):
         abort(404, description=CHAT_SESSION_NOT_FOUND)
 
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     title = session.get("title", "Untitled Chat")
     safe_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", title)
@@ -349,7 +350,7 @@ def delete_chat_session(session_id):
         abort(404, description=CHAT_SESSION_NOT_FOUND)
 
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     if delete_from_couchdb("chat_history", session_id, session["_rev"]):
         return jsonify({"status": "deleted"})
@@ -374,7 +375,7 @@ async def _run_agent_turn(messages, llm_provider, target_model, openai_tools, se
     )
 
     response_message = response.choices[0].message
-    print(f"DEBUG: Model Raw Response Content: {response_message.content}")
+    logger.debug(f"Model Raw Response Content: {response_message.content}")
 
     # Store message in history
     msg_dict = {
@@ -467,13 +468,13 @@ async def _execute_tool_calls(session, tool_calls, messages):
             func_args["api_key"] = api_password
 
         try:
-            print(f"Agent calling tool: {func_name} with args: {func_args}")
+            logger.info(f"Agent calling tool: {func_name} with args: {func_args}")
             result = await session.call_tool(func_name, func_args)
             result_text = result.content[0].text if result.content else "Success"
-            print(f"Tool result (truncated): {result_text[:200]}...")
+            logger.debug(f"Tool result (truncated): {result_text[:200]}...")
         except Exception as tool_err:
             result_text = f"Tool Execution Error: {tool_err}"
-            print(f"Tool Error: {tool_err}")
+            logger.error(f"Tool Error: {tool_err}")
 
         messages.append(
             {

@@ -404,13 +404,13 @@ onMounted(() => {
             <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" />
           </div>
           <div class="form-group">
-            <label for="model">LLM Model Name (Ollama):</label>
-            <select v-if="availableModels.length" id="model" v-model="modelName">
+            <label for="ollama-model">LLM Model Name (Ollama):</label>
+            <select v-if="availableModels.length" id="ollama-model" v-model="modelName">
               <option v-for="model in availableModels" :key="model" :value="model">
                 {{ model }}
               </option>
             </select>
-            <input v-else id="model" v-model="modelName" placeholder="e.g. gemma3:1b" />
+            <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
             <small v-if="loadingModels">Loading available models...</small>
             <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
             <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>
