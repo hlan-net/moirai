@@ -1,4 +1,7 @@
+import logging
 from api.db import query_couchdb, fetch_from_couchdb
+
+logger = logging.getLogger(__name__)
 
 
 def enrich_articles_with_events_and_trends(articles):
@@ -152,7 +155,7 @@ def enrich_events_with_articles(events, include_articles=True):
                     if article:
                         articles.append(article)
                 except Exception as e:
-                    print(f"Warning: Could not fetch article {article_id}: {e}")
+                    logger.warning(f"Could not fetch article {article_id}: {e}")
                     continue
             event["articles"] = articles
     return events
@@ -176,7 +179,7 @@ def enrich_trends_with_events(trends, include_events=True, include_articles=Fals
                             enrich_events_with_articles([event], include_articles=True)
                         events.append(event)
                 except Exception as e:
-                    print(f"Warning: Could not fetch event {event_id}: {e}")
+                    logger.warning(f"Could not fetch event {event_id}: {e}")
                     continue
             trend["events"] = events
     return trends

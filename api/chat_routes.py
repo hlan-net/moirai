@@ -189,7 +189,7 @@ def list_models():
         model_names = llm_provider.list_models()
         return jsonify(model_names)
     except Exception as e:
-        print(f"Error fetching models: {e}")
+        logger.error(f"Error fetching models: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -374,7 +374,7 @@ async def _run_agent_turn(messages, llm_provider, target_model, openai_tools, se
     )
 
     response_message = response.choices[0].message
-    print(f"DEBUG: Model Raw Response Content: {response_message.content}")
+    logger.debug(f"Model Raw Response Content: {response_message.content}")
 
     # Store message in history
     msg_dict = {
@@ -467,13 +467,13 @@ async def _execute_tool_calls(session, tool_calls, messages):
             func_args["api_key"] = api_password
 
         try:
-            print(f"Agent calling tool: {func_name} with args: {func_args}")
+            logger.info(f"Agent calling tool: {func_name} with args: {func_args}")
             result = await session.call_tool(func_name, func_args)
             result_text = result.content[0].text if result.content else "Success"
-            print(f"Tool result (truncated): {result_text[:200]}...")
+            logger.debug(f"Tool result (truncated): {result_text[:200]}...")
         except Exception as tool_err:
             result_text = f"Tool Execution Error: {tool_err}"
-            print(f"Tool Error: {tool_err}")
+            logger.error(f"Tool Error: {tool_err}")
 
         messages.append(
             {
