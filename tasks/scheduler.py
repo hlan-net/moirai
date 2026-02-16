@@ -2,22 +2,15 @@ import os
 import threading
 import time
 import requests
-from urllib.parse import quote
+import logging
+from api.db_config import get_couchdb_uri
 from .fetch_feed_task import FetchFeedTask
+
+logger = logging.getLogger(__name__)
 
 
 def get_dynamic_interval(default_interval):
-    uri = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
-    user = os.environ.get("COUCHDB_USER")
-    password = os.environ.get("COUCHDB_PASSWORD")
-    if user and password and "@" not in uri:
-        if "://" in uri:
-            scheme, host = uri.split("://", 1)
-        else:
-            scheme, host = "http", uri
-        uri = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
-
-    db_url = uri + "/"
+    db_url = get_couchdb_uri()
     try:
         res = requests.get(f"{db_url}config/main", timeout=2)
         if res.status_code == 200:
@@ -30,8 +23,8 @@ def get_dynamic_interval(default_interval):
 
 def scheduler_loop(initial_interval):
     current_interval = initial_interval
-    db_url = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
-    feeds_db_url = f"{db_url}/feeds/_all_docs?include_docs=true"
+    db_url = get_couchdb_uri()
+    feeds_db_url = f"{db_url}feeds/_all_docs?include_docs=true"
     
     # Run tasks once per iteration interval.
     while True:
@@ -39,17 +32,17 @@ def scheduler_loop(initial_interval):
         current_interval = get_dynamic_interval(initial_interval)
 
         if current_interval <= 0:
-            print(
+            logger.info(
                 f"Scheduler paused (Interval: {current_interval}). Checking again in 60s."
             )
             time.sleep(60)
             continue
 
-        print(f"Scheduler: Starting fetch cycle (Interval: {current_interval}s)")
+        logger.info(f"Scheduler: Starting fetch cycle (Interval: {current_interval}s)")
 
         try:
-            auth = (os.environ.get("COUCHDB_USER"), os.environ.get("COUCHDB_PASSWORD"))
-            response = requests.get(feeds_db_url, auth=auth, timeout=10)
+            # Credentials are now handled in get_couchdb_uri() via basic auth in URL
+            response = requests.get(feeds_db_url, timeout=10)
             response.raise_for_status()
             feeds = response.json().get("rows", [])
 
@@ -63,12 +56,12 @@ def scheduler_loop(initial_interval):
                     if feed_id and url and original_url:
                         FetchFeedTask(feed_id, url, original_url).start()
                     else:
-                        print(f"Scheduler: Skipping invalid feed document: {doc}")
+                        logger.warning(f"Scheduler: Skipping invalid feed document: {doc}")
 
         except requests.exceptions.RequestException as e:
-            print(f"Scheduler: Error fetching feeds from CouchDB: {e}")
+            logger.error(f"Scheduler: Error fetching feeds from CouchDB: {e}")
         except Exception as e:
-            print(f"Scheduler: An unexpected error occurred: {e}")
+            logger.error(f"Scheduler: An unexpected error occurred: {e}")
 
 
         time.sleep(current_interval)
@@ -80,7 +73,7 @@ class SchedulerWrapper:
             interval = int(iteration_interval)
         except (TypeError, ValueError):
             interval = 600  # default interval in seconds
-        print(f"Scheduling tasks to run once every {interval} seconds.")
+        logger.info(f"Scheduling tasks to run once every {interval} seconds.")
 
         # Start the scheduler loop in a daemon thread.
         scheduler_thread = threading.Thread(target=scheduler_loop, args=(interval,))

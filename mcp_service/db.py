@@ -1,7 +1,10 @@
 import hashlib
 import json
 import requests
+import logging
 from .config import COUCHDB_URI
+
+logger = logging.getLogger(__name__)
 
 # --- DB Helpers ---
 
@@ -26,7 +29,7 @@ def db_request(method, db_name, path="", json_data=None, params=None):
 
         # Don't raise for 404s if we want to handle them gracefully in callers
         if response.status_code >= 400 and response.status_code != 404:
-            print(f"DB Error {method} {url}: {response.text}")
+            logger.error(f"DB Error {method} {url}: {response.text}")
 
         return response
     except requests.exceptions.RequestException as e:

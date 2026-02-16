@@ -90,7 +90,7 @@ const fetchFeeds = async () => {
       feeds.value = await response.json()
     }
   } catch (error) {
-    console.error('Error fetching feeds:', error)
+    // Fail silently
   } finally {
     loading.value = false
   }

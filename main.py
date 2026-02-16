@@ -83,9 +83,9 @@ def start_services():
 
     sys.stdout.reconfigure(line_buffering=True)
 
-    print(f"{get_version_string()} starting...", flush=True)
+    app.logger.info(f"{get_version_string()} starting...")
     init.run()
-    print("Moirai initialised.")
+    app.logger.info("Moirai initialised.")
 
     # Start the enrichment worker only once
     # In dev mode with reloader, only start in the reloaded process (WERKZEUG_RUN_MAIN='true')
@@ -99,12 +99,12 @@ def start_services():
 
     if should_start_worker and (is_production or is_dev_reloader_child):
         worker.start()
-        print("Enrichment worker started.")
+        app.logger.info("Enrichment worker started.")
 
     # Start the scheduler
     interval = os.environ.get("ITERATION_INTERVAL", 600)
     scheduler.start(interval)
-    print(f"Scheduler started with interval {interval}s")
+    app.logger.info(f"Scheduler started with interval {interval}s")
 
 
 # Conditional Flask run for local development
@@ -113,6 +113,6 @@ if __name__ == "__main__":
     # Check if this is the main process and not a reloader child in development
     if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
         port = int(os.environ.get("HTTP_PORT", 8088))
-        print(f"Starting Moirai on port {port}")
+        app.logger.info(f"Starting Moirai on port {port}")
         app.run(host="0.0.0.0", port=port)
 # No need for else block here, as gunicorn handles the app startup (and calls start_services via hook)

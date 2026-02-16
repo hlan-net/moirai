@@ -1,8 +1,11 @@
 import threading
 import time
 import requests
-from api.db_config import COUCHDB_URI
+import logging
+from api.db_config import get_couchdb_uri
 from .article_processor import ArticleProcessor
+
+logger = logging.getLogger(__name__)
 
 
 class EnrichmentWorker(threading.Thread):
@@ -11,14 +14,16 @@ class EnrichmentWorker(threading.Thread):
         self.daemon = True
         self.db_name = "feed_content"
         self.registry_name = "feeds"
-        self.changes_url = f"{COUCHDB_URI}{self.db_name}/_changes"
-        self.registry_url = f"{COUCHDB_URI}{self.registry_name}"
         self.processor = ArticleProcessor()
         self.last_seq = "0"
         self.running = True
 
+    @property
+    def couchdb_url(self):
+        return get_couchdb_uri()
+
     def run(self):
-        print("EnrichmentWorker started.")
+        logger.info("EnrichmentWorker started.")
         # Try to get last sequence from DB config if possible, else start from now
         self.last_seq = self.get_last_seq()
 
@@ -28,43 +33,44 @@ class EnrichmentWorker(threading.Thread):
     def get_last_seq(self):
         """Get the last processed sequence from the config DB."""
         try:
-            res = requests.get(f"{COUCHDB_URI}config/enrichment_last_seq", timeout=10)
+            res = requests.get(f"{self.couchdb_url}config/enrichment_last_seq", timeout=10)
             if res.status_code == 200:
                 return res.json().get("value", "0")
             if res.status_code != 404:
-                print(
+                logger.error(
                     f"EnrichmentWorker: unexpected status {res.status_code} loading last_seq"
                 )
         except requests.exceptions.RequestException as e:
-            print(f"EnrichmentWorker: failed to load last_seq: {e}")
+            logger.error(f"EnrichmentWorker: failed to load last_seq: {e}")
         except ValueError as e:
-            print(f"EnrichmentWorker: invalid last_seq response: {e}")
+            logger.error(f"EnrichmentWorker: invalid last_seq response: {e}")
         return "now"
 
     def save_last_seq(self, seq):
         """Save the last processed sequence to the config DB."""
         try:
             doc = {"_id": "enrichment_last_seq", "value": seq}
-            res = requests.get(f"{COUCHDB_URI}config/enrichment_last_seq", timeout=10)
+            res = requests.get(f"{self.couchdb_url}config/enrichment_last_seq", timeout=10)
             if res.status_code == 200:
                 doc["_rev"] = res.json()["_rev"]
             elif res.status_code != 404:
-                print(
+                logger.error(
                     f"EnrichmentWorker: unexpected status {res.status_code} reading last_seq"
                 )
             res = requests.put(
-                f"{COUCHDB_URI}config/enrichment_last_seq", json=doc, timeout=10
+                f"{self.couchdb_url}config/enrichment_last_seq", json=doc, timeout=10
             )
             if res.status_code not in (200, 201):
-                print(
+                logger.error(
                     f"EnrichmentWorker: failed to save last_seq: {res.status_code} {res.text}"
                 )
         except requests.exceptions.RequestException as e:
-            print(f"EnrichmentWorker: failed to save last_seq: {e}")
+            logger.error(f"EnrichmentWorker: failed to save last_seq: {e}")
         except ValueError as e:
-            print(f"EnrichmentWorker: invalid last_seq response: {e}")
+            logger.error(f"EnrichmentWorker: invalid last_seq response: {e}")
 
     def process_changes(self):
+        changes_url = f"{self.couchdb_url}{self.db_name}/_changes"
         params = {
             "feed": "longpoll",
             "since": self.last_seq,
@@ -73,16 +79,16 @@ class EnrichmentWorker(threading.Thread):
         }
 
         try:
-            response = requests.get(self.changes_url, params=params, timeout=35)
+            response = requests.get(changes_url, params=params, timeout=35)
         except requests.exceptions.RequestException as e:
-            print(f"EnrichmentWorker: changes feed error: {e}")
+            logger.error(f"EnrichmentWorker: changes feed error: {e}")
             time.sleep(5)
             return
         if response.status_code == 200:
             try:
                 data = response.json()
             except ValueError as e:
-                print(f"EnrichmentWorker: invalid changes response: {e}")
+                logger.error(f"EnrichmentWorker: invalid changes response: {e}")
                 time.sleep(5)
                 return
             results = data.get("results", [])
@@ -101,7 +107,7 @@ class EnrichmentWorker(threading.Thread):
             # DB doesn't exist yet
             time.sleep(10)
         else:
-            print(f"EnrichmentWorker: Unexpected status {response.status_code}")
+            logger.error(f"EnrichmentWorker: Unexpected status {response.status_code}")
             time.sleep(10)
 
     def process_feed_content(self, content_doc):
@@ -112,7 +118,7 @@ class EnrichmentWorker(threading.Thread):
         if not feed_url or not body or not content_doc_id:
             return
 
-        print(f"Enriching articles for feed: {feed_url}")
+        logger.info(f"Enriching articles for feed: {feed_url}")
 
         feed_title, articles = self.processor.process_feed(feed_url, body)
 
@@ -120,7 +126,7 @@ class EnrichmentWorker(threading.Thread):
         for article in articles:
             self.processor.store_article(article)
 
-        print(f"Asynchronously processed {len(articles)} articles for {feed_url}")
+        logger.info(f"Asynchronously processed {len(articles)} articles for {feed_url}")
 
         # Update feed title in registry if it was missing
         if feed_title:
@@ -134,8 +140,9 @@ class EnrichmentWorker(threading.Thread):
                             This corresponds to the hash of the original feed URL.
             feed_title: The title to set in the registry
         """
+        registry_url = f"{self.couchdb_url}{self.registry_name}"
         try:
-            res = requests.get(f"{self.registry_url}/{registry_doc_id}", timeout=10)
+            res = requests.get(f"{registry_url}/{registry_doc_id}", timeout=10)
             if res.status_code == 200:
                 reg_doc = res.json()
                 current_title = reg_doc.get("title", "")
@@ -147,26 +154,26 @@ class EnrichmentWorker(threading.Thread):
                 ):
                     reg_doc["title"] = feed_title
                     update_res = requests.put(
-                        f"{self.registry_url}/{registry_doc_id}",
+                        f"{registry_url}/{registry_doc_id}",
                         json=reg_doc,
                         timeout=10,
                     )
                     if update_res.status_code in (200, 201):
-                        print(
+                        logger.info(
                             f"Updated registry title for {registry_doc_id} -> {feed_title}"
                         )
                     else:
-                        print(
+                        logger.error(
                             f"Failed to update registry title: {update_res.status_code} {update_res.text}"
                         )
             elif res.status_code != 404:
-                print(
+                logger.error(
                     f"EnrichmentWorker: unexpected registry status {res.status_code} for {registry_doc_id}"
                 )
         except requests.exceptions.RequestException as e:
-            print(f"Failed to update registry title: {e}")
+            logger.error(f"Failed to update registry title: {e}")
         except ValueError as e:
-            print(f"Failed to parse registry response: {e}")
+            logger.error(f"Failed to parse registry response: {e}")
 
 
 # Global instance

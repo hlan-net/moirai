@@ -55,7 +55,7 @@ const fetchConfig = async () => {
       }
     }
   } catch (error) {
-    console.error('Error fetching config:', error)
+    // Silently fail or handle error appropriately
   }
 }
 

@@ -1,27 +1,30 @@
 import os
 import requests
 import datetime
+import logging
 from api.db_config import get_couchdb_uri
 from api.db import _request, get_user_by_email, create_user
 from api.auth import hash_password
 from .cleanup_task import CleanupTask
 from tenacity import retry, stop_after_delay, wait_fixed, retry_if_exception_type
 
+logger = logging.getLogger(__name__)
+
 # initialise the CouchDB database if they don't yet exists
 
 
 def ensure_db(db_name):
     try:
-        response = _request("PUT", f"{get_couchdb_uri()}{db_name}")
+        response = _request("PUT", f"{get_couchdb_uri()}{db_name}", timeout=10)
         if response.status_code in (200, 201):
-            print(f"Database '{db_name}' created.")
+            logger.info(f"Database '{db_name}' created.")
         elif response.status_code == 412:
             # Database already exists
             pass
         else:
-            print(f"Failed to ensure database '{db_name}': {response.text}")
+            logger.error(f"Failed to ensure database '{db_name}': {response.text}")
     except Exception as e:
-        print(f"Error ensuring database '{db_name}': {e}")
+        logger.error(f"Error ensuring database '{db_name}': {e}")
 
 
 def create_index(db_name, fields, name):
@@ -31,13 +34,13 @@ def create_index(db_name, fields, name):
         # Ensure DB exists before index creation
         ensure_db(db_name)
 
-        response = _request("POST", url, json=payload)
+        response = _request("POST", url, json=payload, timeout=10)
         if response.status_code in (200, 201):
-            print(f"Index '{name}' created/verified on '{db_name}'")
+            logger.info(f"Index '{name}' created/verified on '{db_name}'")
         else:
-            print(f"Failed to create index '{name}' on '{db_name}': {response.text}")
+            logger.error(f"Failed to create index '{name}' on '{db_name}': {response.text}")
     except Exception as e:
-        print(f"Error creating index on '{db_name}': {e}")
+        logger.error(f"Error creating index on '{db_name}': {e}")
 
 
 def ensure_design_doc(db_name, design_doc_name, views):
@@ -45,7 +48,7 @@ def ensure_design_doc(db_name, design_doc_name, views):
 
     # Check if exists to get current rev
     try:
-        response = _request("GET", url)
+        response = _request("GET", url, timeout=10)
 
         # Start from existing design doc (if present) to preserve other fields
         if response.status_code == 200:
@@ -60,13 +63,13 @@ def ensure_design_doc(db_name, design_doc_name, views):
         else:
             # Design doc does not exist (or other non-200) – create a new one
             design_doc = {"views": views}
-        response = _request("PUT", url, json=design_doc)
+        response = _request("PUT", url, json=design_doc, timeout=10)
         if response.status_code in (200, 201):
-            print(f"Design doc '{design_doc_name}' on '{db_name}' updated.")
+            logger.info(f"Design doc '{design_doc_name}' on '{db_name}' updated.")
         else:
-            print(f"Failed to update design doc '{design_doc_name}': {response.text}")
+            logger.error(f"Failed to update design doc '{design_doc_name}': {response.text}")
     except requests.exceptions.RequestException as e:
-        print(f"Error ensuring design doc on '{db_name}': {e}")
+        logger.error(f"Error ensuring design doc on '{db_name}': {e}")
 
 
 @retry(
@@ -79,7 +82,7 @@ def ensure_design_doc(db_name, design_doc_name, views):
 )
 def init_db():
     # Skip network check as initContainer handles it
-    print("Assuming CouchDB is ready (handled by initContainer).")
+    logger.info("Assuming CouchDB is ready (handled by initContainer).")
 
     # Ensure all databases exist
     allowed_dbs = [
@@ -133,16 +136,16 @@ def ensure_default_user():
     password = os.environ.get("API_PASSWORD")
 
     if not username or not password:
-        print("No API_USERNAME/API_PASSWORD found. Skipping default user creation.")
+        logger.info("No API_USERNAME/API_PASSWORD found. Skipping default user creation.")
         return
 
     try:
         existing = get_user_by_email(username)
         if existing:
-            print(f"Default user '{username}' already exists.")
+            logger.info(f"Default user '{username}' already exists.")
             return
 
-        print(f"Creating default admin user '{username}'...")
+        logger.info(f"Creating default admin user '{username}'...")
         hashed = hash_password(password)
         user_doc = {
             "email": username,
@@ -154,19 +157,19 @@ def ensure_default_user():
 
         success, result = create_user(user_doc)
         if success:
-            print(f"Default admin user '{username}' created successfully.")
+            logger.info(f"Default admin user '{username}' created successfully.")
         else:
-            print(f"Failed to create default user: {result}")
+            logger.error(f"Failed to create default user: {result}")
 
     except Exception as e:
-        print(f"Error ensuring default user: {e}")
+        logger.error(f"Error ensuring default user: {e}")
 
 
 def run():
-    print("Initialising database...")
+    logger.info("Initialising database...")
     init_db()
     ensure_default_user()
 
-    print("Starting cleanup task...")
+    logger.info("Starting cleanup task...")
     cleanup = CleanupTask()
     cleanup.start()

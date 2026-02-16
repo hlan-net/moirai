@@ -70,7 +70,6 @@ const fetchTrends = async (isRefresh = false) => {
       trends.value = []
     }
   } catch (error) {
-    console.error('Error fetching data:', error)
     if (!isRefresh) {
       trends.value = []
     }

@@ -90,7 +90,6 @@ const loadFromCache = async () => {
     if (cached.length > 0) {
       articles.value = cached
       loading.value = false
-      console.log(`Loaded ${cached.length} articles from cache`)
     }
   } catch (error) {
     console.error('Error loading from cache:', error)
@@ -110,7 +109,6 @@ const fetchLatestUpdates = async () => {
       if (newArticles.length > 0) {
         articles.value = [...newArticles, ...articles.value]
         await articleCache.saveArticles(result.articles)
-        console.log(`Fetched ${newArticles.length} new articles`)
       }
     }
     

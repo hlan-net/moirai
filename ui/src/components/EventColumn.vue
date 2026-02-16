@@ -78,7 +78,7 @@ const processTrendsResponse = async (response: Response, isRefresh: boolean) => 
       trends.value = Array.isArray(trendsData) ? trendsData : []
       return
     } catch (e) {
-      console.error('Error parsing trends:', e)
+      // Fail silently
     }
   }
 
@@ -112,7 +112,6 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
       processTrendsResponse(trendsResponse, isRefresh),
     ])
   } catch (error) {
-    console.error('Error fetching events or trends:', error)
     // Only clear events if we failed to fetch them and it's not a refresh
     if (!isRefresh) {
       events.value = []

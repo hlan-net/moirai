@@ -61,7 +61,7 @@ const fetchArticles = async (
       }
     }
   } catch (error) {
-    console.error('Error fetching articles:', error)
+    // Fail silently
   }
   return { articles: [], hasMore: false, totalCount: 0 }
 }

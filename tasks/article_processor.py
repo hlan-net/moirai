@@ -3,28 +3,21 @@ import hashlib
 import json
 import os
 import requests
-from urllib.parse import quote
+import logging
 from datetime import datetime, timedelta
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
+from api.db_config import get_couchdb_uri
 
 # Ensure consistent results for language detection
 DetectorFactory.seed = 0
 
+logger = logging.getLogger(__name__)
+
 
 class ArticleProcessor:
     def __init__(self):
-        uri = os.environ.get("COUCHDB_URI", "http://localhost:5984/").rstrip("/")
-        user = os.environ.get("COUCHDB_USER")
-        password = os.environ.get("COUCHDB_PASSWORD")
-        if user and password and "@" not in uri:
-            if "://" in uri:
-                scheme, host = uri.split("://", 1)
-            else:
-                scheme, host = "http", uri
-            uri = f"{scheme}://{quote(user)}:{quote(password)}@{host}"
-
-        self.couchdb_url = uri + "/articles"
+        self.couchdb_url = get_couchdb_uri() + "articles"
         self.expiration_days = int(os.environ.get("ARTICLE_EXPIRATION_DAYS", 30))
 
     def detect_language(self, text):
@@ -58,8 +51,8 @@ class ArticleProcessor:
                     try:
                         published_date = datetime(*entry.published_parsed[:6])
                     except (ValueError, TypeError) as err:
-                        print(
-                            f"Warning: Could not parse date for article '{entry.get('title', 'No Title')}': {err}"
+                        logger.warning(
+                            f"Could not parse date for article '{entry.get('title', 'No Title')}': {err}"
                         )
 
                 if published_date and (datetime.now() - published_date) > timedelta(
@@ -95,9 +88,9 @@ class ArticleProcessor:
 
                 articles.append(article)
         except (ValueError, TypeError) as err:
-            print(f"Error parsing feed content for {feed_url}: {err}")
+            logger.error(f"Error parsing feed content for {feed_url}: {err}")
         except Exception as err:
-            print(f"Unexpected error parsing feed for {feed_url}: {err}")
+            logger.error(f"Unexpected error parsing feed for {feed_url}: {err}")
 
         return feed_title, articles
 
@@ -114,16 +107,16 @@ class ArticleProcessor:
         article["_id"] = article_hash
 
         try:
-            response = requests.head(f"{self.couchdb_url}/{article_hash}")
+            response = requests.head(f"{self.couchdb_url}/{article_hash}", timeout=10)
             if response.status_code == 200:
                 return
 
-            response = requests.post(self.couchdb_url, json=article)
+            response = requests.post(self.couchdb_url, json=article, timeout=10)
             if response.status_code not in (200, 201):
-                print(
+                logger.error(
                     f"Failed to store article {article_hash}: {response.status_code} {response.text}"
                 )
         except requests.exceptions.RequestException as err:
-            print(f"Error storing article {article_hash}: {err}")
+            logger.error(f"Error storing article {article_hash}: {err}")
         except Exception as err:
-            print(f"Unexpected error storing article {article_hash}: {err}")
+            logger.error(f"Unexpected error storing article {article_hash}: {err}")

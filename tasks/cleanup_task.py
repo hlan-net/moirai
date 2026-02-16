@@ -3,37 +3,43 @@ import time
 import requests
 import datetime
 import threading
+import logging
 from urllib.parse import quote
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api.db_config import get_couchdb_uri
 
+logger = logging.getLogger(__name__)
+
 
 def get_all_docs(db_name):
     try:
         url = f"{get_couchdb_uri()}{db_name}/_all_docs?include_docs=true"
-        res = requests.get(url)
+        res = requests.get(url, timeout=10)
         if res.status_code == 200:
             return [row["doc"] for row in res.json().get("rows", [])]
     except Exception as e:
-        print(f"Cleanup: Error fetching {db_name}: {e}")
+        logger.error(f"Cleanup: Error fetching {db_name}: {e}")
     return []
 
 
 def delete_doc(db_name, doc_id, rev):
     try:
-        url = f"{get_couchdb_uri()}{quote(db_name, safe='')}?rev={rev}"
-        res = requests.delete(url)
+        # Construct proper CouchDB delete URL: /db/doc_id?rev=REV
+        safe_db = quote(db_name, safe="")
+        safe_id = quote(doc_id, safe="")
+        url = f"{get_couchdb_uri()}{safe_db}/{safe_id}?rev={rev}"
+        res = requests.delete(url, timeout=10)
         return res.status_code in (200, 202)
     except Exception as e:
-        print(f"Cleanup: Error deleting {doc_id} from {db_name}: {e}")
+        logger.error(f"Cleanup: Error deleting {doc_id} from {db_name}: {e}")
     return False
 
 
 def parse_date(date_str):
     if not date_str:
-        return datetime.datetime.now()
+        return datetime.datetime.now(datetime.timezone.utc)
     # Handle various formats or fallback
     try:
         # ISO format
@@ -41,11 +47,11 @@ def parse_date(date_str):
     except ValueError:
         pass
 
-    return datetime.datetime.now()
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 def run_cleanup():
-    print("Cleanup: Starting maintenance cycle...")
+    logger.info("Cleanup: Starting maintenance cycle...")
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -57,7 +63,7 @@ def run_cleanup():
             for eid in t["event_ids"]:
                 linked_event_ids.add(eid)
 
-    print(
+    logger.info(
         f"Cleanup: Found {len(trends)} trends referencing {len(linked_event_ids)} events."
     )
 
@@ -79,7 +85,7 @@ def run_cleanup():
         # Check if Event should be deleted
         # Condition: Not in any Trend AND older than 1 year (365 days)
         if eid not in linked_event_ids and age.days > 365:
-            print(f"Cleanup: Deleting orphaned event {eid} (Age: {age.days} days)")
+            logger.info(f"Cleanup: Deleting orphaned event {eid} (Age: {age.days} days)")
             if delete_doc("events", eid, e.get("_rev")):
                 events_deleted += 1
         else:
@@ -89,7 +95,7 @@ def run_cleanup():
                 for link in e["article_links"]:
                     active_article_links.add(link)
 
-    print(
+    logger.info(
         f"Cleanup: Events processed. Deleted: {events_deleted}. Kept: {events_kept}. Active referenced articles: {len(active_article_links)}"
     )
 
@@ -111,11 +117,11 @@ def run_cleanup():
         # Condition: Not linked to any *surviving* Event AND older than 30 days
         # Note: 'link' is the URL, which is the foreign key used in events
         if link not in active_article_links and age.days > 30:
-            print(f"Cleanup: Deleting orphaned article {aid} (Age: {age.days} days)")
+            logger.info(f"Cleanup: Deleting orphaned article {aid} (Age: {age.days} days)")
             if delete_doc("articles", aid, a.get("_rev")):
                 articles_deleted += 1
 
-    print(
+    logger.info(
         f"Cleanup: Finished. Deleted {events_deleted} events and {articles_deleted} articles."
     )
 
@@ -131,5 +137,5 @@ class CleanupTask(threading.Thread):
             try:
                 run_cleanup()
             except Exception as e:
-                print(f"Cleanup: Unexpected error in loop: {e}")
+                logger.error(f"Cleanup: Unexpected error in loop: {e}")
             time.sleep(self.interval)
