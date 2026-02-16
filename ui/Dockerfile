@@ -1,13 +1,13 @@
 # Stage 1: Build the Vue.js application
-FROM node:20 AS build-stage
+FROM node:20-alpine AS build-stage
 
 WORKDIR /app
 
 # Copy package.json and yarn.lock to leverage Docker cache
 COPY package.json yarn.lock ./
 
-# Install dependencies
-RUN yarn install
+# Install dependencies (resolutions in package.json will handle entities)
+RUN yarn install --frozen-lockfile
 
 # Copy the rest of the UI source code
 COPY . .
