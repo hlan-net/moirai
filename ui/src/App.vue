@@ -82,13 +82,13 @@ html,
 .brand {
   font-weight: bold;
   font-size: 1.2rem; /* Slightly larger brand font */
-  color: var(--primary-color);
+  color: white;
   text-decoration: none;
 }
 
 .brand:hover {
   text-decoration: none;
-  color: var(--primary-hover);
+  opacity: 0.8;
 }
 
 .links {
@@ -102,7 +102,7 @@ html,
 .nav-link {
   color: var(--text-color);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: bold;
   font-size: 0.95rem; /* Slightly larger nav links */
   padding: 5px 10px;
   border-radius: 4px;
@@ -111,10 +111,14 @@ html,
     color 0.2s;
 }
 
-.nav-link:hover,
+.nav-link:hover {
+  opacity: 0.8;
+  text-decoration: none;
+}
+
 .nav-link.router-link-active {
   color: white;
-  background-color: var(--primary-color);
+  background-color: rgba(0, 0, 0, 0.2);
   text-decoration: none;
 }
 
@@ -146,15 +150,19 @@ html,
 
   .nav-link {
     font-size: 1rem;
-    padding: 0;
+    padding: 5px 10px;
     background-color: transparent; /* Remove background for horizontal nav */
   }
 
-  .nav-link:hover,
+  .nav-link:hover {
+    opacity: 0.8;
+    text-decoration: none;
+  }
+
   .nav-link.router-link-active {
-    color: var(--primary-hover);
-    background-color: transparent;
-    text-decoration: underline;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.3);
+    text-decoration: none;
   }
 }
 </style>
