@@ -22,11 +22,12 @@ spec:
         app.kubernetes.io/component: mcp-server
 
     spec:
+      automountServiceAccountToken: false
       serviceAccountName: {{ include "moirai.serviceAccountName" . }}
       containers:
         - name: {{ include "moirai.name" . }}-mcp-server
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           {{- with .Values.mcpServer.command }}
           command:
 {{ toYaml . | indent 12 }}
@@ -47,9 +48,11 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+              ephemeral-storage: "1Gi"
             limits:
               cpu: 500m
               memory: 512Mi
+              ephemeral-storage: "2Gi"
           env:
             - name: ENVIRONMENT
               value: {{ .Values.environment | quote }}
@@ -68,16 +71,16 @@ spec:
                   name: {{ .Release.Name }}-couchdb
                   key: adminPassword
             - name: COUCHDB_URI
-              value: "http://$(MOIRAI_SVC_COUCHDB_SERVICE_HOST):5984/"
+              value: "http://{{ include "moirai.fullname" . }}-couchdb:5984/"
             - name: API_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-moirai-secret
+                  name: {{ include "moirai.fullname" . }}-moirai-secret
                   key: apiUsername
             - name: API_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-moirai-secret
+                  name: {{ include "moirai.fullname" . }}-moirai-secret
                   key: apiPassword
             - name: COUCHDB_SECRET
               valueFrom:
