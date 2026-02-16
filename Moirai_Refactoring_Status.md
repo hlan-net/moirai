@@ -20,7 +20,7 @@ The Helm chart (`helm/`) has been extensively refactored to support the new serv
 *   **`helm/values.yaml`:**
     *   Removed top-level `image` and `service` configurations.
     *   Introduced new, granular configuration sections for `api`, `ui`, and `nginx` services, each with its own `image`, `replicaCount`, and `service` settings.
-    *   `appVersion` was corrected back to `0.3.0` as no new application release has occurred yet, while the chart `version` was incremented to `0.4.0`.
+    *   `appVersion` was corrected back to `0.3.0` as no new application release has occurred yet, while the chart `version` was incremented to `0.3.1`.
 *   **`helm/templates/api-deployment.yaml` & `helm/templates/api-service.yaml`:**
     *   The former `moirai-deployment.yaml` and `moirai-service.yaml` were renamed and modified to specifically deploy and expose the `api` service.
     *   The `app.kubernetes.io/component` label was updated to `api`.
@@ -39,7 +39,7 @@ The Helm chart (`helm/`) has been extensively refactored to support the new serv
 *   **`helm/templates/_helpers.tpl`:**
     *   Updated to include new helper definitions for generating names and labels specific to the `api`, `ui`, and `nginx` components.
 *   **`helm/Chart.yaml`:**
-    *   `version` incremented to `0.4.0`.
+    *   `version` incremented to `0.3.1`.
     *   `appVersion` set to `0.3.0`.
 
 ### 3. Verification
@@ -56,13 +56,13 @@ To deploy these changes to a Kubernetes environment or continue development:
 2.  **Trigger CI/CD (if not automated):**
     *   Ensure your CI/CD pipeline builds new Docker images for the `moirai-api` and `moirai-ui` services based on the updated Dockerfiles.
     *   Verify that these images are pushed to your container registry (e.g., GHCR).
-    *   Publish the updated Helm chart (version `0.4.0`) to your Helm chart repository.
+    *   Publish the updated Helm chart (version `0.3.1`) to your Helm chart repository.
 3.  **Review `values.yaml`:** Before deploying, review your specific Kubernetes deployment `values.yaml` file to ensure that all `api`, `ui`, and `nginx` configurations, especially image tags, resource limits, and ingress settings, align with your deployment environment.
 4.  **Helm Upgrade:** Execute the Helm upgrade command to apply the new chart to your Kubernetes cluster:
     ```bash
-    helm upgrade --install moirai oci://ghcr.io/hlan-net/charts/moirai:0.4.0 -f your-values.yaml --namespace moirai
+    helm upgrade --install moirai oci://ghcr.io/hlan-net/charts/moirai:0.3.1 -f your-values.yaml --namespace moirai
     ```
-    (Adjust `0.4.0` to the actual chart version if it changes, and `your-values.yaml` to your specific values file.)
+    (Adjust `0.3.1` to the actual chart version if it changes, and `your-values.yaml` to your specific values file.)
 5.  **Monitor Deployment:** Observe the deployment status in Kubernetes to ensure all new pods (for `api`, `ui`, `nginx`) start successfully and services are accessible.
 
 This document provides a clear path forward for managing and deploying the newly structured Moirai application.
