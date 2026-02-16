@@ -5,6 +5,9 @@ Attempts to fetch favicons from various common locations using HTTPS only.
 
 import requests
 from urllib.parse import urlparse, urljoin
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_favicon_url(feed_url: str, timeout: int = 5) -> str:
@@ -63,5 +66,5 @@ def fetch_favicon_url(feed_url: str, timeout: int = 5) -> str:
         return ""
 
     except Exception as e:
-        print(f"Error fetching favicon for {feed_url}: {e}")
+        logger.error(f"Error fetching favicon for {feed_url}: {e}")
         return ""

@@ -100,7 +100,7 @@ def github_login():
     payload = {"client_id": client_id, "client_secret": client_secret, "code": code}
 
     try:
-        res = requests.post(token_url, json=payload, headers=headers)
+        res = requests.post(token_url, json=payload, headers=headers, timeout=10)
         res.raise_for_status()
         token_data = res.json()
 
@@ -120,6 +120,7 @@ def github_login():
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/json",
             },
+            timeout=10
         )
         user_res.raise_for_status()
         github_user = user_res.json()
@@ -134,6 +135,7 @@ def github_login():
                     "Authorization": f"Bearer {access_token}",
                     "Accept": "application/json",
                 },
+                timeout=10
             )
             if emails_res.ok:
                 emails = emails_res.json()
@@ -456,10 +458,10 @@ def entra_login():
             decoded = jwt.decode(
                 token, options={"verify_signature": True}, algorithms=["RS256"]
             )
-        except jwt.PyJWTError:
+        except jwt.PyJWTError as e:
             # Fallback for dev if needed, or re-raise
             logger.warning(
-                "Entra ID Signature verification failed. Ensure OIDC discovery is configured."
+                f"Entra ID Signature verification failed: {e}. Ensure OIDC discovery is configured."
             )
             # For the sake of fixing the "High" finding, we MUST NOT use verify_signature=False
             raise
@@ -504,7 +506,7 @@ def entra_login():
 
     except Exception as e:
         logger.error(f"Entra Login Error: {e}")
-        return jsonify({"message": "Invalid Token"}), 401
+        return jsonify({"message": f"Invalid Token: {e}"}), 401
 
 
 @auth_blueprint.route("/me", methods=["GET"])

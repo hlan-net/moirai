@@ -597,7 +597,7 @@ def remove_trend_event(trend_id):
 
 def fetch_url(url):
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             return {"url": url, "status": "success"}
         else:

@@ -15,17 +15,18 @@ def get_db_url(db_name):
 
 def db_request(method, db_name, path="", json_data=None, params=None):
     url = f"{get_db_url(db_name)}{path}"
+    timeout = 10
     try:
         if method == "GET":
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=timeout)
         elif method == "POST":
-            response = requests.post(url, json=json_data)
+            response = requests.post(url, json=json_data, timeout=timeout)
         elif method == "PUT":
-            response = requests.put(url, json=json_data)
+            response = requests.put(url, json=json_data, timeout=timeout)
         elif method == "HEAD":
-            response = requests.head(url)
+            response = requests.head(url, timeout=timeout)
         elif method == "DELETE":
-            response = requests.delete(url, params=params)
+            response = requests.delete(url, params=params, timeout=timeout)
 
         # Don't raise for 404s if we want to handle them gracefully in callers
         if response.status_code >= 400 and response.status_code != 404:
