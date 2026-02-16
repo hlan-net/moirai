@@ -3,9 +3,43 @@ import re
 from datetime import datetime, timedelta, timezone
 from ..core import mcp, auth_required, validate_namespace
 from ..db import db_request
+from api.db_constants import MONGO_REGEX, MONGO_OR
 
 # ===== SEARCH TOOLS =====
 
+def _process_article_docs(docs):
+    """Common logic to format article documents for tool output."""
+    results = []
+    for doc in docs:
+        results.append(
+            {
+                "_id": doc.get("_id"),
+                "title": doc.get("title", "Untitled"),
+                "link": doc.get("link", ""),
+                "published": doc.get("published", ""),
+                "feed_title": doc.get("feed_title", "Unknown"),
+                "description": doc.get("description", "")[:200],
+                "namespace": doc.get("namespace"),
+            }
+        )
+    return results
+
+def _handle_date_filters(selector, date_from, date_to):
+    """Add date range filters to Mango selector."""
+    if date_from:
+        from_dt = datetime.fromisoformat(date_from)
+        if from_dt.tzinfo is None:
+            from_dt = from_dt.replace(tzinfo=timezone.utc)
+        selector["published"] = {"$gte": from_dt.isoformat()}
+
+    if date_to:
+        to_dt = datetime.fromisoformat(date_to)
+        if to_dt.tzinfo is None:
+            to_dt = to_dt.replace(tzinfo=timezone.utc)
+        if "published" in selector:
+            selector["published"]["$lte"] = to_dt.isoformat()
+        else:
+            selector["published"] = {"$lte": to_dt.isoformat()}
 
 @mcp.tool()
 @auth_required
@@ -31,44 +65,25 @@ def search_articles(
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
 
-    if limit > 200:
-        limit = 200
-
+    limit = min(limit, 200)
     safe_query = re.escape(query)
 
     # Build Mango selector
     selector = {
-        "$or": [
-            {"title": {"$regex": f"(?i){safe_query}"}},
-            {"description": {"$regex": f"(?i){safe_query}"}},
-            {"content": {"$regex": f"(?i){safe_query}"}},
+        MONGO_OR: [
+            {"title": {MONGO_REGEX: f"(?i){safe_query}"}},
+            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
+            {"content": {MONGO_REGEX: f"(?i){safe_query}"}},
         ]
     }
 
     if namespace:
         selector["namespace"] = namespace
 
-    # Add date range filters
-    if date_from:
-        try:
-            from_dt = datetime.fromisoformat(date_from)
-            if from_dt.tzinfo is None:
-                from_dt = from_dt.replace(tzinfo=timezone.utc)
-            selector["published"] = {"$gte": from_dt.isoformat()}
-        except ValueError:
-            return json.dumps({"error": "Invalid date_from format."})
-
-    if date_to:
-        try:
-            to_dt = datetime.fromisoformat(date_to)
-            if to_dt.tzinfo is None:
-                to_dt = to_dt.replace(tzinfo=timezone.utc)
-            if "published" in selector:
-                selector["published"]["$lte"] = to_dt.isoformat()
-            else:
-                selector["published"] = {"$lte": to_dt.isoformat()}
-        except ValueError:
-            return json.dumps({"error": "Invalid date_to format."})
+    try:
+        _handle_date_filters(selector, date_from, date_to)
+    except ValueError:
+        return json.dumps({"error": "Invalid date format provided."})
 
     try:
         query_payload = {
@@ -94,21 +109,7 @@ def search_articles(
         if resp.status_code != 200:
             return json.dumps({"error": f"Search failed: {resp.text}"})
 
-        docs = resp.json().get("docs", [])
-
-        results = []
-        for doc in docs:
-            results.append(
-                {
-                    "_id": doc.get("_id"),
-                    "title": doc.get("title", "Untitled"),
-                    "link": doc.get("link", ""),
-                    "published": doc.get("published", ""),
-                    "feed_title": doc.get("feed_title", "Unknown"),
-                    "description": doc.get("description", "")[:200],
-                    "namespace": doc.get("namespace"),
-                }
-            )
+        results = _process_article_docs(resp.json().get("docs", []))
 
         return json.dumps(
             {
@@ -138,10 +139,8 @@ def get_recent_articles(
         limit: Max results.
         api_key: Required for authentication.
     """
-    if hours > 168:
-        hours = 168
-    if limit > 200:
-        limit = 200
+    hours = min(hours, 168)
+    limit = min(limit, 200)
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
@@ -170,21 +169,7 @@ def get_recent_articles(
         if resp.status_code != 200:
             return json.dumps({"error": f"Fetch failed: {resp.text}"})
 
-        docs = resp.json().get("docs", [])
-
-        results = []
-        for doc in docs:
-            results.append(
-                {
-                    "_id": doc.get("_id"),
-                    "title": doc.get("title", "Untitled"),
-                    "link": doc.get("link", ""),
-                    "published": doc.get("published", ""),
-                    "feed_title": doc.get("feed_title", "Unknown"),
-                    "description": doc.get("description", "")[:200],
-                    "namespace": doc.get("namespace"),
-                }
-            )
+        results = _process_article_docs(resp.json().get("docs", []))
 
         return json.dumps(
             {
@@ -221,17 +206,15 @@ def search_events(
     if not valid:
         return json.dumps({"error": err})
 
-    if limit > 100:
-        limit = 100
-
+    limit = min(limit, 100)
     safe_query = re.escape(query)
 
     # Mango selector
     selector = {
         "namespace": namespace,
-        "$or": [
-            {"name": {"$regex": f"(?i){safe_query}"}},
-            {"description": {"$regex": f"(?i){safe_query}"}},
+        MONGO_OR: [
+            {"name": {MONGO_REGEX: f"(?i){safe_query}"}},
+            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
         ],
     }
 
@@ -289,17 +272,15 @@ def search_trends(
     if not valid:
         return json.dumps({"error": err})
 
-    if limit > 100:
-        limit = 100
-
+    limit = min(limit, 100)
     safe_query = re.escape(query)
 
     # Mango selector
     selector = {
         "namespace": namespace,
-        "$or": [
-            {"name": {"$regex": f"(?i){safe_query}"}},
-            {"description": {"$regex": f"(?i){safe_query}"}},
+        MONGO_OR: [
+            {"name": {MONGO_REGEX: f"(?i){safe_query}"}},
+            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
         ],
     }
 

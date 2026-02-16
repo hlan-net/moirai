@@ -18,6 +18,7 @@ check_couchdb_ready() {
     sleep 5
   done
   echo "CouchDB is ready!"
+  return 0
 }
 
 # Function to create a database if it doesn't exist
@@ -34,6 +35,7 @@ create_database() {
     done
     echo "Database '$db_name' created successfully."
   fi
+  return 0
 }
 
 # Check CouchDB readiness

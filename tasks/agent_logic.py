@@ -5,6 +5,8 @@ import validators
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_AGENT_NAME = "Unnamed Agent"
+
 
 # Placeholder for LLM interaction - this would typically use mcp_client.call_tool('llm_chat', ...)
 # or directly interact with the LLM API using user-specific keys.
@@ -29,7 +31,7 @@ def create_event_from_articles(
     Agent logic to analyze new articles and potentially create new events.
     """
     user_id = agent_config.get("user_id")
-    agent_name = agent_config.get("name", "Unnamed Agent")
+    agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     llm_config = agent_config.get("llm_model_config", {})
     params = agent_config.get("parameters", {})
 
@@ -100,7 +102,7 @@ def add_articles_to_event(
     Agent logic to analyze new articles and add relevant ones to a specific event.
     """
     user_id = agent_config.get("user_id")
-    agent_name = agent_config.get("name", "Unnamed Agent")
+    agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     llm_config = agent_config.get("llm_model_config", {})
     event_id = agent_config.get("linked_entity_id")
     params = agent_config.get("parameters", {})
@@ -188,7 +190,7 @@ def check_event_staleness(agent_config: Dict[str, Any], mcp_client):
     Agent logic to check if a linked event is stale and mark it as such.
     """
     user_id = agent_config.get("user_id")
-    agent_name = agent_config.get("name", "Unnamed Agent")
+    agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     event_id = agent_config.get("linked_entity_id")
     params = agent_config.get("parameters", {})
     staleness_threshold_days = params.get(

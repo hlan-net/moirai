@@ -38,6 +38,7 @@ CHAT_HISTORY_LIMIT = 6
 MAX_AGENT_TURNS = 5
 LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
+ERROR_ACCESS_DENIED = "Access denied"
 
 SYSTEM_PROMPT = (
     "You are Moirai, a GenAI-native press review agent. "
@@ -245,7 +246,7 @@ def get_chat_session(session_id):
 
     # Check ownership
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     return jsonify(session)
 
@@ -279,7 +280,7 @@ def update_chat_session(session_id):
         abort(404, description=CHAT_SESSION_NOT_FOUND)
 
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     data = request.json
 
@@ -307,7 +308,7 @@ def export_chat_session(session_id):
         abort(404, description=CHAT_SESSION_NOT_FOUND)
 
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     title = session.get("title", "Untitled Chat")
     safe_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", title)
@@ -349,7 +350,7 @@ def delete_chat_session(session_id):
         abort(404, description=CHAT_SESSION_NOT_FOUND)
 
     if session.get("user_id") != g.user_id:
-        abort(403, description="Access denied")
+        abort(403, description=ERROR_ACCESS_DENIED)
 
     if delete_from_couchdb("chat_history", session_id, session["_rev"]):
         return jsonify({"status": "deleted"})

@@ -62,13 +62,22 @@ const fetchConfig = async () => {
 const loadSettings = () => {
     currentLlmEndpoint.value = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
     
-    if (currentLlmEndpoint.value === 'openai') {
-        currentModel.value = localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo'
-    } else if (currentLlmEndpoint.value === 'gemini') {
-        currentModel.value = localStorage.getItem('moirai_gemini_model') || 'gemini-1.5-pro'
-    } else {
-        currentModel.value = localStorage.getItem('moirai_model') || 'llama3.1:latest'
+    const settingsMap: Record<string, string> = {
+        'openai': 'moirai_openai_model',
+        'gemini': 'moirai_gemini_model',
+        'ollama': 'moirai_model'
     }
+    
+    const defaultModels: Record<string, string> = {
+        'openai': 'gpt-4-turbo',
+        'gemini': 'gemini-1.5-pro',
+        'ollama': 'llama3.1:latest'
+    }
+    
+    const settingsKey = settingsMap[currentLlmEndpoint.value] || 'moirai_model'
+    const defaultModel = defaultModels[currentLlmEndpoint.value] || 'llama3.1:latest'
+    
+    currentModel.value = localStorage.getItem(settingsKey) || defaultModel
 }
 
 const parsedContent = (content: string) => {

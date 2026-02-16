@@ -50,18 +50,18 @@ app.register_blueprint(chat_blueprint, url_prefix="/api")
 app.register_blueprint(auth_blueprint, url_prefix="/api/auth")
 
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
-@app.route("/ui/<path:path>")
+@app.route("/ui/<path:path>", methods=["GET"])
 def serve_ui(path):
     return send_from_directory(app.static_folder, path)
 
 
 # Catch-all route for SPA client-side routing
-@app.route("/<path:path>")
+@app.route("/<path:path>", methods=["GET"])
 def catch_all(path):
     if path.startswith("api/") or path.startswith("mcp/"):
         return jsonify({"message": "Not Found"}), 404
