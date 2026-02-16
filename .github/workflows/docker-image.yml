@@ -14,6 +14,12 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    env:
+      API_USERNAME: testuser
+      API_PASSWORD: testpassword
+      COUCHDB_PASSWORD: testpassword
+      REDIS_PASSWORD: testpassword
+      JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
     steps:
       - uses: actions/checkout@v3
       
@@ -28,10 +34,6 @@ jobs:
           use-mamba: true
           
       - name: Run unit tests (no services required)
-        env:
-          API_USERNAME: testuser
-          API_PASSWORD: testpassword
-          JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
         run: |
           conda run -n moirai pytest tests/test_article_processor.py tests/test_live_lwn.py
           
@@ -52,11 +54,6 @@ jobs:
 
       - name: Start backend services
         env:
-          API_USERNAME: testuser
-          API_PASSWORD: testpassword
-          COUCHDB_PASSWORD: testpassword
-          REDIS_PASSWORD: testpassword
-          JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DEFAULT_LLM_PROVIDER: gemini
           MODEL_NAME: gemini-2.0-flash
@@ -116,9 +113,6 @@ jobs:
           
       - name: Run integration tests (requires services)
         env:
-          API_USERNAME: testuser
-          API_PASSWORD: testpassword
-          JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
           DISABLE_RATE_LIMIT: true
         run: |
           # Run security API tests (should all pass)
