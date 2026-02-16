@@ -6,8 +6,8 @@ api:
   replicaCount: 1
   image:
     repository: ghcr.io/hlan-net/moirai-api
-    tag: "latest"
-    pullPolicy: Always
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
   command:
     - /opt/conda/envs/moirai/bin/gunicorn 
     - --config
@@ -24,8 +24,8 @@ ui:
   replicaCount: 1
   image:
     repository: ghcr.io/hlan-net/moirai-ui
-    tag: "latest"
-    pullPolicy: Always
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 80
@@ -35,8 +35,8 @@ nginx:
   replicaCount: 1
   image:
     repository: nginx
-    tag: "latest"
-    pullPolicy: Always
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP # Or LoadBalancer/NodePort if you want to expose it directly
     port: 80

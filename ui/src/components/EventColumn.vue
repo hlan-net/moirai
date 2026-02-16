@@ -78,7 +78,7 @@ const processTrendsResponse = async (response: Response, isRefresh: boolean) => 
       trends.value = Array.isArray(trendsData) ? trendsData : []
       return
     } catch (e) {
-      // Fail silently
+      console.error('Error parsing trends JSON:', e)
     }
   }
 

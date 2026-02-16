@@ -18,7 +18,7 @@ accesslog = "-"
 errorlog = "-"
 
 # Server hooks
-def on_starting(server):
+def on_starting(_server):
     """
     Server hook that is called just before the master process is forked.
     """

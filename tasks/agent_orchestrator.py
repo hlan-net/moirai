@@ -79,6 +79,23 @@ class AgentOrchestrator(threading.Thread):
         self.is_leader = False
         logger.info(f"Agent Orchestrator {self.leader_id} released lock.")
 
+    def _update_leadership(self):
+        """Helper to handle lock acquisition and renewal."""
+        if not self.is_leader:
+            # Not a leader, try to acquire lock
+            if self._acquire_lock():
+                self.is_leader = True
+                logger.info(f"Agent Orchestrator {self.leader_id} acquired leadership.")
+            else:
+                logger.debug(f"Agent Orchestrator {self.leader_id} is not leader. Waiting.")
+        else:
+            # We are the leader, try to renew lock
+            if not self._renew_lock():
+                self.is_leader = False # Lost leadership
+                logger.warning(f"Agent Orchestrator {self.leader_id} lost leadership.")
+            else:
+                logger.debug(f"Agent Orchestrator {self.leader_id} renewed leadership.")
+
     def run(self):
         self.running = True
         logger.info(f"Agent Orchestrator {self.leader_id} started.")
@@ -86,41 +103,25 @@ class AgentOrchestrator(threading.Thread):
         while self.running:
             try:
                 if not self.redis_client:
-                    logger.error("Redis client not available. Cannot perform distributed locking. Exiting.")
+                    logger.error("Redis client not available. Exiting orchestrator.")
                     self.stop()
                     break
 
-                if not self.is_leader:
-                    # Not a leader, try to acquire lock
-                    if self._acquire_lock():
-                        self.is_leader = True
-                        logger.info(f"Agent Orchestrator {self.leader_id} acquired leadership.")
-                    else:
-                        logger.debug(f"Agent Orchestrator {self.leader_id} is not leader. Waiting.")
-                else:
-                    # We are the leader, try to renew lock
-                    if not self._renew_lock():
-                        self.is_leader = False # Lost leadership
-                        logger.warning(f"Agent Orchestrator {self.leader_id} lost leadership.")
-                        # Try to acquire again in next loop iteration
-                    else:
-                        logger.debug(f"Agent Orchestrator {self.leader_id} renewed leadership.")
+                self._update_leadership()
 
                 if self.is_leader:
-                    logger.info(f"Agent Orchestrator {self.leader_id} is leader. Checking and running agents.")
+                    logger.info(f"Agent Orchestrator {self.leader_id} is leader. Checking agents.")
                     self.check_and_run_agents()
                 else:
-                    logger.debug(f"Agent Orchestrator {self.leader_id} is not leader, skipping agent checks.")
+                    logger.debug(f"Agent Orchestrator {self.leader_id} skipping agent checks (not leader).")
 
             except Exception as e:
                 logger.error(f"Error in Agent Orchestrator loop: {e}", exc_info=True)
-                # If an unexpected error occurs, try to release lock to allow another instance to take over
                 if self.is_leader:
                     self._release_lock()
             
             time.sleep(self.interval)
         
-        # Ensure lock is released on graceful shutdown
         if self.is_leader:
             self._release_lock()
         logger.info(f"Agent Orchestrator {self.leader_id} stopped.")

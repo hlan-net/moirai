@@ -409,7 +409,7 @@ onMounted(() => {
                 {{ model }}
               </option>
             </select>
-            <input v-else id="ollama-model" v-model="modelName" placeholder="e.g. gemma3:1b" />
+            <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
             <small v-if="loadingModels">Loading available models...</small>
             <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
             <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>

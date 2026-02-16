@@ -17,6 +17,7 @@ spec:
         {{- include "moirai.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: nginx
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: {{ include "moirai.name" . }}-nginx
           image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
@@ -24,6 +25,15 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.nginx.service.port }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+              ephemeral-storage: "100Mi"
+            limits:
+              cpu: 200m
+              memory: 128Mi
+              ephemeral-storage: "200Mi"
           volumeMounts:
             - name: nginx-config
               mountPath: /etc/nginx/conf.d

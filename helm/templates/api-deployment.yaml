@@ -22,6 +22,7 @@ spec:
         {{- include "moirai.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
     spec:
+      automountServiceAccountToken: false
       serviceAccountName: {{ include "moirai.serviceAccountName" . }}
       containers:
         - name: {{ include "moirai.name" . }}-api
@@ -55,9 +56,11 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
+              ephemeral-storage: "1Gi"
             limits:
               cpu: 500m
               memory: 512Mi
+              ephemeral-storage: "2Gi"
           env:
           - name: ENVIRONMENT
             value: {{ .Values.environment | quote }}
