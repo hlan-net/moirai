@@ -61,3 +61,24 @@ Create the name of the service account to use
     {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+API name
+*/}}
+{{- define "moirai.api.name" -}}
+{{- printf "%s-%s" (include "moirai.name" .) "api" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+UI name
+*/}}
+{{- define "moirai.ui.name" -}}
+{{- printf "%s-%s" (include "moirai.name" .) "ui" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Nginx name
+*/}}
+{{- define "moirai.nginx.name" -}}
+{{- printf "%s-%s" (include "moirai.name" .) "nginx" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
