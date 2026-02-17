@@ -21,7 +21,7 @@ jobs:
       REDIS_PASSWORD: testpassword
       JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
       DEFAULT_LLM_PROVIDER: gemini
-      MODEL_NAME: gemini-2.0-flash
+      MODEL_NAME: gemini-3-flash
       DISABLE_RATE_LIMIT: true
       TEST_TARGET: docker
     steps:

@@ -18,7 +18,7 @@ services:
       - API_USERNAME=${API_USERNAME:-username}
       - API_PASSWORD=${API_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}
-      - MODEL_NAME=${MODEL_NAME:-llama3.1:latest}
+      - MODEL_NAME=${MODEL_NAME:-gemini-3-flash}
       - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-ollama}
       - ALLOW_PUBLIC_READ=true
       - ARTICLE_EXPIRATION_DAYS=30
