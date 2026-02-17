@@ -1,0 +1,9 @@
+services:
+  api:
+    image: moirai-app:ci
+
+  mcp-server:
+    image: moirai-app:ci
+
+  ui:
+    image: moirai-ui:ci
