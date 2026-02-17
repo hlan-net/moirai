@@ -24,8 +24,7 @@ class AgentOrchestrator(threading.Thread):
         self.agent_configs_db = "agent_configs"
         self.articles_db = "articles"
         self.feeds_db = "feeds"
-        self.events_db = "events"
-        self.trends_db = "trends"
+        self.issues_db = "issues"
         self.mcp_client = None  # To be initialized with an MCP client for tool calls
 
         # Redis distributed locking

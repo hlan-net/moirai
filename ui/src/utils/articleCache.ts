@@ -15,8 +15,12 @@ export interface Article {
   link: string
   published: string
   feed_url: string
-  events?: string[]
-  trends?: string[]
+  issues?: {
+    id: string
+    logos: string
+    longevity: string
+    status: string
+  }[]
   feed_title?: string
   feed_favicon?: string
   cached_at?: string

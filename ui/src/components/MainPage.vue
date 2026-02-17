@@ -28,8 +28,7 @@ const setFocus = (column: string | null) => {
 const hasActiveFilters = computed(() => {
   return (
     filterStore.selectedFeedId !== null ||
-    filterStore.selectedEventId !== null ||
-    filterStore.selectedTrendId !== null
+    filterStore.selectedIssueId !== null
   )
 })
 </script>

@@ -46,8 +46,7 @@ def _request(method, url, **kwargs):
 ALLOWED_DBS = {
     "feeds",
     "articles",
-    "events",
-    "trends",
+    "issues",
     "config",
     "chat_history",
     "users",

@@ -1,93 +1,50 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { useFilterStore } from '../stores/filter' // Import the new filter store
+import { useFilterStore } from '../stores/filter'
 
-interface Event {
+interface Premise {
+  type: 'message' | 'issue'
+  id: string
+}
+
+interface Issue {
   _id: string
-  name: string
+  logos: string
   description: string
-  article_links: string[]
-  trend_id?: string
+  premises: Premise[]
+  longevity: 'transient' | 'temporal' | 'epic'
+  status: 'active' | 'eternal'
 }
 
-interface Trend {
-  _id?: string
-  name?: string
-  title?: string
-  description?: string
-}
-
-const events = ref<Event[]>([])
-const trends = ref<Trend[]>([])
+const issues = ref<Issue[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
-const expandedEvents = ref<Set<string>>(new Set())
+const expandedIssues = ref<Set<string>>(new Set())
 const searchQuery = ref('')
 let refreshInterval: number | null = null
 
-// Inject selected feed from parent - NO LONGER USED DIRECTLY FOR FILTERING
-// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
-
 const authStore = useAuthStore()
-const filterStore = useFilterStore() // Initialize the filter store
+const filterStore = useFilterStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-const normalizeEvent = (event: any): Event => ({
-  _id: event._id,
-  name: event.name || event.title || 'Unnamed Event',
-  description: event.description || '',
-  article_links: Array.isArray(event.article_links) ? event.article_links : [],
-  trend_id: event.trend_id,
-})
+// Filtered issues based on search query
+const filteredIssues = computed(() => {
+  let filtered = issues.value
 
-// Computed: Filtered events based on search query
-const filteredEvents = computed(() => {
-  let filtered = events.value
-
-  // Filter by search query
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter((event) => {
-      const name = event.name.toLowerCase()
-      const description = event.description.toLowerCase()
-      return name.includes(query) || description.includes(query)
+    filtered = filtered.filter((issue) => {
+      const logos = issue.logos.toLowerCase()
+      const description = issue.description.toLowerCase()
+      return logos.includes(query) || description.includes(query)
     })
   }
 
   return filtered
 })
 
-const processEventsResponse = async (response: Response, isRefresh: boolean) => {
-  if (response.ok) {
-    const eventsData = await response.json()
-    const allEvents = Array.isArray(eventsData) ? eventsData.map(normalizeEvent) : []
-    events.value = allEvents.filter((e) => !e._id.startsWith('_design/'))
-    return
-  }
-
-  if (!isRefresh) {
-    events.value = []
-  }
-}
-
-const processTrendsResponse = async (response: Response, isRefresh: boolean) => {
-  if (response.ok) {
-    try {
-      const trendsData = await response.json()
-      trends.value = Array.isArray(trendsData) ? trendsData : []
-      return
-    } catch (e) {
-      console.error('Error parsing trends JSON:', e)
-    }
-  }
-
-  if (!isRefresh) {
-    trends.value = []
-  }
-}
-
-const fetchEventsAndTrends = async (isRefresh = false) => {
+const fetchIssues = async (isRefresh = false) => {
   if (isRefresh) {
     refreshing.value = true
   } else {
@@ -96,27 +53,25 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
 
   try {
     const params = new URLSearchParams()
+    params.append('longevity', 'transient') // "Events" are transient issues
+    
     if (filterStore.selectedFeedId) {
-      // Use filterStore.selectedFeedId
-      params.append('feed_id', filterStore.selectedFeedId)
+      params.append('feed_url', filterStore.selectedFeedId) // filter_id is currently the feed URL in some contexts, but check store usage
     }
+    
     const queryString = params.toString() ? `?${params.toString()}` : ''
+    const response = await fetch(`/api/issues${queryString}`)
 
-    const [eventsResponse, trendsResponse] = await Promise.all([
-      fetch(`/api/events${queryString}`),
-      fetch(`/api/trends${queryString}`),
-    ])
-
-    await Promise.all([
-      processEventsResponse(eventsResponse, isRefresh),
-      processTrendsResponse(trendsResponse, isRefresh),
-    ])
+    if (response.ok) {
+      const data = await response.json()
+      issues.value = Array.isArray(data) ? data.filter((i: Issue) => !i._id.startsWith('_design/')) : []
+    } else if (!isRefresh) {
+      issues.value = []
+    }
   } catch (error) {
-    console.error('Error fetching events and trends:', error)
-    // Only clear events if we failed to fetch them and it's not a refresh
+    console.error('Error fetching transient issues:', error)
     if (!isRefresh) {
-      events.value = []
-      trends.value = []
+      issues.value = []
     }
   } finally {
     loading.value = false
@@ -124,29 +79,26 @@ const fetchEventsAndTrends = async (isRefresh = false) => {
   }
 }
 
-const selectEvent = (eventId: string) => {
-  filterStore.setSelectedEventId(filterStore.selectedEventId === eventId ? null : eventId)
+const selectIssue = (issueId: string) => {
+  filterStore.setSelectedIssueId(filterStore.selectedIssueId === issueId ? null : issueId)
 }
 
-// Watch for feed selection changes to refresh data
 watch(
   () => filterStore.selectedFeedId,
   () => {
-    // Watch filterStore.selectedFeedId
-    fetchEventsAndTrends()
+    fetchIssues()
   }
 )
 
-const deleteEvent = async (id: string) => {
+const deleteIssue = async (id: string) => {
   if (!confirm('Delete this event?')) return
   try {
-    const res = await fetch(`/api/events/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/issues/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      events.value = events.value.filter((e) => e._id !== id)
-      expandedEvents.value.delete(id)
-      if (filterStore.selectedEventId === id) {
-        // Clear selection if deleted
-        filterStore.setSelectedEventId(null)
+      issues.value = issues.value.filter((i) => i._id !== id)
+      expandedIssues.value.delete(id)
+      if (filterStore.selectedIssueId === id) {
+        filterStore.setSelectedIssueId(null)
       }
     }
   } catch (error) {
@@ -154,19 +106,19 @@ const deleteEvent = async (id: string) => {
   }
 }
 
-const removeLink = async (eventId: string, link: string) => {
+const removePremise = async (issueId: string, premiseId: string) => {
   if (!confirm('Remove this article from the event?')) return
   try {
-    const res = await fetch(`/api/events/${eventId}/links`, {
+    const res = await fetch(`/api/issues/${issueId}/premises`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ link }),
+      body: JSON.stringify({ id: premiseId }),
     })
     if (res.ok) {
-      const updatedEvent = normalizeEvent(await res.json())
-      const index = events.value.findIndex((e) => e._id === eventId)
+      const updatedIssue = await res.json()
+      const index = issues.value.findIndex((i) => i._id === issueId)
       if (index !== -1) {
-        events.value[index] = updatedEvent
+        issues.value[index] = updatedIssue
       }
     }
   } catch (error) {
@@ -175,25 +127,16 @@ const removeLink = async (eventId: string, link: string) => {
 }
 
 const toggleExpand = (id: string) => {
-  if (expandedEvents.value.has(id)) {
-    expandedEvents.value.delete(id)
+  if (expandedIssues.value.has(id)) {
+    expandedIssues.value.delete(id)
   } else {
-    expandedEvents.value.add(id)
+    expandedIssues.value.add(id)
   }
-}
-
-const getTrendDisplayName = (trendId?: string) => {
-  if (!trendId) {
-    return ''
-  }
-  const trend = trends.value.find((t) => t._id === trendId)
-  return trend?.name || trend?.title || trendId
 }
 
 onMounted(() => {
-  fetchEventsAndTrends()
-  // Refresh every 30 seconds
-  refreshInterval = globalThis.setInterval(() => fetchEventsAndTrends(true), 30000)
+  fetchIssues()
+  refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
 })
 
 onUnmounted(() => {
@@ -207,12 +150,12 @@ onUnmounted(() => {
   <div class="event-column">
     <div class="column-header">
       <h2>
-        Events ({{ filteredEvents.length }})
+        Events ({{ filteredIssues.length }})
         <span v-if="refreshing" class="update-badge">↻</span>
       </h2>
       <button
         v-if="isAdmin"
-        @click="() => fetchEventsAndTrends(true)"
+        @click="() => fetchIssues(true)"
         :disabled="refreshing"
         class="action-btn"
         title="Refresh events"
@@ -236,7 +179,7 @@ onUnmounted(() => {
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Search events by name or description..."
+        placeholder="Search events by name..."
         class="search-input"
       />
       <button
@@ -250,43 +193,43 @@ onUnmounted(() => {
     </div>
 
     <div v-if="loading" class="loading-state">Loading events...</div>
-    <div v-else-if="!filteredEvents.length" class="no-results">
+    <div v-else-if="!filteredIssues.length" class="no-results">
       <span v-if="searchQuery">No events match "{{ searchQuery }}"</span>
       <span v-else>No events found yet.</span>
     </div>
     <div v-else class="event-list">
       <div
-        v-for="event in filteredEvents"
-        :key="event._id"
+        v-for="issue in filteredIssues"
+        :key="issue._id"
         class="event-card"
-        @click="selectEvent(event._id)"
-        :class="{ 'selected-event': filterStore.selectedEventId === event._id }"
+        @click="selectIssue(issue._id)"
+        :class="{ 'selected-event': filterStore.selectedIssueId === issue._id }"
       >
         <div class="card-header">
-          <h3 @click.stop="toggleExpand(event._id)" class="clickable">{{ event.name }}</h3>
+          <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
           <button
             v-if="isAdmin"
-            @click="deleteEvent(event._id)"
+            @click="deleteIssue(issue._id)"
             class="delete-btn"
             title="Delete Event"
           >
             ×
           </button>
         </div>
-        <p v-if="event.description" class="summary">{{ event.description }}</p>
-        <div v-if="event.trend_id" class="trend-link">
-          <span class="trend-label">Related Trend:</span>
-          <span class="trend-name">{{ getTrendDisplayName(event.trend_id) }}</span>
+        <p v-if="issue.description" class="summary">{{ issue.description }}</p>
+        
+        <div class="status-tags">
+            <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
         </div>
 
-        <div v-if="expandedEvents.has(event._id)" class="links-section">
-          <h4>Linked Articles ({{ (event.article_links || []).length }})</h4>
+        <div v-if="expandedIssues.has(issue._id)" class="links-section">
+          <h4>Constituents ({{ (issue.premises || []).length }})</h4>
           <ul>
-            <li v-for="link in event.article_links || []" :key="link">
-              <a :href="link" target="_blank" rel="noopener noreferrer">{{ link }}</a>
+            <li v-for="premise in issue.premises || []" :key="premise.id">
+              <span class="premise-link">{{ premise.id }}</span>
               <button
                 v-if="isAdmin"
-                @click="removeLink(event._id, link)"
+                @click="removePremise(issue._id, premise.id)"
                 class="remove-link-btn"
                 title="Remove link"
               >
@@ -295,8 +238,8 @@ onUnmounted(() => {
             </li>
           </ul>
         </div>
-        <div v-else class="expand-hint" @click="toggleExpand(event._id)">
-          {{ (event.article_links || []).length }} articles (click to expand)
+        <div v-else class="expand-hint" @click="toggleExpand(issue._id)">
+          {{ (issue.premises || []).length }} items (click to expand)
         </div>
       </div>
     </div>
@@ -335,7 +278,7 @@ h2 {
   border-bottom: 1px solid var(--border-color);
   padding: 15px 0;
   text-align: left;
-  cursor: pointer; /* Add cursor pointer for selectable events */
+  cursor: pointer;
   transition:
     background-color 0.2s,
     border-left 0.2s;
@@ -345,8 +288,8 @@ h2 {
   background-color: #3a3a3a;
 }
 .event-card.selected-event {
-  background-color: #5a2e00; /* Darker background for selected event */
-  border-left: 3px solid #d83b01; /* Highlight with event color */
+  background-color: #5a2e00;
+  border-left: 3px solid #d83b01;
 }
 .event-card.selected-event:hover {
   background-color: #6a3e00;
@@ -379,20 +322,27 @@ h3 {
   margin: 5px 0;
 }
 
-.trend-link {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-color);
-  font-size: 0.9em;
+.status-tags {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
 }
-.trend-label {
-  color: var(--text-color);
-  opacity: 0.6;
-  margin-right: 5px;
+
+.status-tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
 }
-.trend-name {
-  color: #ff6b6b;
-  font-weight: 500;
+
+.status-tag.active {
+    background: #28a745;
+    color: white;
+}
+
+.status-tag.eternal {
+    background: #6c757d;
+    color: white;
 }
 
 .delete-btn {
@@ -434,12 +384,14 @@ h3 {
   justify-content: space-between;
   font-size: 0.8rem;
   margin-bottom: 3px;
+  align-items: center;
 }
-.links-section a {
+.premise-link {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
   color: var(--primary-color);
+  flex: 1;
 }
 .remove-link-btn {
   border: none;
@@ -450,6 +402,7 @@ h3 {
   height: 20px;
   cursor: pointer;
   line-height: 1;
+  margin-left: 10px;
 }
 .remove-link-btn:hover {
   background: #cc0000;

@@ -1,28 +1,29 @@
 from datetime import datetime, timezone
 from api.db_constants import MONGO_GT, MONGO_IN
-from api.db import query_couchdb
+from api.db import fetch_from_couchdb
 
 
-def _get_article_ids_from_trend(trend_id):
-    trend = query_couchdb("trends", selector={"_id": trend_id}, limit=1)
-    if not trend or not trend[0].get("event_ids"):
+def _get_article_ids_from_issue(issue_id):
+    """
+    Recursively extract article IDs (message links) from an issue and its nested issues.
+    """
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
         return None
     
-    events = query_couchdb(
-        "events",
-        selector={MONGO_IN: trend[0]["event_ids"]},
-        fields=["article_links"]
-    )
-    ids = []
-    for e in events:
-        ids.extend(e.get("article_links", []))
-    return ids
+    article_links = []
+    for premise in issue.get("premises", []):
+        if premise.get("type") == "message":
+            article_links.append(premise.get("id"))
+        elif premise.get("type") == "issue":
+            nested_links = _get_article_ids_from_issue(premise.get("id"))
+            if nested_links:
+                article_links.extend(nested_links)
+    
+    return list(set(article_links))
 
-def _get_article_ids_from_event(event_id):
-    event = query_couchdb("events", selector={"_id": event_id}, limit=1)
-    return event[0].get("article_links", []) if event else None
 
-def build_article_selector(since=None, feed_id=None, event_id=None, trend_id=None):
+def build_article_selector(since=None, feed_id=None, issue_id=None):
     """Build selector for efficient DB querying of articles."""
     selector = {"published": {MONGO_GT: None}}
     
@@ -36,29 +37,21 @@ def build_article_selector(since=None, feed_id=None, event_id=None, trend_id=Non
             pass
 
     article_ids = []
-    if trend_id:
-        trend_ids = _get_article_ids_from_trend(trend_id)
-        if trend_ids is None: return {"_id": {"$eq": "no_match"}}
-        article_ids = trend_ids
-
-    if event_id:
-        event_ids = _get_article_ids_from_event(event_id)
-        if event_ids is None: return {"_id": {"$eq": "no_match"}}
-        article_ids = list(set(article_ids) & set(event_ids)) if article_ids else event_ids
+    if issue_id:
+        found_ids = _get_article_ids_from_issue(issue_id)
+        if found_ids is None:
+            return {"_id": {"$eq": "no_match"}}
+        article_ids = found_ids
 
     if article_ids:
-        selector["_id"] = {MONGO_IN: list(set(article_ids))}
-    elif trend_id or event_id:
+        # Note: 'id' in premises is actually the article 'link' in our current article schema
+        # but articles are stored with URL-based IDs. Let's ensure consistency.
+        selector["link"] = {MONGO_IN: list(set(article_ids))}
+    elif issue_id:
         return {"_id": {"$eq": "no_match"}}
 
     if feed_id:
-        if "_id" in selector:
-            feed_articles = query_couchdb("articles", selector={"feed_id": feed_id}, fields=["_id"])
-            feed_ids = [a["_id"] for a in feed_articles if "_id" in a]
-            selector["_id"][MONGO_IN] = list(set(selector["_id"][MONGO_IN]) & set(feed_ids))
-            if not selector["_id"][MONGO_IN]: return {"_id": {"$eq": "no_match"}}
-        else:
-            selector["feed_id"] = feed_id
+        selector["feed_id"] = feed_id
 
     return selector
 

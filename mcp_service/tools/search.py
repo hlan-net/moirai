@@ -5,7 +5,11 @@ from ..core import mcp, auth_required, validate_namespace
 from ..db import db_request
 from api.db_constants import MONGO_REGEX, MONGO_OR
 
-# ===== SEARCH TOOLS =====
+# Database names
+ISSUES_DB = "issues"
+ARTICLES_DB = "articles"
+
+# ===== INTERNAL LOGIC =====
 
 def _process_article_docs(docs):
     """Common logic to format article documents for tool output."""
@@ -41,6 +45,69 @@ def _handle_date_filters(selector, date_from, date_to):
         else:
             selector["published"] = {"$lte": to_dt.isoformat()}
 
+def _search_issues_internal(
+    query: str, namespace: str, longevity: str = None, limit: int = 50
+) -> str:
+    """Internal implementation of issue search."""
+    if not query.strip():
+        return json.dumps({"error": "Query cannot be empty"})
+
+    valid, err = validate_namespace(namespace)
+    if not valid:
+        return json.dumps({"error": err})
+
+    limit = min(limit, 100)
+    safe_query = re.escape(query)
+
+    # Mango selector
+    selector = {
+        "namespace": namespace,
+        MONGO_OR: [
+            {"logos": {MONGO_REGEX: f"(?i){safe_query}"}},
+            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
+        ],
+    }
+    
+    if longevity:
+        selector["longevity"] = longevity
+
+    try:
+        query_payload = {
+            "selector": selector,
+            "limit": limit,
+            "fields": ["_id", "logos", "description", "premises", "longevity", "status"],
+        }
+
+        resp = db_request("POST", ISSUES_DB, "/_find", json_data=query_payload)
+
+        if resp.status_code != 200:
+            return json.dumps({"error": f"Search failed: {resp.text}"})
+
+        docs = resp.json().get("docs", [])
+
+        results = []
+        for doc in docs:
+            results.append(
+                {
+                    "_id": doc.get("_id"),
+                    "logos": doc.get("logos", "Untitled"),
+                    "description": doc.get("description", ""),
+                    "scale": doc.get("longevity"),
+                    "status": doc.get("status"),
+                    "premises_count": len(doc.get("premises", [])),
+                }
+            )
+
+        return json.dumps(
+            {"total": len(results), "query": query, "results": results}, indent=2
+        )
+
+    except Exception as e:
+        return json.dumps({"error": f"Search execution error: {str(e)}"})
+
+
+# ===== SEARCH TOOLS =====
+
 @mcp.tool()
 @auth_required
 def search_articles(
@@ -53,14 +120,6 @@ def search_articles(
 ) -> str:
     """
     Search articles by keyword. Optionally filter by namespace.
-
-    Args:
-        query: Search keywords.
-        namespace: Optional GUID of the namespace.
-        date_from: Optional start date (ISO).
-        date_to: Optional end date (ISO).
-        limit: Max results.
-        api_key: Required for authentication.
     """
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
@@ -101,10 +160,10 @@ def search_articles(
             ],
         }
 
-        if not query_payload["sort"]:
+        if "sort" in query_payload and not query_payload["sort"]:
             del query_payload["sort"]
 
-        resp = db_request("POST", "articles", "/_find", json_data=query_payload)
+        resp = db_request("POST", ARTICLES_DB, "/_find", json_data=query_payload)
 
         if resp.status_code != 200:
             return json.dumps({"error": f"Search failed: {resp.text}"})
@@ -132,12 +191,6 @@ def get_recent_articles(
 ) -> str:
     """
     Get most recent articles. Optionally filter by namespace.
-
-    Args:
-        namespace: Optional GUID of the namespace.
-        hours: How far back to look.
-        limit: Max results.
-        api_key: Required for authentication.
     """
     hours = min(hours, 168)
     limit = min(limit, 200)
@@ -164,7 +217,7 @@ def get_recent_articles(
             ],
         }
 
-        resp = db_request("POST", "articles", "/_find", json_data=query_payload)
+        resp = db_request("POST", ARTICLES_DB, "/_find", json_data=query_payload)
 
         if resp.status_code != 200:
             return json.dumps({"error": f"Fetch failed: {resp.text}"})
@@ -187,68 +240,24 @@ def get_recent_articles(
 
 @mcp.tool()
 @auth_required
+def search_issues(
+    query: str, namespace: str, longevity: str = None, limit: int = 50, api_key: str = None
+) -> str:
+    """
+    Search Issues (Resonances) by keyword within a namespace.
+    """
+    return _search_issues_internal(query, namespace, longevity, limit)
+
+
+@mcp.tool()
+@auth_required
 def search_events(
     query: str, namespace: str, limit: int = 50, api_key: str = None
 ) -> str:
     """
-    Search events by keyword within a namespace.
-
-    Args:
-        query: Search keywords.
-        namespace: GUID of the namespace.
-        limit: Max results.
-        api_key: Required for authentication.
+    (Alias for search_issues) Search events (transient issues) by keyword.
     """
-    if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
-
-    valid, err = validate_namespace(namespace)
-    if not valid:
-        return json.dumps({"error": err})
-
-    limit = min(limit, 100)
-    safe_query = re.escape(query)
-
-    # Mango selector
-    selector = {
-        "namespace": namespace,
-        MONGO_OR: [
-            {"name": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
-        ],
-    }
-
-    try:
-        query_payload = {
-            "selector": selector,
-            "limit": limit,
-            "fields": ["_id", "name", "description", "article_links"],
-        }
-
-        resp = db_request("POST", "events", "/_find", json_data=query_payload)
-
-        if resp.status_code != 200:
-            return json.dumps({"error": f"Search failed: {resp.text}"})
-
-        docs = resp.json().get("docs", [])
-
-        results = []
-        for doc in docs:
-            results.append(
-                {
-                    "_id": doc.get("_id"),
-                    "name": doc.get("name", "Untitled"),
-                    "description": doc.get("description", ""),
-                    "article_count": len(doc.get("article_links", [])),
-                }
-            )
-
-        return json.dumps(
-            {"total": len(results), "query": query, "results": results}, indent=2
-        )
-
-    except Exception as e:
-        return json.dumps({"error": f"Search execution error: {str(e)}"})
+    return _search_issues_internal(query, namespace, longevity="transient", limit=limit)
 
 
 @mcp.tool()
@@ -257,61 +266,6 @@ def search_trends(
     query: str, namespace: str, limit: int = 20, api_key: str = None
 ) -> str:
     """
-    Search trends by keyword within a namespace.
-
-    Args:
-        query: Search keywords.
-        namespace: GUID of the namespace.
-        limit: Max results.
-        api_key: Required for authentication.
+    (Alias for search_issues) Search trends (temporal issues) by keyword.
     """
-    if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
-
-    valid, err = validate_namespace(namespace)
-    if not valid:
-        return json.dumps({"error": err})
-
-    limit = min(limit, 100)
-    safe_query = re.escape(query)
-
-    # Mango selector
-    selector = {
-        "namespace": namespace,
-        MONGO_OR: [
-            {"name": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
-        ],
-    }
-
-    try:
-        query_payload = {
-            "selector": selector,
-            "limit": limit,
-            "fields": ["_id", "name", "description", "event_ids"],
-        }
-
-        resp = db_request("POST", "trends", "/_find", json_data=query_payload)
-
-        if resp.status_code != 200:
-            return json.dumps({"error": f"Search failed: {resp.text}"})
-
-        docs = resp.json().get("docs", [])
-
-        results = []
-        for doc in docs:
-            results.append(
-                {
-                    "_id": doc.get("_id"),
-                    "name": doc.get("name", "Untitled"),
-                    "description": doc.get("description", ""),
-                    "event_count": len(doc.get("event_ids", [])),
-                }
-            )
-
-        return json.dumps(
-            {"total": len(results), "query": query, "results": results}, indent=2
-        )
-
-    except Exception as e:
-        return json.dumps({"error": f"Search execution error: {str(e)}"})
+    return _search_issues_internal(query, namespace, longevity="temporal", limit=limit)

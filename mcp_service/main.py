@@ -3,11 +3,16 @@ from starlette.routing import Route
 from .core import mcp
 from api.telemetry import configure_telemetry
 from tasks.agent_orchestrator import AgentOrchestrator
+from .tools import feeds, issues, search, staleness, users, agent_configs  # noqa: F401
+from version import get_version_string
 import logging
 import os # Added for env vars
 import redis # Added for Redis client
 
 logger = logging.getLogger(__name__)
+
+# Print version info
+logger.info(f"{get_version_string()} starting...")
 
 # Get the ASGI app
 app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()

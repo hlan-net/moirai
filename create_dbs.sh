@@ -45,8 +45,7 @@ check_couchdb_ready
 create_database "_users"
 create_database "feeds"
 create_database "articles"
-create_database "events"
-create_database "trends"
+create_database "issues"
 create_database "agent_configs"
 create_database "config" # The config DB is also used, ensure it's created
 

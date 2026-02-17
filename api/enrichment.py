@@ -5,9 +5,9 @@ from api.db_constants import MONGO_ELEM_MATCH, MONGO_IN
 logger = logging.getLogger(__name__)
 
 
-def enrich_articles_with_events_and_trends(articles):
+def enrich_articles_with_issues(articles):
     """
-    Enriches a list of articles with their associated events and trends.
+    Enriches a list of articles with their associated issues.
     Expected article format: dictionary with 'link' and 'feed_url' fields.
     """
     if not articles:
@@ -17,16 +17,15 @@ def enrich_articles_with_events_and_trends(articles):
     if not article_links:
         return articles
 
-    events, trends, feeds = _fetch_related_data(article_links)
+    issues, feeds = _fetch_related_data(article_links)
 
-    article_event_map, article_link_to_trends, feed_title_map, feed_favicon_map = (
-        _build_mappings(events, trends, feeds)
+    article_issue_map, feed_title_map, feed_favicon_map = (
+        _build_mappings(issues, feeds)
     )
 
     _apply_enrichment(
         articles,
-        article_event_map,
-        article_link_to_trends,
+        article_issue_map,
         feed_title_map,
         feed_favicon_map,
     )
@@ -35,33 +34,22 @@ def enrich_articles_with_events_and_trends(articles):
 
 
 def _fetch_related_data(article_links):
-    """Fetches events, trends, and feeds based on article links."""
-    # Batch fetch events containing these article links
-    events = []
+    """Fetches issues and feeds based on article links."""
+    # Batch fetch issues containing these article links in premises
+    issues = []
     if article_links:
-        events = query_couchdb(
-            "events",
-            selector={"article_links": {MONGO_ELEM_MATCH: {MONGO_IN: article_links}}},
-            limit=1000,
-        )
-
-    event_ids = [e.get("_id") for e in events if e.get("_id")]
-
-    # Batch fetch trends containing these event IDs
-    trends = []
-    if event_ids:
-        trends = query_couchdb(
-            "trends",
-            selector={"event_ids": {MONGO_ELEM_MATCH: {MONGO_IN: event_ids}}},
+        issues = query_couchdb(
+            "issues",
+            selector={"premises": {MONGO_ELEM_MATCH: { "id": {MONGO_IN: article_links} }}},
             limit=1000,
         )
 
     # Pre-fetch feed info for title and favicon mapping
     feeds = fetch_from_couchdb("feeds")
-    return events, trends, feeds
+    return issues, feeds
 
 
-def _build_mappings(events, trends, feeds):
+def _build_mappings(issues, feeds):
     """Builds lookup maps for enrichment."""
     feed_title_map = {
         feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
@@ -70,52 +58,33 @@ def _build_mappings(events, trends, feeds):
         feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")
     }
 
-    # Build article link to event names and IDs mapping
-    article_event_map = {}
-    article_link_to_event_ids = {}
+    # Build article link to issue logos and IDs mapping
+    article_issue_map = {}
 
-    for event in events:
-        event_id = event.get("_id")
-        event_name = event.get("name")
-        if not event_name:
+    for issue in issues:
+        issue_id = issue.get("_id")
+        issue_logos = issue.get("logos")
+        if not issue_logos:
             continue
 
-        for link in event.get("article_links", []):
-            # Map link -> event names
-            article_event_map.setdefault(link, []).append(event_name)
+        for premise in issue.get("premises", []):
+            if premise.get("type") == "message":
+                link = premise.get("id")
+                if link:
+                    # Map link -> issue summary info
+                    article_issue_map.setdefault(link, []).append({
+                        "id": issue_id,
+                        "logos": issue_logos,
+                        "longevity": issue.get("longevity"),
+                        "status": issue.get("status")
+                    })
 
-            # Map link -> event IDs (for trend lookup)
-            if event_id:
-                article_link_to_event_ids.setdefault(link, []).append(event_id)
-
-    # Build event ID to trend names mapping
-    event_id_to_trends = {}
-    for trend in trends or []:
-        trend_name = trend.get("name")
-        if not trend_name:
-            continue
-        for event_id in trend.get("event_ids", []):
-            event_id_to_trends.setdefault(event_id, []).append(trend_name)
-
-    # Build article link to trend names mapping
-    article_link_to_trends = {}
-    for link, event_ids in article_link_to_event_ids.items():
-        trend_names = {
-            name 
-            for eid in event_ids 
-            if eid in event_id_to_trends 
-            for name in event_id_to_trends[eid]
-        }
-        if trend_names:
-            article_link_to_trends[link] = sorted(list(trend_names))
-
-    return article_event_map, article_link_to_trends, feed_title_map, feed_favicon_map
+    return article_issue_map, feed_title_map, feed_favicon_map
 
 
 def _apply_enrichment(
     articles,
-    article_event_map,
-    article_link_to_trends,
+    article_issue_map,
     feed_title_map,
     feed_favicon_map,
 ):
@@ -130,52 +99,37 @@ def _apply_enrichment(
 
         article_link = article.get("link")
         if article_link:
-            if article_link in article_event_map:
-                article["events"] = article_event_map[article_link]
-
-            if article_link in article_link_to_trends:
-                article["trends"] = article_link_to_trends[article_link]
+            if article_link in article_issue_map:
+                article["issues"] = article_issue_map[article_link]
 
 
-def enrich_events_with_articles(events, include_articles=True):
+def enrich_issues_with_constituents(issues, recursive=True):
     """
-    Enriches a list of events with full article objects.
+    Enriches a list of issues with their full premise objects (articles or nested issues).
     """
-    if not (events and include_articles):
-        return events
+    if not issues:
+        return issues
 
-    for event in events:
-        article_ids = event.get("article_ids", [])
-        articles = []
-        for article_id in article_ids:
+    for issue in issues:
+        premises = issue.get("premises", [])
+        enriched_premises = []
+        for premise in premises:
+            p_type = premise.get("type")
+            p_id = premise.get("id")
             try:
-                article = fetch_from_couchdb("articles", article_id)
-                if article:
-                    articles.append(article)
+                if p_type == "message":
+                    doc = fetch_from_couchdb("articles", p_id)
+                elif p_type == "issue":
+                    doc = fetch_from_couchdb("issues", p_id)
+                    if doc and recursive:
+                        enrich_issues_with_constituents([doc], recursive=True)
+                else:
+                    doc = None
+                
+                if doc:
+                    enriched_premises.append(doc)
             except Exception as e:
-                logger.warning(f"Could not fetch article {article_id}: {e}")
-        event["articles"] = articles
-    return events
-
-
-def enrich_trends_with_events(trends, include_events=True, include_articles=False):
-    """
-    Enriches a list of trends with full event objects, and optionally those events with articles.
-    """
-    if not (trends and include_events):
-        return trends
-
-    for trend in trends:
-        event_ids = trend.get("event_ids", [])
-        events = []
-        for event_id in event_ids:
-            try:
-                event = fetch_from_couchdb("events", event_id)
-                if event:
-                    if include_articles:
-                        enrich_events_with_articles([event], include_articles=True)
-                    events.append(event)
-            except Exception as e:
-                logger.warning(f"Could not fetch event {event_id}: {e}")
-        trend["events"] = events
-    return trends
+                logger.warning(f"Could not fetch premise {p_id} of type {p_type}: {e}")
+        
+        issue["enriched_premises"] = enriched_premises
+    return issues

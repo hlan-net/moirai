@@ -31,12 +31,12 @@ def add_agent_config(
         user_id: The GUID of the user creating the agent config.
         name: A descriptive name for the agent config.
         trigger_type: How the agent is triggered ('on_new_article', 'scheduled').
-        target_db: The database the agent primarily monitors ('articles', 'events', 'trends').
+        target_db: The database the agent primarily monitors ('articles', 'issues', 'feeds').
         logic_module: Reference to a Python module/function for agent logic (e.g., 'tasks.agent_logic.create_event').
         schedule_interval: (Optional) If trigger_type is 'scheduled', the interval (e.g., '1h', '1d', 'every 30m').
         llm_model_config: (Optional) LLM specific configurations (model_name, provider).
         parameters: (Optional) User-defined parameters for the agent logic.
-        linked_entity_id: (Optional) ID of a specific event or trend this agent is managing.
+        linked_entity_id: (Optional) ID of a specific issue (event or trend) this agent is managing.
     Returns:
         A dictionary representing the created agent configuration.
     """

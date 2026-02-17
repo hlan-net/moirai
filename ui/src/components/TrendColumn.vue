@@ -1,47 +1,50 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { useFilterStore } from '../stores/filter' // Import the new filter store
+import { useFilterStore } from '../stores/filter'
 
-interface Trend {
-  _id: string
-  name: string
-  description: string
-  event_ids: string[]
+interface Premise {
+  type: 'message' | 'issue'
+  id: string
 }
 
-const trends = ref<Trend[]>([])
+interface Issue {
+  _id: string
+  logos: string
+  description: string
+  premises: Premise[]
+  longevity: 'transient' | 'temporal' | 'epic'
+  status: 'active' | 'eternal'
+}
+
+const issues = ref<Issue[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
-const expandedTrends = ref<Set<string>>(new Set())
+const expandedIssues = ref<Set<string>>(new Set())
 const searchQuery = ref('')
 let refreshInterval: number | null = null
 
-// Inject selected feed from parent - NO LONGER USED DIRECTLY FOR FILTERING
-// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
-
 const authStore = useAuthStore()
-const filterStore = useFilterStore() // Initialize the filter store
+const filterStore = useFilterStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-// Computed: Filtered trends based on search query
-const filteredTrends = computed(() => {
-  let filtered = trends.value
+// Filtered issues based on search query
+const filteredIssues = computed(() => {
+  let filtered = issues.value
 
-  // Filter by search query
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter((trend) => {
-      const name = trend.name.toLowerCase()
-      const description = trend.description.toLowerCase()
-      return name.includes(query) || description.includes(query)
+    filtered = filtered.filter((issue) => {
+      const logos = issue.logos.toLowerCase()
+      const description = issue.description.toLowerCase()
+      return logos.includes(query) || description.includes(query)
     })
   }
 
   return filtered
 })
 
-const fetchTrends = async (isRefresh = false) => {
+const fetchIssues = async (isRefresh = false) => {
   if (isRefresh) {
     refreshing.value = true
   } else {
@@ -50,29 +53,26 @@ const fetchTrends = async (isRefresh = false) => {
 
   try {
     const params = new URLSearchParams()
+    // "Trends" are temporal or epic issues
+    params.append('longevity', 'temporal')
+    
     if (filterStore.selectedFeedId) {
-      // Use filterStore.selectedFeedId
-      params.append('feed_id', filterStore.selectedFeedId)
+      params.append('feed_url', filterStore.selectedFeedId)
     }
-    if (filterStore.selectedEventId) {
-      // Use filterStore.selectedEventId
-      params.append('event_id', filterStore.selectedEventId)
-    }
+    
     const queryString = params.toString() ? `?${params.toString()}` : ''
-
-    const response = await fetch(`/api/trends${queryString}`)
+    const response = await fetch(`/api/issues${queryString}`)
 
     if (response.ok) {
       const data = await response.json()
-      const allTrends = Array.isArray(data) ? data : []
-      trends.value = allTrends.filter((t: Trend) => !t._id.startsWith('_design/'))
+      issues.value = Array.isArray(data) ? data.filter((i: Issue) => !i._id.startsWith('_design/')) : []
     } else if (!isRefresh) {
-      trends.value = []
+      issues.value = []
     }
   } catch (error) {
-    console.error('Error fetching trends:', error)
+    console.error('Error fetching temporal issues:', error)
     if (!isRefresh) {
-      trends.value = []
+      issues.value = []
     }
   } finally {
     loading.value = false
@@ -80,26 +80,26 @@ const fetchTrends = async (isRefresh = false) => {
   }
 }
 
-const selectTrend = (trendId: string) => {
-  filterStore.setSelectedTrendId(filterStore.selectedTrendId === trendId ? null : trendId)
+const selectIssue = (issueId: string) => {
+  filterStore.setSelectedIssueId(filterStore.selectedIssueId === issueId ? null : issueId)
 }
 
-// Watch for filter changes to refresh data
-watch([() => filterStore.selectedFeedId, () => filterStore.selectedEventId], () => {
-  // Watch filterStore.selectedFeedId and selectedEventId
-  fetchTrends()
-})
+watch(
+  () => filterStore.selectedFeedId,
+  () => {
+    fetchIssues()
+  }
+)
 
-const deleteTrend = async (id: string) => {
+const deleteIssue = async (id: string) => {
   if (!confirm('Delete this trend?')) return
   try {
-    const res = await fetch(`/api/trends/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/issues/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      trends.value = trends.value.filter((t) => t._id !== id)
-      expandedTrends.value.delete(id)
-      if (filterStore.selectedTrendId === id) {
-        // Clear selection if deleted
-        filterStore.setSelectedTrendId(null)
+      issues.value = issues.value.filter((i) => i._id !== id)
+      expandedIssues.value.delete(id)
+      if (filterStore.selectedIssueId === id) {
+        filterStore.setSelectedIssueId(null)
       }
     }
   } catch (error) {
@@ -107,19 +107,19 @@ const deleteTrend = async (id: string) => {
   }
 }
 
-const removeEvent = async (trendId: string, eventId: string) => {
-  if (!confirm('Remove this event from the trend?')) return
+const removePremise = async (issueId: string, premiseId: string) => {
+  if (!confirm('Remove this constituent from the trend?')) return
   try {
-    const res = await fetch(`/api/trends/${trendId}/events`, {
+    const res = await fetch(`/api/issues/${issueId}/premises`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_id: eventId }),
+      body: JSON.stringify({ id: premiseId }),
     })
     if (res.ok) {
-      const updatedTrend = await res.json()
-      const index = trends.value.findIndex((t) => t._id === trendId)
+      const updatedIssue = await res.json()
+      const index = issues.value.findIndex((i) => i._id === issueId)
       if (index !== -1) {
-        trends.value[index] = updatedTrend
+        issues.value[index] = updatedIssue
       }
     }
   } catch (error) {
@@ -128,17 +128,16 @@ const removeEvent = async (trendId: string, eventId: string) => {
 }
 
 const toggleExpand = (id: string) => {
-  if (expandedTrends.value.has(id)) {
-    expandedTrends.value.delete(id)
+  if (expandedIssues.value.has(id)) {
+    expandedIssues.value.delete(id)
   } else {
-    expandedTrends.value.add(id)
+    expandedIssues.value.add(id)
   }
 }
 
 onMounted(() => {
-  fetchTrends()
-  // Refresh every 30 seconds
-  refreshInterval = globalThis.setInterval(() => fetchTrends(true), 30000)
+  fetchIssues()
+  refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
 })
 
 onUnmounted(() => {
@@ -152,12 +151,12 @@ onUnmounted(() => {
   <div class="trend-column">
     <div class="column-header">
       <h2>
-        Trends ({{ filteredTrends.length }})
+        Trends ({{ filteredIssues.length }})
         <span v-if="refreshing" class="update-badge">↻</span>
       </h2>
       <button
         v-if="isAdmin"
-        @click="() => fetchTrends(true)"
+        @click="() => fetchIssues(true)"
         :disabled="refreshing"
         class="action-btn"
         title="Refresh trends"
@@ -181,7 +180,7 @@ onUnmounted(() => {
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Search trends by name or description..."
+        placeholder="Search trends by name..."
         class="search-input"
       />
       <button
@@ -195,49 +194,53 @@ onUnmounted(() => {
     </div>
 
     <div v-if="loading" class="loading-state">Loading trends...</div>
-    <div v-else-if="!filteredTrends.length" class="no-results">
+    <div v-else-if="!filteredIssues.length" class="no-results">
       <span v-if="searchQuery">No trends match "{{ searchQuery }}"</span>
       <span v-else>No trends found yet.</span>
     </div>
     <div v-else class="trend-list">
       <div
-        v-for="trend in filteredTrends"
-        :key="trend._id"
+        v-for="issue in filteredIssues"
+        :key="issue._id"
         class="trend-card"
-        @click="selectTrend(trend._id)"
-        :class="{ 'selected-trend': filterStore.selectedTrendId === trend._id }"
+        @click="selectIssue(issue._id)"
+        :class="{ 'selected-trend': filterStore.selectedIssueId === issue._id }"
       >
         <div class="card-header">
-          <h3 @click.stop="toggleExpand(trend._id)" class="clickable">{{ trend.name }}</h3>
+          <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
           <button
             v-if="isAdmin"
-            @click="deleteTrend(trend._id)"
+            @click="deleteIssue(issue._id)"
             class="delete-btn"
             title="Delete Trend"
           >
             ×
           </button>
         </div>
-        <p class="summary">{{ trend.description }}</p>
+        <p v-if="issue.description" class="summary">{{ issue.description }}</p>
+        
+        <div class="status-tags">
+            <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
+        </div>
 
-        <div v-if="expandedTrends.has(trend._id)" class="events-section">
-          <h4>Linked Events ({{ (trend.event_ids || []).length }})</h4>
+        <div v-if="expandedIssues.has(issue._id)" class="events-section">
+          <h4>Constituents ({{ (issue.premises || []).length }})</h4>
           <ul>
-            <li v-for="eid in trend.event_ids || []" :key="eid">
-              <span class="event-id">{{ eid.substring(0, 8) }}...</span>
+            <li v-for="premise in issue.premises || []" :key="premise.id">
+              <span class="premise-id">{{ premise.id.substring(0, 8) }}...</span>
               <button
                 v-if="isAdmin"
-                @click="removeEvent(trend._id, eid)"
+                @click="removePremise(issue._id, premise.id)"
                 class="remove-event-btn"
-                title="Remove event"
+                title="Remove constituent"
               >
                 -
               </button>
             </li>
           </ul>
         </div>
-        <div v-else class="expand-hint" @click="toggleExpand(trend._id)">
-          {{ (trend.event_ids || []).length }} events (click to expand)
+        <div v-else class="expand-hint" @click="toggleExpand(issue._id)">
+          {{ (issue.premises || []).length }} items (click to expand)
         </div>
       </div>
     </div>
@@ -276,7 +279,7 @@ h2 {
   border-bottom: 1px solid var(--border-color);
   padding: 15px 0;
   text-align: left;
-  cursor: pointer; /* Add cursor pointer for selectable trends */
+  cursor: pointer;
   transition:
     background-color 0.2s,
     border-left 0.2s;
@@ -286,8 +289,8 @@ h2 {
   background-color: #3a3a3a;
 }
 .trend-card.selected-trend {
-  background-color: #4a0d7f; /* Darker background for selected trend */
-  border-left: 3px solid #6a0dad; /* Highlight with trend color */
+  background-color: #4a0d7f;
+  border-left: 3px solid #6a0dad;
 }
 .trend-card.selected-trend:hover {
   background-color: #5a1d8f;
@@ -318,6 +321,29 @@ h3 {
   opacity: 0.9;
   line-height: 1.4;
   margin: 5px 0;
+}
+
+.status-tags {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.status-tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.status-tag.active {
+    background: #28a745;
+    color: white;
+}
+
+.status-tag.eternal {
+    background: #6c757d;
+    color: white;
 }
 
 .delete-btn {
@@ -361,7 +387,7 @@ h3 {
   margin-bottom: 3px;
   align-items: center;
 }
-.event-id {
+.premise-id {
   font-family: monospace;
   color: var(--text-color);
   opacity: 0.6;

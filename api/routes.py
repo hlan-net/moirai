@@ -20,7 +20,7 @@ from .auth import get_auth_config
 
 import uuid  # Import uuid
 
-from api.enrichment import enrich_articles_with_events_and_trends
+from api.enrichment import enrich_articles_with_issues
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
 from api.article_ops import build_article_selector, paginate_results
@@ -325,14 +325,13 @@ def list_articles():
 
     # New filtering parameters
     feed_id = request.args.get("feed_id")
-    event_id = request.args.get("event_id")
-    trend_id = request.args.get("trend_id")
+    issue_id = request.args.get("issue_id")
 
     # Validate pagination params
     limit = min(max(limit, 1), 200)  # Clamp between 1-200
     skip = max(skip, 0)
 
-    selector = build_article_selector(since, feed_id, event_id, trend_id)
+    selector = build_article_selector(since, feed_id, issue_id)
 
     # If selector indicates no match (e.g., non-existent event/trend), return empty
     if selector.get("_id", {}).get("$eq") == "no_match":
@@ -359,7 +358,7 @@ def list_articles():
     paginated_articles, has_more, total_count = paginate_results(articles, limit, skip)
 
     # Enrichment
-    enrich_articles_with_events_and_trends(paginated_articles)
+    enrich_articles_with_issues(paginated_articles)
 
     return jsonify(
         {
@@ -390,7 +389,7 @@ def rss_feed():
     )
 
     # Enrichment
-    enrich_articles_with_events_and_trends(rss_articles)
+    enrich_articles_with_issues(rss_articles)
 
     # Build RSS XML
     rss_items = []
@@ -439,15 +438,24 @@ def delete_article(article_id):
         abort(500, description="Failed to delete article")
 
 
-# --- Events ---
-@api_blueprint.route("/events", methods=["GET"])
-def list_events():
+# --- Issues (Synthesized Resonances) ---
+@api_blueprint.route("/issues", methods=["GET"])
+def list_issues():
     if not check_public_read_access():
         response = jsonify({"message": "Unauthorized"})
         response.status_code = 401
         response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
         return response
+    
     feed_url = request.args.get("feed_url")
+    longevity = request.args.get("longevity") # transient, temporal, epic
+    status = request.args.get("status") # active, eternal
+
+    selector = {}
+    if longevity:
+        selector["longevity"] = longevity
+    if status:
+        selector["status"] = status
 
     if feed_url:
         # 1. Get all article links for this feed
@@ -459,141 +467,60 @@ def list_events():
         if not links:
             return jsonify([])
 
-        # 2. Find events containing any of these links
-        # Using $elemMatch with $in for efficient array searching
-        selector = {
-            "type": "event",
-            "article_links": {MONGO_ELEM_MATCH: {MONGO_IN: links}},
-        }
-        events = query_couchdb("events", selector=selector, limit=1000)
-        return jsonify(events)
+        # 2. Find issues containing any of these links in their premises
+        selector["premises"] = {MONGO_ELEM_MATCH: { "id": {MONGO_IN: links} }}
+        issues = query_couchdb("issues", selector=selector, limit=1000)
+        return jsonify(issues)
 
-    events = fetch_from_couchdb("events")
-    # Filter only actual events (legacy docs might not have 'type')
-    events = [e for e in events if e.get("type", "event") == "event"]
-    return jsonify(events)
+    issues = fetch_from_couchdb("issues")
+    # Filter based on selector if provided, as fetch_from_couchdb is a simple list
+    if longevity or status:
+        issues = [
+            i for i in issues 
+            if (not longevity or i.get("longevity") == longevity) and
+               (not status or i.get("status") == status)
+        ]
+    return jsonify(issues)
 
 
-@api_blueprint.route("/events/<event_id>", methods=["DELETE"])
+@api_blueprint.route("/issues/<issue_id>", methods=["GET"])
+def get_issue(issue_id):
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
+        abort(404, description="Issue not found")
+    return jsonify(issue)
+
+
+@api_blueprint.route("/issues/<issue_id>", methods=["DELETE"])
 @admin_required
-def delete_event(event_id):
-    event = fetch_from_couchdb("events", event_id)
-    if not event:
+def delete_issue(issue_id):
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
         abort(404)
-    if delete_from_couchdb("events", event_id, event["_rev"]):
+    if delete_from_couchdb("issues", issue_id, issue["_rev"]):
         return jsonify({"status": "deleted"})
     abort(500)
 
 
-@api_blueprint.route("/events/<event_id>/links", methods=["DELETE"])
+@api_blueprint.route("/issues/<issue_id>/premises", methods=["DELETE"])
 @admin_required
-def remove_event_link(event_id):
-    """Remove a specific article link from an event."""
+def remove_issue_premise(issue_id):
+    """Remove a specific premise (link or nested issue) from an issue."""
     data = request.json
-    link_to_remove = data.get("link")
+    premise_id = data.get("id")
 
-    event = fetch_from_couchdb("events", event_id)
-    if not event:
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
         abort(404)
 
-    if "article_links" in event:
-        event["article_links"] = [
-            link_item
-            for link_item in event["article_links"]
-            if link_item != link_to_remove
+    if "premises" in issue:
+        issue["premises"] = [
+            p for p in issue["premises"] if p.get("id") != premise_id
         ]
-        if update_couchdb_doc("events", event_id, event):
-            return jsonify(event)
+        if update_couchdb_doc("issues", issue_id, issue):
+            return jsonify(issue)
 
-    abort(500, description="Failed to update event")
-
-
-# --- Trends ---
-@api_blueprint.route("/trends", methods=["GET"])
-def list_trends():
-    if not check_public_read_access():
-        response = jsonify({"message": "Unauthorized"})
-        response.status_code = 401
-        response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
-        return response
-    feed_url = request.args.get("feed_url")
-
-    if feed_url:
-        # 1. Get all article links for this feed
-        articles = query_couchdb(
-            "articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000
-        )
-        links = [a.get("link") for a in articles if a.get("link")]
-
-        if not links:
-            return jsonify([])
-
-        # 2. Find event IDs containing any of these links
-        event_docs = query_couchdb(
-            "events",
-            selector={"article_links": {"$elemMatch": {"$in": links}}},
-            fields=["_id"],
-            limit=1000,
-        )
-        event_ids = [e.get("_id") for e in event_docs if e.get("_id")]
-
-        if not event_ids:
-            return jsonify([])
-
-        # 3. Find trends containing any of these event IDs
-        selector = {
-            "type": "trend",
-            "event_ids": {MONGO_ELEM_MATCH: {MONGO_IN: event_ids}},
-        }
-        trends = query_couchdb("trends", selector=selector, limit=1000)
-        return jsonify(trends)
-
-    trends = fetch_from_couchdb("trends")
-    if not trends:
-        trends = []
-    # Ensure we only return trend documents
-    trends = [t for t in trends if t.get("type", "trend") == "trend"]
-    return jsonify(trends)
-
-
-@api_blueprint.route("/trends/<trend_id>", methods=["GET"])
-def get_trend(trend_id):
-    trend = fetch_from_couchdb("trends", trend_id)
-    if not trend:
-        abort(404, description="Trend not found")
-    return jsonify(trend)
-
-
-@api_blueprint.route("/trends/<trend_id>", methods=["DELETE"])
-@admin_required
-def delete_trend(trend_id):
-    trend = fetch_from_couchdb("trends", trend_id)
-    if not trend:
-        abort(404)
-    if delete_from_couchdb("trends", trend_id, trend["_rev"]):
-        return jsonify({"status": "deleted"})
-    abort(500)
-
-
-@api_blueprint.route("/trends/<trend_id>/events", methods=["DELETE"])
-@admin_required
-def remove_trend_event(trend_id):
-    """Remove a specific event ID from a trend."""
-    data = request.json
-    event_id_to_remove = data.get("event_id")
-
-    trend = fetch_from_couchdb("trends", trend_id)
-    if not trend:
-        abort(404)
-
-    if "event_ids" in trend:
-        trend["event_ids"] = [
-            eid for eid in trend["event_ids"] if eid != event_id_to_remove
-        ]
-        if update_couchdb_doc("trends", trend_id, trend):
-            return jsonify(trend)
-
-    abort(500, description="Failed to update trend")
+    abort(500, description="Failed to update issue")
 
 
 def fetch_url(url):
@@ -881,11 +808,11 @@ def get_recent_articles_endpoint():
     return jsonify({"total": len(results), "hours": hours, "results": results[:limit]})
 
 
-@api_blueprint.route("/events/search", methods=["GET"])
+@api_blueprint.route("/issues/search", methods=["GET"])
 @jwt_required
 @limiter.limit("20 per minute")
-def search_events_endpoint():
-    """Search events by keyword using CouchDB query"""
+def search_issues_endpoint():
+    """Search issues by keyword using CouchDB query"""
     query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
@@ -903,69 +830,25 @@ def search_events_endpoint():
         limit = 100
 
     # Use Mango query with regex for case-insensitive search
-    # Note: For better performance at scale, consider using a full-text search engine
     selector = {
         "$or": [
-            {"name": {"$regex": f"(?i){safe_query}"}},
+            {"logos": {"$regex": f"(?i){safe_query}"}},
             {"description": {"$regex": f"(?i){safe_query}"}},
         ]
     }
 
-    events = query_couchdb("events", selector=selector, limit=limit)
+    issues = query_couchdb("issues", selector=selector, limit=limit)
 
     results = []
-    for event in events:
+    for issue in issues:
         results.append(
             {
-                "_id": event.get("_id"),
-                "name": event.get("name", "Untitled"),
-                "description": event.get("description", ""),
-            }
-        )
-
-    return jsonify({"total": len(results), "query": query, "results": results})
-
-
-@api_blueprint.route("/trends/search", methods=["GET"])
-@jwt_required
-@limiter.limit("20 per minute")
-def search_trends_endpoint():
-    """Search trends by keyword using CouchDB query"""
-    query = request.args.get("q", "").strip()
-    if not query:
-        abort(400, description=ERROR_QUERY_REQUIRED)
-
-    import re
-
-    safe_query = re.escape(query)
-
-    try:
-        limit = int(request.args.get("limit", 20))
-    except ValueError:
-        abort(400, description=ERROR_LIMIT_INTEGER)
-
-    if limit > 100:
-        limit = 100
-
-    # Use Mango query with regex for case-insensitive search
-    # Note: For better performance at scale, consider using a full-text search engine
-    selector = {
-        "$or": [
-            {"name": {"$regex": f"(?i){safe_query}"}},
-            {"description": {"$regex": f"(?i){safe_query}"}},
-        ]
-    }
-
-    trends = query_couchdb("trends", selector=selector, limit=limit)
-
-    results = []
-    for trend in trends:
-        results.append(
-            {
-                "_id": trend.get("_id"),
-                "name": trend.get("name", "Untitled"),
-                "description": trend.get("description", ""),
-                "event_count": len(trend.get("event_ids", [])),
+                "_id": issue.get("_id"),
+                "logos": issue.get("logos", "Untitled"),
+                "description": issue.get("description", ""),
+                "longevity": issue.get("longevity", "transient"),
+                "status": issue.get("status", "active"),
+                "premise_count": len(issue.get("premises", [])),
             }
         )
 

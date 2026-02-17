@@ -3,7 +3,7 @@ import { onMounted, ref, onUnmounted, computed, watch } from 'vue'
 import { articleCache, type Article } from '../utils/articleCache'
 import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
-import { useFilterStore } from '../stores/filter' // Import the new filter store
+import { useFilterStore } from '../stores/filter'
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -14,11 +14,8 @@ const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
 
-// Inject selected feed from parent - NO LONGER USED DIRECTLY FOR FILTERING
-// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
-
 const authStore = useAuthStore()
-const filterStore = useFilterStore() // Initialize the filter store
+const filterStore = useFilterStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 let observer: IntersectionObserver | null = null
@@ -30,8 +27,7 @@ const fetchArticles = async (
   skip = 0,
   since?: string,
   feedId: string | null = null,
-  eventId: string | null = null,
-  trendId: string | null = null
+  issueId: string | null = null
 ) => {
   try {
     const params = new URLSearchParams({
@@ -44,11 +40,8 @@ const fetchArticles = async (
     if (feedId) {
       params.append('feed_id', feedId)
     }
-    if (eventId) {
-      params.append('event_id', eventId)
-    }
-    if (trendId) {
-      params.append('trend_id', trendId)
+    if (issueId) {
+      params.append('issue_id', issueId)
     }
 
     const response = await fetch(`/api/articles?${params}`)
@@ -67,11 +60,10 @@ const fetchArticles = async (
 }
 
 const loadFromCache = async () => {
-  // Clear cache if any filter is active
-  if (filterStore.selectedFeedId || filterStore.selectedEventId || filterStore.selectedTrendId) {
+  if (filterStore.selectedFeedId || filterStore.selectedIssueId) {
     articles.value = []
     loading.value = false
-    return // Don't load from cache if filtered, fetch fresh
+    return
   }
   try {
     const cached = await articleCache.getArticles()
@@ -85,8 +77,7 @@ const loadFromCache = async () => {
 }
 
 const fetchLatestUpdates = async () => {
-  // Skip fetching updates if any filter is active, as we re-fetch completely
-  if (filterStore.selectedFeedId || filterStore.selectedEventId || filterStore.selectedTrendId) {
+  if (filterStore.selectedFeedId || filterStore.selectedIssueId) {
     fetchingUpdates.value = false
     return
   }
@@ -98,8 +89,7 @@ const fetchLatestUpdates = async () => {
       0,
       newestTimestamp || undefined,
       filterStore.selectedFeedId,
-      filterStore.selectedEventId,
-      filterStore.selectedTrendId
+      filterStore.selectedIssueId
     )
 
     if (result.articles.length > 0) {
@@ -129,17 +119,14 @@ const loadMore = async () => {
       articles.value.length,
       undefined,
       filterStore.selectedFeedId,
-      filterStore.selectedEventId,
-      filterStore.selectedTrendId
+      filterStore.selectedIssueId
     )
 
     if (result.articles.length > 0) {
       articles.value = [...articles.value, ...result.articles]
-      // Only cache if no filters are active
       if (
         !filterStore.selectedFeedId &&
-        !filterStore.selectedEventId &&
-        !filterStore.selectedTrendId
+        !filterStore.selectedIssueId
       ) {
         await articleCache.saveArticles(result.articles)
       }
@@ -154,25 +141,23 @@ const loadMore = async () => {
   }
 }
 
-// Watch for changes in filter store and re-fetch articles
 watch(
   [
     () => filterStore.selectedFeedId,
-    () => filterStore.selectedEventId,
-    () => filterStore.selectedTrendId,
+    () => filterStore.selectedIssueId,
   ],
   async () => {
     loading.value = true
-    articles.value = [] // Clear current articles
+    articles.value = []
     hasMore.value = true
     totalCount.value = 0
     if (observer) {
-      observer.disconnect() // Disconnect old observer
+      observer.disconnect()
     }
-    await loadFromCache() // Try to load from cache first if no filters
-    await fetchArticlesAndCache(0) // Fetch fresh based on new filters
+    await loadFromCache()
+    await fetchArticlesAndCache(0)
     loading.value = false
-    setupIntersectionObserver() // Re-setup observer
+    setupIntersectionObserver()
   }
 )
 
@@ -181,34 +166,23 @@ const fetchArticlesAndCache = async (skip = 0) => {
     skip,
     undefined,
     filterStore.selectedFeedId,
-    filterStore.selectedEventId,
-    filterStore.selectedTrendId
+    filterStore.selectedIssueId
   )
   if (skip === 0) {
-    // Initial load
     articles.value = result.articles
   } else {
-    // Load more
     articles.value = [...articles.value, ...result.articles]
   }
   hasMore.value = result.hasMore
   totalCount.value = result.totalCount
-  // Only cache if no filters are active
-  if (!filterStore.selectedFeedId && !filterStore.selectedEventId && !filterStore.selectedTrendId) {
+  if (!filterStore.selectedFeedId && !filterStore.selectedIssueId) {
     await articleCache.saveArticles(result.articles)
   }
 }
 
-// Computed: Filtered articles based on search query
 const filteredArticles = computed(() => {
   let filtered = articles.value
 
-  // No longer filtering by selectedFeedUrl here, as it's handled by API now
-  // if (selectedFeedUrl.value) {
-  //   filtered = filtered.filter(article => article.feed_url === selectedFeedUrl.value)
-  // }
-
-  // Filter by search query (local client-side filter)
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter((article) => {
@@ -228,7 +202,6 @@ const deleteArticle = async (id: string) => {
     const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' })
     if (res.ok) {
       articles.value = articles.value.filter((a) => a._id !== id)
-      // Note: We don't remove from cache as it will auto-expire
     } else {
       alert('Failed to delete article')
     }
@@ -253,26 +226,16 @@ const setupIntersectionObserver = () => {
 }
 
 onMounted(async () => {
-  // 1. Load cached articles immediately (only if no filters initially active)
   await loadFromCache()
-
-  // 2. Fetch initial articles (might include latest updates or filtered)
   await fetchArticlesAndCache(0)
-
   loading.value = false
-
-  // 3. Set up infinite scroll
   setupIntersectionObserver()
-
-  // 4. Clean old cache
   articleCache.clearOldArticles().catch(console.error)
 
-  // 5. Periodic refresh (every 2 minutes) - only if no filters are active
   refreshInterval = globalThis.setInterval(() => {
     if (
       !filterStore.selectedFeedId &&
-      !filterStore.selectedEventId &&
-      !filterStore.selectedTrendId
+      !filterStore.selectedIssueId
     ) {
       fetchLatestUpdates()
     }
@@ -294,20 +257,17 @@ const handleRefresh = async () => {
   refreshingFeed.value = true
 
   try {
-    // Determine which feed to refresh based on filter store
     const feedToRefresh = filterStore.selectedFeedId
       ? articles.value.find((a) => a._id === filterStore.selectedFeedId)?.feed_url
       : null
 
     if (feedToRefresh) {
-      // Refresh specific feed
       const encodedUrl = encodeURIComponent(feedToRefresh)
       const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
 
       if (response.ok) {
-        // Wait a bit for the feed to be fetched
         setTimeout(async () => {
-          await fetchArticlesAndCache(0) // Re-fetch all based on current filters
+          await fetchArticlesAndCache(0)
           refreshingFeed.value = false
         }, 2000)
       } else {
@@ -315,9 +275,7 @@ const handleRefresh = async () => {
         refreshingFeed.value = false
       }
     } else {
-      // If no specific feed is selected, or if feedToRefresh is null, just fetch latest updates
-      // This will respect current filters
-      await fetchArticlesAndCache(0) // Re-fetch all based on current filters
+      await fetchArticlesAndCache(0)
       refreshingFeed.value = false
     }
   } catch (error) {
@@ -407,8 +365,10 @@ const handleRefresh = async () => {
           {{ formatDate(article.published) }} | {{ getHostname(article.feed_url) }}
         </p>
         <p class="summary">{{ stripHtml(article.summary).substring(0, 200) }}...</p>
-        <div v-if="article.events" class="event-tags">
-          <span v-for="event in article.events" :key="event" class="tag">{{ event }}</span>
+        <div v-if="article.issues" class="event-tags">
+          <span v-for="issue in article.issues" :key="issue.id" class="tag">
+            {{ issue.longevity === 'transient' ? 'Event' : 'Trend' }}: {{ issue.logos }}
+          </span>
         </div>
       </div>
 

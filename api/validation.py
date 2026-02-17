@@ -24,9 +24,7 @@ class AgentStatus(str, Enum):
 
 class AgentTargetDB(str, Enum):
     ARTICLES = "articles"
-    EVENTS = "events"
-    TRENDS = "trends"
-
+    ISSUES = "issues"
 
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
