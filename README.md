@@ -59,24 +59,32 @@ The UI includes a Chat interface to interact with the Agent.
 
 If you want to run components individually without Docker:
 
-1. **Create/Use a Conda Environment:**
+1. **Install Miniforge (if needed):**
 
     ```bash
-    conda env create -f environment.yml
-    conda activate moirai
+    # Linux x86_64
+    curl -L -o /tmp/Miniforge3.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+    bash /tmp/Miniforge3.sh
+    ```
+
+1. **Create/Use a Miniforge Environment:**
+
+    ```bash
+    mamba env create -f environment.yml
+    mamba activate moirai
     ```
 
 1. **Database:** Ensure CouchDB is running (e.g., via `docker compose up couchdb`).
 2. **API:**
 
     ```bash
-    conda run -n moirai python main.py
+    mamba run -n moirai python main.py
     ```
 
 3. **MCP Server:**
 
     ```bash
-    conda run -n moirai python mcp_server.py
+    mamba run -n moirai python mcp_server.py
     ```
 
 4. **UI:**

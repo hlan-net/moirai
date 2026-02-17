@@ -54,3 +54,34 @@ jobs:
         TESTING: true
       run: |
         conda run --name moirai pytest # Use conda run
+  
+  ui-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'yarn'
+        cache-dependency-path: ui/yarn.lock
+
+    - name: Install dependencies (Yarn)
+      working-directory: ./ui
+      run: yarn install
+
+    - name: Build UI
+      working-directory: ./ui
+      run: yarn build
+
+    - name: Install Playwright Browsers
+      working-directory: ./ui
+      run: npx playwright install --with-deps
+
+    - name: Run Playwright tests
+      working-directory: ./ui
+      run: |
+        sleep 30
+        npx playwright test

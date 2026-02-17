@@ -1,4 +1,5 @@
 import os
+import json
 import pytest
 
 # Configuration
@@ -31,7 +32,9 @@ async def test_crud_flow():
     from mcp import ClientSession
 
     print(f"Connecting to MCP Server at {MCP_URL}...")
-    async with sse_client(MCP_URL) as (read, write):
+    # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
+    headers = {"Host": "localhost:8090"}
+    async with sse_client(MCP_URL, headers=headers) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             print("Connected!")
@@ -60,8 +63,8 @@ async def test_crud_flow():
             res = await session.call_tool("delete_feed", {"url": feed_url})
             print(f"Result: {res.content[0].text}")
 
-            # 2. Events CRUD
-            print("\n--- Testing Events CRUD ---")
+            # 2. Events CRUD (Transient Issues)
+            print("\n--- Testing Events CRUD (Transient Issues) ---")
             namespace = "test-crud-namespace"
 
             # Add
@@ -78,13 +81,22 @@ async def test_crud_flow():
             result_text = res.content[0].text
             print(f"Result: {result_text}")
 
-            # Extract Event ID (hacky parsing)
+            # Extract Issue ID (hacky parsing)
             import re
 
-            match = re.search(r"ID: ([a-f0-9]+)", result_text)
+            match = re.search(r"Issue forged with ID: ([a-f0-9]+)", result_text)
             if match:
                 event_id = match.group(1)
-                print(f"Captured Event ID: {event_id}")
+                print(f"Captured Issue ID (Event): {event_id}")
+
+                # Verify issue type/longevity
+                issue_res = await session.call_tool(
+                    "read_issue",
+                    {"issue_id": event_id, "namespace": namespace},
+                )
+                issue_doc = json.loads(issue_res.content[0].text)
+                assert issue_doc.get("type") == "issue"
+                assert issue_doc.get("longevity") == "transient"
 
                 # Update
                 print(f"Updating event {event_id}...")
@@ -98,6 +110,13 @@ async def test_crud_flow():
                 )
                 print(f"Result: {res.content[0].text}")
 
+                issue_res = await session.call_tool(
+                    "read_issue",
+                    {"issue_id": event_id, "namespace": namespace},
+                )
+                issue_doc = json.loads(issue_res.content[0].text)
+                assert issue_doc.get("description") == "Updated description"
+
                 # Delete
                 print(f"Deleting event {event_id}...")
                 res = await session.call_tool(
@@ -107,8 +126,8 @@ async def test_crud_flow():
             else:
                 print("Failed to capture Event ID, skipping update/delete tests.")
 
-            # 3. Trends CRUD
-            print("\n--- Testing Trends CRUD ---")
+            # 3. Trends CRUD (Temporal Issues)
+            print("\n--- Testing Trends CRUD (Temporal Issues) ---")
 
             # Add
             print("Adding trend...")
@@ -124,10 +143,18 @@ async def test_crud_flow():
             result_text = res.content[0].text
             print(f"Result: {result_text}")
 
-            match = re.search(r"ID: ([a-f0-9]+)", result_text)
+            match = re.search(r"Issue forged with ID: ([a-f0-9]+)", result_text)
             if match:
                 trend_id = match.group(1)
-                print(f"Captured Trend ID: {trend_id}")
+                print(f"Captured Issue ID (Trend): {trend_id}")
+
+                issue_res = await session.call_tool(
+                    "read_issue",
+                    {"issue_id": trend_id, "namespace": namespace},
+                )
+                issue_doc = json.loads(issue_res.content[0].text)
+                assert issue_doc.get("type") == "issue"
+                assert issue_doc.get("longevity") == "temporal"
 
                 # Update
                 print(f"Updating trend {trend_id}...")
@@ -140,6 +167,13 @@ async def test_crud_flow():
                     },
                 )
                 print(f"Result: {res.content[0].text}")
+
+                issue_res = await session.call_tool(
+                    "read_issue",
+                    {"issue_id": trend_id, "namespace": namespace},
+                )
+                issue_doc = json.loads(issue_res.content[0].text)
+                assert issue_doc.get("logos") == "Updated Trend Name"
 
                 # Delete
                 print(f"Deleting trend {trend_id}...")

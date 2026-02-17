@@ -8,7 +8,7 @@ from mcp.client.sse import sse_client
 
 async def verify_filtering():
     mcp_url = "http://localhost:8090/sse"
-    api_url = "http://localhost:8088/api/events"
+    api_url = "http://localhost:8088/api/issues"
 
     username = os.environ.get("API_USERNAME")
     password = os.environ.get("API_PASSWORD")
@@ -28,7 +28,7 @@ async def verify_filtering():
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
-                # Create Event in NS1
+                # Create Event in NS1 (Transient Issue)
                 await session.call_tool(
                     "add_event",
                     {
@@ -39,7 +39,7 @@ async def verify_filtering():
                     },
                 )
 
-                # Create Event in NS2
+                # Create Event in NS2 (Transient Issue)
                 await session.call_tool(
                     "add_event",
                     {
@@ -54,43 +54,50 @@ async def verify_filtering():
         print(f"MCP Error: {e}")
         return
 
-    # Verify API Filtering
-    print("\n--- Verifying API Filtering ---")
+    # Verify MCP namespace filtering
+    print("\n--- Verifying MCP Namespace Filtering ---")
+    try:
+        async with sse_client(mcp_url) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                res1 = await session.call_tool(
+                    "list_issues", {"namespace": ns1, "longevity": "transient"}
+                )
+                res2 = await session.call_tool(
+                    "list_issues", {"namespace": ns2, "longevity": "transient"}
+                )
 
-    # 1. Fetch NS1
-    res1 = requests.get(f"{api_url}?namespace={ns1}", auth=(username, password))
-    if res1.status_code != 200:
-        print(f"API Error: {res1.status_code} {res1.text}")
+                ns1_text = res1.content[0].text
+                ns2_text = res2.content[0].text
+
+                if "Event NS1" in ns1_text and "Event NS2" not in ns1_text:
+                    print("SUCCESS: NS1 isolated correctly in MCP list.")
+                else:
+                    print("FAILURE: NS1 isolation check failed.")
+
+                if "Event NS2" in ns2_text and "Event NS1" not in ns2_text:
+                    print("SUCCESS: NS2 isolated correctly in MCP list.")
+                else:
+                    print("FAILURE: NS2 isolation check failed.")
+    except Exception as e:
+        print(f"MCP Error during list_issues: {e}")
         return
 
-    data1 = res1.json()
-    print(f"NS1 Events Count: {len(data1)}")
-    if len(data1) == 1 and data1[0]["namespace"] == ns1:
-        print("SUCCESS: NS1 filtered correctly.")
-    else:
-        print(f"FAILURE: Expected 1 event for NS1, got {len(data1)}: {data1}")
+    # Verify API returns transient issues (events) across namespaces
+    print("\n--- Verifying API Issues (Transient) ---")
+    res_all = requests.get(f"{api_url}?longevity=transient", auth=(username, password))
+    if res_all.status_code != 200:
+        print(f"API Error: {res_all.status_code} {res_all.text}")
+        return
 
-    # 2. Fetch NS2
-    res2 = requests.get(f"{api_url}?namespace={ns2}", auth=(username, password))
-    data2 = res2.json()
-    print(f"NS2 Events Count: {len(data2)}")
-    if len(data2) == 1 and data2[0]["namespace"] == ns2:
-        print("SUCCESS: NS2 filtered correctly.")
-    else:
-        print(f"FAILURE: Expected 1 event for NS2, got {len(data2)}")
-
-    # 3. Fetch All (or at least check it returns multiple)
-    # Note: Fetching all might be large, but we check if it contains both
-    res_all = requests.get(api_url, auth=(username, password))
     data_all = res_all.json()
-
-    found_ns1 = any(e.get("namespace") == ns1 for e in data_all)
-    found_ns2 = any(e.get("namespace") == ns2 for e in data_all)
+    found_ns1 = any(i.get("namespace") == ns1 and i.get("logos") == "Event NS1" for i in data_all)
+    found_ns2 = any(i.get("namespace") == ns2 and i.get("logos") == "Event NS2" for i in data_all)
 
     if found_ns1 and found_ns2:
-        print("SUCCESS: No filter returns both.")
+        print("SUCCESS: /api/issues returns transient issues across namespaces.")
     else:
-        print("FAILURE: Missing events in default view.")
+        print("FAILURE: Missing transient issues in /api/issues response.")
 
 
 if __name__ == "__main__":

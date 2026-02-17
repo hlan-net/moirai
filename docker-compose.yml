@@ -28,6 +28,7 @@ services:
     depends_on:
       - couchdb
     volumes:
+      - ./:/app
       - ./feeds:/app/feeds
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/api/health"]

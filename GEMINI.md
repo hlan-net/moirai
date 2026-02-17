@@ -8,8 +8,8 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 ## New User & Agent Flow
 1.  **Ingestion:** An agent uses the `add_feed` tool via MCP to register RSS sources into a specific **Namespace** (GUID).
 2.  **Collection:** The agent triggers `read_feed` to pull live articles.
-3.  **Synthesis (Layer 1 - Events):** The agent analyzes raw articles and calls `add_event` to group related links into a named **Event** with a description.
-4.  **Synthesis (Layer 2 - Trends):** The agent identifies patterns across events and calls `add_trend` to group events into a high-level **Trend**.
+3.  **Synthesis (Layer 1 - Events):** The agent analyzes raw articles and calls `add_event` to group related links into a named **Event** with a description (stored as a transient Issue).
+4.  **Synthesis (Layer 2 - Trends):** The agent identifies patterns across events and calls `add_trend` to group events into a high-level **Trend** (stored as a temporal Issue).
 5.  **Review & Administration:** A human user accesses the Vue.js dashboard to review the agent's work, delete noisy data, or refine the groupings (removing specific links or events).
 
 ## Current Architecture
@@ -18,11 +18,11 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
     -   **Responsibility:** Serves the UI and provides administrative CRUD operations.
 -   **MCP Server:** FastMCP SSE server on port `8090`.
     -   **Security:** Enforces **Namespace isolation** (GUID required for all data tools).
-    -   **Tools:** `add_feed`, `list_feeds`, `read_feed`, `add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`.
+    -   **Tools:** `add_feed`, `list_feeds`, `read_feed`, `forge_issue`, `list_issues`, `read_issue` plus event/trend aliases (`add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`).
 -   **Frontend:** Vue.js 3 + TypeScript.
     -   **Layout:** 4-column admin view (Feeds, Articles, Events, Trends).
     -   **Features:** Cross-namespace review and item-level cleanup.
--   **Data Storage:** Apache CouchDB. Databases: `feeds`, `articles`, `events`, `trends`.
+-   **Data Storage:** Apache CouchDB. Databases: `feeds`, `articles`, `issues`.
 
 ## Rewrite Progress
 - [x] **Remove Scheduler:** Autonomous background tasks have been disabled.
@@ -40,4 +40,4 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 
 ## How to Build and Run
 1.  **App & DB:** `docker compose up --build` (Port 8088).
-2.  **MCP Server:** Activate conda environment, then `conda run -n moirai python mcp_server.py` (Port 8090).
+2.  **MCP Server:** Activate Miniforge env, then `mamba run -n moirai python mcp_server.py` (Port 8090).

@@ -42,8 +42,8 @@ async def live_trend_test():
 
                 print(f"Found {len(links)} article links.")
 
-                # 3. Create Event from first 2 links
-                print("\n--- Creating Event from Real Articles ---")
+                # 3. Create Event from first 2 links (Transient Issue)
+                print("\n--- Creating Event from Real Articles (Transient Issue) ---")
                 event_name = "BBC Top Stories"
                 event_res = await session.call_tool(
                     "add_event",
@@ -56,9 +56,9 @@ async def live_trend_test():
                 )
                 print(f"Add Event Result: {event_res.content[0].text}")
 
-                # Extract Event ID
+                # Extract Issue ID (Event)
                 match = re.search(
-                    r"Event created with ID: ([a-f0-9]+)", event_res.content[0].text
+                    r"Issue forged with ID: ([a-f0-9]+)", event_res.content[0].text
                 )
                 if not match:
                     print("Failed to get Event ID.")
@@ -80,9 +80,9 @@ async def live_trend_test():
                 print(f"Add Trend Result: {trend_res.content[0].text}")
 
                 # 5. Verify
-                print("\n--- Verifying Trend ---")
+                print("\n--- Verifying Trend (Temporal Issue) ---")
                 list_res = await session.call_tool(
-                    "list_trends", {"namespace": namespace}
+                    "list_issues", {"namespace": namespace, "longevity": "temporal"}
                 )
                 output = list_res.content[0].text
                 print(f"List Trends Output:\n{output}")

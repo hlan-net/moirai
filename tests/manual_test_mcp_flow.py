@@ -15,7 +15,7 @@ async def test_mcp_flow():
 
                 # 1. Test Feeds (Global)
                 print("\n--- Testing Feeds (Global) ---")
-                feeds_list = await session.call_tool("list_feeds", {{}})
+                feeds_list = await session.call_tool("list_feeds", {})
                 print(f"Initial Feeds: {feeds_list.content[0].text[:50]}...")
 
                 add_feed_result = await session.call_tool(
@@ -24,8 +24,8 @@ async def test_mcp_flow():
                 )
                 print(f"Add Feed Result: {add_feed_result.content[0].text}")
 
-                # 2. Test Events (Auto Namespace)
-                print("\n--- Testing Events (Auto Namespace) ---")
+                # 2. Test Events (Auto Namespace / Transient Issues)
+                print("\n--- Testing Events (Auto Namespace / Transient Issues) ---")
                 event_auto = await session.call_tool(
                     "add_event",
                     {
@@ -36,10 +36,11 @@ async def test_mcp_flow():
                 )
                 print(f"Add Event (Auto) Result: {event_auto.content[0].text}")
 
-                # Extract GUID from response "Event created with ID: ... in namespace: <GUID>"
+                # Extract GUID from response "Issue forged with ID: ... in namespace: <GUID>"
                 output_text = event_auto.content[0].text
                 import re
 
+                auto_namespace = None
                 match = re.search(r"namespace: ([a-f0-9\-]+)", output_text)
                 if match:
                     auto_namespace = match.group(1)
@@ -47,14 +48,14 @@ async def test_mcp_flow():
 
                     # Verify we can list it using that namespace
                     list_res = await session.call_tool(
-                        "list_events", {{"namespace": auto_namespace}}
+                        "list_issues", {"namespace": auto_namespace, "longevity": "transient"}
                     )
                     print(f"List Events (Auto NS): {list_res.content[0].text}")
                 else:
                     print("FAILED to capture auto namespace.")
 
-                # 3. Test Events (Client Namespace)
-                print("\n--- Testing Events (Client Namespace) ---")
+                # 3. Test Events (Client Namespace / Transient Issues)
+                print("\n--- Testing Events (Client Namespace / Transient Issues) ---")
                 client_ns = "11111111-2222-3333-4444-555555555555"
                 event_client = await session.call_tool(
                     "add_event",
@@ -69,16 +70,16 @@ async def test_mcp_flow():
 
                 # Verify listing
                 list_client = await session.call_tool(
-                    "list_events", {{"namespace": client_ns}}
+                    "list_issues", {"namespace": client_ns, "longevity": "transient"}
                 )
                 print(f"List Events (Client NS): {list_client.content[0].text}")
 
                 # 4. Isolation Check
                 print("\n--- Testing Isolation ---")
                 # Check auto namespace for client event (should NOT be there)
-                if match:
+                if auto_namespace:
                     list_iso = await session.call_tool(
-                        "list_events", {{"namespace": auto_namespace}}
+                        "list_issues", {"namespace": auto_namespace, "longevity": "transient"}
                     )
                     if "Client Event" not in list_iso.content[0].text:
                         print("SUCCESS: Client Event not found in Auto Namespace.")

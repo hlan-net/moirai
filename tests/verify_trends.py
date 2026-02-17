@@ -19,8 +19,8 @@ async def verify_trends():
                 namespace = str(uuid.uuid4())
                 print(f"Using Test Namespace: {namespace}")
 
-                # 1. Create a dummy event (needed for a trend)
-                print("\n--- Creating Test Event ---")
+                # 1. Create a dummy event (transient issue) needed for a trend
+                print("\n--- Creating Test Event (Transient Issue) ---")
                 event_res = await session.call_tool(
                     "add_event",
                     {
@@ -32,9 +32,9 @@ async def verify_trends():
                 )
                 print(f"Add Event Result: {event_res.content[0].text}")
 
-                # Extract Event ID
+                # Extract Issue ID (Event)
                 match = re.search(
-                    r"Event created with ID: ([a-f0-9]+)", event_res.content[0].text
+                    r"Issue forged with ID: ([a-f0-9]+)", event_res.content[0].text
                 )
                 if not match:
                     print("Failed to get Event ID. Cannot proceed to create trend.")
@@ -57,10 +57,10 @@ async def verify_trends():
                 )
                 print(f"Add Trend Result: {trend_res.content[0].text}")
 
-                # 3. List Trends and Verify
-                print("\n--- Verifying Trend Existence ---")
+                # 3. List Issues (Temporal) and Verify
+                print("\n--- Verifying Trend Existence (Temporal Issue) ---")
                 list_res = await session.call_tool(
-                    "list_trends", {"namespace": namespace}
+                    "list_issues", {"namespace": namespace, "longevity": "temporal"}
                 )
                 output = list_res.content[0].text
                 print(f"List Trends Output:\n{output}")
