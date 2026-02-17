@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y curl && \
     mamba env create -f environment.yml && \
     mamba clean --all && \
     useradd -ms /bin/bash appuser && \
-    mkdir -p /app/feeds /app/ui/dist && \
-    chown -R appuser:appuser /app/feeds /app/ui/dist
+    mkdir -p /app/feeds /app/ui/dist /run/gunicorn && \
+    chown -R appuser:appuser /app/feeds /app/ui/dist /run/gunicorn
 
 # Set the PATH to include the conda environment's bin directory
 ENV PATH="/opt/conda/envs/moirai/bin:$PATH"
@@ -32,12 +32,13 @@ RUN chown -R root:appuser /app && \
     chmod -R 550 /app && \
     chmod -R 700 /app/feeds && \
     chmod -R 770 /app/ui/dist && \
-    chmod +x /app/create_dbs.sh
+    chmod +x /app/create_dbs.sh && \
+    chmod 1777 /tmp
 
 USER appuser
 
 # Expose port 8088 for the Flask app
 EXPOSE 8088
 
-# Run the application
-CMD ["conda", "run", "--name", "moirai", "python", "/app/main.py"]
+# Run the application using Gunicorn
+CMD ["conda", "run", "--no-capture-output", "--name", "moirai", "gunicorn", "--config", "gunicorn.conf.py", "main:app"]
