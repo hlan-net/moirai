@@ -180,8 +180,6 @@ def get_trend(trend_id):
 
     # Check if we should include full event objects
     include_events = request.args.get("include_events", "").lower() == "true"
-    include_articles = request.args.get("include_articles", "").lower() == "true"
-
     if include_events:
         enrich_issues_with_constituents([trend], recursive=True)
 

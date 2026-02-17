@@ -1,9 +1,12 @@
 import asyncio
 import uuid
-import requests
 import os
+import httpx
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+
+EVENT_NS1_NAME = "Event NS1"
+EVENT_NS2_NAME = "Event NS2"
 
 
 async def verify_filtering():
@@ -32,7 +35,7 @@ async def verify_filtering():
                 await session.call_tool(
                     "add_event",
                     {
-                        "name": "Event NS1",
+                        "name": EVENT_NS1_NAME,
                         "description": "Desc 1",
                         "article_links": [],
                         "namespace": ns1,
@@ -43,7 +46,7 @@ async def verify_filtering():
                 await session.call_tool(
                     "add_event",
                     {
-                        "name": "Event NS2",
+                        "name": EVENT_NS2_NAME,
                         "description": "Desc 2",
                         "article_links": [],
                         "namespace": ns2,
@@ -70,12 +73,12 @@ async def verify_filtering():
                 ns1_text = res1.content[0].text
                 ns2_text = res2.content[0].text
 
-                if "Event NS1" in ns1_text and "Event NS2" not in ns1_text:
+                if EVENT_NS1_NAME in ns1_text and EVENT_NS2_NAME not in ns1_text:
                     print("SUCCESS: NS1 isolated correctly in MCP list.")
                 else:
                     print("FAILURE: NS1 isolation check failed.")
 
-                if "Event NS2" in ns2_text and "Event NS1" not in ns2_text:
+                if EVENT_NS2_NAME in ns2_text and EVENT_NS1_NAME not in ns2_text:
                     print("SUCCESS: NS2 isolated correctly in MCP list.")
                 else:
                     print("FAILURE: NS2 isolation check failed.")
@@ -85,19 +88,26 @@ async def verify_filtering():
 
     # Verify API returns transient issues (events) across namespaces
     print("\n--- Verifying API Issues (Transient) ---")
-    res_all = requests.get(f"{api_url}?longevity=transient", auth=(username, password))
-    if res_all.status_code != 200:
-        print(f"API Error: {res_all.status_code} {res_all.text}")
-        return
+    async with httpx.AsyncClient(auth=httpx.BasicAuth(username, password)) as client:
+        res_all = await client.get(f"{api_url}?longevity=transient")
+        if res_all.status_code != 200:
+            print(f"API Error: {res_all.status_code} {res_all.text}")
+            return
 
-    data_all = res_all.json()
-    found_ns1 = any(i.get("namespace") == ns1 and i.get("logos") == "Event NS1" for i in data_all)
-    found_ns2 = any(i.get("namespace") == ns2 and i.get("logos") == "Event NS2" for i in data_all)
+        data_all = res_all.json()
+        found_ns1 = any(
+            i.get("namespace") == ns1 and i.get("logos") == EVENT_NS1_NAME
+            for i in data_all
+        )
+        found_ns2 = any(
+            i.get("namespace") == ns2 and i.get("logos") == EVENT_NS2_NAME
+            for i in data_all
+        )
 
-    if found_ns1 and found_ns2:
-        print("SUCCESS: /api/issues returns transient issues across namespaces.")
-    else:
-        print("FAILURE: Missing transient issues in /api/issues response.")
+        if found_ns1 and found_ns2:
+            print("SUCCESS: /api/issues returns transient issues across namespaces.")
+        else:
+            print("FAILURE: Missing transient issues in /api/issues response.")
 
 
 if __name__ == "__main__":
