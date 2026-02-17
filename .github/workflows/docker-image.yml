@@ -123,7 +123,7 @@ jobs:
         
       - name: Run Playwright tests
         working-directory: ui
-        run: npx playwright test --reporter=github --quiet
+        run: npx playwright test --workers=2 --reporter=github --quiet
         
       - name: Stop backend services
         run: docker compose down

@@ -300,11 +300,10 @@ const importSettings = async (event: Event) => {
 
 const fetchConfig = async () => {
     try {
-        const res = await fetch('/api/config', {
-            headers: authStore.token ? { 'Authorization': `Bearer ${authStore.token}` } : {}
-        })
-        if (res.ok) {
-            const config = await res.json()
+        const res = await axios.get('/api/config')
+        if (res.data) {
+            const config = res.data
+            console.log("Config loaded via axios:", config)
             if (config.version) appVersion.value = config.version
             if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
             if (config.iteration_interval !== undefined) iterationInterval.value = config.iteration_interval
@@ -315,7 +314,8 @@ const fetchConfig = async () => {
             if (config.github_client_secret) githubClientSecret.value = config.github_client_secret
         }
     } catch (e) {
-        console.error("Error fetching system config", e)
+        console.error("Error fetching system config via axios", e)
+        appVersion.value = "Error loading version"
     }
 }
 
