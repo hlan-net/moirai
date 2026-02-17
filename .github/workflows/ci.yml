@@ -54,3 +54,54 @@ jobs:
         TESTING: true
       run: |
         conda run --name moirai pytest # Use conda run
+  
+  ui-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'yarn'
+        cache-dependency-path: ui/yarn.lock
+
+    - name: Install dependencies (Yarn)
+      working-directory: ./ui
+      run: yarn install
+
+    - name: Build UI
+      working-directory: ./ui
+      run: yarn build
+
+    - name: Install Playwright Browsers
+      working-directory: ./ui
+      run: npx playwright install --with-deps
+
+    - name: Start UI stack (Docker Compose)
+      env:
+        COUCHDB_PASSWORD: password
+        REDIS_PASSWORD: password
+        API_USERNAME: testuser
+        API_PASSWORD: testpassword
+        JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
+      run: |
+        docker compose up -d --build couchdb redis api ui nginx
+        for i in {1..30}; do
+          if curl -fsS http://localhost:8088/api/health > /dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        docker compose ps
+        exit 1
+
+    - name: Run Playwright tests
+      working-directory: ./ui
+      env:
+        API_USERNAME: testuser
+        API_PASSWORD: testpassword
+      run: |
+        npx playwright test

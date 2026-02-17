@@ -2,8 +2,8 @@ from flask import Blueprint, jsonify, request, abort
 from datetime import datetime
 import hashlib
 import json
-from api.db import fetch_from_couchdb, store_to_couchdb
-from api.enrichment import enrich_events_with_articles, enrich_trends_with_events
+from api.db import fetch_from_couchdb, store_to_couchdb, delete_from_couchdb
+from api.enrichment import enrich_issues_with_constituents
 
 mcp_blueprint = Blueprint("mcp", __name__)
 
@@ -110,7 +110,7 @@ def get_event(event_id):
     include_articles = request.args.get("include_articles", "").lower() == "true"
 
     if include_articles:
-        enrich_events_with_articles([event], include_articles=True)
+        enrich_issues_with_constituents([event], recursive=True)
 
     return jsonify(event)
 
@@ -180,11 +180,7 @@ def get_trend(trend_id):
 
     # Check if we should include full event objects
     include_events = request.args.get("include_events", "").lower() == "true"
-    include_articles = request.args.get("include_articles", "").lower() == "true"
-
     if include_events:
-        enrich_trends_with_events(
-            [trend], include_events=True, include_articles=include_articles
-        )
+        enrich_issues_with_constituents([trend], recursive=True)
 
     return jsonify(trend)

@@ -16,12 +16,12 @@ curl -u <YOUR_USERNAME>:<YOUR_PASSWORD> http://localhost:8088/api/feeds
 curl -X DELETE -u <YOUR_USERNAME>:<YOUR_PASSWORD> http://localhost:8088/api/articles/<ARTICLE_ID>
 ```
 
-### Remove a Link from an Event
+### Remove a Premise from an Issue (Event/Trend)
 ```bash
 curl -X DELETE -u <YOUR_USERNAME>:<YOUR_PASSWORD> \
      -H "Content-Type: application/json" \
-     -d '{"link": "https://example.com/noisy-article"}' \
-     http://localhost:8088/api/events/<EVENT_ID>/links
+     -d '{"id": "https://example.com/noisy-article"}' \
+     http://localhost:8088/api/issues/<ISSUE_ID>/premises
 ```
 
 ---
@@ -59,9 +59,9 @@ If you are using an LLM agent, it will "see" these tools. Here is how they are s
 }
 ```
 
-**Synthesize an Event:**
+**Synthesize an Event (Transient Issue):**
 ```json
-// Tool: add_event
+// Tool: add_event (alias for forge_issue)
 {
   "name": "Linux Kernel 6.13 Release",
   "description": "A summary of the latest kernel features based on these articles.",
@@ -75,13 +75,13 @@ If you are using an LLM agent, it will "see" these tools. Here is how they are s
 ## 3. Automated Testing Suite
 
 ### Backend Tests (Pytest)
-Ensure your virtual environment is active and dependencies are installed.
+Ensure your Miniforge environment is active and dependencies are installed.
 ```bash
 # Run all unit and integration tests
-PYTHONPATH=. ./venv/bin/pytest
+PYTHONPATH=. pytest
 
 # Run specific live integration test for LWN
-PYTHONPATH=. ./venv/bin/pytest tests/test_live_lwn.py
+PYTHONPATH=. pytest tests/test_live_lwn.py
 ```
 
 ### UI Tests (Playwright)

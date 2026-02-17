@@ -1,85 +1,124 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
+
+type AuthCase = {
+  name: string
+  method: 'get' | 'put' | 'delete'
+  url: string
+  data?: Record<string, unknown>
+  expectStatus?: number
+  expectStatusIn?: number[]
+  expectBodyRegex?: RegExp
+}
+
+const INVALID_CREDENTIALS = { username: 'invalid', password: 'invalid' }
+
+const AUTH_CASES: AuthCase[] = [
+  {
+    name: 'GET /api/config requires authentication',
+    method: 'get',
+    url: '/api/config',
+    expectStatus: 401,
+    expectBodyRegex: /Authorization header is missing|Invalid Basic Auth credentials|login/,
+  },
+  {
+    name: 'PUT /api/config requires authentication',
+    method: 'put',
+    url: '/api/config',
+    data: { allow_public_read: true },
+    expectStatus: 401,
+  },
+  {
+    name: 'DELETE /api/feeds/:id requires authentication',
+    method: 'delete',
+    url: '/api/feeds/test-id',
+    expectStatusIn: [401, 404],
+  },
+  {
+    name: 'DELETE /api/articles/:id requires authentication',
+    method: 'delete',
+    url: '/api/articles/test-id',
+    expectStatusIn: [401, 404],
+  },
+  {
+    name: 'DELETE /api/issues/:id requires authentication',
+    method: 'delete',
+    url: '/api/issues/test-id',
+    expectStatusIn: [401, 404],
+  },
+]
+
+const PUBLIC_READ_CASES = [
+  { name: 'GET /api/feeds allows public read when enabled', url: '/api/feeds' },
+  { name: 'GET /api/articles allows public read when enabled', url: '/api/articles' },
+]
+
+async function withInvalidAuthContext<T>(
+  playwright: any,
+  baseURL: string | undefined,
+  action: (context: any) => Promise<T>
+): Promise<T> {
+  const context = await playwright.request.newContext({
+    baseURL: baseURL,
+    httpCredentials: INVALID_CREDENTIALS,
+  })
+  try {
+    return await action(context)
+  } finally {
+    await context.dispose()
+  }
+}
+
+async function requestWithMethod(
+  context: any,
+  method: AuthCase['method'],
+  url: string,
+  data?: Record<string, unknown>
+) {
+  switch (method) {
+    case 'get':
+      return context.get(url)
+    case 'put':
+      return context.put(url, { data: data })
+    case 'delete':
+      return context.delete(url)
+    default:
+      throw new Error(`Unsupported method: ${method}`)
+  }
+}
 
 test.describe('API Authentication', () => {
-  // Create a new request context without HTTP credentials for each test
-  test('GET /api/config requires authentication', async ({ playwright, baseURL }) => {
-    const context = await playwright.request.newContext({
-      baseURL: baseURL,
-      httpCredentials: { username: 'invalid', password: 'invalid' },
-    });
-    const response = await context.get('/api/config');
-    expect(response.status()).toBe(401);
-    const text = await response.text();
-    // Expect either missing header (if not retried) or invalid credentials
-    expect(text).toMatch(/Authorization header is missing|Invalid Basic Auth credentials|login/);
-    await context.dispose();
-  });
+  AUTH_CASES.forEach((caseInfo) => {
+    test(caseInfo.name, async ({ playwright, baseURL }) => {
+      const result = await withInvalidAuthContext(playwright, baseURL, async (context) => {
+        const response = await requestWithMethod(
+          context,
+          caseInfo.method,
+          caseInfo.url,
+          caseInfo.data
+        )
+        const text = caseInfo.expectBodyRegex ? await response.text() : undefined
+        return { status: response.status(), text }
+      })
 
-  test('PUT /api/config requires authentication', async ({ playwright, baseURL }) => {
-    const context = await playwright.request.newContext({
-      baseURL: baseURL,
-      httpCredentials: { username: 'invalid', password: 'invalid' },
-    });
-    const response = await context.put('/api/config', {
-      data: { allow_public_read: true }
-    });
-    expect(response.status()).toBe(401);
-    await context.dispose();
-  });
+      if (caseInfo.expectStatusIn) {
+        expect(caseInfo.expectStatusIn).toContain(result.status)
+      } else {
+        expect(result.status).toBe(caseInfo.expectStatus)
+      }
 
-  test('DELETE /api/feeds/:id requires authentication', async ({ playwright, baseURL }) => {
-    const context = await playwright.request.newContext({
-      baseURL: baseURL,
-      httpCredentials: { username: 'invalid', password: 'invalid' },
-    });
-    const response = await context.delete('/api/feeds/test-id');
-    // Should be 401 (no auth) or 404 (auth passed but not found) - both are acceptable
-    // since auth check may happen before or after route resolution
-    expect([401, 404]).toContain(response.status());
-    await context.dispose();
-  });
-
-  test('DELETE /api/articles/:id requires authentication', async ({ playwright, baseURL }) => {
-    const context = await playwright.request.newContext({
-      baseURL: baseURL,
-      httpCredentials: { username: 'invalid', password: 'invalid' },
-    });
-    const response = await context.delete('/api/articles/test-id');
-    expect([401, 404]).toContain(response.status());
-    await context.dispose();
-  });
-
-  test('DELETE /api/events/:id requires authentication', async ({ playwright, baseURL }) => {
-    const context = await playwright.request.newContext({
-      baseURL: baseURL,
-      httpCredentials: { username: 'invalid', password: 'invalid' },
-    });
-    const response = await context.delete('/api/events/test-id');
-    expect([401, 404]).toContain(response.status());
-    await context.dispose();
-  });
-
-  test('DELETE /api/trends/:id requires authentication', async ({ playwright, baseURL }) => {
-    const context = await playwright.request.newContext({
-      baseURL: baseURL,
-      httpCredentials: { username: 'invalid', password: 'invalid' },
-    });
-    const response = await context.delete('/api/trends/test-id');
-    expect([401, 404]).toContain(response.status());
-    await context.dispose();
-  });
-});
+      if (caseInfo.expectBodyRegex) {
+        expect(result.text).toMatch(caseInfo.expectBodyRegex)
+      }
+    })
+  })
+})
 
 test.describe('API Public Read Access', () => {
-  test('GET /api/feeds allows public read when enabled', async ({ request }) => {
-    const response = await request.get('/api/feeds');
-    // Should return 200 when ALLOW_PUBLIC_READ=true
-    expect(response.status()).toBe(200);
-  });
-
-  test('GET /api/articles allows public read when enabled', async ({ request }) => {
-    const response = await request.get('/api/articles');
-    // Should return 200 when ALLOW_PUBLIC_READ=true
-    expect(response.status()).toBe(200);
-  });
-});
+  PUBLIC_READ_CASES.forEach((caseInfo) => {
+    test(caseInfo.name, async ({ request }) => {
+      const response = await request.get(caseInfo.url)
+      // Should return 200 when ALLOW_PUBLIC_READ=true
+      expect(response.status()).toBe(200)
+    })
+  })
+})
