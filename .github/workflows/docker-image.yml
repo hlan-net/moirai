@@ -62,6 +62,10 @@ jobs:
       - name: Install Frontend dependencies
         working-directory: ui
         run: yarn install
+
+      - name: Build UI
+        working-directory: ui
+        run: yarn build
         
       - name: Install Playwright Browsers
         working-directory: ui
