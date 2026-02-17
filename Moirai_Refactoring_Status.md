@@ -6,11 +6,11 @@ This document summarizes the significant architectural refactoring undertaken to
 ## Completed Work
 
 ### 1. Docker Container Split
-*   **`Dockerfile` (Root):** Simplified to build only the Python API backend, removing all Node.js and UI build stages.
+*   **`api/Dockerfile`:** Builds the Python API backend, removing all Node.js and UI build stages.
 *   **`ui/Dockerfile`:** Created a new multi-stage Dockerfile dedicated to building the Vue.js frontend and serving it with Nginx.
 *   **`ui/nginx.conf`:** Created an Nginx configuration file within the `ui` directory for serving static UI assets and demonstrating API proxying for local Docker Compose development.
 *   **`docker-compose.yml`:** Updated to define three separate services:
-    *   `api`: The Python Flask backend, built from the root `Dockerfile`.
+    *   `api`: The Python Flask backend, built from `api/Dockerfile`.
     *   `ui`: The Vue.js frontend, built from `ui/Dockerfile`, internally served by Nginx.
     *   `nginx`: A top-level Nginx reverse proxy that routes requests to either `api` (for `/api` paths) or `ui` (for all other paths). This proxy is the primary entry point for the application (`http://localhost:8088`).
 

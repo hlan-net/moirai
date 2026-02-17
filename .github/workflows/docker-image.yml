@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: buildx-${{ runner.os }}-${{ hashFiles('Dockerfile', 'environment.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
+          key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
           restore-keys: |
             buildx-${{ runner.os }}-
       
@@ -77,7 +77,7 @@ jobs:
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             -t moirai-app:ci \
-            -f Dockerfile .
+            -f api/Dockerfile .
           docker buildx build --load \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
@@ -172,10 +172,10 @@ jobs:
         include:
           - image: ghcr.io/${{ github.repository }}-api
             context: .
-            file: Dockerfile
+            file: api/Dockerfile
           - image: ghcr.io/${{ github.repository }}-ui
             context: ui
-            file: Dockerfile
+            file: ui/Dockerfile
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

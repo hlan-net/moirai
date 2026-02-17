@@ -28,7 +28,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
-        key: buildx-${{ runner.os }}-${{ hashFiles('Dockerfile', 'environment.yml') }}
+        key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml') }}
         restore-keys: |
           buildx-${{ runner.os }}-
 
@@ -72,7 +72,7 @@ jobs:
           --cache-from type=local,src=/tmp/.buildx-cache \
           --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
           -t moirai-app:ci \
-          -f Dockerfile .
+          -f api/Dockerfile .
         rm -rf /tmp/.buildx-cache
         mv /tmp/.buildx-cache-new /tmp/.buildx-cache
   
@@ -89,7 +89,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
-        key: buildx-${{ runner.os }}-${{ hashFiles('Dockerfile', 'environment.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
+        key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
         restore-keys: |
           buildx-${{ runner.os }}-
     
@@ -118,7 +118,7 @@ jobs:
           --cache-from type=local,src=/tmp/.buildx-cache \
           --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
           -t moirai-app:ci \
-          -f Dockerfile .
+          -f api/Dockerfile .
         docker buildx build --load \
           --cache-from type=local,src=/tmp/.buildx-cache \
           --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
