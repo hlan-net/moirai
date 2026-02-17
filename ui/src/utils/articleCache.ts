@@ -21,6 +21,8 @@ export interface Article {
     longevity: string
     status: string
   }[]
+  events?: string[]
+  trends?: string[]
   feed_title?: string
   feed_favicon?: string
   cached_at?: string
