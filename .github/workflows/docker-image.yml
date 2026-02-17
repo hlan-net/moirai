@@ -20,6 +20,10 @@ jobs:
       COUCHDB_PASSWORD: testpassword
       REDIS_PASSWORD: testpassword
       JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
+      DEFAULT_LLM_PROVIDER: gemini
+      MODEL_NAME: gemini-2.0-flash
+      DISABLE_RATE_LIMIT: true
+      TEST_TARGET: docker
     steps:
       - uses: actions/checkout@v3
       
@@ -53,11 +57,6 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Start backend services
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          DEFAULT_LLM_PROVIDER: gemini
-          MODEL_NAME: gemini-2.0-flash
-          DISABLE_RATE_LIMIT: true
         run: docker compose up -d
 
       - name: Wait for services to be ready
@@ -123,6 +122,10 @@ jobs:
         
       - name: Run Playwright tests
         working-directory: ui
+        env:
+          API_USERNAME: testuser
+          API_PASSWORD: testpassword
+          TEST_TARGET: docker
         run: npx playwright test --workers=2 --reporter=github --quiet
         
       - name: Stop backend services

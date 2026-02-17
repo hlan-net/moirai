@@ -39,15 +39,14 @@ services:
   ui:
     build:
       context: ./ui
-    ports:
-      - "8080:80"
 
   nginx:
     image: nginx:latest
     ports:
       - "8088:80"
     volumes:
-      - ./ui/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ui/dist:/usr/share/nginx/html:ro
     depends_on:
       api:
         condition: service_healthy
