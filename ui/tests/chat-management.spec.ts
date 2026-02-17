@@ -11,7 +11,7 @@ async function createChatSession(page: Page, title: string): Promise<void> {
   await input.press('Enter');
   
   // Wait for new session to appear in the list
-  await expect(page.locator('.session-item')).toHaveCount(initialCount + 1, { timeout: 5000 });
+  await expect(page.locator('.session-item')).toHaveCount(initialCount + 1);
 }
 
 async function searchSessions(page: Page, query: string): Promise<void> {

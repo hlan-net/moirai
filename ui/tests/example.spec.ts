@@ -11,5 +11,5 @@ test('feeds column loads', async ({ page }) => {
   await page.goto('/#/dashboard');
   
   // Check if the Feeds header exists (with count)
-  await expect(page.getByRole('heading', { name: /Feeds \(\d+\)/ })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: /Feeds \(\d+\)/ })).toBeVisible();
 });

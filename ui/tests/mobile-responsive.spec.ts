@@ -7,7 +7,7 @@ test.describe('Mobile Responsive Dashboard', () => {
     await page.goto('/#/dashboard');
     
     // Wait for the page to load
-    await expect(page.locator('h1')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1')).toBeVisible();
     
     // Check that columns container exists
     const columnsContainer = page.locator('.columns-container');
@@ -37,7 +37,7 @@ test.describe('Mobile Responsive Dashboard', () => {
     await page.goto('/#/dashboard');
     
     // Wait for the page to load
-    await expect(page.locator('h1')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1')).toBeVisible();
     
     const columnsContainer = page.locator('.columns-container');
     await expect(columnsContainer).toBeVisible();
@@ -62,7 +62,7 @@ test.describe('Mobile Responsive Dashboard', () => {
     await page.goto('/#/dashboard');
     
     // Wait for the page to load
-    await expect(page.locator('h1')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1')).toBeVisible();
     
     const columnsContainer = page.locator('.columns-container');
     await expect(columnsContainer).toBeVisible();

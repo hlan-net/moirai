@@ -23,7 +23,7 @@ test.describe('Settings Page Version Display', () => {
     const versionText = page.locator('p:has-text("Version:")')
     
     // Wait for "Loading..." to disappear and be replaced by actual version
-    await expect(versionText).not.toContainText('Loading...', { timeout: 10000 })
+    await expect(versionText).not.toContainText('Loading...')
     
     // Get the full text of the version element
     const versionContent = await versionText.textContent() || ""

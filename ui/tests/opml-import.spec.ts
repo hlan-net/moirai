@@ -52,7 +52,7 @@ test.describe('OPML Import Functionality', () => {
 
     // Verify notification appears (using correct class)
     const notification = page.locator('.notification-toast.notification-success');
-    await expect(notification).toBeVisible({ timeout: 3000 });
+    await expect(notification).toBeVisible();
     await expect(notification).toContainText('Found 4 feed URL');
 
     // Clean up
@@ -107,7 +107,7 @@ https://example.com/feed3.xml`;
 
     // Verify error notification appears (using correct class)
     const notification = page.locator('.notification-toast.notification-error');
-    await expect(notification).toBeVisible({ timeout: 3000 });
+    await expect(notification).toBeVisible();
     await expect(notification).toContainText('Failed to parse OPML file');
 
     // Clean up
@@ -144,7 +144,7 @@ https://example.com/feed3.xml`;
 
     // Verify warning notification appears (using correct class)
     const notification = page.locator('.notification-toast.notification-warning');
-    await expect(notification).toBeVisible({ timeout: 3000 });
+    await expect(notification).toBeVisible();
     await expect(notification).toContainText('No valid feed URLs found in OPML file');
 
     // Clean up
