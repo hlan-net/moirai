@@ -89,19 +89,25 @@ async function requestWithMethod(
 test.describe('API Authentication', () => {
   AUTH_CASES.forEach((caseInfo) => {
     test(caseInfo.name, async ({ playwright, baseURL }) => {
-      const response = await withInvalidAuthContext(playwright, baseURL, (context) =>
-        requestWithMethod(context, caseInfo.method, caseInfo.url, caseInfo.data)
-      )
+      const result = await withInvalidAuthContext(playwright, baseURL, async (context) => {
+        const response = await requestWithMethod(
+          context,
+          caseInfo.method,
+          caseInfo.url,
+          caseInfo.data
+        )
+        const text = caseInfo.expectBodyRegex ? await response.text() : undefined
+        return { status: response.status(), text }
+      })
 
       if (caseInfo.expectStatusIn) {
-        expect(caseInfo.expectStatusIn).toContain(response.status())
+        expect(caseInfo.expectStatusIn).toContain(result.status)
       } else {
-        expect(response.status()).toBe(caseInfo.expectStatus)
+        expect(result.status).toBe(caseInfo.expectStatus)
       }
 
       if (caseInfo.expectBodyRegex) {
-        const text = await response.text()
-        expect(text).toMatch(caseInfo.expectBodyRegex)
+        expect(result.text).toMatch(caseInfo.expectBodyRegex)
       }
     })
   })
