@@ -27,7 +27,7 @@ spec:
       containers:
         - name: {{ include "moirai.name" . }}-mcp-server
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          imagePullPolicy: {{ if eq .Values.api.image.tag "latest" }}Always{{ else }}{{ default "IfNotPresent" .Values.api.image.pullPolicy }}{{ end }}
           {{- with .Values.mcpServer.command }}
           command:
 {{ toYaml . | indent 12 }}

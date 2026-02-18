@@ -27,12 +27,11 @@ spec:
       containers:
         - name: {{ include "moirai.name" . }}-api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          imagePullPolicy: {{ if eq .Values.api.image.tag "latest" }}Always{{ else }}{{ default "IfNotPresent" .Values.api.image.pullPolicy }}{{ end }}
+          {{- with .Values.api.command }}
           command:
-            - /opt/conda/envs/moirai/bin/gunicorn
-            - --config
-            - gunicorn.conf.py
-            - main:app
+{{ toYaml . | indent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.api.service.port }}

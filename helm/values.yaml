@@ -5,14 +5,13 @@ replicaCount: 1 # This can be overridden per-service if needed
 api:
   replicaCount: 1
   image:
-    repository: ghcr.io/hlan-net/moirai-api
-    tag: "0.3.1"
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/hlan-net/moirai
+    tag: "latest"
+    pullPolicy: Always
   command:
-    - /opt/conda/envs/moirai/bin/gunicorn 
-    - --config
-    - gunicorn.conf.py
-    - main:app
+    - /bin/sh
+    - -c
+    - "uvicorn main:app --host 0.0.0.0 --port 8088 --interface wsgi"
   service:
     type: ClusterIP
     port: 8088
@@ -24,8 +23,8 @@ ui:
   replicaCount: 1
   image:
     repository: ghcr.io/hlan-net/moirai-ui
-    tag: "0.3.1"
-    pullPolicy: IfNotPresent
+    tag: "latest"
+    pullPolicy: Always
   service:
     type: ClusterIP
     port: 80
@@ -43,7 +42,7 @@ nginx:
     targetPort: 80
   ingress:
     enabled: true
-    host: moirai.hlan.net
+    host: moirai.example.com
     annotations: {}
     tls: []
 
@@ -52,7 +51,7 @@ mcpServer:
   command:
     - /bin/sh
     - -c
-    - "/app/create_dbs.sh && conda run --name moirai uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090"
+    - "/app/create_dbs.sh && uvicorn mcp_service.main:app --host 0.0.0.0 --port 8090"
   service:
     type: ClusterIP
     port: 8090
