@@ -19,19 +19,14 @@ test.describe('Settings Page Version Display', () => {
     // Wait for the About Moirai section to be visible
     await expect(page.getByRole('heading', { name: 'About Moirai' })).toBeVisible()
 
-    // The version might take a moment to load via API
-    const versionText = page.locator('p:has-text("Version:")')
-    
-    // Wait for "Loading..." to disappear and be replaced by actual version
-    await expect(versionText).not.toContainText('Loading...')
-    
-    // Get the full text of the version element
-    const versionContent = await versionText.textContent() || ""
+    const aboutSection = page.getByRole('heading', { name: 'About Moirai' }).locator('..')
 
-    // Verify it contains "Moirai v" which is the expected format
-    expect(versionContent).toContain('Moirai v')
+    const uiRow = aboutSection.locator('.version-row', { hasText: 'UI' })
+    await expect(uiRow).toBeVisible()
+    await expect(uiRow.locator('.version-value')).toContainText('Moirai UI v')
 
-    // Optional: verify it has the version number pattern (e.g., "0.3.1")
-    expect(versionContent).toMatch(/Moirai v\d+\.\d+\.\d+/)
+    const apiRow = aboutSection.locator('.version-row', { hasText: 'API' })
+    await expect(apiRow).toBeVisible()
+    await expect(apiRow.locator('.version-value')).toContainText('Moirai v')
   })
 })

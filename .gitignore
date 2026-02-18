@@ -167,3 +167,7 @@ helm/charts/tests/k6/load_test.js
 # Playwright
 ui/playwright-report/
 ui/test-results/
+
+# Local Helm overrides
+custom-values.yaml
+helm/custom-values.yaml
