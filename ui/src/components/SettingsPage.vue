@@ -6,7 +6,9 @@ import { useTheme, type Theme } from '../composables/useTheme'
 
 const authStore = useAuthStore()
 
-const appVersion = ref('Loading...')
+const uiVersion = __APP_BUILD__ !== 'dev'
+  ? `Moirai UI v${__APP_VERSION__} (build ${__APP_BUILD__})`
+  : `Moirai UI v${__APP_VERSION__}`
 const modelName = ref('llama3.1:latest')
 const availableModels = ref([])
 const loadingModels = ref(false)
@@ -22,6 +24,29 @@ const availableGeminiModels = ref([])
 const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
 const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'authentication']))
 const activeTab = ref('user')
+
+interface ComponentVersion {
+  name: string
+  version: string
+}
+
+const buildComponentVersions = (config?: {
+  version?: string
+  components?: Record<string, string>
+}) => {
+  const apiVersion = config?.components?.api ?? config?.version ?? 'unknown'
+  const mcpVersion = config?.components?.mcp ?? 'unknown'
+  const couchdbVersion = config?.components?.couchdb ?? 'unknown'
+
+  return [
+    { name: 'UI', version: uiVersion },
+    { name: 'API', version: apiVersion },
+    { name: 'MCP Server', version: mcpVersion },
+    { name: 'CouchDB', version: couchdbVersion },
+  ]
+}
+
+const componentVersions = ref<ComponentVersion[]>(buildComponentVersions())
 
 // Auth Config
 const googleClientId = ref('')
@@ -304,7 +329,7 @@ const fetchConfig = async () => {
         if (res.data) {
             const config = res.data
             console.log("Config loaded via axios:", config)
-            if (config.version) appVersion.value = config.version
+            componentVersions.value = buildComponentVersions(config)
             if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
             if (config.iteration_interval !== undefined) iterationInterval.value = config.iteration_interval
             if (config.google_client_id) googleClientId.value = config.google_client_id
@@ -315,7 +340,7 @@ const fetchConfig = async () => {
         }
     } catch (e) {
         console.error("Error fetching system config via axios", e)
-        appVersion.value = "Error loading version"
+        componentVersions.value = buildComponentVersions()
     }
 }
 
@@ -334,7 +359,12 @@ onMounted(() => {
     <div class="settings-section">
       <h2>About Moirai</h2>
       <div>
-        <p><strong>Version:</strong> {{ appVersion }}</p>
+        <div class="version-list">
+          <div v-for="component in componentVersions" :key="component.name" class="version-row">
+            <span class="version-name">{{ component.name }}</span>
+            <span class="version-value">{{ component.version }}</span>
+          </div>
+        </div>
         <p>Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).</p>
       </div>
     </div>
@@ -592,6 +622,35 @@ onMounted(() => {
   margin-bottom: 20px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
+}
+
+.version-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.version-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.version-row:last-child {
+  border-bottom: none;
+}
+
+.version-name {
+  font-weight: 600;
+}
+
+.version-value {
+  color: var(--text-color);
+  opacity: 0.85;
+  text-align: right;
 }
 h2 {
   margin-top: 0;

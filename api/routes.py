@@ -3,10 +3,12 @@ import os
 import version
 import requests
 import logging
+from typing import Any
 from datetime import datetime, timezone
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
+from api.db_config import get_couchdb_uri
 from .db import (
     fetch_from_couchdb,
     delete_from_couchdb,
@@ -78,6 +80,71 @@ def check_public_read_access():
 def get_config_doc():
     """Helper to get the main config doc. Returns None if config doesn't exist or DB is unavailable."""
     return fetch_from_couchdb("config", "main")
+
+
+def _fetch_json(url: str) -> dict[str, Any] | None:
+    """Fetch JSON from a URL.
+
+    Args:
+        url: URL to fetch JSON from.
+
+    Returns:
+        Parsed JSON dict or None when unavailable.
+    """
+    try:
+        response = requests.get(url, timeout=2)
+        if response.ok:
+            return response.json()
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Version lookup failed for %s: %s", url, exc)
+    return None
+
+
+def _derive_mcp_health_url(mcp_server_url: str) -> str:
+    """Derive MCP health URL from the MCP server URL.
+
+    Args:
+        mcp_server_url: MCP server URL (typically the SSE endpoint).
+
+    Returns:
+        MCP health URL.
+    """
+    normalized = mcp_server_url.rstrip("/")
+    if normalized.endswith("/health"):
+        return normalized
+    if normalized.endswith("/sse"):
+        return f"{normalized.rsplit('/', 1)[0]}/health"
+    return f"{normalized}/health"
+
+
+def get_component_versions() -> dict[str, str]:
+    """Collect versions for core components.
+
+    Returns:
+        Dictionary of component version strings.
+    """
+    versions: dict[str, str] = {
+        "api": version.get_version_string(),
+    }
+
+    mcp_server_url = os.environ.get("MCP_SERVER_URL", "").strip()
+    if mcp_server_url:
+        health_url = _derive_mcp_health_url(mcp_server_url)
+        payload = _fetch_json(health_url)
+        if payload and isinstance(payload.get("version"), str):
+            versions["mcp"] = payload["version"]
+        else:
+            versions["mcp"] = "unknown"
+
+    couchdb_url = get_couchdb_uri()
+    if couchdb_url:
+        payload = _fetch_json(couchdb_url)
+        if payload and isinstance(payload.get("version"), str):
+            versions["couchdb"] = payload["version"]
+        else:
+            versions["couchdb"] = "unknown"
+
+    return versions
 
 
 def get_public_read_setting():
@@ -544,6 +611,7 @@ def get_config():
             "allow_public_read": get_public_read_setting(),
             "iteration_interval": get_iteration_interval_setting(),
             "version": version.get_version_string(),
+            "components": get_component_versions(),
             "default_llm_provider": os.environ.get("DEFAULT_LLM_PROVIDER", "ollama"),
             "default_model_name": os.environ.get("MODEL_NAME", "llama3.1"),
             # Include public auth config

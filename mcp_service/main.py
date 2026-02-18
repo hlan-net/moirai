@@ -1,4 +1,5 @@
 from starlette.responses import JSONResponse, Response
+from starlette.requests import Request
 from starlette.routing import Route
 from .core import mcp
 from api.telemetry import configure_telemetry
@@ -46,11 +47,11 @@ except Exception as orchestrator_err:
     logger.error(f"Failed to start Agent Orchestrator: {orchestrator_err}")
 
 
-async def health_check(request):  # Moved definition here
-    return JSONResponse({"status": "ok"})
+async def health_check(request: Request) -> JSONResponse:  # Moved definition here
+    return JSONResponse({"status": "ok", "version": get_version_string()})
 
 
-async def metrics_endpoint(request):  # Moved definition here
+async def metrics_endpoint(request: Request) -> Response:  # Moved definition here
     # Simple metrics endpoint without PrometheusMiddleware
     return Response("# Placeholder metrics endpoint\n", media_type="text/plain")
 
