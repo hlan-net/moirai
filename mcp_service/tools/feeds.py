@@ -31,6 +31,7 @@ def add_feed(
     feed_doc = {
         "_id": feed_id,
         "url": url,
+        "original_url": url,
         "title": title,
         "category": category,
         "added_at": datetime.now(timezone.utc).isoformat(),

@@ -34,8 +34,9 @@ def _process_feeds(feeds_db_url):
 
         for feed_item in feeds:
             doc = feed_item.get("doc")
-            if doc and doc.get("_id") and doc.get("url") and doc.get("original_url"):
-                FetchFeedTask(doc["_id"], doc["url"], doc["original_url"]).start()
+            if doc and doc.get("_id") and doc.get("url"):
+                original_url = doc.get("original_url") or doc.get("url")
+                FetchFeedTask(doc["_id"], doc["url"], original_url).start()
                 started += 1
             elif doc:
                 skipped += 1
