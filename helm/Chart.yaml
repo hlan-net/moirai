@@ -2,8 +2,8 @@ apiVersion: v2
 name: moirai
 description: A Helm chart for the Morai - GenAI Press Review service
 type: application
-version: 0.4.0-rc.7
-appVersion: "0.4.0-rc.7"
+version: 0.4.0-rc.8
+appVersion: "0.4.0-rc.8"
 home: https://github.com/hlan-net/moirai
 icon: https://raw.githubusercontent.com/hlan-net/moirai/main/ui/public/favicon.ico
 sources:
