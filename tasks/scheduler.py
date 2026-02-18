@@ -4,6 +4,7 @@ import requests
 import logging
 from api.db_config import get_couchdb_uri
 from .fetch_feed_task import FetchFeedTask
+from .scheduler_log import add_scheduler_log
 
 logger = logging.getLogger(__name__)
 
@@ -27,32 +28,91 @@ def _process_feeds(feeds_db_url):
         response.raise_for_status()
         feeds = response.json().get("rows", [])
 
+        total = len(feeds)
+        started = 0
+        skipped = 0
+
         for feed_item in feeds:
             doc = feed_item.get("doc")
             if doc and doc.get("_id") and doc.get("url") and doc.get("original_url"):
                 FetchFeedTask(doc["_id"], doc["url"], doc["original_url"]).start()
+                started += 1
             elif doc:
+                skipped += 1
                 logger.warning(f"Scheduler: Skipping invalid feed document: {doc}")
+                add_scheduler_log(
+                    "feed_skipped",
+                    "Skipping invalid feed document.",
+                    {"id": doc.get("_id", "unknown")},
+                )
+            else:
+                skipped += 1
+
+        return {"total": total, "started": started, "skipped": skipped}
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Scheduler: Error fetching feeds from CouchDB: {e}")
+        add_scheduler_log(
+            "feed_fetch_error",
+            "Failed to fetch feeds from CouchDB.",
+            {"error": str(e)},
+        )
     except Exception as e:
         logger.error(f"Scheduler: An unexpected error occurred: {e}")
+        add_scheduler_log(
+            "scheduler_error",
+            "Scheduler encountered an unexpected error.",
+            {"error": str(e)},
+        )
+
+    return {"total": 0, "started": 0, "skipped": 0, "error": "fetch_failed"}
 
 def scheduler_loop(initial_interval):
     db_url = get_couchdb_uri()
     feeds_db_url = f"{db_url}feeds/_all_docs?include_docs=true"
+    was_paused = False
     
     while True:
         current_interval = get_dynamic_interval(initial_interval)
 
         if current_interval <= 0:
+            if not was_paused:
+                add_scheduler_log("paused", "Scheduler paused.")
+            was_paused = True
             logger.info("Scheduler paused. Checking again in 60s.")
             time.sleep(60)
             continue
 
-        logger.info(f"Scheduler: Starting fetch cycle ({current_interval}s)")
-        _process_feeds(feeds_db_url)
+        if was_paused:
+            add_scheduler_log(
+                "resumed",
+                "Scheduler resumed.",
+                {"interval": str(current_interval)},
+            )
+            was_paused = False
+
+        add_scheduler_log(
+            "cycle_start",
+            "Scheduler fetch cycle started.",
+            {"interval": str(current_interval)},
+        )
+        result = _process_feeds(feeds_db_url)
+        if result.get("error"):
+            add_scheduler_log(
+                "cycle_error",
+                "Scheduler fetch cycle encountered errors.",
+                {"error": str(result.get("error"))},
+            )
+        else:
+            add_scheduler_log(
+                "cycle_complete",
+                "Scheduler fetch cycle completed.",
+                {
+                    "total": str(result.get("total", 0)),
+                    "started": str(result.get("started", 0)),
+                    "skipped": str(result.get("skipped", 0)),
+                },
+            )
         time.sleep(current_interval)
 
 

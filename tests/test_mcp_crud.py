@@ -46,7 +46,7 @@ async def test_crud_flow():
             # Add
             print(f"Adding feed: {feed_url}")
             res = await session.call_tool(
-                "add_feed", {"url": feed_url, "category": "test"}
+                "add_feed", {"url": feed_url, "title": "Test Feed", "userspace": "test-userspace", "category": "test"}
             )
             print(f"Result: {res.content[0].text}")
 
@@ -54,18 +54,18 @@ async def test_crud_flow():
             print(f"Updating category for: {feed_url}")
             res = await session.call_tool(
                 "update_feed_category",
-                {"url": feed_url, "new_category": "updated_test"},
+                {"feed_id": feed_url, "new_category": "updated_test", "userspace": "test-userspace"},
             )
             print(f"Result: {res.content[0].text}")
 
             # Delete
             print(f"Deleting feed: {feed_url}")
-            res = await session.call_tool("delete_feed", {"url": feed_url})
+            res = await session.call_tool("delete_feed", {"feed_id": feed_url, "userspace": "test-userspace"})
             print(f"Result: {res.content[0].text}")
 
             # 2. Events CRUD (Transient Issues)
             print("\n--- Testing Events CRUD (Transient Issues) ---")
-            namespace = "test-crud-namespace"
+            userspace = "test-crud-userspace"
 
             # Add
             print("Adding event...")
@@ -75,7 +75,7 @@ async def test_crud_flow():
                     "name": "Test Event",
                     "description": "Initial description",
                     "article_links": ["http://link1.com"],
-                    "namespace": namespace,
+                    "userspace": userspace,
                 },
             )
             result_text = res.content[0].text
@@ -92,7 +92,7 @@ async def test_crud_flow():
                 # Verify issue type/longevity
                 issue_res = await session.call_tool(
                     "read_issue",
-                    {"issue_id": event_id, "namespace": namespace},
+                    {"issue_id": event_id, "userspace": userspace},
                 )
                 issue_doc = json.loads(issue_res.content[0].text)
                 assert issue_doc.get("type") == "issue"
@@ -104,7 +104,7 @@ async def test_crud_flow():
                     "update_event",
                     {
                         "event_id": event_id,
-                        "namespace": namespace,
+                        "userspace": userspace,
                         "description": "Updated description",
                     },
                 )
@@ -112,7 +112,7 @@ async def test_crud_flow():
 
                 issue_res = await session.call_tool(
                     "read_issue",
-                    {"issue_id": event_id, "namespace": namespace},
+                    {"issue_id": event_id, "userspace": userspace},
                 )
                 issue_doc = json.loads(issue_res.content[0].text)
                 assert issue_doc.get("description") == "Updated description"
@@ -120,7 +120,7 @@ async def test_crud_flow():
                 # Delete
                 print(f"Deleting event {event_id}...")
                 res = await session.call_tool(
-                    "delete_event", {"event_id": event_id, "namespace": namespace}
+                    "delete_event", {"event_id": event_id, "userspace": userspace}
                 )
                 print(f"Result: {res.content[0].text}")
             else:
@@ -137,7 +137,7 @@ async def test_crud_flow():
                     "name": "Test Trend",
                     "description": "Initial trend desc",
                     "event_ids": [],
-                    "namespace": namespace,
+                    "userspace": userspace,
                 },
             )
             result_text = res.content[0].text
@@ -150,7 +150,7 @@ async def test_crud_flow():
 
                 issue_res = await session.call_tool(
                     "read_issue",
-                    {"issue_id": trend_id, "namespace": namespace},
+                    {"issue_id": trend_id, "userspace": userspace},
                 )
                 issue_doc = json.loads(issue_res.content[0].text)
                 assert issue_doc.get("type") == "issue"
@@ -162,7 +162,7 @@ async def test_crud_flow():
                     "update_trend",
                     {
                         "trend_id": trend_id,
-                        "namespace": namespace,
+                        "userspace": userspace,
                         "name": "Updated Trend Name",
                     },
                 )
@@ -170,7 +170,7 @@ async def test_crud_flow():
 
                 issue_res = await session.call_tool(
                     "read_issue",
-                    {"issue_id": trend_id, "namespace": namespace},
+                    {"issue_id": trend_id, "userspace": userspace},
                 )
                 issue_doc = json.loads(issue_res.content[0].text)
                 assert issue_doc.get("logos") == "Updated Trend Name"
@@ -178,7 +178,7 @@ async def test_crud_flow():
                 # Delete
                 print(f"Deleting trend {trend_id}...")
                 res = await session.call_tool(
-                    "delete_trend", {"trend_id": trend_id, "namespace": namespace}
+                    "delete_trend", {"trend_id": trend_id, "userspace": userspace}
                 )
                 print(f"Result: {res.content[0].text}")
             else:

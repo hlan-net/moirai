@@ -14,6 +14,11 @@ const availableModels = ref([])
 const loadingModels = ref(false)
 const allowPublicRead = ref(false)
 const iterationInterval = ref(600)
+const schedulerEnabled = ref(true)
+const showSchedulerLogs = ref(false)
+const schedulerLogs = ref<SchedulerLogEntry[]>([])
+const schedulerLogsLoading = ref(false)
+const schedulerLogsError = ref('')
 const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
 const openaiApiKey = ref('')
 const openaiModelName = ref('gpt-4-turbo')
@@ -28,6 +33,13 @@ const activeTab = ref('user')
 interface ComponentVersion {
   name: string
   version: string
+}
+
+interface SchedulerLogEntry {
+  timestamp: string
+  event: string
+  message: string
+  metadata?: Record<string, string>
 }
 
 const buildComponentVersions = (config?: {
@@ -86,6 +98,39 @@ const toggleSection = (section: string) => {
     collapsedSections.value.add(section)
   }
 }
+
+const fetchSchedulerLogs = async () => {
+  schedulerLogsLoading.value = true
+  schedulerLogsError.value = ''
+
+  try {
+    const res = await axios.get('/api/scheduler/logs', { params: { limit: 50 } })
+    schedulerLogs.value = Array.isArray(res.data?.logs) ? res.data.logs : []
+  } catch (e) {
+    console.error('Error fetching scheduler logs', e)
+    schedulerLogsError.value = 'Failed to load scheduler logs.'
+    schedulerLogs.value = []
+  } finally {
+    schedulerLogsLoading.value = false
+  }
+}
+
+const openSchedulerLogs = async () => {
+  showSchedulerLogs.value = true
+  await fetchSchedulerLogs()
+}
+
+const closeSchedulerLogs = () => {
+  showSchedulerLogs.value = false
+}
+
+const formatLogTimestamp = (timestamp: string) => {
+  const parsed = new Date(timestamp)
+  if (Number.isNaN(parsed.valueOf())) {
+    return timestamp
+  }
+  return parsed.toLocaleString()
+}
 const saveSettings = async () => {
   // Save User Settings
   try {
@@ -108,8 +153,8 @@ const saveSettings = async () => {
               'Content-Type': 'application/json'
           } : { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-              allow_public_read: allowPublicRead.value,
-              iteration_interval: iterationInterval.value,
+               allow_public_read: allowPublicRead.value,
+               iteration_interval: schedulerEnabled.value ? iterationInterval.value : 0,
               google_client_id: googleClientId.value,
               entra_client_id: entraClientId.value,
               entra_tenant_id: entraTenantId.value,
@@ -331,7 +376,13 @@ const fetchConfig = async () => {
             console.log("Config loaded via axios:", config)
             componentVersions.value = buildComponentVersions(config)
             if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
-            if (config.iteration_interval !== undefined) iterationInterval.value = config.iteration_interval
+            if (config.iteration_interval !== undefined) {
+              const intervalValue = Number(config.iteration_interval)
+              schedulerEnabled.value = intervalValue > 0
+              if (intervalValue > 0) {
+                iterationInterval.value = intervalValue
+              }
+            }
             if (config.google_client_id) googleClientId.value = config.google_client_id
             if (config.entra_client_id) entraClientId.value = config.entra_client_id
             if (config.entra_tenant_id) entraTenantId.value = config.entra_tenant_id
@@ -365,7 +416,7 @@ onMounted(() => {
             <span class="version-value">{{ component.version }}</span>
           </div>
         </div>
-        <p>Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).</p>
+        <p class="about-description">Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).</p>
       </div>
     </div>
 
@@ -516,10 +567,21 @@ onMounted(() => {
           </label>
           <small>If enabled, the Stream page can be viewed without logging in.</small>
         </div>
+        <div class="form-group checkbox-group">
+          <label for="scheduler-enabled" class="checkbox-label">
+            <input type="checkbox" id="scheduler-enabled" v-model="schedulerEnabled" />
+            Enable Scheduler (Automatic Feed Refresh)
+          </label>
+          <small v-if="schedulerEnabled">Feeds will refresh on the interval below.</small>
+          <small v-else>Scheduler is paused. Turn this on to resume automatic updates.</small>
+        </div>
         <div class="form-group">
           <label for="interval">Feed Refresh Interval (seconds):</label>
-          <input type="number" id="interval" v-model="iterationInterval" min="0" step="60" />
-          <small>How often the system checks for new articles. Set to 0 to disable automatic updates.</small>
+          <input type="number" id="interval" v-model="iterationInterval" min="60" step="60" :disabled="!schedulerEnabled" />
+          <small>How often the system checks for new articles.</small>
+        </div>
+        <div class="button-group">
+          <button class="secondary" @click="openSchedulerLogs">View Scheduler Logs</button>
         </div>
       </div>
     </div>
@@ -570,6 +632,35 @@ onMounted(() => {
 
     <div class="actions-bar">
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
+    </div>
+
+    <div v-if="showSchedulerLogs" class="modal-backdrop" @click.self="closeSchedulerLogs">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <h3>Scheduler Logs</h3>
+          <button class="secondary" @click="closeSchedulerLogs">Close</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="schedulerLogsLoading" class="modal-state">Loading logs...</div>
+          <div v-else-if="schedulerLogsError" class="modal-state">{{ schedulerLogsError }}</div>
+          <div v-else-if="!schedulerLogs.length" class="modal-state">No scheduler logs yet.</div>
+          <ul v-else class="scheduler-logs">
+            <li v-for="(log, index) in schedulerLogs" :key="`${log.timestamp}-${index}`" class="scheduler-log">
+              <div class="log-line">
+                <span class="log-time">{{ formatLogTimestamp(log.timestamp) }}</span>
+                <span class="log-event">{{ log.event }}</span>
+              </div>
+              <div class="log-message">{{ log.message }}</div>
+              <div v-if="log.metadata" class="log-meta">
+                <span v-for="(value, key) in log.metadata" :key="key">{{ key }}={{ value }}</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button class="secondary" :disabled="schedulerLogsLoading" @click="fetchSchedulerLogs">Refresh</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -627,7 +718,7 @@ onMounted(() => {
 .version-list {
   display: grid;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .version-row {
@@ -636,7 +727,8 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 6px 0;
-  border-bottom: 1px dashed var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  border-bottom-color: color-mix(in srgb, var(--border-color) 40%, transparent);
 }
 
 .version-row:last-child {
@@ -644,13 +736,24 @@ onMounted(() => {
 }
 
 .version-name {
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
 }
 
 .version-value {
   color: var(--text-color);
-  opacity: 0.85;
+  opacity: 0.8;
   text-align: right;
+  font-size: 0.98rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.about-description {
+  margin: 10px 0 0;
+  font-size: 1.15rem;
+  line-height: 1.65;
+  max-width: 62ch;
 }
 h2 {
   margin-top: 0;
@@ -758,5 +861,106 @@ button.secondary:hover {
   padding: 15px;
   font-size: 1.1rem;
   margin-top: 20px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 14, 18, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 200;
+}
+
+.modal-panel {
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  width: min(90vw, 720px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.modal-body {
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+.modal-footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-state {
+  color: var(--text-color);
+  opacity: 0.8;
+}
+
+.scheduler-logs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.scheduler-log {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-bg) 80%, var(--input-bg));
+}
+
+.log-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.log-event {
+  text-transform: capitalize;
+  font-weight: 600;
+}
+
+.log-message {
+  margin-top: 6px;
+}
+
+.log-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.log-meta span {
+  background: var(--input-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
 }
 </style>

@@ -1,6 +1,6 @@
 # Moirai - MCP-Powered GenAI Press Review Service
 
-Moirai is a GenAI-native press review platform designed for the Model Context Protocol (MCP) ecosystem. It allows AI agents to aggregate RSS feeds, synthesize them into "Events," and track long-term "Trends" across isolated namespaces.
+Moirai is a GenAI-native press review platform designed for the Model Context Protocol (MCP) ecosystem. It allows AI agents to aggregate RSS feeds, synthesize them into "Events," and track long-term "Trends" across isolated userspaces.
 
 ## Project Overview
 

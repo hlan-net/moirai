@@ -50,11 +50,13 @@ If you are using an LLM agent, it will "see" these tools. Here is how they are s
 }
 ```
 
-**Add a Feed (Global):**
+**Add a Feed (Userspace):**
 ```json
 // Tool: add_feed
 {
   "url": "https://lwn.net/headlines/rss",
+  "title": "LWN Headlines",
+  "userspace": "550e8400-e29b-41d4-a716-446655440000",
   "category": "linux"
 }
 ```
@@ -66,7 +68,7 @@ If you are using an LLM agent, it will "see" these tools. Here is how they are s
   "name": "Linux Kernel 6.13 Release",
   "description": "A summary of the latest kernel features based on these articles.",
   "article_links": ["https://lwn.net/articles/123", "https://wired.com/kernel-news"],
-  "namespace": "550e8400-e29b-41d4-a716-446655440000"
+  "userspace": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 

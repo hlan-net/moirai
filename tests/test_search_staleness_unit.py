@@ -16,7 +16,7 @@ def mock_db():
         }
 
 def test_search_issues_unit(mock_db):
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
@@ -27,29 +27,32 @@ def test_search_issues_unit(mock_db):
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
-        result = search_issues(query="test", namespace=namespace, api_key="test_password")
+        result = search_issues(query="test", userspace=userspace, api_key="test_password")
     
     data = json.loads(result)
     assert data["total"] == 1
     assert data["results"][0]["logos"] == "Test Logos"
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args
-    assert kwargs['json_data']['selector']['namespace'] == namespace
+    userspace_selector = kwargs['json_data']['selector']['$and'][0]['$or']
+    assert {"userspace": userspace} in userspace_selector
 
 def test_search_events_alias_unit(mock_db):
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"docs": []}
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
-        search_events(query="test", namespace=namespace, api_key="test_password")
+        search_events(query="test", userspace=userspace, api_key="test_password")
     
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args
     # Verify it filters by transient longevity
-    assert kwargs['json_data']['selector']['longevity'] == "transient"
+    selector = kwargs['json_data']['selector']
+    conditions = selector.get('$and', [selector])
+    assert any(condition.get('longevity') == "transient" for condition in conditions)
 
 def test_mark_entity_stale_unit(mock_db):
     entity_id = "issue_123"

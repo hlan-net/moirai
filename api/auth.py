@@ -3,6 +3,7 @@ import jwt
 import datetime
 import logging
 import base64
+import secrets
 from functools import wraps
 from flask import Blueprint, request, jsonify, g
 from passlib.hash import bcrypt
@@ -26,8 +27,11 @@ ERROR_FAILED_TO_CREATE_USER = "Failed to create user"
 # Configuration
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 if not JWT_SECRET_KEY:
-    logger.critical("JWT_SECRET_KEY not set! This is required for secure authentication.")
-    raise RuntimeError("JWT_SECRET_KEY environment variable must be set")
+    JWT_SECRET_KEY = secrets.token_urlsafe(64)
+    logger.warning(
+        "JWT_SECRET_KEY not set; generated an ephemeral key for this process. "
+        "Set JWT_SECRET_KEY for stable tokens across restarts or replicas."
+    )
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days for now

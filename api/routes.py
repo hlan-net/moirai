@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from api.extensions import limiter
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
+from tasks.scheduler_log import get_scheduler_logs
 from api.db_config import get_couchdb_uri
 from .db import (
     fetch_from_couchdb,
@@ -145,6 +146,10 @@ def get_component_versions() -> dict[str, str]:
             versions["couchdb"] = "unknown"
 
     return versions
+
+
+def _extract_userspace(doc: dict[str, Any]) -> str | None:
+    return doc.get("userspace") or doc.get("namespace")
 
 
 def get_public_read_setting():
@@ -666,6 +671,36 @@ def update_config():
         return jsonify({"status": "updated", "config": new_doc})
     else:
         abort(500, description="Failed to update config")
+
+
+@api_blueprint.route("/scheduler/logs", methods=["GET"])
+@admin_required
+def list_scheduler_logs():
+    logs = get_scheduler_logs()
+    limit = request.args.get("limit")
+    if limit:
+        try:
+            limit_value = int(limit)
+        except ValueError:
+            abort(400, description="Invalid limit")
+        if limit_value > 0:
+            logs = logs[-limit_value:]
+    return jsonify({"logs": logs})
+
+
+@api_blueprint.route("/userspaces", methods=["GET"])
+@admin_required
+def list_userspaces():
+    userspaces = set()
+    for doc in (fetch_from_couchdb("issues") or []):
+        value = _extract_userspace(doc)
+        if value:
+            userspaces.add(value)
+    for doc in (fetch_from_couchdb("feeds") or []):
+        value = _extract_userspace(doc)
+        if value:
+            userspaces.add(value)
+    return jsonify(sorted(userspaces))
 
 
 # --- Stats ---

@@ -37,7 +37,7 @@ async def test_api_key_injection(setup_api_password_env, mock_session):
         id="call_123",
         function=SimpleNamespace(
             name="search_articles",
-            arguments=json.dumps({"query": "test", "namespace": "test-guid"}),
+            arguments=json.dumps({"query": "test", "userspace": "test-guid"}),
         ),
     )
 
@@ -61,7 +61,7 @@ async def test_api_key_injection(setup_api_password_env, mock_session):
 
     # Verify original arguments are preserved
     assert func_args["query"] == "test"
-    assert func_args["namespace"] == "test-guid"
+    assert func_args["userspace"] == "test-guid"
 
     # Verify tool result was added to messages
     assert len(messages) == 1
@@ -115,7 +115,7 @@ async def test_api_key_not_overwritten_if_present(setup_api_password_env, mock_s
             arguments=json.dumps(
                 {
                     "query": "test",
-                    "namespace": "test-guid",
+                    "userspace": "test-guid",
                     "api_key": "existing_key",  # Already has api_key
                 }
             ),
@@ -145,7 +145,7 @@ async def test_api_key_missing_env_var(monkeypatch, mock_session):
         id="call_123",
         function=SimpleNamespace(
             name="search_articles",
-            arguments=json.dumps({"query": "test", "namespace": "test-guid"}),
+            arguments=json.dumps({"query": "test", "userspace": "test-guid"}),
         ),
     )
 

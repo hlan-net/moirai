@@ -26,12 +26,12 @@ def auth_required(func):
     return wrapper
 
 
-def validate_namespace(namespace_guid: str):
-    """Validate that the namespace is a valid GUID/UUID."""
-    if not namespace_guid:
-        return False, "Error: 'namespace' parameter is required."
+def validate_userspace(userspace_guid: str):
+    """Validate that the userspace is a valid GUID/UUID."""
+    if not userspace_guid:
+        return False, "Error: 'userspace' parameter is required."
     try:
-        uuid.UUID(namespace_guid)
+        uuid.UUID(userspace_guid)
         return True, ""
     except ValueError:
-        return False, "Error: 'namespace' must be a valid GUID/UUID."
+        return False, "Error: 'userspace' must be a valid GUID/UUID."

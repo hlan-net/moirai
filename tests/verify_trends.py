@@ -15,9 +15,9 @@ async def verify_trends():
                 await session.initialize()
                 print("Connected to MCP Server!")
 
-                # Generate a test namespace
-                namespace = str(uuid.uuid4())
-                print(f"Using Test Namespace: {namespace}")
+                # Generate a test userspace
+                userspace = str(uuid.uuid4())
+                print(f"Using Test Userspace: {userspace}")
 
                 # 1. Create a dummy event (transient issue) needed for a trend
                 print("\n--- Creating Test Event (Transient Issue) ---")
@@ -27,7 +27,7 @@ async def verify_trends():
                         "name": "Trend Test Event",
                         "description": "An event to test trend creation",
                         "article_links": ["http://example.com/trend-test"],
-                        "namespace": namespace,
+                        "userspace": userspace,
                     },
                 )
                 print(f"Add Event Result: {event_res.content[0].text}")
@@ -52,7 +52,7 @@ async def verify_trends():
                         "name": trend_name,
                         "description": "A trend created by the verification script",
                         "event_ids": [event_id],
-                        "namespace": namespace,
+                        "userspace": userspace,
                     },
                 )
                 print(f"Add Trend Result: {trend_res.content[0].text}")
@@ -60,7 +60,7 @@ async def verify_trends():
                 # 3. List Issues (Temporal) and Verify
                 print("\n--- Verifying Trend Existence (Temporal Issue) ---")
                 list_res = await session.call_tool(
-                    "list_issues", {"namespace": namespace, "longevity": "temporal"}
+                    "list_issues", {"userspace": userspace, "longevity": "temporal"}
                 )
                 output = list_res.content[0].text
                 print(f"List Trends Output:\n{output}")

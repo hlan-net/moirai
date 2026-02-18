@@ -153,18 +153,18 @@ class EventCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=300)
     description: str = Field(..., min_length=1, max_length=2000)
     article_links: list[str] = Field(default_factory=list, max_items=100)
-    namespace: Optional[str] = None
+    userspace: Optional[str] = None
 
-    @validator("namespace")
-    def validate_namespace(cls, v):
-        """Validate namespace is a valid UUID/GUID"""
+    @validator("userspace")
+    def validate_userspace(cls, v):
+        """Validate userspace is a valid UUID/GUID"""
         if v is None:
             return v
         try:
             uuid.UUID(v)
             return v
         except ValueError:
-            raise ValueError("Namespace must be a valid UUID/GUID")
+            raise ValueError("Userspace must be a valid UUID/GUID")
 
     @validator("title", "description")
     def sanitize_text(cls, v):
@@ -208,17 +208,17 @@ class TrendCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=300)
     description: str = Field(..., min_length=1, max_length=2000)
     event_ids: list[str] = Field(default_factory=list, max_items=50)
-    namespace: Optional[str] = None
+    userspace: Optional[str] = None
 
-    @validator("namespace")
-    def validate_namespace(cls, v):
+    @validator("userspace")
+    def validate_userspace(cls, v):
         if v is None:
             return v
         try:
             uuid.UUID(v)
             return v
         except ValueError:
-            raise ValueError("Namespace must be a valid UUID/GUID")
+            raise ValueError("Userspace must be a valid UUID/GUID")
 
     @validator("title", "description")
     def sanitize_text(cls, v):
@@ -244,8 +244,8 @@ class ConfigUpdateRequest(BaseModel):
 
     allow_public_read: Optional[bool] = None
     iteration_interval: Optional[int] = Field(
-        None, ge=60, le=86400
-    )  # 1 minute to 24 hours
+        None, ge=0, le=86400
+    )  # 0 disables, 1 minute to 24 hours
     google_client_id: Optional[str] = None
     entra_client_id: Optional[str] = None
     entra_tenant_id: Optional[str] = None
@@ -254,20 +254,20 @@ class ConfigUpdateRequest(BaseModel):
 
     @validator("iteration_interval")
     def validate_interval(cls, v):
-        if v is not None and v < 60:
+        if v is not None and v != 0 and v < 60:
             raise ValueError("Iteration interval must be at least 60 seconds")
         return v
 
 
-def validate_namespace_param(namespace: str) -> str:
-    """Validate namespace query parameter"""
-    if not namespace:
-        return namespace
+def validate_userspace_param(userspace: str) -> str:
+    """Validate userspace query parameter"""
+    if not userspace:
+        return userspace
     try:
-        uuid.UUID(namespace)
-        return namespace
+        uuid.UUID(userspace)
+        return userspace
     except ValueError:
-        raise ValueError("Invalid namespace GUID format")
+        raise ValueError("Invalid userspace GUID format")
 
 
 def sanitize_html_content(html: str, max_length: int = 10000) -> str:

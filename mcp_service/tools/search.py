@@ -1,9 +1,10 @@
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from ..core import mcp, auth_required, validate_namespace
+from ..core import mcp, auth_required, validate_userspace
 from ..db import db_request
 from api.db_constants import MONGO_REGEX, MONGO_OR
+from .userspace import build_userspace_selector, extract_userspace
 
 # Database names
 ISSUES_DB = "issues"
@@ -23,36 +24,39 @@ def _process_article_docs(docs):
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", "Unknown"),
                 "description": doc.get("description", "")[:200],
-                "namespace": doc.get("namespace"),
+                "userspace": extract_userspace(doc),
             }
         )
     return results
 
-def _handle_date_filters(selector, date_from, date_to):
-    """Add date range filters to Mango selector."""
+def _build_date_filter(date_from, date_to):
+    """Build date range filter for Mango selector."""
+    date_filter = {}
     if date_from:
         from_dt = datetime.fromisoformat(date_from)
         if from_dt.tzinfo is None:
             from_dt = from_dt.replace(tzinfo=timezone.utc)
-        selector["published"] = {"$gte": from_dt.isoformat()}
+        date_filter["published"] = {"$gte": from_dt.isoformat()}
 
     if date_to:
         to_dt = datetime.fromisoformat(date_to)
         if to_dt.tzinfo is None:
             to_dt = to_dt.replace(tzinfo=timezone.utc)
-        if "published" in selector:
-            selector["published"]["$lte"] = to_dt.isoformat()
+        if "published" in date_filter:
+            date_filter["published"]["$lte"] = to_dt.isoformat()
         else:
-            selector["published"] = {"$lte": to_dt.isoformat()}
+            date_filter["published"] = {"$lte": to_dt.isoformat()}
+
+    return date_filter
 
 def _search_issues_internal(
-    query: str, namespace: str, longevity: str = None, limit: int = 50
+    query: str, userspace: str, longevity: str = None, limit: int = 50
 ) -> str:
     """Internal implementation of issue search."""
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
 
-    valid, err = validate_namespace(namespace)
+    valid, err = validate_userspace(userspace)
     if not valid:
         return json.dumps({"error": err})
 
@@ -60,16 +64,17 @@ def _search_issues_internal(
     safe_query = re.escape(query)
 
     # Mango selector
-    selector = {
-        "namespace": namespace,
+    text_selector = {
         MONGO_OR: [
             {"logos": {MONGO_REGEX: f"(?i){safe_query}"}},
             {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
         ],
     }
-    
+
     if longevity:
-        selector["longevity"] = longevity
+        text_selector["longevity"] = longevity
+
+    selector = {"$and": [build_userspace_selector(userspace), text_selector]}
 
     try:
         query_payload = {
@@ -112,14 +117,14 @@ def _search_issues_internal(
 @auth_required
 def search_articles(
     query: str,
-    namespace: str = None,
+    userspace: str = None,
     date_from: str = "",
     date_to: str = "",
     limit: int = 50,
     api_key: str = None,
 ) -> str:
     """
-    Search articles by keyword. Optionally filter by namespace.
+    Search articles by keyword. Optionally filter by userspace.
     """
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
@@ -128,7 +133,7 @@ def search_articles(
     safe_query = re.escape(query)
 
     # Build Mango selector
-    selector = {
+    text_selector = {
         MONGO_OR: [
             {"title": {MONGO_REGEX: f"(?i){safe_query}"}},
             {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
@@ -136,15 +141,19 @@ def search_articles(
         ]
     }
 
-    if namespace:
-        selector["namespace"] = namespace
+    filters = [text_selector]
+    if userspace:
+        filters.append(build_userspace_selector(userspace))
 
     try:
-        _handle_date_filters(selector, date_from, date_to)
+        date_filter = _build_date_filter(date_from, date_to)
+        if date_filter:
+            filters.append(date_filter)
     except ValueError:
         return json.dumps({"error": "Invalid date format provided."})
 
     try:
+        selector = {"$and": filters} if len(filters) > 1 else filters[0]
         query_payload = {
             "selector": selector,
             "limit": limit,
@@ -156,6 +165,7 @@ def search_articles(
                 "published",
                 "feed_title",
                 "description",
+                "userspace",
                 "namespace",
             ],
         }
@@ -174,7 +184,7 @@ def search_articles(
             {
                 "total": len(results),
                 "query": query,
-                "namespace": namespace,
+                "userspace": userspace,
                 "results": results,
             },
             indent=2,
@@ -187,10 +197,10 @@ def search_articles(
 @mcp.tool()
 @auth_required
 def get_recent_articles(
-    namespace: str = None, hours: int = 24, limit: int = 50, api_key: str = None
+    userspace: str = None, hours: int = 24, limit: int = 50, api_key: str = None
 ) -> str:
     """
-    Get most recent articles. Optionally filter by namespace.
+    Get most recent articles. Optionally filter by userspace.
     """
     hours = min(hours, 168)
     limit = min(limit, 200)
@@ -198,8 +208,8 @@ def get_recent_articles(
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     selector = {"published": {"$gte": cutoff.isoformat()}}
-    if namespace:
-        selector["namespace"] = namespace
+    if userspace:
+        selector = {"$and": [build_userspace_selector(userspace), selector]}
 
     try:
         query_payload = {
@@ -213,6 +223,7 @@ def get_recent_articles(
                 "published",
                 "feed_title",
                 "description",
+                "userspace",
                 "namespace",
             ],
         }
@@ -228,7 +239,7 @@ def get_recent_articles(
             {
                 "total": len(results),
                 "hours": hours,
-                "namespace": namespace,
+                "userspace": userspace,
                 "results": results,
             },
             indent=2,
@@ -241,31 +252,31 @@ def get_recent_articles(
 @mcp.tool()
 @auth_required
 def search_issues(
-    query: str, namespace: str, longevity: str = None, limit: int = 50, api_key: str = None
+    query: str, userspace: str, longevity: str = None, limit: int = 50, api_key: str = None
 ) -> str:
     """
-    Search Issues (Resonances) by keyword within a namespace.
+    Search Issues (Resonances) by keyword within a userspace.
     """
-    return _search_issues_internal(query, namespace, longevity, limit)
+    return _search_issues_internal(query, userspace, longevity, limit)
 
 
 @mcp.tool()
 @auth_required
 def search_events(
-    query: str, namespace: str, limit: int = 50, api_key: str = None
+    query: str, userspace: str, limit: int = 50, api_key: str = None
 ) -> str:
     """
     (Alias for search_issues) Search events (transient issues) by keyword.
     """
-    return _search_issues_internal(query, namespace, longevity="transient", limit=limit)
+    return _search_issues_internal(query, userspace, longevity="transient", limit=limit)
 
 
 @mcp.tool()
 @auth_required
 def search_trends(
-    query: str, namespace: str, limit: int = 20, api_key: str = None
+    query: str, userspace: str, limit: int = 20, api_key: str = None
 ) -> str:
     """
     (Alias for search_issues) Search trends (temporal issues) by keyword.
     """
-    return _search_issues_internal(query, namespace, longevity="temporal", limit=limit)
+    return _search_issues_internal(query, userspace, longevity="temporal", limit=limit)

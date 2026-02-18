@@ -17,14 +17,14 @@ def mock_db():
 
 def test_forge_issue_unit(mock_db):
     mock_db['store'].return_value = "issue_123"
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
         result = forge_issue(
             logos="Test Logos",
             description="Test Desc",
             premises=[{"type": "message", "id": "msg_1"}],
-            namespace=namespace,
+            userspace=userspace,
             longevity="transient",
             api_key="test_password"
         )
@@ -38,14 +38,14 @@ def test_forge_issue_unit(mock_db):
 
 def test_add_event_alias_unit(mock_db):
     mock_db['store'].return_value = "event_123"
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
         result = add_event(
             name="Test Event",
             description="Event Desc",
             article_links=["http://link1.com"],
-            namespace=namespace,
+            userspace=userspace,
             api_key="test_password"
         )
     
@@ -59,14 +59,14 @@ def test_add_event_alias_unit(mock_db):
 
 def test_add_trend_alias_unit(mock_db):
     mock_db['store'].return_value = "trend_123"
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
         result = add_trend(
             name="Test Trend",
             description="Trend Desc",
             event_ids=["event_1"],
-            namespace=namespace,
+            userspace=userspace,
             api_key="test_password"
         )
     
@@ -79,7 +79,7 @@ def test_add_trend_alias_unit(mock_db):
     assert args[1]["premises"] == [{"type": "issue", "id": "event_1"}]
 
 def test_list_issues_unit(mock_db):
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
@@ -90,23 +90,23 @@ def test_list_issues_unit(mock_db):
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
-        result = list_issues(namespace=namespace, api_key="test_password")
+        result = list_issues(userspace=userspace, api_key="test_password")
     
     assert "ID: issue_1" in result
     assert "Logos: Logos 1" in result
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args
-    assert kwargs['json_data']['selector']['namespace'] == namespace
+    assert {"userspace": userspace} in kwargs['json_data']['selector']['$or']
 
 def test_list_events_alias_unit(mock_db):
-    namespace = "00000000-0000-0000-0000-000000000000"
+    userspace = "00000000-0000-0000-0000-000000000000"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"docs": []}
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.API_PASSWORD', 'test_password'):
-        list_events(namespace=namespace, api_key="test_password")
+        list_events(userspace=userspace, api_key="test_password")
     
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args

@@ -94,6 +94,7 @@ couchdb:
 moirai:
   apiUsername: ""
   apiPassword: ""
+  jwtSecretKey: ""
 
 # -- OpenAI API key
 openai:

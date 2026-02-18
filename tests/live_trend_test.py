@@ -15,21 +15,21 @@ async def live_trend_test():
                 await session.initialize()
                 print("Connected to MCP Server!")
 
-                # Use a specific namespace for this live test
-                namespace = str(uuid.uuid4())
-                print(f"Using Live Test Namespace: {namespace}")
+                # Use a specific userspace for this live test
+                userspace = str(uuid.uuid4())
+                print(f"Using Live Test Userspace: {userspace}")
 
                 # 1. Add/Ensure Feed
                 feed_url = "https://feeds.bbci.co.uk/news/rss.xml"
                 print(f"\n--- Adding Feed: {feed_url} ---")
                 await session.call_tool(
-                    "add_feed", {"url": feed_url, "category": "news"}
+                    "add_feed", {"url": feed_url, "title": "BBC News", "userspace": userspace, "category": "news"}
                 )
 
                 # 2. Read Feed
                 print("\n--- Reading Feed ---")
                 read_res = await session.call_tool(
-                    "read_feed", {"url": feed_url, "limit": 3}
+                    "read_feed", {"url": feed_url, "userspace": userspace, "limit": 3}
                 )
                 articles_text = read_res.content[0].text
                 print(f"Fetched Articles (first 200 chars):\n{articles_text[:200]}...")
@@ -51,7 +51,7 @@ async def live_trend_test():
                         "name": event_name,
                         "description": "Top stories fetched from BBC RSS",
                         "article_links": links[:2],
-                        "namespace": namespace,
+                        "userspace": userspace,
                     },
                 )
                 print(f"Add Event Result: {event_res.content[0].text}")
@@ -74,7 +74,7 @@ async def live_trend_test():
                         "name": trend_name,
                         "description": "A snapshot trend from live BBC data",
                         "event_ids": [event_id],
-                        "namespace": namespace,
+                        "userspace": userspace,
                     },
                 )
                 print(f"Add Trend Result: {trend_res.content[0].text}")
@@ -82,7 +82,7 @@ async def live_trend_test():
                 # 5. Verify
                 print("\n--- Verifying Trend (Temporal Issue) ---")
                 list_res = await session.call_tool(
-                    "list_issues", {"namespace": namespace, "longevity": "temporal"}
+                    "list_issues", {"userspace": userspace, "longevity": "temporal"}
                 )
                 output = list_res.content[0].text
                 print(f"List Trends Output:\n{output}")

@@ -57,26 +57,26 @@ This document outlines planned security improvements for the Moirai press review
 
 ---
 
-### 1.3 Namespace Access Control
+### 1.3 Userspace Access Control
 **Priority: MEDIUM**
 
 **Current State:**
-- Namespaces exist but no access control
-- Any authenticated user can access any namespace
-- Namespace filtering is client-side only
+- Userspaces exist but no access control
+- Any authenticated user can access any userspace
+- Userspace filtering is client-side only
 
 **Proposed Enhancement:**
-- Implement namespace ownership model
-- Users assigned to one or more namespaces
-- Admins can access all namespaces
-- Editors/Viewers restricted to assigned namespaces
-- Server-side namespace filtering on all queries
-- Namespace access validation on all write operations
+- Implement userspace ownership model
+- Users assigned to one or more userspaces
+- Admins can access all userspaces
+- Editors/Viewers restricted to assigned userspaces
+- Server-side userspace filtering on all queries
+- Userspace access validation on all write operations
 
 **Benefits:**
 - Data isolation between teams/projects
 - Multi-tenant security
-- Prevent unauthorized cross-namespace access
+- Prevent unauthorized cross-userspace access
 
 ---
 
@@ -305,24 +305,24 @@ This document outlines planned security improvements for the Moirai press review
 
 ## 5. MCP Server Security
 
-### 5.1 MCP Namespace Isolation
+### 5.1 MCP Userspace Isolation
 **Priority: HIGH**
 
 **Current State:**
-- Namespace required for tools but not enforced at transport level
+- Userspace required for tools but not enforced at transport level
 - HTTP SSE endpoint exposed on port 8090
 - No authentication on MCP server
 
 **Proposed Enhancement:**
 - Add authentication to MCP server (shared secret or JWT)
-- Enforce namespace validation on all tool calls
-- Implement namespace quota limits (max feeds, events, trends per namespace)
+- Enforce userspace validation on all tool calls
+- Implement userspace quota limits (max feeds, events, trends per userspace)
 - Add audit logging for all MCP tool invocations
-- Rate limit MCP tool calls per namespace
+- Rate limit MCP tool calls per userspace
 
 **Benefits:**
 - Prevent unauthorized MCP access
-- Namespace data isolation
+- Userspace data isolation
 - Resource consumption control
 - Audit trail for agent actions
 

@@ -96,9 +96,9 @@ This document provides essential instructions for AI agents working on the Moira
 - **Sanitization:** All text inputs MUST be sanitized with `bleach.clean()`.
 - **Validation:** Validate all inputs using `api/validation.py` Pydantic models.
 
-### Data & Namespace Isolation
-- **Namespace:** ALL MCP tools and API endpoints MUST require and validate a `namespace` UUID.
-- **Isolation:** Ensure queries filter by `namespace` to prevent data leakage between agents/users.
+### Data & Userspace Isolation
+- **Userspace:** ALL MCP tools and API endpoints MUST require and validate a `userspace` UUID.
+- **Isolation:** Ensure queries filter by `userspace` to prevent data leakage between agents/users.
 - **Database:**
   - **CouchDB:** Use `get_doc`, `store_doc`, `update_doc` helpers.
   - **Conflict Handling:** ALWAYS fetch the latest `_rev` before updating a document.
@@ -117,8 +117,8 @@ This document provides essential instructions for AI agents working on the Moira
 ### Common Tasks
 - **Adding MCP Tool:**
   - Define in `mcp_server.py` with `@mcp.tool()`.
-  - First argument MUST be `namespace: str`.
-  - Validate `namespace` is a valid UUID.
+  - First argument MUST be `userspace: str`.
+  - Validate `userspace` is a valid UUID.
 - **Adding API Endpoint:**
   - Define in `api/routes.py`.
   - Use `@requires_auth`.
@@ -130,4 +130,3 @@ This document provides essential instructions for AI agents working on the Moira
 - **CouchDB:** Check if databases exist with `curl -u $COUCHDB_USER:$COUCHDB_PASSWORD http://localhost:5984/_all_dbs`.
 - **Logs:** Check Docker logs with `docker compose logs -f moirai`.
 - **Tests:** Use `-v` flag with pytest for verbose output.
-

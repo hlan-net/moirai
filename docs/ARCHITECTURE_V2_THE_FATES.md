@@ -15,7 +15,7 @@ Issues are defined by their **Longevity Scale**:
 
 *   **Transient Issues:** High-frequency bursts. They appear suddenly as a flash in the signal and fade just as fast.
 *   **Temporal Issues:** Mid-frequency sustained structures. They represent a coherent movement or debate that persists across time.
-*   **Epic Issues:** Low-frequency, foundational arcs. These are the standing waves of history, defining the character of a namespace for eternity.
+*   **Epic Issues:** Low-frequency, foundational arcs. These are the standing waves of history, defining the character of a userspace for eternity.
 
 ## 2. The Roles of the Moirai
 
@@ -42,7 +42,7 @@ The `events` and `trends` databases are merged into a single **`issues`** databa
   "_id": "uuid",
   "logos": "The headline/essence of the deduction",
   "description": "text",
-  "namespace": "guid",
+  "userspace": "guid",
   "longevity": "transient | temporal | epic",
   "status": "active | eternal",
   "premises": [
@@ -55,4 +55,4 @@ The `events` and `trends` databases are merged into a single **`issues`** databa
 
 ## 4. MCP & UI Evolution
 *   **Tools:** `forge_issue`, `measure_issue`, `seal_issue`, `list_issues`.
-*   **UI:** A **Lifespan View** that visualizes the "frequency" of the current namespace, showing how the fast-moving sand crystallizes into the "Things that ARE" and the "Things that WERE."
+*   **UI:** A **Lifespan View** that visualizes the "frequency" of the current userspace, showing how the fast-moving sand crystallizes into the "Things that ARE" and the "Things that WERE."

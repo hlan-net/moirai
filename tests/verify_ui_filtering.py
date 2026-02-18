@@ -38,7 +38,7 @@ async def verify_filtering():
                         "name": EVENT_NS1_NAME,
                         "description": "Desc 1",
                         "article_links": [],
-                        "namespace": ns1,
+                        "userspace": ns1,
                     },
                 )
 
@@ -49,7 +49,7 @@ async def verify_filtering():
                         "name": EVENT_NS2_NAME,
                         "description": "Desc 2",
                         "article_links": [],
-                        "namespace": ns2,
+                        "userspace": ns2,
                     },
                 )
 
@@ -57,17 +57,17 @@ async def verify_filtering():
         print(f"MCP Error: {e}")
         return
 
-    # Verify MCP namespace filtering
-    print("\n--- Verifying MCP Namespace Filtering ---")
+    # Verify MCP userspace filtering
+    print("\n--- Verifying MCP Userspace Filtering ---")
     try:
         async with sse_client(mcp_url) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 res1 = await session.call_tool(
-                    "list_issues", {"namespace": ns1, "longevity": "transient"}
+                    "list_issues", {"userspace": ns1, "longevity": "transient"}
                 )
                 res2 = await session.call_tool(
-                    "list_issues", {"namespace": ns2, "longevity": "transient"}
+                    "list_issues", {"userspace": ns2, "longevity": "transient"}
                 )
 
                 ns1_text = res1.content[0].text
@@ -86,7 +86,7 @@ async def verify_filtering():
         print(f"MCP Error during list_issues: {e}")
         return
 
-    # Verify API returns transient issues (events) across namespaces
+    # Verify API returns transient issues (events) across userspaces
     print("\n--- Verifying API Issues (Transient) ---")
     async with httpx.AsyncClient(auth=httpx.BasicAuth(username, password)) as client:
         res_all = await client.get(f"{api_url}?longevity=transient")
@@ -96,16 +96,16 @@ async def verify_filtering():
 
         data_all = res_all.json()
         found_ns1 = any(
-            i.get("namespace") == ns1 and i.get("logos") == EVENT_NS1_NAME
+            i.get("userspace") == ns1 and i.get("logos") == EVENT_NS1_NAME
             for i in data_all
         )
         found_ns2 = any(
-            i.get("namespace") == ns2 and i.get("logos") == EVENT_NS2_NAME
+            i.get("userspace") == ns2 and i.get("logos") == EVENT_NS2_NAME
             for i in data_all
         )
 
         if found_ns1 and found_ns2:
-            print("SUCCESS: /api/issues returns transient issues across namespaces.")
+            print("SUCCESS: /api/issues returns transient issues across userspaces.")
         else:
             print("FAILURE: Missing transient issues in /api/issues response.")
 

@@ -1,8 +1,9 @@
 import json
 from datetime import datetime, timezone
-from ..core import mcp, auth_required, validate_namespace
+from ..core import mcp, auth_required, validate_userspace
 from ..db import store_doc, db_request, get_doc, update_doc, delete_doc
 from .constants import ERROR_ISSUE_NOT_FOUND_OR_DENIED
+from .userspace import build_userspace_selector, extract_userspace, with_userspace
 
 # --- Internal Logic (No Auth Decorators) ---
 
@@ -10,10 +11,10 @@ def _forge_issue_internal(
     logos: str,
     description: str,
     premises: list[dict],
-    namespace: str,
+    userspace: str,
     longevity: str = "transient"
 ) -> str:
-    valid, err = validate_namespace(namespace)
+    valid, err = validate_userspace(userspace)
     if not valid:
         return err
 
@@ -24,34 +25,34 @@ def _forge_issue_internal(
         "logos": logos,
         "description": description,
         "premises": premises,
-        "namespace": namespace,
         "longevity": longevity,
         "status": "active",
         "born_at": datetime.now(timezone.utc).isoformat(),
         "passed_at": None,
         "type": "issue"
     }
+    with_userspace(issue_doc, userspace)
 
     try:
         doc_id = store_doc("issues", issue_doc)
-        return f"Issue forged with ID: {doc_id} in namespace {namespace} (Scale: {longevity})"
+        return f"Issue forged with ID: {doc_id} in userspace {userspace} (Scale: {longevity})"
     except Exception as e:
         return f"Error forging issue: {e}"
 
 
 def _measure_issue_internal(
     issue_id: str,
-    namespace: str,
+    userspace: str,
     longevity: str = None,
     description: str = None,
     add_premises: list[dict] = None
 ) -> str:
-    valid, err = validate_namespace(namespace)
+    valid, err = validate_userspace(userspace)
     if not valid:
         return err
 
     existing = get_doc("issues", issue_id)
-    if not existing or existing.get("namespace") != namespace:
+    if not existing or extract_userspace(existing) != userspace:
         return ERROR_ISSUE_NOT_FOUND_OR_DENIED
 
     updates = {}
@@ -79,13 +80,13 @@ def _measure_issue_internal(
         return f"Error measuring issue: {msg}"
 
 
-def _seal_issue_internal(issue_id: str, namespace: str) -> str:
-    valid, err = validate_namespace(namespace)
+def _seal_issue_internal(issue_id: str, userspace: str) -> str:
+    valid, err = validate_userspace(userspace)
     if not valid:
         return err
 
     existing = get_doc("issues", issue_id)
-    if not existing or existing.get("namespace") != namespace:
+    if not existing or extract_userspace(existing) != userspace:
         return ERROR_ISSUE_NOT_FOUND_OR_DENIED
 
     updates = {
@@ -101,15 +102,15 @@ def _seal_issue_internal(issue_id: str, namespace: str) -> str:
 
 
 def _list_issues_internal(
-    namespace: str, 
+    userspace: str,
     longevity: str = None, 
     status: str = None
 ) -> str:
-    valid, err = validate_namespace(namespace)
+    valid, err = validate_userspace(userspace)
     if not valid:
         return err
 
-    selector = {"type": "issue", "namespace": namespace}
+    selector = {"type": "issue", **build_userspace_selector(userspace)}
     if longevity:
         selector["longevity"] = longevity
     if status:
@@ -130,29 +131,29 @@ def _list_issues_internal(
     return (
         "\n---\n".join(output)
         if output
-        else f"No matching issues found in namespace {namespace}."
+        else f"No matching issues found in userspace {userspace}."
     )
 
 
-def _read_issue_internal(issue_id: str, namespace: str) -> str:
-    valid, err = validate_namespace(namespace)
+def _read_issue_internal(issue_id: str, userspace: str) -> str:
+    valid, err = validate_userspace(userspace)
     if not valid:
         return err
 
     doc = get_doc("issues", issue_id)
-    if not doc or doc.get("namespace") != namespace:
+    if not doc or extract_userspace(doc) != userspace:
         return ERROR_ISSUE_NOT_FOUND_OR_DENIED
 
     return json.dumps(doc, indent=2)
 
 
-def _delete_issue_internal(issue_id: str, namespace: str) -> str:
-    valid, err = validate_namespace(namespace)
+def _delete_issue_internal(issue_id: str, userspace: str) -> str:
+    valid, err = validate_userspace(userspace)
     if not valid:
         return err
 
     existing = get_doc("issues", issue_id)
-    if not existing or existing.get("namespace") != namespace:
+    if not existing or extract_userspace(existing) != userspace:
         return ERROR_ISSUE_NOT_FOUND_OR_DENIED
 
     success, msg = delete_doc("issues", issue_id)
@@ -170,21 +171,21 @@ def forge_issue(
     logos: str,
     description: str,
     premises: list[dict],
-    namespace: str,
+    userspace: str,
     longevity: str = "transient",
     api_key: str = None,
 ) -> str:
     """
     (Clotho) Forge a new Issue (Resonance) from identified patterns in the sand.
     """
-    return _forge_issue_internal(logos, description, premises, namespace, longevity)
+    return _forge_issue_internal(logos, description, premises, userspace, longevity)
 
 
 @mcp.tool()
 @auth_required
 def measure_issue(
     issue_id: str,
-    namespace: str,
+    userspace: str,
     longevity: str = None,
     description: str = None,
     add_premises: list[dict] = None,
@@ -193,48 +194,48 @@ def measure_issue(
     """
     (Lachesis) Measure and modulate an existing resonance.
     """
-    return _measure_issue_internal(issue_id, namespace, longevity, description, add_premises)
+    return _measure_issue_internal(issue_id, userspace, longevity, description, add_premises)
 
 
 @mcp.tool()
 @auth_required
 def seal_issue(
     issue_id: str,
-    namespace: str,
+    userspace: str,
     api_key: str = None,
 ) -> str:
     """
     (Atropos) Cut the thread of an active resonance.
     """
-    return _seal_issue_internal(issue_id, namespace)
+    return _seal_issue_internal(issue_id, userspace)
 
 
 @mcp.tool()
 @auth_required
 def list_issues(
-    namespace: str, 
+    userspace: str,
     longevity: str = None, 
     status: str = None,
     api_key: str = None
 ) -> str:
     """
-    List forged issues in a namespace.
+    List forged issues in a userspace.
     """
-    return _list_issues_internal(namespace, longevity, status)
+    return _list_issues_internal(userspace, longevity, status)
 
 
 @mcp.tool()
 @auth_required
-def read_issue(issue_id: str, namespace: str, api_key: str = None) -> str:
+def read_issue(issue_id: str, userspace: str, api_key: str = None) -> str:
     """Read full details of a specific issue."""
-    return _read_issue_internal(issue_id, namespace)
+    return _read_issue_internal(issue_id, userspace)
 
 
 @mcp.tool()
 @auth_required
-def delete_issue(issue_id: str, namespace: str, api_key: str = None) -> str:
+def delete_issue(issue_id: str, userspace: str, api_key: str = None) -> str:
     """Irreversibly remove an issue record."""
-    return _delete_issue_internal(issue_id, namespace)
+    return _delete_issue_internal(issue_id, userspace)
 
 
 # --- Backward Compatibility Aliases (Legacy Events/Trends) ---
@@ -245,47 +246,47 @@ def add_event(
     name: str,
     description: str,
     article_links: list[str],
-    namespace: str,
+    userspace: str,
     api_key: str = None,
 ) -> str:
     """
     (Alias for forge_issue) Create a new Event.
     """
     premises = [{"type": "message", "id": link} for link in article_links]
-    return _forge_issue_internal(name, description, premises, namespace, "transient")
+    return _forge_issue_internal(name, description, premises, userspace, "transient")
 
 
 @mcp.tool()
 @auth_required
-def list_events(namespace: str, api_key: str = None) -> str:
+def list_events(userspace: str, api_key: str = None) -> str:
     """
     (Alias for list_issues) List transient issues.
     """
-    return _list_issues_internal(namespace, longevity="transient")
+    return _list_issues_internal(userspace, longevity="transient")
 
 
 @mcp.tool()
 @auth_required
-def read_event(event_id: str, namespace: str, api_key: str = None) -> str:
+def read_event(event_id: str, userspace: str, api_key: str = None) -> str:
     """
     (Alias for read_issue) Get details of a specific event.
     """
-    return _read_issue_internal(event_id, namespace)
+    return _read_issue_internal(event_id, userspace)
 
 
 @mcp.tool()
 @auth_required
-def get_event(event_id: str, namespace: str = None, api_key: str = None) -> dict:
+def get_event(event_id: str, userspace: str = None, api_key: str = None) -> dict:
     """
     (Alias for read_issue) Returns the event document as a dictionary.
     """
-    if not namespace:
+    if not userspace:
         doc = get_doc("issues", event_id)
         if doc:
             return {"status": "success", "event": doc}
         return {"status": "error", "message": "Event not found"}
-    
-    res = _read_issue_internal(event_id, namespace)
+
+    res = _read_issue_internal(event_id, userspace)
     try:
         data = json.loads(res)
         if "error" in data:
@@ -299,7 +300,7 @@ def get_event(event_id: str, namespace: str = None, api_key: str = None) -> dict
 @auth_required
 def update_event(
     event_id: str,
-    namespace: str,
+    userspace: str,
     name: str = None,
     description: str = None,
     article_links: list[str] = None,
@@ -312,16 +313,16 @@ def update_event(
     if article_links:
         add_premises = [{"type": "message", "id": link} for link in article_links]
     
-    return _measure_issue_internal(event_id, namespace, description=description, add_premises=add_premises)
+    return _measure_issue_internal(event_id, userspace, description=description, add_premises=add_premises)
 
 
 @mcp.tool()
 @auth_required
-def delete_event(event_id: str, namespace: str, api_key: str = None) -> str:
+def delete_event(event_id: str, userspace: str, api_key: str = None) -> str:
     """
     (Alias for delete_issue) Delete an event.
     """
-    return _delete_issue_internal(event_id, namespace)
+    return _delete_issue_internal(event_id, userspace)
 
 
 @mcp.tool()
@@ -330,47 +331,47 @@ def add_trend(
     name: str,
     description: str,
     event_ids: list[str],
-    namespace: str,
+    userspace: str,
     api_key: str = None,
 ) -> str:
     """
     (Alias for forge_issue) Create a new Trend.
     """
     premises = [{"type": "issue", "id": eid} for eid in event_ids]
-    return _forge_issue_internal(name, description, premises, namespace, "temporal")
+    return _forge_issue_internal(name, description, premises, userspace, "temporal")
 
 
 @mcp.tool()
 @auth_required
-def list_trends(namespace: str, api_key: str = None) -> str:
+def list_trends(userspace: str, api_key: str = None) -> str:
     """
     (Alias for list_issues) List temporal issues.
     """
-    return _list_issues_internal(namespace, longevity="temporal")
+    return _list_issues_internal(userspace, longevity="temporal")
 
 
 @mcp.tool()
 @auth_required
-def read_trend(trend_id: str, namespace: str, api_key: str = None) -> str:
+def read_trend(trend_id: str, userspace: str, api_key: str = None) -> str:
     """
     (Alias for read_issue) Get details of a specific trend.
     """
-    return _read_issue_internal(trend_id, namespace)
+    return _read_issue_internal(trend_id, userspace)
 
 
 @mcp.tool()
 @auth_required
-def get_trend(trend_id: str, namespace: str = None, api_key: str = None) -> dict:
+def get_trend(trend_id: str, userspace: str = None, api_key: str = None) -> dict:
     """
     (Alias for read_issue) Returns the trend document as a dictionary.
     """
-    if not namespace:
+    if not userspace:
         doc = get_doc("issues", trend_id)
         if doc:
             return {"status": "success", "trend": doc}
         return {"status": "error", "message": "Trend not found"}
 
-    res = _read_issue_internal(trend_id, namespace)
+    res = _read_issue_internal(trend_id, userspace)
     try:
         data = json.loads(res)
         if "error" in data:
@@ -384,7 +385,7 @@ def get_trend(trend_id: str, namespace: str = None, api_key: str = None) -> dict
 @auth_required
 def update_trend(
     trend_id: str,
-    namespace: str,
+    userspace: str,
     name: str = None,
     description: str = None,
     event_ids: list[str] = None,
@@ -397,13 +398,13 @@ def update_trend(
     if event_ids:
         add_premises = [{"type": "issue", "id": eid} for eid in event_ids]
     
-    return _measure_issue_internal(trend_id, namespace, description=description, add_premises=add_premises)
+    return _measure_issue_internal(trend_id, userspace, description=description, add_premises=add_premises)
 
 
 @mcp.tool()
 @auth_required
-def delete_trend(trend_id: str, namespace: str, api_key: str = None) -> str:
+def delete_trend(trend_id: str, userspace: str, api_key: str = None) -> str:
     """
     (Alias for delete_issue) Delete a trend.
     """
-    return _delete_issue_internal(trend_id, namespace)
+    return _delete_issue_internal(trend_id, userspace)

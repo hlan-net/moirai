@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-Moirai is an MCP-powered press review platform with an agent-centric architecture. AI agents use MCP tools to aggregate RSS feeds, synthesize them into Events, and track Trends across isolated namespaces.
+Moirai is an MCP-powered press review platform with an agent-centric architecture. AI agents use MCP tools to aggregate RSS feeds, synthesize them into Events, and track Trends across isolated userspaces.
 
 ### Three-Tier Architecture
 
@@ -13,12 +13,12 @@ Moirai is an MCP-powered press review platform with an agent-centric architectur
 
 2. **MCP Server** (port 8090)
    - FastMCP SSE server providing agent tools (`mcp_server.py`)
-   - Enforces namespace isolation (GUID required for all data operations)
+   - Enforces userspace isolation (GUID required for all data operations)
    - Tools: `add_feed`, `list_feeds`, `read_feed`, `add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`
 
 3. **Vue.js 3 + TypeScript UI** (in `ui/`)
    - 4-column layout: Feeds, Articles, Events, Trends
-   - Cross-namespace review with namespace selector
+   - Cross-userspace review with userspace selector
    - Chat interface with built-in agent (uses MCP tools)
 
 ### Data Model
@@ -26,14 +26,14 @@ Moirai is an MCP-powered press review platform with an agent-centric architectur
 **CouchDB databases:** `feeds`, `articles`, `events`, `trends`
 
 ```
-Namespace (GUID)
+Userspace (GUID)
   └── Feeds (RSS sources)
        └── Articles (raw feed items)
             └── Events (groups of related articles)
                  └── Trends (patterns across events)
 ```
 
-**Namespace Isolation:** All MCP tools require a `namespace` parameter (UUID/GUID). This ensures data segregation between different agent contexts.
+**Userspace Isolation:** All MCP tools require a `userspace` parameter (UUID/GUID). This ensures data segregation between different agent contexts.
 
 ## Build, Test, and Run
 
@@ -105,7 +105,7 @@ docker compose logs -f moirai # Watch logs
 
 - **API routes:** ALL routes in `api/routes.py` require `@requires_auth` decorator (HTTP Basic Auth)
 - **Public read mode:** If `ALLOW_PUBLIC_READ=true`, GET endpoints skip auth
-- **MCP namespace enforcement:** Every MCP tool validates `namespace` is a valid UUID
+- **MCP userspace enforcement:** Every MCP tool validates `userspace` is a valid UUID
 - **Input validation:** Use Pydantic models from `api/validation.py` for all request data
 - **Sanitization:** All text inputs sanitized with `bleach.clean()` to prevent XSS
 
@@ -125,29 +125,29 @@ if existing:
 - `update_doc(db_name, doc_id, updates)` → updated doc
 - `delete_doc(db_name, doc_id)` → success bool
 
-### Namespace Filtering
+### Userspace Filtering
 
 **Backend pattern (in API routes):**
 ```python
-namespace = request.args.get('namespace')
-if namespace:
-    validate_namespace_param(namespace)
+userspace = request.args.get('userspace')
+if userspace:
+    validate_userspace_param(userspace)
     # Filter query: ?include_docs=true
-    # Then filter results: [d for d in docs if d.get('namespace') == namespace]
+    # Then filter results: [d for d in docs if d.get('userspace') == userspace]
 ```
 
 **MCP tool pattern:**
 ```python
 @mcp.tool()
-def some_tool(namespace: str, other_params: str):
-    """All tools MUST require namespace parameter first"""
-    if not namespace:
-        raise ValueError("namespace is required")
+def some_tool(userspace: str, other_params: str):
+    """All tools MUST require userspace parameter first"""
+    if not userspace:
+        raise ValueError("userspace is required")
     # Validate UUID format
     try:
-        uuid.UUID(namespace)
+        uuid.UUID(userspace)
     except ValueError:
-        raise ValueError("Invalid namespace GUID format")
+        raise ValueError("Invalid userspace GUID format")
     # ... rest of logic
 ```
 
@@ -172,7 +172,7 @@ def some_tool(namespace: str, other_params: str):
 
 **State management:**
 - No Vuex/Pinia - uses `localStorage` for chat history and settings
-- Namespace selected via dropdown persisted in `sessionStorage`
+- Userspace selected via dropdown persisted in `sessionStorage`
 
 **API calls:**
 - Use native `fetch()` with Basic Auth headers
@@ -212,13 +212,13 @@ def some_tool(namespace: str, other_params: str):
 1. Add tool function in `mcp_server.py`:
 ```python
 @mcp.tool()
-def my_new_tool(namespace: str, param: str) -> str:
+def my_new_tool(userspace: str, param: str) -> str:
     """Tool description for agent"""
-    # Validate namespace
+    # Validate userspace
     try:
-        uuid.UUID(namespace)
+        uuid.UUID(userspace)
     except ValueError:
-        raise ValueError("Invalid namespace")
+        raise ValueError("Invalid userspace")
     # ... implementation
     return result
 ```
@@ -283,7 +283,7 @@ This project transitioned from an autonomous scheduled service to agent-centric 
 - **Legacy code:** `tasks/scheduler.py` still exists but is not used in production
 
 The rewrite prioritized:
-1. Namespace isolation for multi-tenant security
+1. Userspace isolation for multi-tenant security
 2. HTTP Basic Auth for API access
 3. Pydantic validation for input sanitization
 4. Agent-friendly MCP tool interface
