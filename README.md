@@ -95,6 +95,10 @@ If you want to run components individually without Docker:
     yarn dev
     ```
 
+### Local Testing Policy
+
+Before committing and pushing changes, run relevant local tests for the area you touched (API, UI, MCP, or integration). If local tests cannot be run, explicitly document why (and what you did instead) in the commit message body or pull request description.
+
 ## Documentation
 
 * [Architecture](docs/ARCHITECTURE.md)
