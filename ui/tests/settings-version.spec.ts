@@ -21,11 +21,11 @@ test.describe('Settings Page Version Display', () => {
 
     const aboutSection = page.getByRole('heading', { name: 'About Moirai' }).locator('..')
 
-    const uiRow = aboutSection.locator('.version-row', { hasText: 'UI' })
+    const uiRow = aboutSection.getByText('UI', { exact: true }).locator('..')
     await expect(uiRow).toBeVisible()
     await expect(uiRow.locator('.version-value')).toContainText('Moirai UI v')
 
-    const apiRow = aboutSection.locator('.version-row', { hasText: 'API' })
+    const apiRow = aboutSection.getByText('API', { exact: true }).locator('..')
     await expect(apiRow).toBeVisible()
     await expect(apiRow.locator('.version-value')).toContainText('Moirai v')
   })
