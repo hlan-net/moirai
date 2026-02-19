@@ -90,7 +90,7 @@ def test_feed_url_validation_valid():
     unique_url = f"https://example.com/feed-{uuid.uuid4()}"
     data = {"url": unique_url, "title": "Valid Scheme", "category": "test"}
     response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
-    assert response.status_code in [200, 201]
+    assert response.status_code in [200, 201], response.text
 
 
 @pytest.mark.integration
