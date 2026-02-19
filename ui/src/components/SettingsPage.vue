@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { useTheme, type Theme } from '../composables/useTheme'
@@ -10,6 +10,8 @@ const uiVersion = __APP_BUILD__ !== 'dev'
   ? `Moirai UI v${__APP_VERSION__} (build ${__APP_BUILD__})`
   : `Moirai UI v${__APP_VERSION__}`
 const modelName = ref('llama3.1:latest')
+const aboutDescription =
+  'Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).'
 const availableModels = ref([])
 const loadingModels = ref(false)
 const allowPublicRead = ref(false)
@@ -59,6 +61,16 @@ const buildComponentVersions = (config?: {
 }
 
 const componentVersions = ref<ComponentVersion[]>(buildComponentVersions())
+const copyStatus = ref('')
+const aboutCopyText = computed(() => {
+  const lines: string[] = ['About Moirai']
+  for (const component of componentVersions.value) {
+    lines.push(component.name)
+    lines.push(component.version)
+  }
+  lines.push(aboutDescription)
+  return lines.join('\n')
+})
 
 // Auth Config
 const googleClientId = ref('')
@@ -68,6 +80,33 @@ const githubClientId = ref('')
 const githubClientSecret = ref('')
 
 const { theme, setTheme } = useTheme()
+
+const copyAbout = async () => {
+  const text = aboutCopyText.value
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.setAttribute('readonly', 'true')
+      textarea.style.position = 'absolute'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    copyStatus.value = 'Copied'
+  } catch (error) {
+    console.error('Failed to copy about info', error)
+    copyStatus.value = 'Copy failed'
+  } finally {
+    window.setTimeout(() => {
+      copyStatus.value = ''
+    }, 2000)
+  }
+}
 
 watch(llmEndpoint, (newEndpoint) => {
   if (newEndpoint === 'openai' && availableOpenAiModels.value.length === 0 && openaiApiKey.value) {
@@ -408,7 +447,13 @@ onMounted(() => {
     <h1>Settings</h1>
     
     <div class="settings-section">
-      <h2>About Moirai</h2>
+      <h2 class="about-header">
+        <span>About Moirai</span>
+        <span class="about-actions">
+          <button class="secondary copy-btn" @click="copyAbout">Copy details</button>
+          <span v-if="copyStatus" class="copy-status">{{ copyStatus }}</span>
+        </span>
+      </h2>
       <div>
         <div class="version-list">
           <div v-for="component in componentVersions" :key="component.name" class="version-row">
@@ -416,7 +461,7 @@ onMounted(() => {
             <span class="version-value">{{ component.version }}</span>
           </div>
         </div>
-        <p class="about-description">Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).</p>
+        <p class="about-description">{{ aboutDescription }}</p>
       </div>
     </div>
 
@@ -754,6 +799,23 @@ onMounted(() => {
   font-size: 1.15rem;
   line-height: 1.65;
   max-width: 62ch;
+}
+.about-header {
+  align-items: center;
+  gap: 12px;
+}
+.about-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.copy-btn {
+  white-space: nowrap;
+}
+.copy-status {
+  font-size: 0.85rem;
+  color: var(--text-color);
+  opacity: 0.7;
 }
 h2 {
   margin-top: 0;
