@@ -1,8 +1,8 @@
 import { test, expect, Page } from '@playwright/test'
 
 function getBasicAuthHeader(): string | null {
-  const username = process.env.API_USERNAME
-  const password = process.env.API_PASSWORD
+  const username = process.env.ADMIN_USERNAME
+  const password = process.env.ADMIN_PASSWORD
   if (!username || !password) return null
   const token = Buffer.from(`${username}:${password}`).toString('base64')
   return `Basic ${token}`

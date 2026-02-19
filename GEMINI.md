@@ -14,7 +14,7 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 
 ## Current Architecture
 -   **Backend (API):** Flask REST API on port `8088`.
-    -   **Security:** Enforces HTTP Basic Auth (`API_USERNAME` / `API_PASSWORD`).
+-   **Security:** Enforces HTTP Basic Auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`).
     -   **Responsibility:** Serves the UI and provides administrative CRUD operations.
 -   **MCP Server:** FastMCP SSE server on port `8090`.
     -   **Security:** Enforces **Userspace isolation** (GUID required for all data tools).

@@ -43,7 +43,7 @@ api_blueprint = Blueprint("api", __name__)
 logger = logging.getLogger(__name__)
 
 # Basic Auth Removed
-# API_USERNAME / API_PASSWORD removed
+# ADMIN_USERNAME / ADMIN_PASSWORD removed
 ALLOW_PUBLIC_READ_ENV = os.environ.get("ALLOW_PUBLIC_READ", "false").lower() == "true"
 ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
 

@@ -88,16 +88,16 @@ spec:
               secretKeyRef:
                 name: {{ .Release.Name }}-openai-secret
                 key: apiKey
-          - name: API_USERNAME
+          - name: ADMIN_USERNAME
             valueFrom:
               secretKeyRef:
                 name: {{ include "moirai.fullname" . }}-moirai-secret
-                key: apiUsername
-          - name: API_PASSWORD
+                key: adminUsername
+          - name: ADMIN_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: {{ include "moirai.fullname" . }}-moirai-secret
-                key: apiPassword
+                key: adminPassword
           - name: JWT_SECRET_KEY
             valueFrom:
               secretKeyRef:

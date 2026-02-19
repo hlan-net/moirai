@@ -10,7 +10,7 @@ Instead of the system autonomously deciding what to fetch and process, Moirai ac
 ### 2.1 Backend (Flask API)
 -   **Port:** `8088`
 -   **Role:** Serves the Web UI, handles data persistence, and provides administrative REST APIs.
--   **Security:** HTTP Basic Auth (`API_USERNAME` / `API_PASSWORD`).
+-   **Security:** HTTP Basic Auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`).
 -   **Key Routes:**
     -   `/api/feeds`, `/api/articles` - Content management
     -   `/api/events`, `/api/trends` - Synthesis management

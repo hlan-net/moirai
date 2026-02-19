@@ -132,23 +132,26 @@ def init_db():
 
 
 def ensure_default_user():
-    username = os.environ.get("API_USERNAME")
-    password = os.environ.get("API_PASSWORD")
+    admin_username = os.environ.get("ADMIN_USERNAME")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
 
-    if not username or not password:
-        logger.info("No API_USERNAME/API_PASSWORD found. Skipping default user creation.")
+    if not admin_username or not admin_password:
+        logger.info(
+            "No ADMIN_USERNAME/ADMIN_PASSWORD found. Skipping default user creation."
+        )
         return
 
     try:
-        existing = get_user_by_email(username)
+        admin_email = f"{admin_username}@localhost.local"
+        existing = get_user_by_email(admin_email)
         if existing:
-            logger.info(f"Default user '{username}' already exists.")
+            logger.info(f"Default admin user '{admin_email}' already exists.")
             return
 
-        logger.info(f"Creating default admin user '{username}'...")
-        hashed = hash_password(password)
+        logger.info(f"Creating default admin user '{admin_email}'...")
+        hashed = hash_password(admin_password)
         user_doc = {
-            "email": username,
+            "email": admin_email,
             "password_hash": hashed,
             "role": "admin",
             "settings": {},
@@ -157,7 +160,7 @@ def ensure_default_user():
 
         success, result = create_user(user_doc)
         if success:
-            logger.info(f"Default admin user '{username}' created successfully.")
+            logger.info(f"Default admin user '{admin_email}' created successfully.")
         else:
             logger.error(f"Failed to create default user: {result}")
 

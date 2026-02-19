@@ -8,7 +8,7 @@ Moirai is an MCP-powered press review platform with an agent-centric architectur
 
 1. **Flask REST API** (port 8088)
    - Serves Vue.js UI and provides administrative CRUD operations
-   - Secured with HTTP Basic Auth (`API_USERNAME`/`API_PASSWORD`)
+- Secured with HTTP Basic Auth (`ADMIN_USERNAME`/`ADMIN_PASSWORD`)
    - Routes: `api/routes.py` (admin), `api/chat_routes.py` (chat), `api/mcp_routes.py` (MCP proxy)
 
 2. **MCP Server** (port 8090)
@@ -183,7 +183,7 @@ def some_tool(userspace: str, other_params: str):
 **Required:**
 - `COUCHDB_URI` - CouchDB connection string
 - `COUCHDB_USER` / `COUCHDB_PASSWORD` - DB credentials
-- `API_USERNAME` / `API_PASSWORD` - HTTP Basic Auth for API
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD` - HTTP Basic Auth for API
 
 **Optional:**
 - `ALLOW_PUBLIC_READ` (default: false) - Allow unauthenticated GET requests

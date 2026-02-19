@@ -15,8 +15,8 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - API_USERNAME=${API_USERNAME:-username}
-      - API_PASSWORD=${API_PASSWORD}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-username}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}
       - MODEL_NAME=${MODEL_NAME:-gemini-3-flash}
       - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-ollama}
@@ -61,8 +61,8 @@ services:
       - "8090:8090"
     environment:
       - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}@couchdb:5984/
-      - API_USERNAME=username
-      - API_PASSWORD=${API_PASSWORD}
+      - ADMIN_USERNAME=username
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}
       - COUCHDB_USER=admin # Explicitly set COUCHDB_USER for create_dbs.sh
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set} # Explicitly set COUCHDB_PASSWORD for create_dbs.sh

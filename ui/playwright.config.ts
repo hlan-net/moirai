@@ -15,8 +15,8 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || ((process.env.CI || process.env.TEST_TARGET === 'docker') ? 'http://localhost:8088' : 'http://localhost:5173'),
     trace: 'on-first-retry',
     httpCredentials: {
-      username: process.env.API_USERNAME || 'testuser',
-      password: process.env.API_PASSWORD || 'testpassword',
+      username: process.env.ADMIN_USERNAME || 'testuser',
+      password: process.env.ADMIN_PASSWORD || 'testpassword',
     },
   },
   projects: [

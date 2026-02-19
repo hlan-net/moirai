@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("ADMIN_PASSWORD", "test_password")
+
 import pytest
 from unittest.mock import patch, MagicMock
 from mcp_service.tools.search import search_issues, search_events
@@ -26,7 +29,7 @@ def test_search_issues_unit(mock_db):
     }
     mock_db['request'].return_value = mock_response
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         result = search_issues(query="test", userspace=userspace, api_key="test_password")
     
     data = json.loads(result)
@@ -44,7 +47,7 @@ def test_search_events_alias_unit(mock_db):
     mock_response.json.return_value = {"docs": []}
     mock_db['request'].return_value = mock_response
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         search_events(query="test", userspace=userspace, api_key="test_password")
     
     mock_db['request'].assert_called_once()

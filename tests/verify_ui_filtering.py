@@ -13,11 +13,11 @@ async def verify_filtering():
     mcp_url = "http://localhost:8090/sse"
     api_url = "http://localhost:8088/api/issues"
 
-    username = os.environ.get("API_USERNAME")
-    password = os.environ.get("API_PASSWORD")
+    username = os.environ.get("ADMIN_USERNAME")
+    password = os.environ.get("ADMIN_PASSWORD")
 
-    assert username, "API_USERNAME environment variable must be set"
-    assert password, "API_PASSWORD environment variable must be set"
+    assert username, "ADMIN_USERNAME environment variable must be set"
+    assert password, "ADMIN_PASSWORD environment variable must be set"
 
     ns1 = str(uuid.uuid4())
     ns2 = str(uuid.uuid4())

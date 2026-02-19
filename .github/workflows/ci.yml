@@ -59,8 +59,8 @@ jobs:
         COUCHDB_PASSWORD: password
         COUCHDB_HOST: localhost
         COUCHDB_PORT: 5984
-        API_USERNAME: testuser
-        API_PASSWORD: testpassword
+        ADMIN_USERNAME: testuser
+        ADMIN_PASSWORD: testpassword
         FLASK_ENV: test
         TESTING: true
       run: |
@@ -131,8 +131,8 @@ jobs:
       env:
         COUCHDB_PASSWORD: password
         REDIS_PASSWORD: password
-        API_USERNAME: testuser
-        API_PASSWORD: testpassword
+        ADMIN_USERNAME: testuser
+        ADMIN_PASSWORD: testpassword
         JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
       run: |
         docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --no-build couchdb redis api ui nginx
@@ -148,7 +148,7 @@ jobs:
     - name: Run Playwright tests
       working-directory: ./ui
       env:
-        API_USERNAME: testuser
-        API_PASSWORD: testpassword
+        ADMIN_USERNAME: testuser
+        ADMIN_PASSWORD: testpassword
       run: |
         npx playwright test

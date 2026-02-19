@@ -2,11 +2,13 @@ import unittest
 import secrets
 import logging
 import os
+import base64
 from unittest.mock import patch
 
 # Set environment variables BEFORE importing app
 os.environ["JWT_SECRET_KEY"] = "super_secret_test_key_that_is_at_least_32_chars_long"
-os.environ["API_PASSWORD"] = "test_password_123"
+os.environ["ADMIN_USERNAME"] = "admin"
+os.environ["ADMIN_PASSWORD"] = "test_password_123"
 
 from main import app
 
@@ -142,6 +144,10 @@ class TestAuthFlow(unittest.TestCase):
             "email": f"admin_user_{cls.unique_suffix}@example.com",
             "password": "SecureAdminPassword123!",
         }
+        cls.admin_basic_credentials = {
+            "username": os.environ["ADMIN_USERNAME"],
+            "password": os.environ["ADMIN_PASSWORD"],
+        }
 
     @classmethod
     def tearDownClass(cls):
@@ -245,3 +251,15 @@ class TestAuthFlow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+    def test_00_admin_basic_auth_login(self):
+        """Test Basic Auth login for admin user."""
+        creds = f"{self.__class__.admin_basic_credentials['username']}:{self.__class__.admin_basic_credentials['password']}"
+        auth_header = {
+            "Authorization": f"Basic {base64.b64encode(creds.encode()).decode()}"
+        }
+
+        response = self.client.get("/api/auth/me", headers=auth_header)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["role"], "admin")
+        self.assertEqual(data["email"], "admin@localhost.local")

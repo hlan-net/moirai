@@ -7,19 +7,19 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
 
 # Auth Configuration
-API_PASSWORD = os.environ.get("API_PASSWORD")
-if not API_PASSWORD:
-    raise RuntimeError("API_PASSWORD environment variable must be set for MCP server")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_PASSWORD environment variable must be set for MCP server")
 
 
 def auth_required(func):
-    """Decorator to require API_PASSWORD for a tool call."""
+    """Decorator to require ADMIN_PASSWORD for a tool call."""
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # We expect 'api_key' to be passed in kwargs for top-level tools
         api_key = kwargs.pop("api_key", None)
-        if api_key != API_PASSWORD:
+        if api_key != ADMIN_PASSWORD:
             return "Error: Unauthorized. Valid 'api_key' is required."
         return func(*args, **kwargs)
 

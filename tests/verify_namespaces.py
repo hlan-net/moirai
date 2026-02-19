@@ -6,11 +6,11 @@ def verify_userspaces():
     url = "http://localhost:8088/api/userspaces"
     print(f"Fetching userspaces from {url}...")
 
-    username = os.environ.get("API_USERNAME")
-    password = os.environ.get("API_PASSWORD")
+    username = os.environ.get("ADMIN_USERNAME")
+    password = os.environ.get("ADMIN_PASSWORD")
 
-    assert username, "API_USERNAME environment variable must be set"
-    assert password, "API_PASSWORD environment variable must be set"
+    assert username, "ADMIN_USERNAME environment variable must be set"
+    assert password, "ADMIN_PASSWORD environment variable must be set"
 
     try:
         res = requests.get(url, auth=(username, password))

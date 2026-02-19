@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("ADMIN_PASSWORD", "test_password")
+
 import pytest
 from unittest.mock import patch, MagicMock
 from mcp_service.tools.issues import forge_issue, add_event, add_trend, list_issues, list_events
@@ -19,7 +22,7 @@ def test_forge_issue_unit(mock_db):
     mock_db['store'].return_value = "issue_123"
     userspace = "00000000-0000-0000-0000-000000000000"
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         result = forge_issue(
             logos="Test Logos",
             description="Test Desc",
@@ -40,7 +43,7 @@ def test_add_event_alias_unit(mock_db):
     mock_db['store'].return_value = "event_123"
     userspace = "00000000-0000-0000-0000-000000000000"
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         result = add_event(
             name="Test Event",
             description="Event Desc",
@@ -61,7 +64,7 @@ def test_add_trend_alias_unit(mock_db):
     mock_db['store'].return_value = "trend_123"
     userspace = "00000000-0000-0000-0000-000000000000"
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         result = add_trend(
             name="Test Trend",
             description="Trend Desc",
@@ -89,7 +92,7 @@ def test_list_issues_unit(mock_db):
     }
     mock_db['request'].return_value = mock_response
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         result = list_issues(userspace=userspace, api_key="test_password")
     
     assert "ID: issue_1" in result
@@ -105,7 +108,7 @@ def test_list_events_alias_unit(mock_db):
     mock_response.json.return_value = {"docs": []}
     mock_db['request'].return_value = mock_response
     
-    with patch('mcp_service.core.API_PASSWORD', 'test_password'):
+    with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         list_events(userspace=userspace, api_key="test_password")
     
     mock_db['request'].assert_called_once()

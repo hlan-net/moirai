@@ -1,7 +1,7 @@
 import os
 # Set environment variables BEFORE importing application code
 os.environ["JWT_SECRET_KEY"] = "super_secret_test_key_that_is_at_least_32_chars_long"
-os.environ["API_PASSWORD"] = "test_password_123"
+os.environ["ADMIN_PASSWORD"] = "test_password_123"
 
 import pytest
 import json
@@ -12,9 +12,9 @@ from api.chat_routes import _execute_tool_calls
 
 
 @pytest.fixture
-def setup_api_password_env(monkeypatch):
+def setup_admin_password_env(monkeypatch):
     """Fixture to set environment variables for testing."""
-    monkeypatch.setenv("API_PASSWORD", "test_password_123")
+    monkeypatch.setenv("ADMIN_PASSWORD", "test_password_123")
     monkeypatch.setenv("JWT_SECRET_KEY", "super_secret_test_key_that_is_at_least_32_chars_long")
 
 
@@ -29,7 +29,7 @@ def mock_session():
 
 
 @pytest.mark.asyncio
-async def test_api_key_injection(setup_api_password_env, mock_session):
+async def test_api_key_injection(setup_admin_password_env, mock_session):
     """Test that _execute_tool_calls injects api_key into function arguments."""
 
     # Create mock tool call
@@ -56,7 +56,7 @@ async def test_api_key_injection(setup_api_password_env, mock_session):
     # Verify api_key was injected
     assert "api_key" in func_args, "api_key should be injected into tool arguments"
     assert func_args["api_key"] == "test_password_123", (
-        "api_key should match API_PASSWORD"
+        "api_key should match ADMIN_PASSWORD"
     )
 
     # Verify original arguments are preserved
@@ -72,7 +72,7 @@ async def test_api_key_injection(setup_api_password_env, mock_session):
 
 
 @pytest.mark.asyncio
-async def test_api_key_injection_multiple_tools(setup_api_password_env, mock_session):
+async def test_api_key_injection_multiple_tools(setup_admin_password_env, mock_session):
     """Test that api_key is injected for multiple tool calls."""
 
     # Create multiple tool calls
@@ -104,7 +104,7 @@ async def test_api_key_injection_multiple_tools(setup_api_password_env, mock_ses
 
 
 @pytest.mark.asyncio
-async def test_api_key_not_overwritten_if_present(setup_api_password_env, mock_session):
+async def test_api_key_not_overwritten_if_present(setup_admin_password_env, mock_session):
     """Test that existing api_key in arguments is not overwritten."""
 
     # Create tool call with existing api_key
@@ -136,10 +136,10 @@ async def test_api_key_not_overwritten_if_present(setup_api_password_env, mock_s
 
 @pytest.mark.asyncio
 async def test_api_key_missing_env_var(monkeypatch, mock_session):
-    """Test behavior when API_PASSWORD is not set."""
+    """Test behavior when ADMIN_PASSWORD is not set."""
 
-    # Remove API_PASSWORD from environment
-    monkeypatch.delenv("API_PASSWORD", raising=False)
+    # Remove ADMIN_PASSWORD from environment
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
 
     mock_tool_call = SimpleNamespace(
         id="call_123",
@@ -161,7 +161,7 @@ async def test_api_key_missing_env_var(monkeypatch, mock_session):
     call_args = mock_session.call_tool.call_args
     func_args = call_args.args[1]  # Second positional argument
     assert "api_key" not in func_args, (
-        "api_key should not be injected when API_PASSWORD is missing"
+        "api_key should not be injected when ADMIN_PASSWORD is missing"
     )
 
 

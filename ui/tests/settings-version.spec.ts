@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 
 test.use({
   httpCredentials: {
-    username: process.env.API_USERNAME || 'testuser',
-    password: process.env.API_PASSWORD || 'testpassword',
+    username: process.env.ADMIN_USERNAME || 'testuser',
+    password: process.env.ADMIN_PASSWORD || 'testpassword',
   },
 })
 

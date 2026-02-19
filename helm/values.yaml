@@ -92,8 +92,8 @@ couchdb:
 
 # -- Moirai configuration
 moirai:
-  apiUsername: ""
-  apiPassword: ""
+  adminUsername: ""
+  adminPassword: ""
   jwtSecretKey: ""
 
 # -- OpenAI API key

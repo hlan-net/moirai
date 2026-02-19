@@ -126,6 +126,9 @@ This document provides essential instructions for AI agents working on the Moira
   - Apply `bleach` sanitization to text inputs.
   - Return JSON responses with standard status codes.
 
+### Release Process
+- **Release and RC checklist:** Follow `docs/RELEASE.md` to avoid version/tag order issues.
+
 ### Troubleshooting
 - **CouchDB:** Check if databases exist with `curl -u $COUCHDB_USER:$COUCHDB_PASSWORD http://localhost:5984/_all_dbs`.
 - **Logs:** Check Docker logs with `docker compose logs -f moirai`.

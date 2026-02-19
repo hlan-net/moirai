@@ -7,8 +7,8 @@ import secrets
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8088")
 # Generate random credentials per test run if not provided via environment
 # This avoids hardcoded credentials flagged as security hotspots by SonarQube
-API_USERNAME = os.environ.get("API_USERNAME") or f"test_user_{secrets.token_hex(8)}"
-API_PASSWORD = os.environ.get("API_PASSWORD") or secrets.token_urlsafe(32)
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME") or f"test_user_{secrets.token_hex(8)}"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or secrets.token_urlsafe(32)
 
 
 @pytest.mark.integration
@@ -21,7 +21,7 @@ def test_stats_endpoint_auth():
 @pytest.mark.integration
 def test_stats_endpoint_data():
     """Verify the structure of the /stats response."""
-    res = requests.get(f"{BASE_URL}/api/stats", auth=(API_USERNAME, API_PASSWORD))
+    res = requests.get(f"{BASE_URL}/api/stats", auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert res.status_code == 200
 
     data = res.json()
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # Manual test run
     print(f"Testing Stats API at {BASE_URL}/api/stats...")
     try:
-        res = requests.get(f"{BASE_URL}/api/stats", auth=(API_USERNAME, API_PASSWORD))
+    res = requests.get(f"{BASE_URL}/api/stats", auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
         if res.status_code == 200:
             print("SUCCESS: Stats API returned data:")
             import json

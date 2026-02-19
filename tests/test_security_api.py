@@ -9,8 +9,8 @@ import secrets
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8088")
 # Generate random credentials per test run if not provided via environment
 # This avoids hardcoded credentials flagged as security hotspots by SonarQube
-API_USERNAME = os.environ.get("API_USERNAME") or f"test_user_{secrets.token_hex(8)}"
-API_PASSWORD = os.environ.get("API_PASSWORD") or secrets.token_urlsafe(32)
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME") or f"test_user_{secrets.token_hex(8)}"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or secrets.token_urlsafe(32)
 
 # Track last bulk import call time to manage rate limiting
 # Note: Global variables are safe here because tests run sequentially due to rate limiting.
@@ -72,7 +72,7 @@ def test_feed_url_validation_http():
         "title": "Invalid Scheme",
         "category": "test",
     }
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     # Should fail with 400 Bad Request
     assert response.status_code == 400
     # Check for validation error (Pydantic or custom)
@@ -89,7 +89,7 @@ def test_feed_url_validation_valid():
     # Using a fake but valid URL hash to avoid collision with real feeds
     unique_url = f"https://example.com/feed-{uuid.uuid4()}"
     data = {"url": unique_url, "title": "Valid Scheme", "category": "test"}
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code in [200, 201]
 
 
@@ -100,13 +100,13 @@ def test_xss_sanitization():
     unique_url = f"https://example.com/feed-{uuid.uuid4()}"
     malicious_title = "<script>alert('xss')</script>Safe Title"
     data = {"url": unique_url, "title": malicious_title, "category": "test"}
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code in [200, 201]
 
     # Fetch back to verify sanitization
     # Note: This depends on how the ID is generated. Assuming URL hash or similar.
     # Alternatively, listing feeds and finding it.
-    feeds_response = requests.get(url, auth=(API_USERNAME, API_PASSWORD))
+    feeds_response = requests.get(url, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     feeds = feeds_response.json()
     created_feed = next((f for f in feeds if f.get("url") == unique_url), None)
 
@@ -122,7 +122,7 @@ def test_rate_limiting():
     # but we can check headers to see if rate limit info is present.
     url = f"{BASE_URL}/api/config"
     response = requests.get(
-        url, auth=(API_USERNAME, API_PASSWORD)
+        url, auth=(ADMIN_USERNAME, ADMIN_PASSWORD)
     )  # Public endpoint usually
 
     # Flask-Limiter usually adds headers like X-RateLimit-Limit
@@ -130,7 +130,7 @@ def test_rate_limiting():
     # Let's try /api/feeds without auth (if public read) or with auth.
 
     # We will just verify the headers exist on a standard API call
-    response = requests.get(f"{BASE_URL}/api/feeds", auth=(API_USERNAME, API_PASSWORD))
+    response = requests.get(f"{BASE_URL}/api/feeds", auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
 
     # These headers are configurable, but default is usually X-RateLimit-Limit
     # If using memory storage and default config, they should be there.
@@ -160,7 +160,7 @@ def test_bulk_import_successful(wait_for_bulk_rate_limit):
     ]
     data = {"urls": urls}
 
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 200
 
     result = response.json()
@@ -180,7 +180,7 @@ def test_bulk_import_duplicates(wait_for_bulk_rate_limit):
 
     # First import
     data = {"urls": [duplicate_url]}
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 200
     result = response.json()
     assert result["success"] == 1
@@ -190,7 +190,7 @@ def test_bulk_import_duplicates(wait_for_bulk_rate_limit):
 
     # Second import with same URL
     data = {"urls": [duplicate_url, f"https://example.com/new-{unique_id}"]}
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 200
 
     result = response.json()
@@ -216,7 +216,7 @@ def test_bulk_import_invalid_urls(wait_for_bulk_rate_limit):
         ]
     }
 
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 200
 
     result = response.json()
@@ -241,7 +241,7 @@ def test_bulk_import_dos_protection(wait_for_bulk_rate_limit):
     urls = [f"https://example.com/feed{i}-{unique_id}" for i in range(51)]
     data = {"urls": urls}
 
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 400
     response_text = response.text.lower()
     assert (
@@ -257,20 +257,20 @@ def test_bulk_import_empty_request(wait_for_bulk_rate_limit):
     url = f"{BASE_URL}/api/feeds/bulk"
 
     # Missing urls field
-    response = requests.post(url, json={}, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json={}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 400
 
     wait_for_rate_limit()
 
     # Empty urls array
-    response = requests.post(url, json={"urls": []}, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json={"urls": []}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 400
 
     wait_for_rate_limit()
 
     # Non-array urls field
     response = requests.post(
-        url, json={"urls": "not-an-array"}, auth=(API_USERNAME, API_PASSWORD)
+        url, json={"urls": "not-an-array"}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD)
     )
     assert response.status_code == 400
 
@@ -283,7 +283,7 @@ def test_bulk_import_mixed_results(wait_for_bulk_rate_limit):
 
     # First create one feed to test duplicate detection
     valid_url = f"https://example.com/existing-{unique_id}"
-    requests.post(url, json={"urls": [valid_url]}, auth=(API_USERNAME, API_PASSWORD))
+    requests.post(url, json={"urls": [valid_url]}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
 
     wait_for_rate_limit()
 
@@ -300,7 +300,7 @@ def test_bulk_import_mixed_results(wait_for_bulk_rate_limit):
         ]
     }
 
-    response = requests.post(url, json=data, auth=(API_USERNAME, API_PASSWORD))
+    response = requests.post(url, json=data, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
     assert response.status_code == 200
 
     result = response.json()

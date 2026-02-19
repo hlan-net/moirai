@@ -21,7 +21,7 @@ k6 run load_test.js
 Override the base URL or credentials using environment variables:
 
 ```bash
-k6 run -e BASE_URL=http://localhost:8088 -e API_USERNAME=admin -e API_PASSWORD=secret load_test.js
+k6 run -e BASE_URL=http://localhost:8088 -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD=secret load_test.js
 ```
 
 ## Scenarios

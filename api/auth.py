@@ -42,8 +42,8 @@ ENTRA_TENANT_ID = os.environ.get("ENTRA_TENANT_ID", "")
 ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}"
 
 # Basic Auth Configuration
-API_USERNAME = os.environ.get("API_USERNAME")
-API_PASSWORD = os.environ.get("API_PASSWORD")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
 
 def get_auth_config():
@@ -260,17 +260,18 @@ def _verify_basic_auth(header):
         decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
         username, password = decoded_creds.split(":", 1)
 
-        if API_USERNAME and API_PASSWORD:
-            if username == API_USERNAME and password == API_PASSWORD:
+        if ADMIN_USERNAME and ADMIN_PASSWORD:
+            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
                 # Basic Auth maps to the configured admin user when available
-                user = get_user_by_email(username)
+                admin_email = f"{ADMIN_USERNAME}@localhost.local"
+                user = get_user_by_email(admin_email)
                 if user:
                     g.user_id = user.get("_id")
-                    g.user_email = user.get("email", username)
+                    g.user_email = user.get("email", admin_email)
                     g.user_role = user.get("role", "admin")
                 else:
                     g.user_id = "system"
-                    g.user_email = API_USERNAME
+                    g.user_email = admin_email
                     g.user_role = "admin"
                 return True, None
 
