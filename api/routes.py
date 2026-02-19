@@ -201,8 +201,12 @@ def health_check():
 @api_blueprint.route("/feeds", methods=["POST"])
 @admin_required
 def create_feed():
+    payload = request.json or {}
+    raw_url = payload.get("url")
+    if not raw_url or not str(raw_url).startswith(("http://", "https://")):
+        abort(400, description="Only HTTP/HTTPS URLs are allowed")
     try:
-        validated = FeedCreateRequest(**request.json)
+        validated = FeedCreateRequest(**payload)
     except ValidationError as e:
         abort(400, description=str(e))
 
