@@ -38,7 +38,9 @@ if __name__ == "__main__":
     # Manual test run
     print(f"Testing Stats API at {BASE_URL}/api/stats...")
     try:
-    res = requests.get(f"{BASE_URL}/api/stats", auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
+        res = requests.get(
+            f"{BASE_URL}/api/stats", auth=(ADMIN_USERNAME, ADMIN_PASSWORD)
+        )
         if res.status_code == 200:
             print("SUCCESS: Stats API returned data:")
             import json
