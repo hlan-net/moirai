@@ -1,27 +1,24 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
-import { articleCache, type Article } from '../utils/articleCache'
+import { type Article } from '../utils/articleCache'
 
 interface ArticleGroup {
-  title: string;
-  favicon?: string;
-  articles: Article[];
+  title: string
+  favicon?: string
+  articles: Article[]
 }
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
-const loadingMore = ref(false)
 const fetchingUpdates = ref(false)
-const hasMore = ref(true)
 const totalCount = ref(0)
-const sentinelEl = ref<HTMLElement | null>(null)
 const expandedArticles = ref<Set<string>>(new Set())
 const isHighDensity = ref(true)
 
-let observer: IntersectionObserver | null = null
 let refreshInterval: number | null = null
 
-const PAGE_SIZE = 50
+const RSS_LIMIT = 200
+const RSS_REFRESH_MS = 120000
 
 const groupedArticles = computed(() => {
   if (articles.value.length === 0) {
@@ -54,135 +51,93 @@ const groupedArticles = computed(() => {
   return groups
 })
 
-const fetchArticles = async (skip = 0, since?: string) => {
-  try {
-    const params = new URLSearchParams({
-      limit: PAGE_SIZE.toString(),
-      skip: skip.toString()
-    })
-    if (since) {
-      params.append('since', since)
-    }
+const parseRssFeed = (xmlText: string): Article[] => {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
+  if (doc.querySelector('parsererror')) {
+    throw new Error('Invalid RSS feed')
+  }
 
-    const response = await fetch(`/api/articles?${params}`)
-    if (response.ok) {
-      const data = await response.json()
-      return {
-        articles: data.articles || [],
-        hasMore: data.has_more || false,
-        totalCount: data.total_count || 0
+  return Array.from(doc.querySelectorAll('item')).map((item, index) => {
+    const title = item.querySelector('title')?.textContent?.trim() || 'Untitled'
+    const link = item.querySelector('link')?.textContent?.trim() || ''
+    const summary = item.querySelector('description')?.textContent?.trim() || ''
+    const pubDate = item.querySelector('pubDate')?.textContent?.trim() || ''
+    const guid = item.querySelector('guid')?.textContent?.trim() || link || `${title}-${index}`
+    const sourceTitle =
+      item.querySelector('source > title')?.textContent?.trim() ||
+      item.querySelector('source')?.textContent?.trim() ||
+      ''
+
+    let published = ''
+    if (pubDate) {
+      const parsed = new Date(pubDate)
+      if (!Number.isNaN(parsed.getTime())) {
+        published = parsed.toISOString()
       }
     }
-  } catch (error) {
-    console.error('Error fetching articles:', error)
-  }
-  return { articles: [], hasMore: false, totalCount: 0 }
-}
 
-const loadFromCache = async () => {
-  try {
-    const cached = await articleCache.getArticles()
-    if (cached.length > 0) {
-      articles.value = cached
-      loading.value = false
+    let feedUrl = link
+    try {
+      feedUrl = new URL(link).origin
+    } catch (error) {
+      feedUrl = link
     }
-  } catch (error) {
-    console.error('Error loading from cache:', error)
-  }
+
+    const events: string[] = []
+    const trends: string[] = []
+    for (const category of Array.from(item.querySelectorAll('category'))) {
+      const label = category.textContent?.trim()
+      if (!label) continue
+      const domain = category.getAttribute('domain')
+      if (domain === 'event') {
+        events.push(label)
+      } else if (domain === 'trend') {
+        trends.push(label)
+      }
+    }
+
+    return {
+      _id: guid,
+      title,
+      summary,
+      link,
+      published: published || new Date().toISOString(),
+      feed_url: feedUrl,
+      feed_title: sourceTitle || getHostname(feedUrl),
+      events: events.length ? events : undefined,
+      trends: trends.length ? trends : undefined
+    }
+  })
 }
 
-const fetchLatestUpdates = async () => {
+const fetchStream = async () => {
+  if (articles.value.length === 0) {
+    loading.value = true
+  }
   fetchingUpdates.value = true
   try {
-    const newestTimestamp = await articleCache.getNewestTimestamp()
-    const result = await fetchArticles(0, newestTimestamp || undefined)
-    
-    if (result.articles.length > 0) {
-      const existingIds = new Set(articles.value.map((a: Article) => a._id))
-      const newArticles = result.articles.filter((a: Article) => !existingIds.has(a._id))
-      
-      if (newArticles.length > 0) {
-        articles.value = [...newArticles, ...articles.value]
-        await articleCache.saveArticles(result.articles)
-      }
+    const response = await fetch(`/api/stream.rss?limit=${RSS_LIMIT}`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch RSS: ${response.status}`)
     }
-    
-    totalCount.value = result.totalCount
+    const xmlText = await response.text()
+    const parsed = parseRssFeed(xmlText)
+    articles.value = parsed
+    totalCount.value = parsed.length
   } catch (error) {
-    console.error('Error fetching updates:', error)
+    console.error('Error fetching RSS stream:', error)
   } finally {
     fetchingUpdates.value = false
+    loading.value = false
   }
-}
-
-const loadMore = async () => {
-  if (loadingMore.value || !hasMore.value) return
-  
-  loadingMore.value = true
-  try {
-    const result = await fetchArticles(articles.value.length)
-    
-    if (result.articles.length > 0) {
-      articles.value = [...articles.value, ...result.articles]
-      await articleCache.saveArticles(result.articles)
-    }
-    
-    hasMore.value = result.hasMore
-    totalCount.value = result.totalCount
-  } catch (error) {
-    console.error('Error loading more articles:', error)
-  } finally {
-    loadingMore.value = false
-  }
-}
-
-const setupIntersectionObserver = () => {
-  if (!sentinelEl.value) return
-  
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting && hasMore.value && !loadingMore.value) {
-        loadMore()
-      }
-    },
-    { rootMargin: '200px' }
-  )
-  
-  observer.observe(sentinelEl.value)
 }
 
 onMounted(async () => {
-  // 1. Load cached articles immediately
-  await loadFromCache()
-  
-  // 2. Fetch latest updates
-  await fetchLatestUpdates()
-  
-  // 3. If no cached articles, do initial fetch
-  if (articles.value.length === 0) {
-    const result = await fetchArticles(0)
-    articles.value = result.articles
-    hasMore.value = result.hasMore
-    totalCount.value = result.totalCount
-    await articleCache.saveArticles(result.articles)
-  }
-  
-  loading.value = false
-  
-  // 4. Set up infinite scroll
-  setupIntersectionObserver()
-  
-  // 5. Clean old cache
-  articleCache.clearOldArticles().catch(console.error)
-  
-  // Periodic refresh (every 2 minutes)
-  refreshInterval = globalThis.setInterval(fetchLatestUpdates, 120000)
+  await fetchStream()
+  refreshInterval = globalThis.setInterval(fetchStream, RSS_REFRESH_MS)
 })
 
 onUnmounted(() => {
-  if (observer) {
-    observer.disconnect()
-  }
   if (refreshInterval !== null) {
     clearInterval(refreshInterval)
   }
@@ -254,7 +209,7 @@ const handleFaviconError = (event: Event) => {
                 </svg>
                 RSS
             </a>
-            <button @click="fetchLatestUpdates" :disabled="fetchingUpdates" class="refresh-btn" title="Check for updates">
+            <button @click="fetchStream" :disabled="fetchingUpdates" class="refresh-btn" title="Refresh stream">
                 {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
             </button>
         </div>
@@ -325,12 +280,7 @@ const handleFaviconError = (event: Event) => {
         </div>
         <hr v-if="index < groupedArticles.length - 1 && !isHighDensity" class="group-divider">
       </div>
-      
-      <!-- Sentinel element for infinite scroll -->
-      <div ref="sentinelEl" class="sentinel">
-        <div v-if="loadingMore" class="loading-more">Loading more articles...</div>
-        <div v-else-if="!hasMore" class="end-message">No more articles</div>
-      </div>
+
     </div>
     
     <div v-else class="empty-state">No articles found in the stream.</div>
@@ -653,21 +603,6 @@ const handleFaviconError = (event: Event) => {
   border: 0;
   border-top: 1px solid var(--border-color);
   margin: 20px 0;
-}
-
-.sentinel {
-  padding: 20px;
-  text-align: center;
-}
-
-.loading-more {
-  color: #666;
-  font-style: italic;
-}
-
-.end-message {
-  color: #999;
-  font-size: 0.9rem;
 }
 
 .loading, .empty-state {

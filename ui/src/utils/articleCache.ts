@@ -6,7 +6,7 @@
 const DB_NAME = 'moirai-cache'
 const STORE_NAME = 'articles'
 const DB_VERSION = 1
-const CACHE_MAX_AGE_DAYS = 30
+const CACHE_MAX_AGE_DAYS = 1
 
 export interface Article {
   _id: string
