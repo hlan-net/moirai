@@ -4,7 +4,7 @@ Moirai version information
 
 import os
 
-VERSION = "0.4.0"
+VERSION = "0.4.1-dev"
 BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "dev")
 
 
