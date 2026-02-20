@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { useTheme, type Theme } from '../composables/useTheme'
 import { authFetch } from '../utils/authFetch'
@@ -144,8 +143,11 @@ const fetchSchedulerLogs = async () => {
   schedulerLogsError.value = ''
 
   try {
-    const res = await axios.get('/api/scheduler/logs', { params: { limit: 50 } })
-    schedulerLogs.value = Array.isArray(res.data?.logs) ? res.data.logs : []
+    const res = await authFetch('/api/scheduler/logs?limit=50')
+    if (res.ok) {
+      const data = await res.json()
+      schedulerLogs.value = Array.isArray(data?.logs) ? data.logs : []
+    }
   } catch (e) {
     console.error('Error fetching scheduler logs', e)
     schedulerLogsError.value = 'Failed to load scheduler logs.'
@@ -174,16 +176,23 @@ const formatLogTimestamp = (timestamp: string) => {
 const saveSettings = async () => {
   // Save User Settings
   try {
-      await axios.put('/api/auth/me/settings', {
-          moirai_model: modelName.value,
-          moirai_llm_endpoint: llmEndpoint.value,
-          moirai_openai_api_key: openaiApiKey.value,
-          moirai_openai_model: openaiModelName.value,
-          moirai_gemini_api_key: geminiApiKey.value,
-          moirai_gemini_model: geminiModelName.value,
-          moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
-          moirai_theme: theme.value
+      const res = await authFetch('/api/auth/me/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            moirai_model: modelName.value,
+            moirai_llm_endpoint: llmEndpoint.value,
+            moirai_openai_api_key: openaiApiKey.value,
+            moirai_openai_model: openaiModelName.value,
+            moirai_gemini_api_key: geminiApiKey.value,
+            moirai_gemini_model: geminiModelName.value,
+            moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
+            moirai_theme: theme.value
+        })
       })
+      if (!res.ok) {
+        throw new Error('Failed to save user settings')
+      }
       
       // Save System Config (Admin only or if allowed)
       const configRes = await authFetch('/api/config', {
@@ -278,9 +287,10 @@ const fetchGeminiModels = async () => {
 
 const fetchUserProfile = async () => {
     try {
-        const res = await axios.get('/api/auth/me')
-        if (res.data) {
-            const settings = res.data.settings || {}
+        const res = await authFetch('/api/auth/me')
+        if (res.ok) {
+            const data = await res.json()
+            const settings = data.settings || {}
             // Load User Settings
             if (settings.moirai_model) modelName.value = settings.moirai_model
             if (settings.moirai_llm_endpoint) llmEndpoint.value = settings.moirai_llm_endpoint
@@ -410,10 +420,10 @@ const importSettings = async (event: Event) => {
 
 const fetchConfig = async () => {
     try {
-        const res = await axios.get('/api/config')
-        if (res.data) {
-            const config = res.data
-            console.log("Config loaded via axios:", config)
+        const res = await authFetch('/api/config')
+        if (res.ok) {
+            const config = await res.json()
+            console.log("Config loaded:", config)
             componentVersions.value = buildComponentVersions(config)
             if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
             if (config.iteration_interval !== undefined) {
