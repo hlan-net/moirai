@@ -56,6 +56,31 @@ services:
       ui:
         condition: service_started
 
+  worker:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    command: [ "/opt/conda/envs/moirai/bin/python", "run_worker.py" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}@couchdb:5984/
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-username}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}
+      - MODEL_NAME=${MODEL_NAME:-gemini-3-flash}
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER:-ollama}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+
   mcp-server:
     build:
       context: .

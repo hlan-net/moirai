@@ -16,15 +16,31 @@ Moirai acts as a synthesis engine that LLM agents use to analyze news. It consis
 
 ### 1. Run with Docker Compose
 
-The easiest way to run the full stack (UI, API, MCP Server, Database):
+The easiest way to run the full stack (UI, API, Worker, MCP Server, Database):
 
 ```bash
 docker compose up --build
 ```
 
+This starts the following services:
+* `api` — Flask REST API (stateless, scalable web server)
+* `worker` — Enrichment worker (long-running CouchDB changes-feed listener, single instance)
+* `ui` — Vue.js frontend (served by Nginx)
+* `nginx` — Reverse proxy routing traffic to `api` and `ui`
+* `mcp-server` — FastMCP server for agent tool calls
+* `couchdb` — Database
+* `redis` — Cache
+
+**Endpoints:**
 * **Admin UI:** [http://localhost:8088](http://localhost:8088)
 * **MCP Server:** [http://localhost:8090/sse](http://localhost:8090/sse)
 * **API:** [http://localhost:8088/api](http://localhost:8088/api)
+
+To run the feed scheduler manually (one cycle, then exit):
+
+```bash
+docker compose run --rm api python run_scheduler.py
+```
 
 ### 2. Configure Chat
 

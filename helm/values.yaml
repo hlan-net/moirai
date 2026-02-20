@@ -57,6 +57,10 @@ mcpServer:
     metricsPort: 9000
     metricsTargetPort: 9000
 
+scheduler:
+  # -- Cron schedule for the feed-fetch scheduler job (default: every 10 minutes)
+  schedule: "*/10 * * * *"
+
 # -- Environment to run the application in
 environment: production
 

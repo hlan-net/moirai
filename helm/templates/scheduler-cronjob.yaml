@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "moirai.fullname" . }}-scheduler
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  schedule: {{ .Values.scheduler.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # Automatically clean up finished jobs after one hour.
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            {{- include "moirai.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: scheduler
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          serviceAccountName: {{ include "moirai.serviceAccountName" . }}
+          containers:
+            - name: {{ include "moirai.name" . }}-scheduler
+              image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+              imagePullPolicy: {{ if eq .Values.api.image.tag "latest" }}Always{{ else }}{{ default "IfNotPresent" .Values.api.image.pullPolicy }}{{ end }}
+              command: ["python", "run_scheduler.py"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                  ephemeral-storage: "1Gi"
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                  ephemeral-storage: "2Gi"
+              env:
+              - name: ENVIRONMENT
+                value: {{ .Values.environment | quote }}
+              - name: OLLAMA_BASE_URL
+                value: {{ .Values.ollama.endpoint | quote }}
+              - name: COUCHDB_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Release.Name }}-couchdb
+                    key: adminUsername
+              - name: COUCHDB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Release.Name }}-couchdb
+                    key: adminPassword
+              - name: COUCHDB_URI
+                value: "http://{{ include "moirai.fullname" . }}-couchdb:5984/"
+              - name: OPENAI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Release.Name }}-openai-secret
+                    key: apiKey
+              - name: ADMIN_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "moirai.fullname" . }}-moirai-secret
+                    key: adminUsername
+              - name: ADMIN_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "moirai.fullname" . }}-moirai-secret
+                    key: adminPassword
+              - name: JWT_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "moirai.fullname" . }}-moirai-secret
+                    key: jwtSecretKey
+                    optional: true
+              - name: PYTHONUNBUFFERED
+                value: "1"

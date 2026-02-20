@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "moirai.fullname" . }}-worker
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # Only one enrichment worker may run at a time to avoid duplicate processing
+  # of the CouchDB changes feed.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "moirai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      annotations:
+        checksum/couchdb-secret: {{ include (print $.Template.BasePath "/couchdb-secret.yaml") . | sha256sum }}
+        checksum/moirai-secret: {{ include (print $.Template.BasePath "/moirai-secret.yaml") . | sha256sum }}
+        checksum/openai-secret: {{ include (print $.Template.BasePath "/openai-secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "moirai.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: {{ include "moirai.serviceAccountName" . }}
+      containers:
+        - name: {{ include "moirai.name" . }}-worker
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ if eq .Values.api.image.tag "latest" }}Always{{ else }}{{ default "IfNotPresent" .Values.api.image.pullPolicy }}{{ end }}
+          command: ["python", "run_worker.py"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: "1Gi"
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: "2Gi"
+          env:
+          - name: ENVIRONMENT
+            value: {{ .Values.environment | quote }}
+          - name: OLLAMA_BASE_URL
+            value: {{ .Values.ollama.endpoint | quote }}
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb
+                key: adminUsername
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-couchdb
+                key: adminPassword
+          - name: COUCHDB_URI
+            value: "http://{{ include "moirai.fullname" . }}-couchdb:5984/"
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-openai-secret
+                key: apiKey
+          - name: ADMIN_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: adminUsername
+          - name: ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: adminPassword
+          - name: JWT_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-moirai-secret
+                key: jwtSecretKey
+                optional: true
+          - name: PYTHONUNBUFFERED
+            value: "1"
