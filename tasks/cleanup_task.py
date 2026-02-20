@@ -50,79 +50,129 @@ def parse_date(date_str):
     return datetime.datetime.now(datetime.timezone.utc)
 
 
+def _iter_premises(doc):
+    premises = doc.get("premises")
+    if isinstance(premises, list):
+        return premises
+    return []
+
+
+def _collect_linked_issue_ids(issues):
+    linked_issue_ids = set()
+    for issue in issues:
+        if issue.get("type") != "issue":
+            continue
+        if issue.get("longevity") != "temporal":
+            continue
+        for premise in _iter_premises(issue):
+            if premise.get("type") in {"issue", "event", "trend"}:
+                issue_id = premise.get("id")
+                if isinstance(issue_id, str):
+                    linked_issue_ids.add(issue_id)
+    return linked_issue_ids
+
+
+def _collect_article_links(issue):
+    links = set()
+    if isinstance(issue.get("article_links"), list):
+        links.update(issue["article_links"])
+    for premise in _iter_premises(issue):
+        if premise.get("type") in {"message", "article", "link"}:
+            link = premise.get("id")
+            if isinstance(link, str):
+                links.add(link)
+    return links
+
+
 def run_cleanup():
     logger.info("Cleanup: Starting maintenance cycle...")
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    # 1. Fetch Trends to find active Events
-    trends = get_all_docs("trends")
-    linked_event_ids = set()
-    for t in trends:
-        if "event_ids" in t and isinstance(t["event_ids"], list):
-            for eid in t["event_ids"]:
-                linked_event_ids.add(eid)
+    issues = get_all_docs("issues")
+    linked_issue_ids = _collect_linked_issue_ids(issues)
 
     logger.info(
-        f"Cleanup: Found {len(trends)} trends referencing {len(linked_event_ids)} events."
+        "Cleanup: Found %s temporal issues referencing %s transient issues.",
+        len([i for i in issues if i.get("longevity") == "temporal"]),
+        len(linked_issue_ids),
     )
 
-    # 2. Fetch Events, Delete Orphans, and Collect Active Article Links
-    events = get_all_docs("events")
     active_article_links = set()
-    events_deleted = 0
-    events_kept = 0
+    issues_deleted = 0
+    issues_kept = 0
 
-    for e in events:
-        eid = e.get("_id")
-        created_at = e.get("created_at")
+    for issue in issues:
+        if issue.get("type") != "issue":
+            continue
 
+        issue_id = issue.get("_id")
+        longevity = issue.get("longevity")
+        status = issue.get("status")
+
+        if longevity != "transient":
+            issues_kept += 1
+            active_article_links.update(_collect_article_links(issue))
+            continue
+
+        created_at = issue.get("born_at") or issue.get("created_at")
         dt = parse_date(created_at)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone.utc)
         age = now - dt
 
-        # Check if Event should be deleted
-        # Condition: Not in any Trend AND older than 1 year (365 days)
-        if eid not in linked_event_ids and age.days > 365:
-            logger.info(f"Cleanup: Deleting orphaned event {eid} (Age: {age.days} days)")
-            if delete_doc("events", eid, e.get("_rev")):
-                events_deleted += 1
+        should_delete = (
+            issue_id not in linked_issue_ids
+            and age.days > 365
+            and status != "eternal"
+        )
+
+        if should_delete:
+            logger.info(
+                "Cleanup: Deleting orphaned transient issue %s (Age: %s days)",
+                issue_id,
+                age.days,
+            )
+            if delete_doc("issues", issue_id, issue.get("_rev")):
+                issues_deleted += 1
         else:
-            # Event is kept. Collect its articles.
-            events_kept += 1
-            if "article_links" in e and isinstance(e["article_links"], list):
-                for link in e["article_links"]:
-                    active_article_links.add(link)
+            issues_kept += 1
+            active_article_links.update(_collect_article_links(issue))
 
     logger.info(
-        f"Cleanup: Events processed. Deleted: {events_deleted}. Kept: {events_kept}. Active referenced articles: {len(active_article_links)}"
+        "Cleanup: Issues processed. Deleted: %s. Kept: %s. Active referenced articles: %s",
+        issues_deleted,
+        issues_kept,
+        len(active_article_links),
     )
 
-    # 3. Fetch Articles and Delete Orphans
     articles = get_all_docs("articles")
     articles_deleted = 0
 
-    for a in articles:
-        link = a.get("link")
-        aid = a.get("_id")
-        published = a.get("published")
+    for article in articles:
+        link = article.get("link")
+        article_id = article.get("_id")
+        published = article.get("published")
 
         dt = parse_date(published)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone.utc)
         age = now - dt
 
-        # Check if Article should be deleted
-        # Condition: Not linked to any *surviving* Event AND older than 30 days
-        # Note: 'link' is the URL, which is the foreign key used in events
-        if link not in active_article_links and age.days > 30:
-            logger.info(f"Cleanup: Deleting orphaned article {aid} (Age: {age.days} days)")
-            if delete_doc("articles", aid, a.get("_rev")):
+        should_delete = link not in active_article_links and age.days > 30
+        if should_delete:
+            logger.info(
+                "Cleanup: Deleting orphaned article %s (Age: %s days)",
+                article_id,
+                age.days,
+            )
+            if delete_doc("articles", article_id, article.get("_rev")):
                 articles_deleted += 1
 
     logger.info(
-        f"Cleanup: Finished. Deleted {events_deleted} events and {articles_deleted} articles."
+        "Cleanup: Finished. Deleted %s issues and %s articles.",
+        issues_deleted,
+        articles_deleted,
     )
 
 

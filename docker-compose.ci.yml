@@ -7,3 +7,6 @@ services:
 
   ui:
     image: moirai-ui:ci
+
+  worker:
+    image: moirai-app:ci

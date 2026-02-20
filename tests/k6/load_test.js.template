@@ -17,8 +17,8 @@ export const options = {
 
 // Authentication credentials
 // CHANGE THESE or use environment variables
-const USERNAME = __ENV.API_USERNAME || 'admin';
-const PASSWORD = __ENV.API_PASSWORD || 'changeme';
+const USERNAME = __ENV.ADMIN_USERNAME || 'admin';
+const PASSWORD = __ENV.ADMIN_PASSWORD || 'changeme';
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8088';
 
 export default function () {

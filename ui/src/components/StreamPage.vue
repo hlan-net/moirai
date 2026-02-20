@@ -2,6 +2,8 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { type Article } from '../utils/articleCache'
 import { authFetch } from '../utils/authFetch'
+import { useTheme } from '../composables/useTheme'
+import { useAuthStore } from '../stores/auth'
 
 interface ArticleGroup {
   title: string
@@ -15,6 +17,9 @@ const fetchingUpdates = ref(false)
 const totalCount = ref(0)
 const expandedArticles = ref<Set<string>>(new Set())
 const isHighDensity = ref(true)
+const { resolveTheme, setTheme } = useTheme()
+const authStore = useAuthStore()
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 let refreshInterval: number | null = null
 
@@ -51,6 +56,12 @@ const groupedArticles = computed(() => {
 
   return groups
 })
+
+const resolvedTheme = computed(() => resolveTheme())
+const themeLabel = computed(() => (resolvedTheme.value === 'dark' ? 'Dark' : 'Light'))
+const themeTitle = computed(() =>
+  resolvedTheme.value === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'
+)
 
 const parseRssFeed = (xmlText: string): Article[] => {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
@@ -178,6 +189,11 @@ const handleFaviconError = (event: Event) => {
   const img = event.target as HTMLImageElement
   img.style.display = 'none'
 }
+
+const toggleTheme = () => {
+  const nextTheme = resolvedTheme.value === 'dark' ? 'light' : 'dark'
+  setTheme(nextTheme, { persist: false })
+}
 </script>
 
 <template>
@@ -202,6 +218,16 @@ const handleFaviconError = (event: Event) => {
                     <path d="M3 4h18v4H3V4zm0 7h18v4H3v-4zm0 7h18v4H3v-4z"/>
                 </svg>
                 {{ isHighDensity ? 'Compact' : 'Expanded' }}
+            </button>
+
+            <button v-if="!isAuthenticated" @click="toggleTheme" class="theme-btn" :title="themeTitle">
+                <svg v-if="resolvedTheme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21.64 13.65a9 9 0 0 1-11.29-11.3A9 9 0 1 0 21.64 13.65z" />
+                </svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 0 1-2 0V5.5a1 1 0 0 1 1-1zm0 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 5.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H18.5a1 1 0 0 1 1 1zm-14 0a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H4.5a1 1 0 0 1 1 1zm11.86-5.86a1 1 0 0 1 0-1.41l1.06-1.06a1 1 0 1 1 1.41 1.41l-1.06 1.06a1 1 0 0 1-1.41 0zm-11.31 0a1 1 0 0 1-1.41 0L3.58 5.23a1 1 0 1 1 1.41-1.41l1.06 1.06a1 1 0 0 1 0 1.41zm11.31 11.31a1 1 0 0 1 1.41 0l1.06 1.06a1 1 0 1 1-1.41 1.41l-1.06-1.06a1 1 0 0 1 0-1.41zm-11.31 0a1 1 0 0 1 0 1.41L5 20.27a1 1 0 1 1-1.41-1.41l1.06-1.06a1 1 0 0 1 1.41 0z" />
+                </svg>
+                {{ themeLabel }}
             </button>
 
             <a href="/api/stream.rss" class="rss-link" title="Subscribe to RSS feed" target="_blank">
@@ -400,9 +426,24 @@ const handleFaviconError = (event: Event) => {
     transition: all 0.2s;
 }
 
-.density-btn:hover {
+.density-btn:hover,
+.theme-btn:hover {
     background: var(--button-bg);
     border-color: var(--primary-color);
+}
+
+.theme-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
 }
 
 

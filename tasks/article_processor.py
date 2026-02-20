@@ -4,7 +4,7 @@ import json
 import os
 import requests
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 from api.db_config import get_couchdb_uri
@@ -44,14 +44,21 @@ class ArticleProcessor:
         content_value = entry.content[0].value if "content" in entry else entry.get("summary", "")
         text_to_detect = entry.get("title", "") + " " + entry.get("summary", "")
         detected_lang = self.detect_language(text_to_detect)
-        article_lang = detected_lang or feed_lang or "unknown"
+        article_lang = detected_lang or feed_lang or "xx"
+
+        if published_date and published_date.tzinfo is None:
+            published_date = published_date.replace(tzinfo=timezone.utc)
 
         return {
             "feed_url": feed_url,
             "feed_title": feed_title,
             "title": entry.get("title", "No Title"),
             "link": entry.get("link", ""),
-            "published": published_date.isoformat() + "Z" if published_date else datetime.now().isoformat(),
+            "published": (
+                published_date.isoformat()
+                if published_date
+                else datetime.now(timezone.utc).isoformat()
+            ),
             "summary": entry.get("summary", ""),
             "content": content_value,
             "language": article_lang,

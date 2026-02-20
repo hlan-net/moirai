@@ -4,15 +4,24 @@ export type Theme = 'light' | 'dark' | 'auto'
 
 const theme = ref<Theme>('auto')
 
+type ThemeUpdateOptions = {
+  persist?: boolean
+}
+
 export function useTheme() {
-  
+  const prefersDarkQuery = globalThis.matchMedia('(prefers-color-scheme: dark)')
+  const systemPrefersDark = ref(prefersDarkQuery.matches)
+
+  const resolveTheme = () => {
+    const isDark = theme.value === 'dark' || (theme.value === 'auto' && systemPrefersDark.value)
+    return isDark ? 'dark' : 'light'
+  }
+
   const applyTheme = () => {
     const root = document.documentElement
-        const isDark = 
-          theme.value === 'dark' || 
-          (theme.value === 'auto' && globalThis.matchMedia('(prefers-color-scheme: dark)').matches)
+    const resolved = resolveTheme()
 
-    if (isDark) {
+    if (resolved === 'dark') {
       root.classList.add('dark-theme')
       root.classList.remove('light-theme')
     } else {
@@ -21,9 +30,11 @@ export function useTheme() {
     }
   }
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = (newTheme: Theme, options: ThemeUpdateOptions = {}) => {
     theme.value = newTheme
-    localStorage.setItem('moirai_theme', newTheme)
+    if (options.persist !== false) {
+      localStorage.setItem('moirai_theme', newTheme)
+    }
     applyTheme()
   }
 
@@ -35,7 +46,8 @@ export function useTheme() {
     applyTheme()
 
     // Listen for system changes if in auto mode
-    globalThis.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    prefersDarkQuery.addEventListener('change', (event) => {
+      systemPrefersDark.value = event.matches
       if (theme.value === 'auto') {
         applyTheme()
       }
@@ -44,6 +56,8 @@ export function useTheme() {
 
   return {
     theme,
+    systemPrefersDark,
+    resolveTheme,
     setTheme,
     initTheme
   }

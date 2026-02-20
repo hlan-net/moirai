@@ -1,11 +1,121 @@
 from flask import Blueprint, jsonify, request, abort
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
-from api.db import fetch_from_couchdb, store_to_couchdb, delete_from_couchdb
+from api.db import fetch_from_couchdb, store_to_couchdb, query_couchdb
 from api.enrichment import enrich_issues_with_constituents
+from api.validation import (
+    EventCreateRequest,
+    TrendCreateRequest,
+    validate_userspace_param,
+)
+from pydantic import ValidationError
 
 mcp_blueprint = Blueprint("mcp", __name__)
+
+
+def _normalize_event_payload(payload):
+    normalized = dict(payload or {})
+    if "name" in normalized and "title" not in normalized:
+        normalized["title"] = normalized["name"]
+    if "article_ids" in normalized and "article_links" not in normalized:
+        normalized["article_links"] = normalized["article_ids"]
+    return normalized
+
+
+def _normalize_trend_payload(payload):
+    normalized = dict(payload or {})
+    if "name" in normalized and "title" not in normalized:
+        normalized["title"] = normalized["name"]
+    return normalized
+
+
+def _userspace_selector(userspace):
+    return {"$or": [{"userspace": userspace}, {"namespace": userspace}]}
+
+
+def _extract_userspace(doc):
+    return doc.get("userspace") or doc.get("namespace")
+
+
+def _issue_doc_from_event(validated):
+    premises = [{"type": "message", "id": link} for link in validated.article_links]
+    event_doc = {
+        "type": "issue",
+        "logos": validated.title,
+        "description": validated.description,
+        "premises": premises,
+        "longevity": "transient",
+        "status": "active",
+        "born_at": datetime.now(timezone.utc).isoformat(),
+        "passed_at": None,
+        "userspace": validated.userspace,
+    }
+    return event_doc
+
+
+def _issue_doc_from_trend(validated):
+    premises = [{"type": "issue", "id": eid} for eid in validated.event_ids]
+    trend_doc = {
+        "type": "issue",
+        "logos": validated.title,
+        "description": validated.description,
+        "premises": premises,
+        "longevity": "temporal",
+        "status": "active",
+        "born_at": datetime.now(timezone.utc).isoformat(),
+        "passed_at": None,
+        "userspace": validated.userspace,
+    }
+    return trend_doc
+
+
+def _extract_article_ids(issue):
+    article_ids = []
+    seen = set()
+    for premise in issue.get("premises", []):
+        if premise.get("type") == "message":
+            link = premise.get("id")
+            if link and link not in seen:
+                seen.add(link)
+                article_ids.append(link)
+    if isinstance(issue.get("article_links"), list):
+        for link in issue["article_links"]:
+            if link and link not in seen:
+                seen.add(link)
+                article_ids.append(link)
+    return article_ids
+
+
+def _extract_event_ids(issue):
+    event_ids = []
+    seen = set()
+    for premise in issue.get("premises", []):
+        if premise.get("type") == "issue":
+            issue_id = premise.get("id")
+            if issue_id and issue_id not in seen:
+                seen.add(issue_id)
+                event_ids.append(issue_id)
+    if isinstance(issue.get("event_ids"), list):
+        for issue_id in issue["event_ids"]:
+            if issue_id and issue_id not in seen:
+                seen.add(issue_id)
+                event_ids.append(issue_id)
+    return event_ids
+
+
+def _event_payload_from_issue(issue):
+    payload = dict(issue)
+    payload["name"] = issue.get("logos") or issue.get("name")
+    payload["article_ids"] = _extract_article_ids(issue)
+    return payload
+
+
+def _trend_payload_from_issue(issue):
+    payload = dict(issue)
+    payload["name"] = issue.get("logos") or issue.get("name")
+    payload["event_ids"] = _extract_event_ids(issue)
+    return payload
 
 # Articles Endpoints
 
@@ -54,33 +164,35 @@ def create_event():
         - name: Event name
         - description: Event description
         - article_ids: List of article IDs to link to this event
+        - userspace: Userspace GUID (required)
     """
-    data = request.get_json()
+    payload = _normalize_event_payload(request.get_json() or {})
+    try:
+        validated = EventCreateRequest(**payload)
+    except ValidationError as e:
+        abort(400, description=str(e))
 
-    if not data:
-        abort(400, description="Request body is required")
+    if not validated.userspace:
+        abort(400, description="'userspace' is required")
 
-    if "name" not in data or "description" not in data:
-        abort(400, description="'name' and 'description' are required fields")
+    try:
+        validate_userspace_param(validated.userspace)
+    except ValueError as e:
+        abort(400, description=str(e))
 
-    if "article_ids" not in data or not isinstance(data["article_ids"], list):
-        abort(400, description="'article_ids' must be a list")
+    event_doc = _issue_doc_from_event(validated)
 
-    # Create event document
-    event_doc = {
-        "name": data["name"],
-        "description": data["description"],
-        "article_ids": data["article_ids"],
+    hash_payload = {
+        "title": validated.title,
+        "description": validated.description,
+        "article_links": validated.article_links,
     }
-
-    # Generate a unique ID based on the content
     event_hash = hashlib.sha256(
-        json.dumps(event_doc, sort_keys=True).encode("utf-8")
+        json.dumps(hash_payload, sort_keys=True).encode("utf-8")
     ).hexdigest()
     event_doc["_id"] = event_hash
 
-    # Store the event
-    result = store_to_couchdb("events", event_doc)
+    result = store_to_couchdb("issues", event_doc)
 
     return jsonify({"status": "success", "event_id": result.get("id", event_hash)}), 201
 
@@ -90,7 +202,21 @@ def list_events():
     """
     Retrieve a list of all events.
     """
-    events = fetch_from_couchdb("events")
+    userspace = request.args.get("userspace")
+    if not userspace:
+        abort(400, description="'userspace' query parameter is required")
+    try:
+        validate_userspace_param(userspace)
+    except ValueError as e:
+        abort(400, description=str(e))
+
+    selector = {
+        "type": "issue",
+        "longevity": "transient",
+        **_userspace_selector(userspace),
+    }
+    issues = query_couchdb("issues", selector=selector)
+    events = [_event_payload_from_issue(issue) for issue in issues]
     return jsonify(events)
 
 
@@ -100,10 +226,24 @@ def get_event(event_id):
     Retrieve a single event by ID.
     Query Parameters:
         - include_articles: Boolean to include full article objects
+        - userspace: Userspace GUID (required)
     """
+    userspace = request.args.get("userspace")
+    if not userspace:
+        abort(400, description="'userspace' query parameter is required")
+    try:
+        validate_userspace_param(userspace)
+    except ValueError as e:
+        abort(400, description=str(e))
 
-    event = fetch_from_couchdb("events", event_id)
+    event = fetch_from_couchdb("issues", event_id)
     if not event:
+        abort(404, description="Event not found")
+
+    if event.get("type") != "issue" or event.get("longevity") != "transient":
+        abort(404, description="Event not found")
+
+    if _extract_userspace(event) != userspace:
         abort(404, description="Event not found")
 
     # Check if we should include full article objects
@@ -112,7 +252,7 @@ def get_event(event_id):
     if include_articles:
         enrich_issues_with_constituents([event], recursive=True)
 
-    return jsonify(event)
+    return jsonify(_event_payload_from_issue(event))
 
 
 # Trends Endpoints
@@ -126,33 +266,35 @@ def create_trend():
         - name: Trend name
         - description: Trend description
         - event_ids: List of event IDs to link to this trend
+        - userspace: Userspace GUID (required)
     """
-    data = request.get_json()
+    payload = _normalize_trend_payload(request.get_json() or {})
+    try:
+        validated = TrendCreateRequest(**payload)
+    except ValidationError as e:
+        abort(400, description=str(e))
 
-    if not data:
-        abort(400, description="Request body is required")
+    if not validated.userspace:
+        abort(400, description="'userspace' is required")
 
-    if "name" not in data or "description" not in data:
-        abort(400, description="'name' and 'description' are required fields")
+    try:
+        validate_userspace_param(validated.userspace)
+    except ValueError as e:
+        abort(400, description=str(e))
 
-    if "event_ids" not in data or not isinstance(data["event_ids"], list):
-        abort(400, description="'event_ids' must be a list")
+    trend_doc = _issue_doc_from_trend(validated)
 
-    # Create trend document
-    trend_doc = {
-        "name": data["name"],
-        "description": data["description"],
-        "event_ids": data["event_ids"],
+    hash_payload = {
+        "title": validated.title,
+        "description": validated.description,
+        "event_ids": validated.event_ids,
     }
-
-    # Generate a unique ID based on the content
     trend_hash = hashlib.sha256(
-        json.dumps(trend_doc, sort_keys=True).encode("utf-8")
+        json.dumps(hash_payload, sort_keys=True).encode("utf-8")
     ).hexdigest()
     trend_doc["_id"] = trend_hash
 
-    # Store the trend
-    result = store_to_couchdb("trends", trend_doc)
+    result = store_to_couchdb("issues", trend_doc)
 
     return jsonify({"status": "success", "trend_id": result.get("id", trend_hash)}), 201
 
@@ -162,7 +304,21 @@ def list_trends():
     """
     Retrieve a list of all trends.
     """
-    trends = fetch_from_couchdb("trends")
+    userspace = request.args.get("userspace")
+    if not userspace:
+        abort(400, description="'userspace' query parameter is required")
+    try:
+        validate_userspace_param(userspace)
+    except ValueError as e:
+        abort(400, description=str(e))
+
+    selector = {
+        "type": "issue",
+        "longevity": "temporal",
+        **_userspace_selector(userspace),
+    }
+    issues = query_couchdb("issues", selector=selector)
+    trends = [_trend_payload_from_issue(issue) for issue in issues]
     return jsonify(trends)
 
 
@@ -173,9 +329,24 @@ def get_trend(trend_id):
     Query Parameters:
         - include_events: Boolean to include full event objects
         - include_articles: Boolean to include full article objects linked to events
+        - userspace: Userspace GUID (required)
     """
-    trend = fetch_from_couchdb("trends", trend_id)
+    userspace = request.args.get("userspace")
+    if not userspace:
+        abort(400, description="'userspace' query parameter is required")
+    try:
+        validate_userspace_param(userspace)
+    except ValueError as e:
+        abort(400, description=str(e))
+
+    trend = fetch_from_couchdb("issues", trend_id)
     if not trend:
+        abort(404, description="Trend not found")
+
+    if trend.get("type") != "issue" or trend.get("longevity") != "temporal":
+        abort(404, description="Trend not found")
+
+    if _extract_userspace(trend) != userspace:
         abort(404, description="Trend not found")
 
     # Check if we should include full event objects
@@ -183,4 +354,4 @@ def get_trend(trend_id):
     if include_events:
         enrich_issues_with_constituents([trend], recursive=True)
 
-    return jsonify(trend)
+    return jsonify(_trend_payload_from_issue(trend))
