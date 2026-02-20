@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { type Article } from '../utils/articleCache'
+import { authFetch } from '../utils/authFetch'
 
 interface ArticleGroup {
   title: string
@@ -116,7 +117,7 @@ const fetchStream = async () => {
   }
   fetchingUpdates.value = true
   try {
-    const response = await fetch(`/api/stream.rss?limit=${RSS_LIMIT}`)
+    const response = await authFetch(`/api/stream.rss?limit=${RSS_LIMIT}`)
     if (!response.ok) {
       throw new Error(`Failed to fetch RSS: ${response.status}`)
     }

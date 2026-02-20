@@ -8,10 +8,8 @@ api:
     repository: ghcr.io/hlan-net/moirai
     tag: "latest"
     pullPolicy: Always
-  command:
-    - /bin/sh
-    - -c
-    - "uvicorn main:app --host 0.0.0.0 --port 8088 --interface wsgi"
+  # Use image default command (gunicorn) when empty
+  command: []
   service:
     type: ClusterIP
     port: 8088

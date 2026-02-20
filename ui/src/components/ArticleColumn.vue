@@ -4,6 +4,7 @@ import { articleCache, type Article } from '../utils/articleCache'
 import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
+import { authFetch } from '../utils/authFetch'
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -44,7 +45,7 @@ const fetchArticles = async (
       params.append('issue_id', issueId)
     }
 
-    const response = await fetch(`/api/articles?${params}`)
+    const response = await authFetch(`/api/articles?${params}`)
     if (response.ok) {
       const data = await response.json()
       return {
@@ -199,7 +200,7 @@ const filteredArticles = computed(() => {
 const deleteArticle = async (id: string) => {
   if (!confirm('Delete this article?')) return
   try {
-    const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' })
+    const res = await authFetch(`/api/articles/${id}`, { method: 'DELETE' })
     if (res.ok) {
       articles.value = articles.value.filter((a) => a._id !== id)
     } else {
@@ -263,7 +264,7 @@ const handleRefresh = async () => {
 
     if (feedToRefresh) {
       const encodedUrl = encodeURIComponent(feedToRefresh)
-      const response = await fetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
+      const response = await authFetch(`/api/feeds/refresh/${encodedUrl}`, { method: 'POST' })
 
       if (response.ok) {
         setTimeout(async () => {

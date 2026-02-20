@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { marked } from 'marked'
+import { authFetch } from '../utils/authFetch'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -37,7 +38,7 @@ onMounted(() => {
 
 const fetchConfig = async () => {
   try {
-    const response = await fetch('/api/config')
+    const response = await authFetch('/api/config')
     if (response.ok) {
       const config = await response.json()
       // Use server defaults if no local override
@@ -86,7 +87,7 @@ const parsedContent = (content: string) => {
 
 const fetchSessions = async () => {
   try {
-    const response = await fetch('/api/chat/history')
+    const response = await authFetch('/api/chat/history')
     if (response.ok) {
       sessions.value = await response.json()
     }
@@ -142,7 +143,7 @@ const sendMessage = async () => {
   
   try {
     if (!sessionId.value) {
-      const res = await fetch('/api/chat/history', { 
+      const res = await authFetch('/api/chat/history', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -165,7 +166,7 @@ const sendMessage = async () => {
     
     const headers = getHeaders()
 
-    const res = await fetch('/api/chat', {
+    const res = await authFetch('/api/chat', {
       method: 'POST',
       headers,
       body: JSON.stringify({ 
@@ -181,7 +182,7 @@ const sendMessage = async () => {
       messages.value.push({ role: 'assistant', content: data.response })
 
       if (sessionId.value) {
-        await fetch(`/api/chat/history/${sessionId.value}`, {
+        await authFetch(`/api/chat/history/${sessionId.value}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -230,7 +231,7 @@ const cancelDelete = () => {
 const deleteSession = async (id: string, event: Event) => {
   event.stopPropagation()
   try {
-    const response = await fetch(`/api/chat/history/${id}`, {
+    const response = await authFetch(`/api/chat/history/${id}`, {
       method: 'DELETE'
     })
     if (response.ok) {
@@ -270,7 +271,7 @@ const cancelRename = () => {
 
 const renameSession = async (session: ChatSession) => {
   try {
-    const response = await fetch(`/api/chat/history/${session._id}`, {
+    const response = await authFetch(`/api/chat/history/${session._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -450,6 +450,11 @@ def list_articles():
 @api_blueprint.route("/stream.rss", methods=["GET"])
 def rss_feed():
     """Generate RSS 2.0 feed for the aggregated article stream. Public endpoint (no auth required)."""
+    if not check_public_read_access():
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
+        return response
 
     # Fetch all data (reuse logic from list_articles)
     limit = int(request.args.get("limit", 100))  # Default to 100 items for RSS

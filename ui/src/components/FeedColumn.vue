@@ -3,6 +3,7 @@ import { onMounted, ref, computed, watch, nextTick } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter' // Import the new filter store
+import { authFetch } from '../utils/authFetch'
 
 interface Feed {
   _id: string
@@ -85,7 +86,7 @@ const showNotification = (message: string, type: 'error' | 'success' | 'warning'
 
 const fetchFeeds = async () => {
   try {
-    const response = await fetch('/api/feeds')
+    const response = await authFetch('/api/feeds')
     if (response.ok) {
       feeds.value = await response.json()
     }
@@ -99,7 +100,7 @@ const fetchFeeds = async () => {
 const triggerRefresh = async () => {
   refreshing.value = true
   try {
-    const res = await fetch('/api/feeds/refresh', { method: 'POST' })
+    const res = await authFetch('/api/feeds/refresh', { method: 'POST' })
     if (res.ok) {
       const data = await res.json()
       showNotification(`Started refreshing ${data.count} feeds.`, 'success')
@@ -118,7 +119,7 @@ const deleteFeed = async (id: string) => {
   if (!confirm('Are you sure you want to delete this feed?')) return
 
   try {
-    const res = await fetch(`/api/feeds/${id}`, { method: 'DELETE' })
+    const res = await authFetch(`/api/feeds/${id}`, { method: 'DELETE' })
     if (res.ok) {
       feeds.value = feeds.value.filter((f) => f._id !== id)
       // If the deleted feed was selected, clear the selection
@@ -147,7 +148,7 @@ const cancelRename = () => {
 
 const renameFeed = async (feed: Feed) => {
   try {
-    const res = await fetch(`/api/feeds/${feed._id}`, {
+    const res = await authFetch(`/api/feeds/${feed._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newFeedTitle.value }),
@@ -356,7 +357,7 @@ const bulkImportFeeds = async () => {
 
   bulkImporting.value = true
   try {
-    const res = await fetch('/api/feeds/bulk', {
+    const res = await authFetch('/api/feeds/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls }),

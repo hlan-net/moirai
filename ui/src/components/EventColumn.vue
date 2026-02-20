@@ -2,6 +2,7 @@
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
+import { authFetch } from '../utils/authFetch'
 
 interface Premise {
   type: 'message' | 'issue'
@@ -60,7 +61,7 @@ const fetchIssues = async (isRefresh = false) => {
     }
     
     const queryString = params.toString() ? `?${params.toString()}` : ''
-    const response = await fetch(`/api/issues${queryString}`)
+    const response = await authFetch(`/api/issues${queryString}`)
 
     if (response.ok) {
       const data = await response.json()
@@ -93,7 +94,7 @@ watch(
 const deleteIssue = async (id: string) => {
   if (!confirm('Delete this event?')) return
   try {
-    const res = await fetch(`/api/issues/${id}`, { method: 'DELETE' })
+    const res = await authFetch(`/api/issues/${id}`, { method: 'DELETE' })
     if (res.ok) {
       issues.value = issues.value.filter((i) => i._id !== id)
       expandedIssues.value.delete(id)
@@ -109,7 +110,7 @@ const deleteIssue = async (id: string) => {
 const removePremise = async (issueId: string, premiseId: string) => {
   if (!confirm('Remove this article from the event?')) return
   try {
-    const res = await fetch(`/api/issues/${issueId}/premises`, {
+    const res = await authFetch(`/api/issues/${issueId}/premises`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: premiseId }),

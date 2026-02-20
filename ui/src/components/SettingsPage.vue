@@ -3,6 +3,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { useTheme, type Theme } from '../composables/useTheme'
+import { authFetch } from '../utils/authFetch'
 
 const authStore = useAuthStore()
 
@@ -185,7 +186,7 @@ const saveSettings = async () => {
       })
       
       // Save System Config (Admin only or if allowed)
-      const configRes = await fetch('/api/config', {
+      const configRes = await authFetch('/api/config', {
           method: 'PUT',
           headers: authStore.token ? { 
               'Authorization': `Bearer ${authStore.token}`,
@@ -220,7 +221,7 @@ const saveSettings = async () => {
 const fetchOllamaModels = async () => {
   loadingModels.value = true
   try {
-    const res = await fetch('/api/models')
+    const res = await authFetch('/api/models')
     if (res.ok) {
       availableModels.value = await res.json()
     }
@@ -238,7 +239,7 @@ const fetchOpenAiModels = async () => {
   }
   loadingModels.value = true
   try {
-    const res = await fetch('/api/models?llm_endpoint=openai', {
+    const res = await authFetch('/api/models?llm_endpoint=openai', {
       headers: {
         'x-openai-api-key': openaiApiKey.value
       }
@@ -260,7 +261,7 @@ const fetchGeminiModels = async () => {
   }
   loadingModels.value = true
   try {
-    const res = await fetch('/api/models?llm_endpoint=gemini', {
+    const res = await authFetch('/api/models?llm_endpoint=gemini', {
       headers: {
         'x-gemini-api-key': geminiApiKey.value
       }
@@ -306,7 +307,7 @@ const exportSettings = async () => {
   // 1. Fetch server config
   let serverConfig = {}
   try {
-      const res = await fetch('/api/config')
+      const res = await authFetch('/api/config')
       if (res.ok) {
           serverConfig = await res.json()
       }
@@ -380,7 +381,7 @@ const importSettings = async (event: Event) => {
 
       // Restore server config
       try {
-          const res = await fetch('/api/config', {
+          const res = await authFetch('/api/config', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(data.server_config)

@@ -1,6 +1,8 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     command: [ "/opt/conda/envs/moirai/bin/gunicorn", "--config", "gunicorn.conf.py", "main:app" ]
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -55,7 +57,9 @@ services:
         condition: service_started
 
   mcp-server:
-    build: .
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     command: [ "sh", "-c", "/app/create_dbs.sh && conda run --name moirai uvicorn mcp_service.main:app --host $${HTTP_HOST:-0.0.0.0} --port 8090" ]
     ports:
       - "8090:8090"
