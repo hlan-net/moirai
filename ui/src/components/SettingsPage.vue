@@ -461,7 +461,18 @@ onMounted(() => {
       <h2 class="about-header">
         <span>About Moirai</span>
         <span class="about-actions">
-          <button class="secondary copy-btn" @click="copyAbout">Copy details</button>
+          <button
+            class="secondary copy-btn"
+            @click="copyAbout"
+            title="Copy details"
+            aria-label="Copy details"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M8 8V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h2zm2 0h4a2 2 0 0 1 2 2v2h2V4h-8v4zm4 4H6v8h8v-8z"
+              />
+            </svg>
+          </button>
           <span v-if="copyStatus" class="copy-status">{{ copyStatus }}</span>
         </span>
       </h2>
@@ -821,7 +832,20 @@ onMounted(() => {
   gap: 8px;
 }
 .copy-btn {
-  white-space: nowrap;
+  padding: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.copy-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
 }
 .copy-status {
   font-size: 0.85rem;
