@@ -49,8 +49,8 @@ Group by temporal windows instead of sources.
 
 #### Proposal 3: The "AI-Annotated" River
 Chronological list with AI-driven speed-reading markers.
-- [ ] Color-coded dots/badges per article indicating Topic, Priority, or Sentiment.
-- [ ] Items stay at their original position once fetched.
+- [x] Color-coded dots/badges per article indicating Topic, Priority, or Sentiment.
+- [x] Items stay at their original position once fetched.
 - [x] Depends on an AI annotation enrichment step in the backend.
 
 ### Backend AI Annotation Pipeline

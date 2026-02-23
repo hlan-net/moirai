@@ -145,6 +145,10 @@ const parseRssFeed = (xmlText: string): Article[] => {
 
     const events: string[] = []
     const trends: string[] = []
+    const topics: string[] = []
+    let priority: 'low' | 'medium' | 'high' | undefined
+    let sentiment: 'positive' | 'neutral' | 'negative' | undefined
+
     for (const category of Array.from(item.querySelectorAll('category'))) {
       const label = category.textContent?.trim()
       if (!label) continue
@@ -153,8 +157,23 @@ const parseRssFeed = (xmlText: string): Article[] => {
         events.push(label)
       } else if (domain === 'trend') {
         trends.push(label)
+      } else if (domain === 'topic') {
+        topics.push(label)
+      } else if (domain === 'priority') {
+        priority = label as 'low' | 'medium' | 'high'
+      } else if (domain === 'sentiment') {
+        sentiment = label as 'positive' | 'neutral' | 'negative'
       }
     }
+
+    const annotations =
+      topics.length || priority || sentiment
+        ? {
+            topics,
+            priority: priority || 'low',
+            sentiment: sentiment || 'neutral',
+          }
+        : undefined
 
     return {
       _id: guid,
@@ -165,7 +184,8 @@ const parseRssFeed = (xmlText: string): Article[] => {
       feed_url: feedUrl,
       feed_title: sourceTitle || getHostname(feedUrl),
       events: events.length ? events : undefined,
-      trends: trends.length ? trends : undefined
+      trends: trends.length ? trends : undefined,
+      annotations,
     }
   })
 }
@@ -367,6 +387,10 @@ const toggleTheme = () => {
                 <a :href="article.link" target="_blank">{{ article.title }}</a>
               </h4>
               <div class="compact-tags">
+                <span v-if="article.annotations?.priority === 'high'" class="dot-tag priority-high-dot" title="High Priority"></span>
+                <span v-if="article.annotations?.priority === 'medium'" class="dot-tag priority-medium-dot" title="Medium Priority"></span>
+                <span v-if="article.annotations?.sentiment === 'positive'" class="dot-tag sentiment-positive-dot" title="Positive Sentiment"></span>
+                <span v-if="article.annotations?.sentiment === 'negative'" class="dot-tag sentiment-negative-dot" title="Negative Sentiment"></span>
                 <span v-if="article.events?.length" class="dot-tag event-dot" title="Has Events"></span>
                 <span v-if="article.trends?.length" class="dot-tag trend-dot" title="Has Trends"></span>
               </div>
@@ -401,12 +425,17 @@ const toggleTheme = () => {
                 </button>
               </span>
             </div>
-            <div v-if="article.events || article.trends" class="item-tags">
+            <div v-if="article.events || article.trends || article.annotations" class="item-tags">
               <div v-if="article.events && article.events.length > 0" class="tag-group">
                 <span v-for="event in article.events" :key="event" class="tag tag-event">{{ event }}</span>
               </div>
               <div v-if="article.trends && article.trends.length > 0" class="tag-group">
                 <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+              </div>
+              <div v-if="article.annotations" class="tag-group">
+                <span v-for="topic in article.annotations.topics" :key="topic" class="tag tag-topic">{{ topic }}</span>
+                <span :class="['tag', 'tag-priority', `tag-priority-${article.annotations.priority}`]">{{ article.annotations.priority }}</span>
+                <span :class="['tag', 'tag-sentiment', `tag-sentiment-${article.annotations.sentiment}`]">{{ article.annotations.sentiment }}</span>
               </div>
             </div>
             <div class="item-meta">
@@ -657,6 +686,12 @@ const toggleTheme = () => {
 .event-dot { background-color: #1565c0; }
 .trend-dot { background-color: #7b1fa2; }
 
+/* Annotation dots (compact view) */
+.priority-high-dot { background-color: #c62828; }
+.priority-medium-dot { background-color: #ef6c00; }
+.sentiment-positive-dot { background-color: #2e7d32; }
+.sentiment-negative-dot { background-color: #d32f2f; }
+
 .item-meta {
     font-size: 0.8rem;
     color: #95a5a6;
@@ -748,6 +783,61 @@ const toggleTheme = () => {
   background-color: #f3e5f5;
   color: #7b1fa2;
   border: 1px solid #ce93d8;
+}
+
+/* AI annotation tags (expanded view) */
+.tag-topic {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #81c784;
+}
+
+.tag-priority {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+}
+
+.tag-priority-high {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+.tag-priority-medium {
+  background-color: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffcc80;
+}
+
+.tag-priority-low {
+  background-color: #f5f5f5;
+  color: #757575;
+  border: 1px solid #e0e0e0;
+}
+
+.tag-sentiment {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.tag-sentiment-positive {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #81c784;
+}
+
+.tag-sentiment-neutral {
+  background-color: #f5f5f5;
+  color: #757575;
+  border: 1px solid #e0e0e0;
+}
+
+.tag-sentiment-negative {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
 }
 
 .group-divider {
