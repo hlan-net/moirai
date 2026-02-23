@@ -5,7 +5,9 @@ test('anonymous users are redirected when stream is private', async ({ browser }
   const adminPassword = process.env.ADMIN_PASSWORD || 'password'
   const baseURL =
     process.env.PLAYWRIGHT_TEST_BASE_URL ||
-    (process.env.TEST_TARGET === 'docker' ? 'http://localhost:8088' : 'http://localhost:5173')
+    (process.env.CI || process.env.TEST_TARGET === 'docker'
+      ? 'http://localhost:8088'
+      : 'http://localhost:5173')
 
   const adminContext = await browser.newContext({
     httpCredentials: {
