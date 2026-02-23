@@ -145,3 +145,24 @@ prometheus:
 # -- Open WebUI endpoint
 openWebui:
   endpoint: "https://open-webui.example.com"
+
+# -- Redis configuration (used for rate-limiter sync and agent orchestrator locking)
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  # -- Redis password (MUST be overridden in custom-values.yaml)
+  password: ""
+  # -- Maximum memory Redis may use (keep small on Pi)
+  maxmemory: "64mb"
+  # -- Eviction policy when maxmemory is reached
+  maxmemoryPolicy: "allkeys-lru"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

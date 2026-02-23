@@ -108,6 +108,17 @@ spec:
             value: "http://{{ include "moirai.fullname" . }}-mcp-server:{{ .Values.mcpServer.service.port }}/sse"
           - name: ARTICLE_EXPIRATION_DAYS
             value: {{ .Values.api.articleExpirationDays | quote }}
+          {{- if .Values.redis.enabled }}
+          - name: REDIS_HOST
+            value: "{{ include "moirai.fullname" . }}-redis"
+          - name: REDIS_PORT
+            value: "6379"
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "moirai.fullname" . }}-redis-secret
+                key: password
+          {{- end }}
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds

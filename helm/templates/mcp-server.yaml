@@ -87,6 +87,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-couchdb
                   key: cookieAuthSecret
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_HOST
+              value: "{{ include "moirai.fullname" . }}-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "moirai.fullname" . }}-redis-secret
+                  key: password
+            {{- end }}
 ---
 apiVersion: v1
 kind: Service
