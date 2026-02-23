@@ -87,6 +87,20 @@ function(newDoc, oldDoc, userCtx, secObj) {
 }
 """
 
+ARTICLE_STATS_VIEWS = {
+    "by_language": {
+        "map": "function(doc) { if (doc.language) emit(doc.language, 1); }",
+        "reduce": "_count",
+    }
+}
+
+FEED_HEALTH_VIEWS = {
+    "status": {
+        "map": "function(doc) { if (doc.last_fetch_error) { emit('error', 1); } else { emit('success', 1); } }",
+        "reduce": "_count",
+    }
+}
+
 
 def ensure_db(db_name):
     try:
@@ -202,23 +216,13 @@ def init_db():
     ensure_design_doc(
         "articles",
         "stats",
-        {
-            "by_language": {
-                "map": "function(doc) { if (doc.language) emit(doc.language, 1); }",
-                "reduce": "_count",
-            }
-        },
+        ARTICLE_STATS_VIEWS,
     )
 
     ensure_design_doc(
         "feeds",
         "health",
-        {
-            "status": {
-                "map": "function(doc) { if (doc.last_fetch_error) { emit('error', 1); } else { emit('success', 1); } }",
-                "reduce": "_count",
-            }
-        },
+        FEED_HEALTH_VIEWS,
     )
 
     return

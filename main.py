@@ -118,4 +118,6 @@ if __name__ == "__main__":
         host = os.environ.get("HTTP_HOST", "0.0.0.0")
         app.logger.info(f"Starting Moirai on {host}:{port}")
         app.run(host=host, port=port)
-# No need for else block here, as gunicorn handles the app startup (and calls start_services via hook)
+# Under gunicorn, the on_starting hook in gunicorn.conf.py handles
+# database initialisation (init_db + ensure_default_user).
+# The scheduler and worker are started separately via run_worker.py.

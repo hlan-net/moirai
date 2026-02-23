@@ -85,7 +85,7 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
-    command: [ "sh", "-c", "/app/create_dbs.sh && conda run --name moirai uvicorn mcp_service.main:app --host $${HTTP_HOST:-0.0.0.0} --port 8090" ]
+    command: [ "sh", "-c", "conda run --name moirai python init_db.py && conda run --name moirai uvicorn mcp_service.main:app --host $${HTTP_HOST:-0.0.0.0} --port 8090" ]
     ports:
       - "8090:8090"
     environment:

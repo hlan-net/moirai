@@ -4,8 +4,8 @@
 
 ### Cleanup: Retire `events` and `trends` databases
 The `issues` DB is now the canonical store (Fates V2). The old `events` and `trends` databases are still being created in `tasks/init.py` but are no longer used as primary storage.
-- [ ] Remove `events` and `trends` from the `allowed_dbs` list in `tasks/init.py`.
-- [ ] Verify no active code paths write to them directly (legacy aliases in `mcp_service/tools/issues.py` already redirect to `issues`).
+- [x] Remove `events` and `trends` from the `allowed_dbs` list in `tasks/init.py`.
+- [x] Verify no active code paths write to them directly (legacy aliases in `mcp_service/tools/issues.py` already redirect to `issues`).
 
 ---
 
@@ -13,12 +13,12 @@ The `issues` DB is now the canonical store (Fates V2). The old `events` and `tre
 
 ### CouchDB `validate_doc_update` — Database-Level Validation
 Intended to enforce schema at the database level. Previously marked done but **not implemented**.
-- [ ] Write `validate_doc_update` JavaScript functions for `articles` and `feeds` (required fields, ISO dates, 2-char language codes).
-- [ ] Push these functions as part of design documents via `tasks/init.py`.
-- [ ] Test that malformed documents are rejected at the DB level.
+- [x] Write `validate_doc_update` JavaScript functions for `articles` and `feeds` (required fields, ISO dates, 2-char language codes).
+- [x] Push these functions as part of design documents via `tasks/init.py`.
+- [x] Test that malformed documents are rejected at the DB level.
 
 ### Automated Tests for CouchDB Design Documents
-- [ ] Implement unit/integration tests for `validate_doc_update` and MapReduce views. Options: test harness with mocked CouchDB responses, or a temporary CouchDB instance in CI.
+- [x] Implement unit/integration tests for `validate_doc_update` and MapReduce views. Options: test harness with mocked CouchDB responses, or a temporary CouchDB instance in CI.
 
 ---
 

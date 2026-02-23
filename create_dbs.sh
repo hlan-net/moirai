@@ -1,7 +1,12 @@
 #!/bin/sh
 
-# This script creates necessary CouchDB databases for the Moirai application.
-# It's intended to be run as a pre-startup command in Docker Compose.
+# DEPRECATED: This script is superseded by init_db.py which is the single
+# source of truth for database initialisation.  Both the API (gunicorn) and
+# the MCP server now use init_db.py instead.  This file is kept only as a
+# manual fallback and will be removed in v0.5.0.
+#
+# Original purpose: create CouchDB databases as a pre-startup command in
+# Docker Compose.
 
 set -e
 
@@ -42,11 +47,15 @@ create_database() {
 check_couchdb_ready
 
 # Create required databases
+# Keep in sync with tasks/init.py init_db()
 create_database "_users"
 create_database "feeds"
 create_database "articles"
 create_database "issues"
 create_database "agent_configs"
-create_database "config" # The config DB is also used, ensure it's created
+create_database "config"
+create_database "chat_history"
+create_database "users"
+create_database "feed_content"
 
 echo "CouchDB database setup complete."
