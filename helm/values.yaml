@@ -16,6 +16,25 @@ api:
     targetPort: 8088
   enableProdStartup: "true"
   articleExpirationDays: 30
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      ephemeral-storage: "1Gi"
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: "2Gi"
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 6
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
 
 ui:
   replicaCount: 1
