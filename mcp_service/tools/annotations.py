@@ -141,20 +141,6 @@ def get_annotation_stats(
         return json.dumps({"error": err})
 
     try:
-        # Count total articles in userspace
-        total_payload = {
-            "selector": build_userspace_selector(userspace),
-            "limit": 1,
-            "fields": ["_id"],
-        }
-        # Use execution_stats to get total without fetching all docs
-        total_resp = db_request(
-            "POST",
-            ARTICLES_DB,
-            "/_find",
-            json_data={**total_payload, "limit": 0, "execution_stats": True},
-        )
-
         # Count annotated articles
         annotated_payload = {
             "selector": {
