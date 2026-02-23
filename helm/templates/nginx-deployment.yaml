@@ -18,6 +18,14 @@ spec:
         app.kubernetes.io/component: nginx
     spec:
       automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "moirai.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: nginx
       containers:
         - name: {{ include "moirai.name" . }}-nginx
           image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"

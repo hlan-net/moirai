@@ -1,3 +1,33 @@
+# Version control
+.git
 .github
-helm
+.gitignore
+
+# Frontend (built separately)
 ui/node_modules
+ui/dist
+
+# Helm / Kubernetes
+helm
+custom-values.yaml
+
+# Development tooling
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.vscode
+.husky
+.pre-commit-config.yaml
+
+# Tests (not needed in production image)
+tests
+
+# Documentation
+docs
+*.md
+LICENSE
+
+# Build artifacts
+*.pyc
+.env*

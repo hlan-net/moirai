@@ -3,7 +3,7 @@
 replicaCount: 1 # This can be overridden per-service if needed
 
 api:
-  replicaCount: 1
+  replicaCount: 2
   image:
     repository: ghcr.io/hlan-net/moirai
     tag: "latest"

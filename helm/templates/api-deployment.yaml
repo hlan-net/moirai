@@ -24,6 +24,27 @@ spec:
     spec:
       automountServiceAccountToken: false
       serviceAccountName: {{ include "moirai.serviceAccountName" . }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "moirai.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/component
+                      operator: In
+                      values:
+                        - mcp-server
+                        - worker
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: {{ include "moirai.name" . }}-api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"

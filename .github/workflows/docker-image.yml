@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
+          key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'environment-prod.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
           restore-keys: |
             buildx-${{ runner.os }}-
       

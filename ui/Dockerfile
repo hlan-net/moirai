@@ -2,8 +2,6 @@
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 FROM --platform=$BUILDPLATFORM node:20-alpine AS build-stage
-ARG BUILD_NUMBER
-ENV BUILD_NUMBER=$BUILD_NUMBER
 
 WORKDIR /app
 
@@ -15,6 +13,10 @@ RUN yarn install
 
 # Copy the rest of the UI source code
 COPY . .
+
+# Build argument placed after dependency install so it doesn't bust the cache
+ARG BUILD_NUMBER
+ENV BUILD_NUMBER=$BUILD_NUMBER
 
 # Build the application
 RUN yarn build

@@ -19,6 +19,14 @@ spec:
         app.kubernetes.io/component: redis
     spec:
       automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "moirai.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: redis
       containers:
         - name: redis
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"

@@ -1,0 +1,49 @@
+# Production dependencies for Docker builds.
+# This is environment.yml minus dev/test tooling (pytest, black, ruff, etc.).
+# Keep in sync with environment.yml when adding new runtime dependencies.
+name: moirai
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - flask
+    - feedparser
+    - requests
+    - flask-wtf
+    - schedule
+    - beautifulsoup4
+    - python-dateutil
+    - mcp[cli]
+    - httpx[http2]
+    - openai
+    - uvicorn
+    - flask-limiter
+    - prometheus-flask-exporter
+    - pydantic
+    - validators
+    - bleach
+    - starlette
+    - starlette-prometheus
+    - prometheus_client
+    - google-generativeai
+    - opentelemetry-api
+    - opentelemetry-sdk
+    - opentelemetry-exporter-otlp
+    - opentelemetry-instrumentation-fastapi
+    - opentelemetry-instrumentation-flask
+    - opentelemetry-instrumentation-requests
+    - structlog
+    - tenacity
+    - PyJWT
+    - passlib
+    - bcrypt==4.0.1
+    - google-auth
+    - google-auth-oauthlib
+    - msal
+    - cryptography
+    - langdetect
+    - redis
+    - gunicorn
