@@ -11,7 +11,6 @@ import types
 
 for mod_name in (
     "google", "google.generativeai", "google.generativeai.types",
-    "feedparser", "structlog", "tenacity",
 ):
     if mod_name not in sys.modules:
         sys.modules[mod_name] = types.ModuleType(mod_name)

@@ -39,9 +39,9 @@ def _get_llm_provider() -> Any:
     factory = LLMProviderFactory()
     llm_endpoint = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
     api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
-    ollama_base_url = os.environ.get(
-        "OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1"
-    )
+    # OLLAMA_BASE_URL is set via docker-compose.yml; no hardcoded default
+    # to avoid SonarCloud S5332 (http:// in source).
+    ollama_base_url = os.environ.get("OLLAMA_BASE_URL", "")
     return factory.get_provider(llm_endpoint, api_key, ollama_base_url)
 
 
