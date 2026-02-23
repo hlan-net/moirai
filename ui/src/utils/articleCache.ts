@@ -23,6 +23,11 @@ export interface Article {
   }[]
   events?: string[]
   trends?: string[]
+  annotations?: {
+    topics: string[]
+    priority: 'low' | 'medium' | 'high'
+    sentiment: 'positive' | 'neutral' | 'negative'
+  }
   feed_title?: string
   feed_favicon?: string
   cached_at?: string

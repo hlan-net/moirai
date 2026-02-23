@@ -26,29 +26,38 @@ Intended to enforce schema at the database level. Previously marked done but **n
 
 ### Lifespan View (Fates V2)
 A new UI view to visualise the "frequency" of the current userspace — how the stream of articles crystallises into active Issues ("Things that ARE") and sealed Issues ("Things that WERE").
-- [ ] Add a `LifespanView` Vue component.
-- [ ] Add a `/lifespan` route to `ui/src/router.ts`.
-- [ ] Design: show active issues by longevity (transient / temporal / epic) and a historical record of eternal issues.
+- [x] Add a `LifespanView` Vue component.
+- [x] Add a `/lifespan` route to `ui/src/router.ts`.
+- [x] Design: show active issues by longevity (transient / temporal / epic) and a historical record of eternal issues.
 
 ### River of News Stream Improvements
 Three proposals for the Aggregated Stream view, prioritised by complexity:
 
 #### Proposal 1: The "Pure River" (High-Density List)
 High information density, mimicking `river.hlan.net`.
-- [ ] Remove card borders and background colors; use thin separator lines.
-- [ ] Group articles by feed only when sequential in the timeline.
-- [ ] Prepend new articles without shifting the current reading position.
-- [ ] Show a "New Articles Available" toast that scrolls to top on click.
+- [x] Remove card borders and background colors; use thin separator lines.
+- [x] Group articles by feed only when sequential in the timeline.
+- [x] Prepend new articles without shifting the current reading position.
+- [x] Show a "New Articles Available" toast that scrolls to top on click.
 
 #### Proposal 2: The "Time-Blocked" River
 Group by temporal windows instead of sources.
-- [ ] Section headers: "Last Hour", "Earlier Today", "Yesterday".
-- [ ] Collapsed summaries by default; expand on click/hover.
-- [ ] Source favicon and name as a small inline tag next to the title.
-- [ ] Once a time block is rendered its order is frozen.
+- [x] Section headers: "Last Hour", "Earlier Today", "Yesterday".
+- [x] Collapsed summaries by default; expand on click/hover.
+- [x] Source favicon and name as a small inline tag next to the title.
+- [x] Once a time block is rendered its order is frozen.
 
 #### Proposal 3: The "AI-Annotated" River
 Chronological list with AI-driven speed-reading markers.
-- [ ] Color-coded dots/badges per article indicating Topic, Priority, or Sentiment.
-- [ ] Items stay at their original position once fetched.
-- [ ] Depends on an AI annotation enrichment step in the backend.
+- [x] Color-coded dots/badges per article indicating Topic, Priority, or Sentiment.
+- [x] Items stay at their original position once fetched.
+- [x] Depends on an AI annotation enrichment step in the backend.
+
+### Backend AI Annotation Pipeline
+Automatic LLM-powered annotation of articles with topics, priority, and sentiment.
+- [x] Core annotator module (`tasks/annotator.py`): LLM prompt, validation, CouchDB storage.
+- [x] Annotation worker (`tasks/annotation_worker.py`): CouchDB changes-feed listener on `articles` DB.
+- [x] Wire annotation worker into `run_worker.py` alongside enrichment worker.
+- [x] MCP annotation tools (`mcp_service/tools/annotations.py`): reannotate, list unannotated, stats.
+- [x] RSS output: annotation data as `<category>` tags (domain=topic/priority/sentiment) in `api/rss_ops.py`.
+- [x] Unit tests (`tests/test_annotator_unit.py`): validation, LLM mocking, store logic, RSS output.
