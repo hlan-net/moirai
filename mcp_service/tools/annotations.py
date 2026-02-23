@@ -122,7 +122,7 @@ def list_unannotated_articles(
             indent=2,
         )
 
-    except Exception as e:
+    except (RuntimeError, ValueError, KeyError) as e:
         return json.dumps({"error": f"Query execution error: {str(e)}"})
 
 
@@ -200,5 +200,5 @@ def get_annotation_stats(
             indent=2,
         )
 
-    except Exception as e:
+    except (RuntimeError, ValueError, KeyError) as e:
         return json.dumps({"error": f"Stats execution error: {str(e)}"})

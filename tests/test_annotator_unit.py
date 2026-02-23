@@ -16,7 +16,6 @@ for mod_name in (
         sys.modules[mod_name] = types.ModuleType(mod_name)
 
 import json
-import pytest
 from unittest.mock import patch, MagicMock
 
 from tasks.annotator import _validate_annotation, annotate_article, store_annotation

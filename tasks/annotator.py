@@ -38,7 +38,15 @@ def _get_llm_provider() -> Any:
     """Create an LLM provider from environment configuration."""
     factory = LLMProviderFactory()
     llm_endpoint = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
+
+    # Select the API key matching the chosen provider to avoid passing
+    # the wrong credential (e.g. OpenAI key to a Gemini provider).
+    api_key = ""
+    if llm_endpoint == "openai":
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+    elif llm_endpoint == "gemini":
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+
     # OLLAMA_BASE_URL is set via docker-compose.yml; no hardcoded default
     # to avoid SonarCloud S5332 (http:// in source).
     ollama_base_url = os.environ.get("OLLAMA_BASE_URL", "")
