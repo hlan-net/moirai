@@ -109,7 +109,8 @@ const hasActiveFilters = computed(() => {
 <style scoped>
 /* Mobile-first approach: Base styles for mobile devices */
 .main-page {
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 10px;

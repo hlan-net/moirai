@@ -20,7 +20,7 @@ const handleSuccess = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  flex: 1;
   background-color: var(--bg-color, #f4f4f9);
   color: var(--text-color, #333);
 }

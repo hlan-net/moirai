@@ -125,9 +125,10 @@ html,
 
 .content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 /* Tablet and up: horizontal navigation */

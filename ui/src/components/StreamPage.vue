@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { type Article } from '../utils/articleCache'
 import { authFetch } from '../utils/authFetch'
 import { useTheme } from '../composables/useTheme'
@@ -21,7 +21,6 @@ const expandedArticles = ref<Set<string>>(new Set())
 const isHighDensity = ref(true)
 const groupMode = ref<GroupMode>('feed')
 const newArticleCount = ref(0)
-const showToast = ref(false)
 const streamContainer = ref<HTMLElement | null>(null)
 const { resolveTheme, setTheme } = useTheme()
 const authStore = useAuthStore()
@@ -208,27 +207,12 @@ const fetchStream = async (isManual = false) => {
       articles.value = parsed
       totalCount.value = parsed.length
     } else {
-      // Auto-refresh: prepend new articles without shifting scroll
+      // Auto-refresh: count new articles silently without changing the display
       const existingIds = new Set(articles.value.map((a) => a._id))
       const newItems = parsed.filter((a) => !existingIds.has(a._id))
 
       if (newItems.length > 0) {
-        // Record scroll position before prepending
-        const container = streamContainer.value
-        const prevScrollTop = container?.scrollTop ?? 0
-        const prevScrollHeight = container?.scrollHeight ?? 0
-
-        articles.value = [...newItems, ...articles.value].slice(0, RSS_LIMIT)
-        totalCount.value = articles.value.length
-        newArticleCount.value = newItems.length
-        showToast.value = true
-
-        // Restore scroll position after DOM update
-        await nextTick()
-        if (container && prevScrollTop > 0) {
-          const heightDiff = container.scrollHeight - prevScrollHeight
-          container.scrollTop = prevScrollTop + heightDiff
-        }
+        newArticleCount.value += newItems.length
       }
     }
   } catch (error) {
@@ -239,10 +223,9 @@ const fetchStream = async (isManual = false) => {
   }
 }
 
-const scrollToTop = () => {
-  streamContainer.value?.scrollTo({ top: 0, behavior: 'smooth' })
-  showToast.value = false
+const refreshAndReset = () => {
   newArticleCount.value = 0
+  fetchStream(true)
 }
 
 onMounted(async () => {
@@ -347,18 +330,14 @@ const toggleTheme = () => {
                 </svg>
                 RSS
             </a>
-            <button @click="fetchStream(true)" :disabled="fetchingUpdates" class="refresh-btn" title="Refresh stream">
+            <button @click="refreshAndReset" :disabled="fetchingUpdates" class="refresh-btn" :class="{ 'has-new': newArticleCount > 0 }" title="Refresh stream">
                 {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
+                <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
             </button>
         </div>
     </header>
 
     <div v-if="loading" class="loading">Loading stream...</div>
-
-    <!-- New Articles Toast -->
-    <div v-if="showToast" class="new-articles-toast" @click="scrollToTop">
-      {{ newArticleCount }} new article{{ newArticleCount === 1 ? '' : 's' }} available
-    </div>
     
     <div v-else-if="articles.length" ref="streamContainer" class="stream-container" :class="{ 'high-density': isHighDensity }">
       <div v-for="(group, index) in groupedArticles" :key="group.title + '-' + index" class="feed-group">
@@ -537,6 +516,29 @@ const toggleTheme = () => {
     cursor: pointer;
     font-size: 0.9rem;
     transition: all 0.2s;
+    position: relative;
+}
+
+.refresh-btn.has-new {
+    font-weight: 700;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.new-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-color);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    padding: 0 5px;
+    margin-left: 4px;
+    line-height: 1;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -637,7 +639,7 @@ const toggleTheme = () => {
     background: transparent;
     padding: 14px 0;
     margin-bottom: 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: none;
     text-align: left; /* Ensure stream items are left-aligned */
 }
 
@@ -851,27 +853,6 @@ const toggleTheme = () => {
     padding: 40px;
     color: #7f8c8d;
     font-size: 1.2rem;
-}
-
-/* New Articles Toast */
-.new-articles-toast {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--primary-color);
-    color: white;
-    text-align: center;
-    padding: 10px 16px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-    border-radius: 0 0 8px 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: background-color 0.2s;
-}
-
-.new-articles-toast:hover {
-    background: var(--primary-hover);
 }
 
 /* Group count for time-blocked headers */
