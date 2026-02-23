@@ -170,7 +170,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: ghcr.io/${{ github.repository }}-api
+          - image: ghcr.io/${{ github.repository }}
             context: .
             file: api/Dockerfile
           - image: ghcr.io/${{ github.repository }}-ui
