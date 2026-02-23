@@ -1,3 +1,6 @@
+# Full development environment (runtime + dev/test tooling).
+# All pip packages are pinned to exact versions for reproducible builds.
+# Dependabot will propose PRs to bump these versions.
 name: moirai
 channels:
   - conda-forge
@@ -6,46 +9,48 @@ dependencies:
   - python=3.10
   - pip
   - pip:
-    - flask
-    - feedparser
-    - requests
-    - flask-wtf
-    - schedule
-    - beautifulsoup4
-    - python-dateutil
-    - pytest
-    - pytest-asyncio
-    - mcp[cli]
-    - httpx[http2]
-    - openai
-    - uvicorn
-    - flask-limiter
-    - prometheus-flask-exporter
-    - pydantic
-    - validators
-    - bleach
-    - starlette
-    - starlette-prometheus
-    - prometheus_client
-    - google-generativeai
-    - opentelemetry-api
-    - opentelemetry-sdk
-    - opentelemetry-exporter-otlp
-    - opentelemetry-instrumentation-fastapi
-    - opentelemetry-instrumentation-flask
-    - opentelemetry-instrumentation-requests
-    - structlog
-    - tenacity
-    - PyJWT
-    - passlib
+    # --- Runtime dependencies (keep in sync with environment-prod.yml) ---
+    - flask==3.1.3
+    - feedparser==6.0.12
+    - requests==2.32.5
+    - flask-wtf==1.2.2
+    - schedule==1.2.2
+    - beautifulsoup4==4.14.3
+    - python-dateutil==2.9.0.post0
+    - mcp[cli]==1.26.0
+    - httpx[http2]==0.28.1
+    - openai==2.21.0
+    - uvicorn==0.41.0
+    - flask-limiter==4.1.1
+    - prometheus-flask-exporter==0.23.2
+    - pydantic==2.12.5
+    - validators==0.35.0
+    - bleach==6.3.0
+    - starlette==0.52.1
+    - starlette-prometheus==0.10.0
+    - prometheus_client==0.24.1
+    - google-generativeai==0.8.6
+    - opentelemetry-api==1.39.1
+    - opentelemetry-sdk==1.39.1
+    - opentelemetry-exporter-otlp==1.39.1
+    - opentelemetry-instrumentation-fastapi==0.60b1
+    - opentelemetry-instrumentation-flask==0.60b1
+    - opentelemetry-instrumentation-requests==0.60b1
+    - structlog==25.5.0
+    - tenacity==9.1.4
+    - PyJWT==2.11.0
+    - passlib==1.7.4
     - bcrypt==4.0.1
-    - google-auth
-    - google-auth-oauthlib
-    - msal
-    - cryptography
-    - langdetect
-    - pre-commit
-    - black
-    - ruff
-    - redis
-    - gunicorn
+    - google-auth==2.49.0.dev0
+    - google-auth-oauthlib==1.2.4
+    - msal==1.34.0
+    - cryptography==46.0.5
+    - langdetect==1.0.9
+    - redis==7.2.0
+    - gunicorn==25.1.0
+    # --- Dev/test tooling (not in environment-prod.yml) ---
+    - pytest==9.0.2
+    - pytest-asyncio==1.3.0
+    - pre-commit==4.5.1
+    - black==26.1.0
+    - ruff==0.15.2

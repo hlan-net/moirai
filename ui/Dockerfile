@@ -1,7 +1,7 @@
 # Stage 1: Build the Vue.js application
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
-FROM --platform=$BUILDPLATFORM node:20-alpine AS build-stage
+FROM --platform=$BUILDPLATFORM node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8 AS build-stage
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ ENV BUILD_NUMBER=$BUILD_NUMBER
 RUN yarn build
 
 # Stage 2: Serve the application with Nginx
-FROM --platform=$TARGETPLATFORM nginx:stable-alpine
+FROM --platform=$TARGETPLATFORM nginx:stable-alpine@sha256:15e96e59aa3b0aada3a121296e3bce117721f42d88f5f64217ef4b18f458c6ab
 
 # Copy the built files from the build stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html

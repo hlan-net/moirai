@@ -1,5 +1,5 @@
 # Stage 1: Build the conda environment
-FROM condaforge/miniforge3:24.3.0-0 AS builder
+FROM condaforge/miniforge3:24.3.0-0@sha256:f412616c712b00c09b4fdfd3001941d1876dfed5ab821bcf1e48ada60b70b7cb AS builder
 
 WORKDIR /build
 
@@ -41,7 +41,7 @@ RUN conda install -y mamba && \
     true
 
 # Stage 2: Slim runtime image
-FROM debian:bookworm-slim AS final-stage
+FROM debian:bookworm-slim@sha256:98f4b71de414932439ac6ac690d7060df1f27161073c5036a7553723881bffbe AS final-stage
 
 # Install only curl (health probes) and CA certs (HTTPS).
 # libffi, libssl, libgomp are already inside the conda env.

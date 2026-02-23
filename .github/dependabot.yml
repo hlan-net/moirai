@@ -1,0 +1,99 @@
+# Dependabot configuration for automated dependency updates.
+# PRs are opened weekly for each ecosystem. Review, merge, and redeploy.
+# Docs: https://docs.github.com/en/code-security/dependabot/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # Python (pip) — watches environment.yml and environment-prod.yml
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(py):"
+    labels:
+      - dependencies
+      - python
+    open-pull-requests-limit: 10
+    # Group minor/patch updates into a single PR to reduce noise
+    groups:
+      opentelemetry:
+        patterns:
+          - "opentelemetry-*"
+      google:
+        patterns:
+          - "google-*"
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          - "opentelemetry-*"
+          - "google-*"
+
+  # Node.js (npm/yarn) — watches ui/package.json + yarn.lock
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(ui):"
+    labels:
+      - dependencies
+      - frontend
+    open-pull-requests-limit: 10
+    groups:
+      vue:
+        patterns:
+          - "vue"
+          - "vue-*"
+          - "@vue/*"
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  # Docker — watches Dockerfiles for base image updates
+  - package-ecosystem: docker
+    directory: /api
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(docker):"
+    labels:
+      - dependencies
+      - docker
+
+  - package-ecosystem: docker
+    directory: /ui
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(docker):"
+    labels:
+      - dependencies
+      - docker
+
+  # GitHub Actions — watches .github/workflows/ for action version updates
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(actions):"
+    labels:
+      - dependencies
+      - ci
+    open-pull-requests-limit: 10
+    groups:
+      docker-actions:
+        patterns:
+          - "docker/*"
+      actions-official:
+        patterns:
+          - "actions/*"
