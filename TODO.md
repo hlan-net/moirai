@@ -35,17 +35,17 @@ Three proposals for the Aggregated Stream view, prioritised by complexity:
 
 #### Proposal 1: The "Pure River" (High-Density List)
 High information density, mimicking `river.hlan.net`.
-- [ ] Remove card borders and background colors; use thin separator lines.
-- [ ] Group articles by feed only when sequential in the timeline.
-- [ ] Prepend new articles without shifting the current reading position.
-- [ ] Show a "New Articles Available" toast that scrolls to top on click.
+- [x] Remove card borders and background colors; use thin separator lines.
+- [x] Group articles by feed only when sequential in the timeline.
+- [x] Prepend new articles without shifting the current reading position.
+- [x] Show a "New Articles Available" toast that scrolls to top on click.
 
 #### Proposal 2: The "Time-Blocked" River
 Group by temporal windows instead of sources.
-- [ ] Section headers: "Last Hour", "Earlier Today", "Yesterday".
-- [ ] Collapsed summaries by default; expand on click/hover.
-- [ ] Source favicon and name as a small inline tag next to the title.
-- [ ] Once a time block is rendered its order is frozen.
+- [x] Section headers: "Last Hour", "Earlier Today", "Yesterday".
+- [x] Collapsed summaries by default; expand on click/hover.
+- [x] Source favicon and name as a small inline tag next to the title.
+- [x] Once a time block is rendered its order is frozen.
 
 #### Proposal 3: The "AI-Annotated" River
 Chronological list with AI-driven speed-reading markers.
