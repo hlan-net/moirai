@@ -51,4 +51,13 @@ Group by temporal windows instead of sources.
 Chronological list with AI-driven speed-reading markers.
 - [ ] Color-coded dots/badges per article indicating Topic, Priority, or Sentiment.
 - [ ] Items stay at their original position once fetched.
-- [ ] Depends on an AI annotation enrichment step in the backend.
+- [x] Depends on an AI annotation enrichment step in the backend.
+
+### Backend AI Annotation Pipeline
+Automatic LLM-powered annotation of articles with topics, priority, and sentiment.
+- [x] Core annotator module (`tasks/annotator.py`): LLM prompt, validation, CouchDB storage.
+- [x] Annotation worker (`tasks/annotation_worker.py`): CouchDB changes-feed listener on `articles` DB.
+- [x] Wire annotation worker into `run_worker.py` alongside enrichment worker.
+- [x] MCP annotation tools (`mcp_service/tools/annotations.py`): reannotate, list unannotated, stats.
+- [x] RSS output: annotation data as `<category>` tags (domain=topic/priority/sentiment) in `api/rss_ops.py`.
+- [x] Unit tests (`tests/test_annotator_unit.py`): validation, LLM mocking, store logic, RSS output.

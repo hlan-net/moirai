@@ -34,6 +34,24 @@ def generate_rss_item_xml(article, feed_title_map, parse_datetime_func):
                 f'    <category domain="trend">{escape(trend_name)}</category>'
             )
 
+    # AI annotations (topics, priority, sentiment)
+    annotations = article.get("annotations")
+    if isinstance(annotations, dict):
+        for topic in annotations.get("topics", []):
+            categories.append(
+                f'    <category domain="topic">{escape(str(topic))}</category>'
+            )
+        priority = annotations.get("priority")
+        if priority:
+            categories.append(
+                f'    <category domain="priority">{escape(str(priority))}</category>'
+            )
+        sentiment = annotations.get("sentiment")
+        if sentiment:
+            categories.append(
+                f'    <category domain="sentiment">{escape(str(sentiment))}</category>'
+            )
+
     category_xml = "\n".join(categories) if categories else ""
 
     # Add source feed info

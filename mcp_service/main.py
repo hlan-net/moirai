@@ -4,7 +4,7 @@ from starlette.routing import Route
 from .core import mcp
 from api.telemetry import configure_telemetry
 from tasks.agent_orchestrator import AgentOrchestrator
-from .tools import feeds, issues, search, staleness, users, agent_configs  # noqa: F401
+from .tools import feeds, issues, search, staleness, users, agent_configs, annotations  # noqa: F401
 from version import get_version_string
 import logging
 import os # Added for env vars
