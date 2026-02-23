@@ -7,23 +7,47 @@ COPY environment-prod.yml .
 RUN conda install -y mamba && \
     mamba env create -f environment-prod.yml && \
     mamba clean --all --force-pkgs-dirs -y && \
-    # Remove pyc files and test dirs to shrink the env
+    # ---- Aggressively strip the conda env for production ----
+    # 1. Google API discovery cache (93 MB of JSON, fetched at runtime anyway)
+    rm -rf /opt/conda/envs/moirai/lib/python3.10/site-packages/googleapiclient/discovery_cache/documents && \
+    # 2. pip and setuptools (not needed at runtime)
+    pip install --target /dev/null 2>/dev/null; \
+    rm -rf /opt/conda/envs/moirai/lib/python3.10/site-packages/pip \
+           /opt/conda/envs/moirai/lib/python3.10/site-packages/setuptools \
+           /opt/conda/envs/moirai/lib/python3.10/site-packages/pkg_resources \
+           /opt/conda/envs/moirai/lib/python3.10/ensurepip && \
+    # 3. Tkinter / tcl / tk (not needed for a web server)
+    rm -rf /opt/conda/envs/moirai/lib/libtcl* \
+           /opt/conda/envs/moirai/lib/libtk* \
+           /opt/conda/envs/moirai/lib/tcl8* \
+           /opt/conda/envs/moirai/lib/tk8* \
+           /opt/conda/envs/moirai/lib/python3.10/tkinter \
+           /opt/conda/envs/moirai/lib/python3.10/lib-tk && \
+    # 4. C headers and static libraries (only needed for compiling)
+    rm -rf /opt/conda/envs/moirai/include \
+           /opt/conda/envs/moirai/lib/*.a && \
+    # 5. Share directory (man pages, docs, terminfo, etc.)
+    rm -rf /opt/conda/envs/moirai/share/man \
+           /opt/conda/envs/moirai/share/doc \
+           /opt/conda/envs/moirai/share/terminfo \
+           /opt/conda/envs/moirai/share/gtk-doc && \
+    # 6. Python bytecache, test suites, dist-info overhead
     find /opt/conda/envs/moirai -name '*.pyc' -delete && \
     find /opt/conda/envs/moirai -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; \
     find /opt/conda/envs/moirai -name 'tests' -type d -exec rm -rf {} + 2>/dev/null; \
     find /opt/conda/envs/moirai -name 'test' -type d -exec rm -rf {} + 2>/dev/null; \
+    # 7. Strip debug symbols from shared libraries
+    find /opt/conda/envs/moirai -name '*.so*' -exec strip --strip-unneeded {} + 2>/dev/null; \
     true
 
 # Stage 2: Slim runtime image
 FROM debian:bookworm-slim AS final-stage
 
-# Install only the minimal runtime libraries needed by compiled Python packages
+# Install only curl (health probes) and CA certs (HTTPS).
+# libffi, libssl, libgomp are already inside the conda env.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        libffi8 \
-        libssl3 \
-        libgomp1 \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
