@@ -28,6 +28,7 @@ onMounted(() => {
         <router-link to="/stream" class="nav-link">Stream</router-link>
         <template v-if="isAuthenticated">
           <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
+          <router-link to="/lifespan" class="nav-link">Lifespan</router-link>
           <router-link to="/chat" class="nav-link">Chat</router-link>
           <router-link to="/settings" class="nav-link">Settings</router-link>
           <router-link to="/agents" class="nav-link">Agents</router-link>

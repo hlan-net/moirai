@@ -26,9 +26,9 @@ Intended to enforce schema at the database level. Previously marked done but **n
 
 ### Lifespan View (Fates V2)
 A new UI view to visualise the "frequency" of the current userspace — how the stream of articles crystallises into active Issues ("Things that ARE") and sealed Issues ("Things that WERE").
-- [ ] Add a `LifespanView` Vue component.
-- [ ] Add a `/lifespan` route to `ui/src/router.ts`.
-- [ ] Design: show active issues by longevity (transient / temporal / epic) and a historical record of eternal issues.
+- [x] Add a `LifespanView` Vue component.
+- [x] Add a `/lifespan` route to `ui/src/router.ts`.
+- [x] Design: show active issues by longevity (transient / temporal / epic) and a historical record of eternal issues.
 
 ### River of News Stream Improvements
 Three proposals for the Aggregated Stream view, prioritised by complexity:

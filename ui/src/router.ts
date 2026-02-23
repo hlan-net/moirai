@@ -5,13 +5,15 @@ import SettingsPage from './components/SettingsPage.vue'
 import ChatPage from './components/ChatPage.vue'
 import StreamPage from './components/StreamPage.vue'
 import LoginPage from './components/LoginPage.vue'
-import AgentManagementPage from './components/AgentManagementPage.vue' // Import new component
+import AgentManagementPage from './components/AgentManagementPage.vue'
+import LifespanView from './components/LifespanView.vue'
 
 const routes = [
   { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
   { path: '/stream', component: StreamPage, name: 'StreamExplicit' }, // Explicit /stream route for navigation
   { path: '/login', component: LoginPage, name: 'Login' },
   { path: '/dashboard', component: MainPage, name: 'Dashboard', meta: { requiresAuth: true } },
+  { path: '/lifespan', component: LifespanView, name: 'Lifespan', meta: { requiresAuth: true } },
   { path: '/chat', component: ChatPage, name: 'Chat', meta: { requiresAuth: true } },
   { path: '/settings', component: SettingsPage, name: 'Settings', meta: { requiresAuth: true } },
   {
@@ -19,7 +21,7 @@ const routes = [
     component: AgentManagementPage,
     name: 'AgentManagement',
     meta: { requiresAuth: true },
-  }, // New agent management route
+  },
 ]
 
 const router = createRouter({
