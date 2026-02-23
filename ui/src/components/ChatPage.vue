@@ -29,6 +29,49 @@ const newSessionTitle = ref('')
 
 const currentLlmEndpoint = ref('ollama')
 const currentModel = ref('llama3.1:latest')
+const modelSelectOpen = ref(false)
+const loadingModels = ref(false)
+const modelFetchError = ref('')
+const availableModels = ref<string[]>([])
+const availableOpenAiModels = ref<string[]>([])
+const availableGeminiModels = ref<string[]>([])
+
+const modelSettingsMap: Record<string, string> = {
+  openai: 'moirai_openai_model',
+  gemini: 'moirai_gemini_model',
+  ollama: 'moirai_model'
+}
+
+const defaultModels: Record<string, string> = {
+  openai: 'gpt-4-turbo',
+  gemini: 'gemini-1.5-pro',
+  ollama: 'llama3.1:latest'
+}
+
+const endpointSelection = computed({
+  get: () => currentLlmEndpoint.value,
+  set: (value: string) => {
+    updateEndpoint(value)
+  }
+})
+
+const modelSelection = computed({
+  get: () => currentModel.value,
+  set: (value: string) => {
+    updateModel(value)
+  }
+})
+
+const modelOptions = computed(() => {
+  switch (currentLlmEndpoint.value) {
+    case 'openai':
+      return availableOpenAiModels.value
+    case 'gemini':
+      return availableGeminiModels.value
+    default:
+      return availableModels.value
+  }
+})
 
 onMounted(() => {
     fetchConfig()
@@ -62,23 +105,116 @@ const fetchConfig = async () => {
 
 const loadSettings = () => {
     currentLlmEndpoint.value = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
-    
-    const settingsMap: Record<string, string> = {
-        'openai': 'moirai_openai_model',
-        'gemini': 'moirai_gemini_model',
-        'ollama': 'moirai_model'
-    }
-    
-    const defaultModels: Record<string, string> = {
-        'openai': 'gpt-4-turbo',
-        'gemini': 'gemini-1.5-pro',
-        'ollama': 'llama3.1:latest'
-    }
-    
-    const settingsKey = settingsMap[currentLlmEndpoint.value] || 'moirai_model'
+
+    const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
     const defaultModel = defaultModels[currentLlmEndpoint.value] || 'llama3.1:latest'
     
     currentModel.value = localStorage.getItem(settingsKey) || defaultModel
+}
+
+const updateEndpoint = (value: string) => {
+  if (currentLlmEndpoint.value === value) return
+  currentLlmEndpoint.value = value
+  localStorage.setItem('moirai_llm_endpoint', value)
+
+  const settingsKey = modelSettingsMap[value] || 'moirai_model'
+  const defaultModel = defaultModels[value] || 'llama3.1:latest'
+  currentModel.value = localStorage.getItem(settingsKey) || defaultModel
+  loadModelsForEndpoint(value)
+}
+
+const updateModel = (value: string) => {
+  currentModel.value = value
+  const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
+  localStorage.setItem(settingsKey, value)
+}
+
+const loadModelsForEndpoint = async (endpoint: string) => {
+  modelFetchError.value = ''
+
+  if (endpoint === 'openai') {
+    if (availableOpenAiModels.value.length > 0) return
+    const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
+    if (!openaiApiKey) {
+      modelFetchError.value = 'Add an OpenAI API key in Settings to fetch models.'
+      return
+    }
+    loadingModels.value = true
+    try {
+      const res = await authFetch('/api/models?llm_endpoint=openai', {
+        headers: {
+          'x-openai-api-key': openaiApiKey
+        }
+      })
+      if (res.ok) {
+        availableOpenAiModels.value = await res.json()
+      } else {
+        modelFetchError.value = 'Failed to load OpenAI models.'
+      }
+    } catch (error) {
+      console.error('Error fetching OpenAI models:', error)
+      modelFetchError.value = 'Failed to load OpenAI models.'
+    } finally {
+      loadingModels.value = false
+    }
+    return
+  }
+
+  if (endpoint === 'gemini') {
+    if (availableGeminiModels.value.length > 0) return
+    const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+    if (!geminiApiKey) {
+      modelFetchError.value = 'Add a Gemini API key in Settings to fetch models.'
+      return
+    }
+    loadingModels.value = true
+    try {
+      const res = await authFetch('/api/models?llm_endpoint=gemini', {
+        headers: {
+          'x-gemini-api-key': geminiApiKey
+        }
+      })
+      if (res.ok) {
+        availableGeminiModels.value = await res.json()
+      } else {
+        modelFetchError.value = 'Failed to load Gemini models.'
+      }
+    } catch (error) {
+      console.error('Error fetching Gemini models:', error)
+      modelFetchError.value = 'Failed to load Gemini models.'
+    } finally {
+      loadingModels.value = false
+    }
+    return
+  }
+
+  if (availableModels.value.length > 0) return
+  loadingModels.value = true
+  try {
+    const headers: Record<string, string> = {}
+    const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
+    if (ollamaEndpointUrl) {
+      headers['x-ollama-base-url'] = ollamaEndpointUrl
+    }
+    const res = await authFetch('/api/models', { headers })
+    if (res.ok) {
+      availableModels.value = await res.json()
+    } else {
+      modelFetchError.value = 'Failed to load Ollama models.'
+    }
+  } catch (error) {
+    console.error('Error fetching Ollama models:', error)
+    modelFetchError.value = 'Failed to load Ollama models.'
+  } finally {
+    loadingModels.value = false
+  }
+}
+
+const toggleModelSelect = () => {
+  modelSelectOpen.value = !modelSelectOpen.value
+  if (modelSelectOpen.value) {
+    loadModelsForEndpoint(currentLlmEndpoint.value)
+  }
 }
 
 const parsedContent = (content: string) => {
@@ -389,9 +525,17 @@ const renameSession = async (session: ChatSession) => {
     </div>
     <div class="chat-main">
       <div class="chat-header">
-        <div class="model-info">
+        <div
+          class="model-info"
+          role="button"
+          tabindex="0"
+          @click="toggleModelSelect"
+          @keyup.enter.prevent="toggleModelSelect"
+          @keyup.space.prevent="toggleModelSelect"
+        >
             <span class="provider-label">{{ currentLlmEndpoint }}</span>
             <span class="model-name">{{ currentModel }}</span>
+            <span class="model-caret" :class="{ open: modelSelectOpen }">▾</span>
         </div>
         <button v-if="sessionId" @click="downloadChat" class="download-btn" title="Download Chat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -399,6 +543,42 @@ const renameSession = async (session: ChatSession) => {
           </svg>
           Download
         </button>
+      </div>
+      <div v-if="modelSelectOpen" class="model-select-panel">
+        <div class="model-select-row">
+          <label class="model-select-label" for="chat-provider">Provider</label>
+          <select id="chat-provider" v-model="endpointSelection" class="model-select">
+            <option value="ollama">Ollama</option>
+            <option value="openai">OpenAI</option>
+            <option value="gemini">Gemini</option>
+          </select>
+        </div>
+        <div class="model-select-row">
+          <label class="model-select-label" for="chat-model">Model</label>
+          <select
+            v-if="modelOptions.length"
+            id="chat-model"
+            v-model="modelSelection"
+            class="model-select"
+          >
+            <option v-for="model in modelOptions" :key="model" :value="model">
+              {{ model }}
+            </option>
+          </select>
+          <input
+            v-else
+            id="chat-model"
+            v-model="modelSelection"
+            class="model-input"
+            placeholder="e.g. llama3.1:latest"
+          />
+        </div>
+        <div class="model-select-meta">
+          <span v-if="loadingModels">Loading models...</span>
+          <span v-else-if="modelFetchError">{{ modelFetchError }}</span>
+          <span v-else-if="!modelOptions.length">No models fetched. You can type a model name.</span>
+        </div>
+        <button class="model-select-close" @click="modelSelectOpen = false">Done</button>
       </div>
       <div class="chat-container">
         <div class="messages">
@@ -439,12 +619,16 @@ const renameSession = async (session: ChatSession) => {
 }
 .sidebar {
   width: 250px;
-  background: var(--button-bg);
-  padding: 10px;
-  border-right: 1px solid var(--border-color);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  padding: 16px 12px 16px 16px;
+  border-right: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+:global(.light-theme) .sidebar {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0));
 }
 .new-chat-btn {
   margin-bottom: 0;
@@ -499,13 +683,20 @@ const renameSession = async (session: ChatSession) => {
 .session-item {
   padding: 10px;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: 8px;
   color: var(--text-color);
   font-size: 0.9rem;
   position: relative;
+  transition: background-color 0.2s;
 }
 .session-item:hover, .session-item.active {
-  background: var(--bg-color);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:global(.light-theme) .session-item:hover,
+:global(.light-theme) .session-item.active {
+  background: rgba(0, 0, 0, 0.05);
 }
 .session-header {
   display: flex;
@@ -694,6 +885,13 @@ const renameSession = async (session: ChatSession) => {
     gap: 8px;
     font-size: 0.9rem;
     color: var(--text-color);
+    cursor: pointer;
+    user-select: none;
+}
+.model-info:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 6px;
 }
 .provider-label {
     font-weight: bold;
@@ -707,6 +905,70 @@ const renameSession = async (session: ChatSession) => {
 .model-name {
     opacity: 0.9;
     font-family: monospace;
+}
+.model-caret {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    transition: transform 0.2s;
+}
+.model-caret.open {
+    transform: rotate(180deg);
+}
+.model-select-panel {
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto 12px auto;
+    padding: 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.model-select-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 10px;
+    align-items: center;
+}
+.model-select-label {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+.model-select,
+.model-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--input-text);
+    font-size: 0.9rem;
+}
+.model-select:focus,
+.model-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+.model-select-meta {
+    font-size: 0.8rem;
+    opacity: 0.75;
+}
+.model-select-close {
+    align-self: flex-end;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.model-select-close:hover {
+    background: var(--button-bg);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 .download-btn {
     display: flex;

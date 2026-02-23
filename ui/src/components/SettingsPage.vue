@@ -735,6 +735,10 @@ onMounted(() => {
 <style scoped>
 .settings-page {
   padding: 20px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
   padding-bottom: 80px; /* Space for fixed bottom bar if needed, currently inline */

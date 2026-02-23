@@ -715,7 +715,7 @@ const toggleTheme = () => {
 }
 
 .item-title a {
-    color: var(--primary-color);
+    color: #af9fc5;
     text-decoration: none;
 }
 
