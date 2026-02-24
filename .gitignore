@@ -173,4 +173,5 @@ custom-values.yaml
 helm/custom-values.yaml
 
 # Yarn install state (auto-generated)
+ui/.yarn/
 ui/.yarn/install-state.gz

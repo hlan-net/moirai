@@ -88,6 +88,7 @@ services:
     command: [ "sh", "-c", "python init_db.py && uvicorn mcp_service.main:app --host $${HTTP_HOST:-0.0.0.0} --port 8090" ]
     ports:
       - "8090:8090"
+      - "9000:9000"
     environment:
       - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}@couchdb:5984/
       - ADMIN_USERNAME=username
@@ -98,6 +99,7 @@ services:
       - REDIS_HOST=redis # Added Redis host
       - REDIS_PORT=6379 # Added Redis port
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set} # Added Redis password
+      - METRICS_PORT=9000
     depends_on:
       - couchdb
       - redis # Added dependency on redis
