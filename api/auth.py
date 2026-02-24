@@ -292,7 +292,6 @@ def jwt_required(f):
         if not success:
             response = jsonify({"message": message})
             response.status_code = 401
-            response.headers["WWW-Authenticate"] = 'Basic realm="Login Required"'
             return response
 
         return f(*args, **kwargs)

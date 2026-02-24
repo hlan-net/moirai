@@ -51,7 +51,6 @@ ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
 ERROR_FEED_NOT_FOUND = "Feed not found"
 ERROR_LIMIT_INTEGER = "limit must be an integer"
 ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
-AUTH_HEADER_LOGIN_REQUIRED = 'Basic realm="Login Required"'
 
 # Mongo Constants are now imported from api.db_constants
 
@@ -245,7 +244,6 @@ def list_feeds():
     if not check_public_read_access():
         response = jsonify({"message": "Unauthorized"})
         response.status_code = 401
-        response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
         return response
     feeds = fetch_from_couchdb("feeds")
     return jsonify(feeds)
@@ -389,7 +387,6 @@ def list_articles():
     if not check_public_read_access():
         response = jsonify({"message": "Unauthorized"})
         response.status_code = 401
-        response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
         return response
     # Pagination parameters
     try:
@@ -453,7 +450,6 @@ def rss_feed():
     if not check_public_read_access():
         response = jsonify({"message": "Unauthorized"})
         response.status_code = 401
-        response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
         return response
 
     # Fetch all data (reuse logic from list_articles)
@@ -525,7 +521,6 @@ def list_issues():
     if not check_public_read_access():
         response = jsonify({"message": "Unauthorized"})
         response.status_code = 401
-        response.headers["WWW-Authenticate"] = AUTH_HEADER_LOGIN_REQUIRED
         return response
     
     feed_url = request.args.get("feed_url")
