@@ -46,9 +46,8 @@ class MockDB:
                 user = self.users.get(doc_id)
                 return user.copy() if user else None
             return list(self.users.values())
-        elif db_name == "config":
-            if doc_id == "main":
-                return self.config.get("main")
+        elif db_name == "config" and doc_id == "main":
+            return self.config.get("main")
         # For other DBs like 'articles', return empty list for list calls
         if doc_id is None:
             return []
@@ -59,10 +58,9 @@ class MockDB:
             if doc_id in self.users:
                 self.users[doc_id] = doc
                 return True
-        elif db_name == "config":
-            if doc_id == "main":
-                self.config["main"] = doc
-                return True
+        elif db_name == "config" and doc_id == "main":
+            self.config["main"] = doc
+            return True
         return False
 
     def store_to_couchdb(self, db_name, doc):

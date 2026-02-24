@@ -65,7 +65,7 @@ def extract_tool_calls_from_content(content):
     # We look for something starting with { and ending with } that contains "name" and "parameters"
     # Use non-greedy matching .*? to find multiple separate JSON blocks
     matches = re.findall(
-        r'(\{[^{}]*?"name"\s*:\s*".*?".*?"parameters"\s*:\s*\{.*?\}.*?\})',
+        r'(\{[^{}]*"name"\s*:\s*".*?".*?"parameters"\s*:\s*\{.*?\}.*?\})',
         content,
         re.DOTALL,
     )

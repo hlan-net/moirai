@@ -120,14 +120,14 @@ const handleGithubLogin = () => {
         return
     }
     // Redirect to GitHub
-    const redirectUri = window.location.origin + '/login'
+    const redirectUri = globalThis.location.origin + '/login'
     const scope = 'user:email'
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId.value}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`
-    window.location.href = authUrl
+    globalThis.location.href = authUrl
 }
 
 const checkGithubCallback = async () => {
-    const urlParams = new URLSearchParams(window.location.search)
+    const urlParams = new URLSearchParams(globalThis.location.search)
     const code = urlParams.get('code')
     if (code) {
         loading.value = true
@@ -135,7 +135,7 @@ const checkGithubCallback = async () => {
             const success = await authStore.loginWithGithub(code)
             if (success) {
                 // Clear query params
-                window.history.replaceState({}, document.title, window.location.pathname)
+                globalThis.history.replaceState({}, document.title, globalThis.location.pathname)
                 emit('success')
             } else {
                 errorMessage.value = 'GitHub Login Failed'

@@ -102,7 +102,7 @@ const copyAbout = async () => {
     console.error('Failed to copy about info', error)
     copyStatus.value = 'Copy failed'
   } finally {
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       copyStatus.value = ''
     }, 2000)
   }
