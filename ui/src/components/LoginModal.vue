@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import LoginForm from './LoginForm.vue'
 
 const emit = defineEmits(['close', 'success'])
+const dialogRef = ref<HTMLDialogElement | null>(null)
 
 const handleClose = () => {
     emit('close')
@@ -11,11 +13,17 @@ const handleSuccess = () => {
     emit('success')
     emit('close')
 }
+
+onMounted(() => {
+  if (dialogRef.value) {
+    dialogRef.value.showModal()
+  }
+})
 </script>
 
 <template>
   <div class="modal-overlay" @click.self="handleClose">
-    <div class="modal-content" role="dialog" aria-modal="true">
+    <dialog ref="dialogRef" class="modal-content" @close="handleClose">
       <button class="close-btn" @click="handleClose" aria-label="Close modal">&times;</button>
       <LoginForm @success="handleSuccess">
         <template #header>
@@ -23,7 +31,7 @@ const handleSuccess = () => {
             <p class="subtitle">Please sign in to continue</p>
         </template>
       </LoginForm>
-    </div>
+    </dialog>
   </div>
 </template>
 
@@ -43,14 +51,20 @@ const handleSuccess = () => {
 
 .modal-content {
   background: var(--card-bg);
+  color: var(--text-color);
   border-radius: 8px;
+  border: 1px solid var(--border-color);
   width: 100%;
   max-width: 450px;
   position: relative;
-  /* LoginForm handles its own padding, but we might want a bit wrapper padding if needed. 
-     LoginForm has padding: 2rem. */
   max-height: 90vh;
   overflow-y: auto;
+  padding: 0;
+  margin: auto;
+}
+
+.modal-content::backdrop {
+  background: transparent; /* Use overlay instead */
 }
 
 .close-btn {

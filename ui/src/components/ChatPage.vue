@@ -161,65 +161,60 @@ const updateModel = (value: string) => {
   saveUserSetting(settingsKey, value)
 }
 
-const loadModelsForEndpoint = async (endpoint: string) => {
-  modelFetchError.value = ''
-
-  if (endpoint === 'openai') {
-    if (availableOpenAiModels.value.length > 0) return
-    const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
-    if (!openaiApiKey) {
-      modelFetchError.value = 'Add an OpenAI API key in Settings to fetch models.'
-      return
-    }
-    loadingModels.value = true
-    try {
-      const res = await authFetch('/api/models?llm_endpoint=openai', {
-        headers: {
-          'x-openai-api-key': openaiApiKey
-        }
-      })
-      if (res.ok) {
-        availableOpenAiModels.value = await res.json()
-      } else {
-        modelFetchError.value = 'Failed to load OpenAI models.'
-      }
-    } catch (error) {
-      console.error('Error fetching OpenAI models:', error)
-      modelFetchError.value = 'Failed to load OpenAI models.'
-    } finally {
-      loadingModels.value = false
-    }
-    return
+const _fetchModels = async (endpoint: string, apiKey: string | null, headers: Record<string, string> = {}) => {
+  let url = '/api/models'
+  if (endpoint !== 'ollama') {
+    url += `?llm_endpoint=${endpoint}`
+  }
+  
+  if (apiKey) {
+    headers[`x-${endpoint}-api-key`] = apiKey
   }
 
-  if (endpoint === 'gemini') {
-    if (availableGeminiModels.value.length > 0) return
-    const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
-    if (!geminiApiKey) {
-      modelFetchError.value = 'Add a Gemini API key in Settings to fetch models.'
-      return
-    }
-    loadingModels.value = true
-    try {
-      const res = await authFetch('/api/models?llm_endpoint=gemini', {
-        headers: {
-          'x-gemini-api-key': geminiApiKey
-        }
-      })
-      if (res.ok) {
-        availableGeminiModels.value = await res.json()
-      } else {
-        modelFetchError.value = 'Failed to load Gemini models.'
-      }
-    } catch (error) {
-      console.error('Error fetching Gemini models:', error)
-      modelFetchError.value = 'Failed to load Gemini models.'
-    } finally {
-      loadingModels.value = false
-    }
+  const res = await authFetch(url, { headers })
+  if (res.ok) {
+    return await res.json()
+  }
+  throw new Error(`Failed to load ${endpoint} models.`)
+}
+
+const _loadOpenAiModels = async () => {
+  if (availableOpenAiModels.value.length > 0) return
+  const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
+  if (!openaiApiKey) {
+    modelFetchError.value = 'Add an OpenAI API key in Settings to fetch models.'
     return
   }
+  loadingModels.value = true
+  try {
+    availableOpenAiModels.value = await _fetchModels('openai', openaiApiKey)
+  } catch (error) {
+    console.error('Error fetching OpenAI models:', error)
+    modelFetchError.value = 'Failed to load OpenAI models.'
+  } finally {
+    loadingModels.value = false
+  }
+}
 
+const _loadGeminiModels = async () => {
+  if (availableGeminiModels.value.length > 0) return
+  const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
+  if (!geminiApiKey) {
+    modelFetchError.value = 'Add a Gemini API key in Settings to fetch models.'
+    return
+  }
+  loadingModels.value = true
+  try {
+    availableGeminiModels.value = await _fetchModels('gemini', geminiApiKey)
+  } catch (error) {
+    console.error('Error fetching Gemini models:', error)
+    modelFetchError.value = 'Failed to load Gemini models.'
+  } finally {
+    loadingModels.value = false
+  }
+}
+
+const _loadOllamaModels = async () => {
   if (availableModels.value.length > 0) return
   loadingModels.value = true
   try {
@@ -228,17 +223,24 @@ const loadModelsForEndpoint = async (endpoint: string) => {
     if (ollamaEndpointUrl) {
       headers['x-ollama-base-url'] = ollamaEndpointUrl
     }
-    const res = await authFetch('/api/models', { headers })
-    if (res.ok) {
-      availableModels.value = await res.json()
-    } else {
-      modelFetchError.value = 'Failed to load Ollama models.'
-    }
+    availableModels.value = await _fetchModels('ollama', null, headers)
   } catch (error) {
     console.error('Error fetching Ollama models:', error)
     modelFetchError.value = 'Failed to load Ollama models.'
   } finally {
     loadingModels.value = false
+  }
+}
+
+const loadModelsForEndpoint = async (endpoint: string) => {
+  modelFetchError.value = ''
+
+  if (endpoint === 'openai') {
+    await _loadOpenAiModels()
+  } else if (endpoint === 'gemini') {
+    await _loadGeminiModels()
+  } else {
+    await _loadOllamaModels()
   }
 }
 

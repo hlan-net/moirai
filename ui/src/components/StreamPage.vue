@@ -110,83 +110,90 @@ const themeTitle = computed(() =>
   resolvedTheme.value === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'
 )
 
+const _extractCategories = (item: Element) => {
+  const events: string[] = []
+  const trends: string[] = []
+  const topics: string[] = []
+  let priority: 'low' | 'medium' | 'high' | undefined
+  let sentiment: 'positive' | 'neutral' | 'negative' | undefined
+
+  for (const category of Array.from(item.querySelectorAll('category'))) {
+    const label = category.textContent?.trim()
+    if (!label) continue
+    const domain = category.getAttribute('domain')
+    if (domain === 'event') {
+      events.push(label)
+    } else if (domain === 'trend') {
+      trends.push(label)
+    } else if (domain === 'topic') {
+      topics.push(label)
+    } else if (domain === 'priority') {
+      priority = label as 'low' | 'medium' | 'high'
+    } else if (domain === 'sentiment') {
+      sentiment = label as 'positive' | 'neutral' | 'negative'
+    }
+  }
+  return { events, trends, topics, priority, sentiment }
+}
+
+const _parseFeedItem = (item: Element, index: number): Article => {
+  const title = item.querySelector('title')?.textContent?.trim() || 'Untitled'
+  const link = item.querySelector('link')?.textContent?.trim() || ''
+  const summary = item.querySelector('description')?.textContent?.trim() || ''
+  const pubDate = item.querySelector('pubDate')?.textContent?.trim() || ''
+  const guid = item.querySelector('guid')?.textContent?.trim() || link || `${title}-${index}`
+  const sourceTitle =
+    item.querySelector('source > title')?.textContent?.trim() ||
+    item.querySelector('source')?.textContent?.trim() ||
+    ''
+
+  let published = ''
+  if (pubDate) {
+    const parsed = new Date(pubDate)
+    if (!Number.isNaN(parsed.getTime())) {
+      published = parsed.toISOString()
+    }
+  }
+
+  let feedUrl = link
+  try {
+    feedUrl = new URL(link).origin
+  } catch (error) {
+    feedUrl = link
+  }
+
+  const { events, trends, topics, priority, sentiment } = _extractCategories(item)
+
+  const annotations =
+    topics.length || priority || sentiment
+      ? {
+          topics,
+          priority: priority || 'low',
+          sentiment: sentiment || 'neutral',
+        }
+      : undefined
+
+  return {
+    _id: guid,
+    title,
+    summary,
+    link,
+    published: published || new Date().toISOString(),
+    feed_url: feedUrl,
+    feed_title: sourceTitle || getHostname(feedUrl),
+    events: events.length ? events : undefined,
+    trends: trends.length ? trends : undefined,
+    annotations,
+  }
+}
+
 const parseRssFeed = (xmlText: string): Article[] => {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml')
   if (doc.querySelector('parsererror')) {
     throw new Error('Invalid RSS feed')
   }
 
-  return Array.from(doc.querySelectorAll('item')).map((item, index) => {
-    const title = item.querySelector('title')?.textContent?.trim() || 'Untitled'
-    const link = item.querySelector('link')?.textContent?.trim() || ''
-    const summary = item.querySelector('description')?.textContent?.trim() || ''
-    const pubDate = item.querySelector('pubDate')?.textContent?.trim() || ''
-    const guid = item.querySelector('guid')?.textContent?.trim() || link || `${title}-${index}`
-    const sourceTitle =
-      item.querySelector('source > title')?.textContent?.trim() ||
-      item.querySelector('source')?.textContent?.trim() ||
-      ''
-
-    let published = ''
-    if (pubDate) {
-      const parsed = new Date(pubDate)
-      if (!Number.isNaN(parsed.getTime())) {
-        published = parsed.toISOString()
-      }
-    }
-
-    let feedUrl = link
-    try {
-      feedUrl = new URL(link).origin
-    } catch (error) {
-      feedUrl = link
-    }
-
-    const events: string[] = []
-    const trends: string[] = []
-    const topics: string[] = []
-    let priority: 'low' | 'medium' | 'high' | undefined
-    let sentiment: 'positive' | 'neutral' | 'negative' | undefined
-
-    for (const category of Array.from(item.querySelectorAll('category'))) {
-      const label = category.textContent?.trim()
-      if (!label) continue
-      const domain = category.getAttribute('domain')
-      if (domain === 'event') {
-        events.push(label)
-      } else if (domain === 'trend') {
-        trends.push(label)
-      } else if (domain === 'topic') {
-        topics.push(label)
-      } else if (domain === 'priority') {
-        priority = label as 'low' | 'medium' | 'high'
-      } else if (domain === 'sentiment') {
-        sentiment = label as 'positive' | 'neutral' | 'negative'
-      }
-    }
-
-    const annotations =
-      topics.length || priority || sentiment
-        ? {
-            topics,
-            priority: priority || 'low',
-            sentiment: sentiment || 'neutral',
-          }
-        : undefined
-
-    return {
-      _id: guid,
-      title,
-      summary,
-      link,
-      published: published || new Date().toISOString(),
-      feed_url: feedUrl,
-      feed_title: sourceTitle || getHostname(feedUrl),
-      events: events.length ? events : undefined,
-      trends: trends.length ? trends : undefined,
-      annotations,
-    }
-  })
+  return Array.from(doc.querySelectorAll('item')).map((item, index) => _parseFeedItem(item, index))
 }
 
 const fetchStream = async (isManual = false) => {
@@ -344,7 +351,7 @@ const toggleTheme = () => {
         <h3 class="group-title">
           <template v-if="groupMode === 'feed'">
             <img v-if="group.favicon" :src="group.favicon" class="group-favicon" :alt="`${group.title} icon`" @error="handleFaviconError" />
-            <span v-else class="group-favicon-placeholder" role="img" :aria-label="`${group.title} icon`">&#x1F4F0;</span>
+            <img v-else class="group-favicon-placeholder" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E📰%3C/text%3E%3C/svg%3E" alt="Default news icon" />
           </template>
           {{ group.title }}
           <span v-if="groupMode === 'time'" class="group-count">({{ group.articles.length }})</span>
@@ -359,7 +366,7 @@ const toggleTheme = () => {
               <span class="compact-time">{{ new Date(article.published).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}</span>
               <!-- Inline source tag for time-blocked mode -->
               <span v-if="groupMode === 'time'" class="inline-source" :title="article.feed_title || getHostname(article.feed_url)">
-                <img v-if="article.feed_favicon" :src="article.feed_favicon" class="inline-favicon" @error="handleFaviconError" />
+                <img v-if="article.feed_favicon" :src="article.feed_favicon" class="inline-favicon" alt="Feed icon" @error="handleFaviconError" />
                 {{ article.feed_title || getHostname(article.feed_url) }}
               </span>
               <h4 class="item-title compact-title">
@@ -380,7 +387,7 @@ const toggleTheme = () => {
           <template v-else>
             <!-- Inline source for time-blocked expanded view -->
             <div v-if="groupMode === 'time'" class="inline-source-expanded">
-              <img v-if="article.feed_favicon" :src="article.feed_favicon" class="inline-favicon" @error="handleFaviconError" />
+              <img v-if="article.feed_favicon" :src="article.feed_favicon" class="inline-favicon" alt="Feed icon" @error="handleFaviconError" />
               <span>{{ article.feed_title || getHostname(article.feed_url) }}</span>
             </div>
             <h4 class="item-title">
@@ -854,7 +861,8 @@ const toggleTheme = () => {
 .loading, .empty-state {
     text-align: center;
     padding: 40px;
-    color: #7f8c8d;
+    color: var(--text-color);
+    opacity: 0.8;
     font-size: 1.2rem;
 }
 

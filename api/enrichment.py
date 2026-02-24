@@ -90,17 +90,25 @@ def _apply_enrichment(
 ):
     """Applies the enrichment data to the articles list in-place."""
     for article in articles:
-        feed_url = article.get("feed_url")
-        if feed_url:
-            article["feed_title"] = feed_title_map.get(feed_url)
-            favicon = feed_favicon_map.get(feed_url)
-            if favicon:
-                article["feed_favicon"] = favicon
+        _enrich_article_feed(article, feed_title_map, feed_favicon_map)
+        _enrich_article_issues(article, article_issue_map)
 
-        article_link = article.get("link")
-        if article_link:
-            if article_link in article_issue_map:
-                article["issues"] = article_issue_map[article_link]
+
+def _enrich_article_feed(article, feed_title_map, feed_favicon_map):
+    """Enriches a single article with feed-specific info."""
+    feed_url = article.get("feed_url")
+    if feed_url:
+        article["feed_title"] = feed_title_map.get(feed_url)
+        favicon = feed_favicon_map.get(feed_url)
+        if favicon:
+            article["feed_favicon"] = favicon
+
+
+def _enrich_article_issues(article, article_issue_map):
+    """Enriches a single article with associated issues."""
+    article_link = article.get("link")
+    if article_link and article_link in article_issue_map:
+        article["issues"] = article_issue_map[article_link]
 
 
 def enrich_issues_with_constituents(issues, recursive=True):

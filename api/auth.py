@@ -87,6 +87,64 @@ def auth_config():
     return jsonify(get_public_auth_config())
 
 
+def _github_exchange_code_for_token(code, client_id, client_secret):
+    token_url = "https://github.com/login/oauth/access_token"
+    headers = {"Accept": JSON_CONTENT_TYPE}
+    payload = {"client_id": client_id, "client_secret": client_secret, "code": code}
+    res = requests.post(token_url, json=payload, headers=headers, timeout=10)
+    res.raise_for_status()
+    return res.json()
+
+
+def _github_fetch_profile(access_token):
+    user_res = requests.get(
+        "https://api.github.com/user",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": JSON_CONTENT_TYPE,
+        },
+        timeout=10
+    )
+    user_res.raise_for_status()
+    return user_res.json()
+
+
+def _github_fetch_primary_email(access_token):
+    emails_res = requests.get(
+        "https://api.github.com/user/emails",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": JSON_CONTENT_TYPE,
+        },
+        timeout=10
+    )
+    if emails_res.ok:
+        for e in emails_res.json():
+            if e.get("primary") and e.get("verified"):
+                return e.get("email")
+    return None
+
+
+def _get_or_create_github_user(email, github_id):
+    user = get_user_by_email(email)
+    if user:
+        return user["_id"], user.get("role", "user")
+
+    user_doc = {
+        "email": email,
+        "password_hash": "",
+        "role": "user",
+        "settings": {},
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "auth_provider": "github",
+        "github_id": github_id,
+    }
+    success, result = create_user(user_doc)
+    if not success:
+        return None, None
+    return result, "user"
+
+
 @auth_blueprint.route("/login/github", methods=["POST"])
 def github_login():
     code = request.json.get("code")
@@ -100,93 +158,33 @@ def github_login():
     if not client_id or not client_secret:
         return jsonify({"message": "GitHub Login not configured"}), 501
 
-    # Exchange code for access token
-    token_url = "https://github.com/login/oauth/access_token"
-    headers = {"Accept": JSON_CONTENT_TYPE}
-    payload = {"client_id": client_id, "client_secret": client_secret, "code": code}
-
     try:
-        res = requests.post(token_url, json=payload, headers=headers, timeout=10)
-        res.raise_for_status()
-        token_data = res.json()
-
+        token_data = _github_exchange_code_for_token(code, client_id, client_secret)
         if "error" in token_data:
-            return jsonify(
-                {"message": f"GitHub Error: {token_data.get('error_description')}"}
-            ), 400
+            return jsonify({"message": f"GitHub Error: {token_data.get('error_description')}"}), 400
 
         access_token = token_data.get("access_token")
         if not access_token:
             return jsonify({"message": "Failed to retrieve access token"}), 400
 
-        # Fetch User Profile
-        user_res = requests.get(
-            "https://api.github.com/user",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept": JSON_CONTENT_TYPE,
-            },
-            timeout=10
-        )
-        user_res.raise_for_status()
-        github_user = user_res.json()
-
-        # GitHub user might not check public email, so we might need to fetch emails endpoint
-        email = github_user.get("email")
-        if not email:
-            # Fetch emails
-            emails_res = requests.get(
-                "https://api.github.com/user/emails",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": JSON_CONTENT_TYPE,
-                },
-                timeout=10
-            )
-            if emails_res.ok:
-                emails = emails_res.json()
-                # Find primary verified email
-                for e in emails:
-                    if e.get("primary") and e.get("verified"):
-                        email = e.get("email")
-                        break
+        github_user = _github_fetch_profile(access_token)
+        email = github_user.get("email") or _github_fetch_primary_email(access_token)
 
         if not email:
-            return jsonify(
-                {"message": "No verified email found for GitHub account"}
-            ), 400
+            return jsonify({"message": "No verified email found for GitHub account"}), 400
 
-        # Login or Create User
-        user = get_user_by_email(email)
-        if not user:
-            user_doc = {
-                "email": email,
-                "password_hash": "",
-                "role": "user",
-                "settings": {},
-                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "auth_provider": "github",
-                "github_id": github_user.get("id"),
-            }
-            success, result = create_user(user_doc)
-            if not success:
-                return jsonify({"message": ERROR_FAILED_TO_CREATE_USER}), 500
-            user_id = result
-            role = "user"
-        else:
-            user_id = user["_id"]
-            role = user.get("role", "user")
+        user_id, role = _get_or_create_github_user(email, github_user.get("id"))
+        if not user_id:
+            return jsonify({"message": ERROR_FAILED_TO_CREATE_USER}), 500
 
         app_token = create_access_token({"sub": user_id, "email": email, "role": role})
-        return jsonify(
-            {
-                "access_token": app_token,
-                "token_type": "bearer",
-                "user_id": user_id,
-                "email": email,
-                "role": role,
-            }
-        )
+        return jsonify({
+            "access_token": app_token,
+            "token_type": "bearer",
+            "user_id": user_id,
+            "email": email,
+            "role": role,
+        })
 
     except Exception as e:
         logger.error(f"GitHub Auth Error: {e}")

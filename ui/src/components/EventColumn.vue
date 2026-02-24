@@ -349,19 +349,21 @@ h3 {
 .delete-btn {
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-color);
+  opacity: 0.7;
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0 5px;
 }
 .delete-btn:hover {
   color: #cc0000;
+  opacity: 1;
 }
 
 .expand-hint {
   font-size: 0.8rem;
   color: var(--text-color);
-  opacity: 0.7;
+  opacity: 0.85;
   cursor: pointer;
   margin-top: 10px;
 }
