@@ -5,16 +5,6 @@ import sys
 
 os.environ.setdefault("ADMIN_PASSWORD", "test_password")
 
-# Mock heavy third-party imports that may not be installed in the test venv
-# before importing the modules under test.
-import types
-
-for mod_name in (
-    "google", "google.genai", "google.genai.types",
-):
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = types.ModuleType(mod_name)
-
 import json
 from unittest.mock import patch, MagicMock
 

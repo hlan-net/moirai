@@ -4,14 +4,7 @@ import sys
 import json
 from types import SimpleNamespace
 
-# Mock google.genai before importing gemini provider
-mock_genai = MagicMock()
-mock_types = MagicMock()
-sys.modules["google"] = MagicMock()
-sys.modules["google.genai"] = mock_genai
-sys.modules["google.genai.types"] = mock_types
-
-from api.llm.gemini import GeminiProvider  # noqa: E402
+from api.llm.gemini import GeminiProvider
 
 
 class TestGeminiProvider(unittest.TestCase):
