@@ -13,8 +13,6 @@ from api.db import (
     fetch_from_couchdb,
     update_couchdb_doc,
 )
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
 import requests
 from .auth_utils import (
     JWT_SECRET_KEY,
@@ -323,6 +321,9 @@ def login():
 
 @auth_blueprint.route("/login/google", methods=["POST"])
 def google_login():
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+
     token = request.json.get("token")
     if not token:
         return jsonify({"message": "Token required"}), 400
