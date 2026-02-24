@@ -60,6 +60,7 @@ async function withInvalidAuthContext<T>(
   const context = await playwright.request.newContext({
     baseURL: baseURL,
     httpCredentials: INVALID_CREDENTIALS,
+    extraHTTPHeaders: {},
   })
   try {
     return await action(context)

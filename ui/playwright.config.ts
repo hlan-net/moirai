@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const adminUsername = process.env.ADMIN_USERNAME || 'testuser';
+const adminPassword = process.env.ADMIN_PASSWORD || 'testpassword';
+const basicAuthToken = Buffer.from(`${adminUsername}:${adminPassword}`).toString('base64');
+
 export default defineConfig({
   testDir: './tests',
   timeout: 10000,
@@ -15,8 +19,11 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || ((process.env.CI || process.env.TEST_TARGET === 'docker') ? 'http://localhost:8088' : 'http://localhost:5173'),
     trace: 'on-first-retry',
     httpCredentials: {
-      username: process.env.ADMIN_USERNAME || 'testuser',
-      password: process.env.ADMIN_PASSWORD || 'testpassword',
+      username: adminUsername,
+      password: adminPassword,
+    },
+    extraHTTPHeaders: {
+      Authorization: `Basic ${basicAuthToken}`,
     },
   },
   projects: [
