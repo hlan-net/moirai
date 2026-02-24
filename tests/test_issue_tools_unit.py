@@ -29,7 +29,6 @@ def test_forge_issue_unit(mock_db):
             premises=[{"type": "message", "id": "msg_1"}],
             userspace=userspace,
             longevity="transient",
-            api_key="test_password"
         )
     
     assert "Issue forged with ID: issue_123" in result
@@ -49,7 +48,6 @@ def test_add_event_alias_unit(mock_db):
             description="Event Desc",
             article_links=["http://link1.com"],
             userspace=userspace,
-            api_key="test_password"
         )
     
     assert "Issue forged with ID: event_123" in result
@@ -70,7 +68,6 @@ def test_add_trend_alias_unit(mock_db):
             description="Trend Desc",
             event_ids=["event_1"],
             userspace=userspace,
-            api_key="test_password"
         )
     
     assert "Issue forged with ID: trend_123" in result
@@ -93,7 +90,7 @@ def test_list_issues_unit(mock_db):
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
-        result = list_issues(userspace=userspace, api_key="test_password")
+        result = list_issues(userspace=userspace)
     
     assert "ID: issue_1" in result
     assert "Logos: Logos 1" in result
@@ -109,7 +106,7 @@ def test_list_events_alias_unit(mock_db):
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
-        list_events(userspace=userspace, api_key="test_password")
+        list_events(userspace=userspace)
     
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args

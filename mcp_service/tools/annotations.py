@@ -20,9 +20,7 @@ ARTICLES_DB = "articles"
 @auth_required
 def reannotate_article(
     article_id: str,
-    userspace: str,
-    api_key: str = None,
-) -> str:
+    userspace: str) -> str:
     """
     Re-run AI annotation on a specific article, overwriting any existing annotation.
     """
@@ -70,9 +68,7 @@ def reannotate_article(
 @auth_required
 def list_unannotated_articles(
     userspace: str,
-    limit: int = 50,
-    api_key: str = None,
-) -> str:
+    limit: int = 50) -> str:
     """
     List articles in a userspace that have not yet been annotated by AI.
     """
@@ -129,9 +125,7 @@ def list_unannotated_articles(
 @mcp.tool()
 @auth_required
 def get_annotation_stats(
-    userspace: str,
-    api_key: str = None,
-) -> str:
+    userspace: str) -> str:
     """
     Get annotation statistics for a userspace: total articles, annotated count,
     and breakdowns by priority and sentiment.

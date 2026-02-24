@@ -173,7 +173,6 @@ def forge_issue(
     premises: list[dict],
     userspace: str,
     longevity: str = "transient",
-    api_key: str = None,
 ) -> str:
     """
     (Clotho) Forge a new Issue (Resonance) from identified patterns in the sand.
@@ -189,7 +188,6 @@ def measure_issue(
     longevity: str = None,
     description: str = None,
     add_premises: list[dict] = None,
-    api_key: str = None,
 ) -> str:
     """
     (Lachesis) Measure and modulate an existing resonance.
@@ -202,7 +200,6 @@ def measure_issue(
 def seal_issue(
     issue_id: str,
     userspace: str,
-    api_key: str = None,
 ) -> str:
     """
     (Atropos) Cut the thread of an active resonance.
@@ -215,8 +212,7 @@ def seal_issue(
 def list_issues(
     userspace: str,
     longevity: str = None, 
-    status: str = None,
-    api_key: str = None
+    status: str = None
 ) -> str:
     """
     List forged issues in a userspace.
@@ -226,14 +222,14 @@ def list_issues(
 
 @mcp.tool()
 @auth_required
-def read_issue(issue_id: str, userspace: str, api_key: str = None) -> str:
+def read_issue(issue_id: str, userspace: str) -> str:
     """Read full details of a specific issue."""
     return _read_issue_internal(issue_id, userspace)
 
 
 @mcp.tool()
 @auth_required
-def delete_issue(issue_id: str, userspace: str, api_key: str = None) -> str:
+def delete_issue(issue_id: str, userspace: str) -> str:
     """Irreversibly remove an issue record."""
     return _delete_issue_internal(issue_id, userspace)
 
@@ -247,7 +243,6 @@ def add_event(
     description: str,
     article_links: list[str],
     userspace: str,
-    api_key: str = None,
 ) -> str:
     """
     (Alias for forge_issue) Create a new Event.
@@ -258,7 +253,7 @@ def add_event(
 
 @mcp.tool()
 @auth_required
-def list_events(userspace: str, api_key: str = None) -> str:
+def list_events(userspace: str) -> str:
     """
     (Alias for list_issues) List transient issues.
     """
@@ -267,7 +262,7 @@ def list_events(userspace: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def read_event(event_id: str, userspace: str, api_key: str = None) -> str:
+def read_event(event_id: str, userspace: str) -> str:
     """
     (Alias for read_issue) Get details of a specific event.
     """
@@ -276,7 +271,7 @@ def read_event(event_id: str, userspace: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def get_event(event_id: str, userspace: str = None, api_key: str = None) -> dict:
+def get_event(event_id: str, userspace: str = None) -> dict:
     """
     (Alias for read_issue) Returns the event document as a dictionary.
     """
@@ -304,7 +299,6 @@ def update_event(
     name: str = None,
     description: str = None,
     article_links: list[str] = None,
-    api_key: str = None,
 ) -> str:
     """
     (Alias for measure_issue) Update an existing event.
@@ -318,7 +312,7 @@ def update_event(
 
 @mcp.tool()
 @auth_required
-def delete_event(event_id: str, userspace: str, api_key: str = None) -> str:
+def delete_event(event_id: str, userspace: str) -> str:
     """
     (Alias for delete_issue) Delete an event.
     """
@@ -332,7 +326,6 @@ def add_trend(
     description: str,
     event_ids: list[str],
     userspace: str,
-    api_key: str = None,
 ) -> str:
     """
     (Alias for forge_issue) Create a new Trend.
@@ -343,7 +336,7 @@ def add_trend(
 
 @mcp.tool()
 @auth_required
-def list_trends(userspace: str, api_key: str = None) -> str:
+def list_trends(userspace: str) -> str:
     """
     (Alias for list_issues) List temporal issues.
     """
@@ -352,7 +345,7 @@ def list_trends(userspace: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def read_trend(trend_id: str, userspace: str, api_key: str = None) -> str:
+def read_trend(trend_id: str, userspace: str) -> str:
     """
     (Alias for read_issue) Get details of a specific trend.
     """
@@ -361,7 +354,7 @@ def read_trend(trend_id: str, userspace: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def get_trend(trend_id: str, userspace: str = None, api_key: str = None) -> dict:
+def get_trend(trend_id: str, userspace: str = None) -> dict:
     """
     (Alias for read_issue) Returns the trend document as a dictionary.
     """
@@ -389,7 +382,6 @@ def update_trend(
     name: str = None,
     description: str = None,
     event_ids: list[str] = None,
-    api_key: str = None,
 ) -> str:
     """
     (Alias for measure_issue) Update an existing trend.
@@ -403,7 +395,7 @@ def update_trend(
 
 @mcp.tool()
 @auth_required
-def delete_trend(trend_id: str, userspace: str, api_key: str = None) -> str:
+def delete_trend(trend_id: str, userspace: str) -> str:
     """
     (Alias for delete_issue) Delete a trend.
     """

@@ -16,6 +16,14 @@ from api.db import (
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 import requests
+from .auth_utils import (
+    JWT_SECRET_KEY,
+    JWT_ALGORITHM,
+    ADMIN_USERNAME,
+    ADMIN_PASSWORD,
+    decode_token,
+    verify_auth_header,
+)
 
 auth_blueprint = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
@@ -25,15 +33,6 @@ JSON_CONTENT_TYPE = "application/json"
 ERROR_FAILED_TO_CREATE_USER = "Failed to create user"
 
 # Configuration
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
-if not JWT_SECRET_KEY:
-    JWT_SECRET_KEY = secrets.token_urlsafe(64)
-    logger.warning(
-        "JWT_SECRET_KEY not set; generated an ephemeral key for this process. "
-        "Set JWT_SECRET_KEY for stable tokens across restarts or replicas."
-    )
-
-JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days for now
 
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
@@ -209,16 +208,6 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
-def decode_token(token):
-    try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-
 # Auth Middleware / Decorator
 def verify_request_auth():
     """Verify request using either JWT (Bearer) or Basic Auth."""
@@ -227,55 +216,24 @@ def verify_request_auth():
         # Check for access_token in query param (compatibility)
         token = request.args.get("access_token")
         if token:
-            return _verify_jwt(token)
-        return False, "Authorization header is missing"
+            auth_header = f"Bearer {token}"
 
-    if auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        return _verify_jwt(token)
+    success, message, payload = verify_auth_header(auth_header)
+    if success and payload:
+        # Map sub to user_id for Flask 'g' context
+        g.user_id = payload.get("sub")
+        g.user_email = payload.get("email")
+        g.user_role = payload.get("role", "user")
+        
+        # Additional DB check for Basic Auth mapping if needed
+        if g.user_id == "system" and g.user_role == "admin":
+            admin_email = f"{ADMIN_USERNAME}@localhost.local"
+            user = get_user_by_email(admin_email)
+            if user:
+                g.user_id = user.get("_id")
+                g.user_email = user.get("email", admin_email)
 
-    if auth_header.startswith("Basic "):
-        return _verify_basic_auth(auth_header)
-
-    return False, "Invalid Authorization scheme"
-
-
-def _verify_jwt(token):
-    payload = decode_token(token)
-    if not payload:
-        return False, "Token is invalid or expired"
-
-    # Store user info in flask global 'g'
-    g.user_id = payload.get("sub")
-    g.user_email = payload.get("email")
-    g.user_role = payload.get("role", "user")
-    return True, None
-
-
-def _verify_basic_auth(header):
-    try:
-        encoded_creds = header.split(" ")[1]
-        decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
-        username, password = decoded_creds.split(":", 1)
-
-        if ADMIN_USERNAME and ADMIN_PASSWORD:
-            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-                # Basic Auth maps to the configured admin user when available
-                admin_email = f"{ADMIN_USERNAME}@localhost.local"
-                user = get_user_by_email(admin_email)
-                if user:
-                    g.user_id = user.get("_id")
-                    g.user_email = user.get("email", admin_email)
-                    g.user_role = user.get("role", "admin")
-                else:
-                    g.user_id = "system"
-                    g.user_email = admin_email
-                    g.user_role = "admin"
-                return True, None
-
-        return False, "Invalid Basic Auth credentials"
-    except Exception:
-        return False, "Malformed Basic Auth header"
+    return success, message
 
 
 def verify_jwt_in_request():

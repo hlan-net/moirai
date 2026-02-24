@@ -8,10 +8,9 @@ from ..db import db_request, update_doc, delete_doc, store_doc
 
 @mcp.tool()
 @auth_required
-def list_users(api_key: str = None) -> str:
+def list_users() -> str:
     """
     List all registered users in the system. (Admin only)
-    Requires valid 'api_key'.
     """
     res = db_request("GET", "users", path="/_all_docs", params={"include_docs": "true"})
     if res.status_code != 200:
@@ -33,7 +32,7 @@ def list_users(api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def add_user(email: str, password: str, role: str = "user", api_key: str = None) -> str:
+def add_user(email: str, password: str, role: str = "user") -> str:
     """
     Create a new user. (Admin only)
 
@@ -41,7 +40,6 @@ def add_user(email: str, password: str, role: str = "user", api_key: str = None)
         email: The user's email address.
         password: The user's password.
         role: The user's role ('admin' or 'user').
-        api_key: Required for authentication.
     """
     if not email or not password:
         return "Email and password required."
@@ -79,13 +77,12 @@ def add_user(email: str, password: str, role: str = "user", api_key: str = None)
 
 @mcp.tool()
 @auth_required
-def delete_user(user_id: str, api_key: str = None) -> str:
+def delete_user(user_id: str) -> str:
     """
     Delete a user by their unique ID. (Admin only)
 
     Args:
         user_id: The ID of the user to delete.
-        api_key: Required for authentication.
     """
     success, msg = delete_doc("users", user_id)
     if success:
@@ -96,14 +93,13 @@ def delete_user(user_id: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def update_user_role(user_id: str, role: str, api_key: str = None) -> str:
+def update_user_role(user_id: str, role: str) -> str:
     """
     Change a user's role. (Admin only)
 
     Args:
         user_id: The ID of the user to update.
         role: The new role ('admin' or 'user').
-        api_key: Required for authentication.
     """
     if role not in ["admin", "user"]:
         return f"Invalid role '{role}'. Use 'admin' or 'user'."

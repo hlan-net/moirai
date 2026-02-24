@@ -121,7 +121,6 @@ def search_articles(
     date_from: str = "",
     date_to: str = "",
     limit: int = 50,
-    api_key: str = None,
 ) -> str:
     """
     Search articles by keyword. Optionally filter by userspace.
@@ -197,7 +196,7 @@ def search_articles(
 @mcp.tool()
 @auth_required
 def get_recent_articles(
-    userspace: str = None, hours: int = 24, limit: int = 50, api_key: str = None
+    userspace: str = None, hours: int = 24, limit: int = 50
 ) -> str:
     """
     Get most recent articles. Optionally filter by userspace.
@@ -252,7 +251,7 @@ def get_recent_articles(
 @mcp.tool()
 @auth_required
 def search_issues(
-    query: str, userspace: str, longevity: str = None, limit: int = 50, api_key: str = None
+    query: str, userspace: str, longevity: str = None, limit: int = 50
 ) -> str:
     """
     Search Issues (Resonances) by keyword within a userspace.
@@ -263,7 +262,7 @@ def search_issues(
 @mcp.tool()
 @auth_required
 def search_events(
-    query: str, userspace: str, limit: int = 50, api_key: str = None
+    query: str, userspace: str, limit: int = 50
 ) -> str:
     """
     (Alias for search_issues) Search events (transient issues) by keyword.
@@ -274,7 +273,7 @@ def search_events(
 @mcp.tool()
 @auth_required
 def search_trends(
-    query: str, userspace: str, limit: int = 20, api_key: str = None
+    query: str, userspace: str, limit: int = 20
 ) -> str:
     """
     (Alias for search_issues) Search trends (temporal issues) by keyword.

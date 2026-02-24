@@ -9,7 +9,7 @@ from .userspace import build_userspace_selector, extract_userspace, with_userspa
 @mcp.tool()
 @auth_required
 def add_feed(
-    url: str, title: str, userspace: str, category: str = "general", api_key: str = None
+    url: str, title: str, userspace: str, category: str = "general"
 ) -> str:
     """
     Register a new RSS feed into a specific userspace.
@@ -19,7 +19,6 @@ def add_feed(
         title: Human-readable title for the feed.
         userspace: GUID of the userspace.
         category: Optional category (e.g., 'tech', 'finance').
-        api_key: Required for authentication.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -53,13 +52,12 @@ def add_feed(
 
 @mcp.tool()
 @auth_required
-def list_feeds(userspace: str, api_key: str = None) -> str:
+def list_feeds(userspace: str) -> str:
     """
     List all RSS feeds registered in a specific userspace.
 
     Args:
         userspace: GUID of the userspace.
-        api_key: Required for authentication.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -91,14 +89,13 @@ def list_feeds(userspace: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def delete_feed(feed_id: str, userspace: str, api_key: str = None) -> str:
+def delete_feed(feed_id: str, userspace: str) -> str:
     """
     Remove a feed from a userspace.
 
     Args:
         feed_id: The ID of the feed to delete.
         userspace: GUID of the userspace.
-        api_key: Required for authentication.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -117,7 +114,7 @@ def delete_feed(feed_id: str, userspace: str, api_key: str = None) -> str:
 
 @mcp.tool()
 @auth_required
-def read_feed(url: str, userspace: str, limit: int = 20, api_key: str = None) -> str:
+def read_feed(url: str, userspace: str, limit: int = 20) -> str:
     """
     Fetch and process articles from a specific RSS feed URL.
     This triggers a live fetch and returns the latest articles.
@@ -126,7 +123,6 @@ def read_feed(url: str, userspace: str, limit: int = 20, api_key: str = None) ->
         url: The RSS feed URL to fetch
         userspace: GUID of the userspace.
         limit: Max number of articles to return (default: 20)
-        api_key: Required for authentication.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -173,7 +169,7 @@ def read_feed(url: str, userspace: str, limit: int = 20, api_key: str = None) ->
 @mcp.tool()
 @auth_required
 def update_feed_category(
-    feed_id: str, new_category: str, userspace: str, api_key: str = None
+    feed_id: str, new_category: str, userspace: str
 ) -> str:
     """
     Update the category of an existing feed.
@@ -182,7 +178,6 @@ def update_feed_category(
         feed_id: The ID of the feed to update.
         new_category: New category name.
         userspace: GUID of the userspace.
-        api_key: Required for authentication.
     """
     valid, err = validate_userspace(userspace)
     if not valid:

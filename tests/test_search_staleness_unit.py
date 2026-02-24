@@ -30,7 +30,7 @@ def test_search_issues_unit(mock_db):
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
-        result = search_issues(query="test", userspace=userspace, api_key="test_password")
+        result = search_issues(query="test", userspace=userspace)
     
     data = json.loads(result)
     assert data["total"] == 1
@@ -48,7 +48,7 @@ def test_search_events_alias_unit(mock_db):
     mock_db['request'].return_value = mock_response
     
     with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
-        search_events(query="test", userspace=userspace, api_key="test_password")
+        search_events(query="test", userspace=userspace)
     
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args

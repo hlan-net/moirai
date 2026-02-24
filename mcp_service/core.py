@@ -13,14 +13,15 @@ if not ADMIN_PASSWORD:
 
 
 def auth_required(func):
-    """Decorator to require ADMIN_PASSWORD for a tool call."""
+    """
+    Decorator for MCP tools that require authentication.
+    Authentication is now handled at the transport layer by AuthMiddleware.
+    """
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # We expect 'api_key' to be passed in kwargs for top-level tools
-        api_key = kwargs.pop("api_key", None)
-        if api_key != ADMIN_PASSWORD:
-            return "Error: Unauthorized. Valid 'api_key' is required."
+        # Remove api_key from kwargs if present (for backward compatibility during transition)
+        kwargs.pop("api_key", None)
         return func(*args, **kwargs)
 
     return wrapper

@@ -1,8 +1,10 @@
 from starlette.responses import JSONResponse, Response
 from starlette.requests import Request
 from starlette.routing import Route
+from starlette.middleware.base import BaseHTTPMiddleware
 from .core import mcp
 from api.telemetry import configure_telemetry
+from api.auth_utils import verify_auth_header
 from tasks.agent_orchestrator import AgentOrchestrator
 from .tools import feeds, issues, search, staleness, users, agent_configs, annotations  # noqa: F401
 from version import get_version_string
@@ -12,11 +14,29 @@ import redis # Added for Redis client
 
 logger = logging.getLogger(__name__)
 
+# --- Auth Middleware ---
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Exempt health and metrics
+        if request.url.path in ["/health", "/metrics"]:
+            return await call_next(request)
+        
+        auth_header = request.headers.get("Authorization")
+        success, error_msg, _ = verify_auth_header(auth_header)
+        
+        if not success:
+            return JSONResponse({"error": error_msg}, status_code=401)
+            
+        return await call_next(request)
+
 # Print version info
 logger.info(f"{get_version_string()} starting...")
 
 # Get the ASGI app
 app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()
+
+# Add Auth Middleware
+app.add_middleware(AuthMiddleware)
 
 # Initialize Telemetry
 configure_telemetry(app, "moirai-mcp")

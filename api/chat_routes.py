@@ -89,6 +89,7 @@ def run_agent_sync(
     llm_endpoint=None,
     api_key=None,
     ollama_base_url=None,
+    auth_token=None,
 ):
     return asyncio.run(
         run_agent(
@@ -99,6 +100,7 @@ def run_agent_sync(
             llm_endpoint,
             api_key,
             ollama_base_url,
+            auth_token,
         )
     )
 
@@ -111,6 +113,7 @@ async def run_agent(
     llm_endpoint=None,
     api_key=None,
     ollama_base_url=None,
+    auth_token=None,
 ):
     # Limit history to prevent token overflow
     if len(history) > CHAT_HISTORY_LIMIT:
@@ -136,6 +139,8 @@ async def run_agent(
         # Connect to MCP Server
         # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
         headers = {"Host": "localhost:8090"}
+        if auth_token:
+            headers["Authorization"] = auth_token
 
         # Create async HTTP client factory for proper DNS resolution in Kubernetes
         async with sse_client(
@@ -238,8 +243,17 @@ def chat():
         "moirai_ollama_endpoint_url"
     ) or request.headers.get("x-ollama-base-url")
 
+    auth_token = request.headers.get("Authorization")
+
     response = run_agent_sync(
-        user_message, history, g.user_id, model, llm_endpoint, api_key, ollama_base_url
+        user_message,
+        history,
+        g.user_id,
+        model,
+        llm_endpoint,
+        api_key,
+        ollama_base_url,
+        auth_token,
     )
     return jsonify({"response": response})
 
@@ -469,20 +483,9 @@ def _create_mock_tool_calls(extracted_tools):
 
 
 async def _execute_tool_calls(session, tool_calls, messages, userspace_id):
-    # Get admin password for MCP tool authentication
-    admin_password = os.environ.get("ADMIN_PASSWORD")
-    if not admin_password:
-        logger.error(
-            "ADMIN_PASSWORD environment variable not set - MCP tool calls will fail"
-        )
-
     for tool_call in tool_calls:
         func_name = tool_call.function.name
         func_args = json.loads(tool_call.function.arguments)
-
-        # Inject api_key for MCP tool authentication if not already present
-        if admin_password and "api_key" not in func_args:
-            func_args["api_key"] = admin_password
 
         # Inject userspace_id if not already present
         if userspace_id and "userspace" not in func_args:
