@@ -338,9 +338,19 @@ const sendMessage = async () => {
   }
 }
 
-const downloadChat = () => {
+const downloadChat = async () => {
   if (!sessionId.value) return
-  globalThis.location.href = `/api/chat/history/${sessionId.value}/export`
+  const response = await authFetch(`/api/chat/history/${sessionId.value}/export`)
+  if (!response.ok) return
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="?([^";]+)"?/)
+  link.download = match ? match[1] : 'chat.md'
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 const filteredSessions = computed(() => {
