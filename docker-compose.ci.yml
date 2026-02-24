@@ -1,6 +1,8 @@
 services:
   api:
     image: moirai-app:ci
+    environment:
+      - DISABLE_CSRF=true
 
   mcp-server:
     image: moirai-app:ci

@@ -36,7 +36,11 @@ if not is_test_mode:
 # It is only disabled in test mode or if explicitly requested via environment variable.
 csrf = CSRFProtect()
 csrf.init_app(app)
-if is_test_mode or os.environ.get("DISABLE_CSRF", "false").lower() == "true":
+if (
+    is_test_mode 
+    or os.environ.get("DISABLE_CSRF", "false").lower() == "true"
+    or os.environ.get("WTF_CSRF_ENABLED", "true").lower() == "false"
+):
     app.config["WTF_CSRF_ENABLED"] = False
 
 # Configure rate limiting
