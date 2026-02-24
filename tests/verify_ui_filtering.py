@@ -26,8 +26,13 @@ async def verify_filtering():
     print(f"NS2: {ns2}")
 
     print("Connecting to MCP server...")
+    import base64
+    creds = f"{username}:{password}"
+    auth_header = f"Basic {base64.b64encode(creds.encode()).decode()}"
+    headers = {"Authorization": auth_header, "Host": "localhost:8090"}
+    
     try:
-        async with sse_client(mcp_url) as (read, write):
+        async with sse_client(mcp_url, headers=headers) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
@@ -60,7 +65,7 @@ async def verify_filtering():
     # Verify MCP userspace filtering
     print("\n--- Verifying MCP Userspace Filtering ---")
     try:
-        async with sse_client(mcp_url) as (read, write):
+        async with sse_client(mcp_url, headers=headers) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 res1 = await session.call_tool(

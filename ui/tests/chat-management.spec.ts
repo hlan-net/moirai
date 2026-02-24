@@ -1,12 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
-
-function getBasicAuthHeader(): string | null {
-  const username = process.env.ADMIN_USERNAME
-  const password = process.env.ADMIN_PASSWORD
-  if (!username || !password) return null
-  const token = Buffer.from(`${username}:${password}`).toString('base64')
-  return `Basic ${token}`
-}
+import { authenticate } from './auth-helper'
 
 // Helper functions to reduce code duplication
 async function createChatSession(page: Page, title: string): Promise<void> {
@@ -48,10 +41,7 @@ async function confirmDelete(page: Page): Promise<void> {
 
 test.describe('Chat Session Management', () => {
   test.beforeEach(async ({ page }) => {
-    const authHeader = getBasicAuthHeader()
-    if (authHeader) {
-      await page.setExtraHTTPHeaders({ Authorization: authHeader })
-    }
+    await authenticate(page)
     await page.goto('/#/chat')
     await page.waitForLoadState('networkidle')
     await page.locator('.new-chat-btn').waitFor({ state: 'visible' })
