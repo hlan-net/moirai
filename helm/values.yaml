@@ -140,7 +140,8 @@ prometheus:
     enabled: true
     interval: 30s
     scrapeTimeout: 10s
-    labels: {}
+    labels:
+      release: prometheus
 
 # -- Open WebUI endpoint
 openWebui:
