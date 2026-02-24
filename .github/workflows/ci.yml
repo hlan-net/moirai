@@ -44,7 +44,9 @@ jobs:
 
     - name: Install dependencies (Conda)
       # Dependencies are installed by setup-miniconda using environment.yml
+      # But we explicitly add missing ones that cause collection issues
       run: |
+        conda run -n moirai pip install google-genai==1.3.0 google-auth==2.38.0 tenacity==9.1.4 structlog==25.5.0 passlib==1.7.4
         echo "Conda environment 'moirai' created and activated."
         conda info -e # Display info about environments
 
@@ -63,6 +65,7 @@ jobs:
         ADMIN_PASSWORD: testpassword
         FLASK_ENV: test
         TESTING: true
+        DISABLE_CSRF: true
       run: |
         conda run --name moirai pytest # Use conda run
 
@@ -134,6 +137,7 @@ jobs:
         ADMIN_USERNAME: testuser
         ADMIN_PASSWORD: testpassword
         JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
+        DISABLE_CSRF: true
       run: |
         docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --no-build couchdb redis api ui nginx
         for i in {1..30}; do
