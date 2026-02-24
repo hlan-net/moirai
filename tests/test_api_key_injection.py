@@ -44,7 +44,7 @@ async def test_api_key_injection(setup_admin_password_env, mock_session):
     messages = []
 
     # Execute tool calls
-    await _execute_tool_calls(mock_session, [mock_tool_call], messages)
+    await _execute_tool_calls(mock_session, [mock_tool_call], messages, "test-guid")
 
     # Verify that call_tool was called with api_key injected
     mock_session.call_tool.assert_called_once()
@@ -88,7 +88,7 @@ async def test_api_key_injection_multiple_tools(setup_admin_password_env, mock_s
 
     messages = []
 
-    await _execute_tool_calls(mock_session, tool_calls, messages)
+    await _execute_tool_calls(mock_session, tool_calls, messages, "test-guid")
 
     # Verify call_tool was called 3 times, each with api_key
     assert mock_session.call_tool.call_count == 3
@@ -124,7 +124,7 @@ async def test_api_key_not_overwritten_if_present(setup_admin_password_env, mock
 
     messages = []
 
-    await _execute_tool_calls(mock_session, [mock_tool_call], messages)
+    await _execute_tool_calls(mock_session, [mock_tool_call], messages, "test-guid")
 
     # Verify that existing api_key was preserved
     call_args = mock_session.call_tool.call_args
@@ -152,7 +152,7 @@ async def test_api_key_missing_env_var(monkeypatch, mock_session):
     messages = []
 
     # Should still execute but log error and not inject api_key
-    await _execute_tool_calls(mock_session, [mock_tool_call], messages)
+    await _execute_tool_calls(mock_session, [mock_tool_call], messages, "test-guid")
 
     # Verify call_tool was still called
     mock_session.call_tool.assert_called_once()
