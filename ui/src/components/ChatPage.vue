@@ -98,6 +98,22 @@ const fetchConfig = async () => {
         }
       }
     }
+
+    // Fetch user-specific settings to populate model selector
+    const userRes = await authFetch('/api/auth/me')
+    if (userRes.ok) {
+      const userData = await userRes.json()
+      const settings = userData.settings || {}
+      
+      if (settings.moirai_llm_endpoint && !localStorage.getItem('moirai_llm_endpoint')) {
+        currentLlmEndpoint.value = settings.moirai_llm_endpoint
+      }
+      
+      const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
+      if (settings[settingsKey] && !localStorage.getItem(settingsKey)) {
+        currentModel.value = settings[settingsKey]
+      }
+    }
   } catch (error) {
     console.error('Error fetching config:', error)
   }
@@ -112,10 +128,23 @@ const loadSettings = () => {
     currentModel.value = localStorage.getItem(settingsKey) || defaultModel
 }
 
+const saveUserSetting = async (key: string, value: string) => {
+  try {
+    await authFetch('/api/auth/me/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value })
+    })
+  } catch (error) {
+    console.error(`Failed to save setting ${key} to server:`, error)
+  }
+}
+
 const updateEndpoint = (value: string) => {
   if (currentLlmEndpoint.value === value) return
   currentLlmEndpoint.value = value
   localStorage.setItem('moirai_llm_endpoint', value)
+  saveUserSetting('moirai_llm_endpoint', value)
 
   const settingsKey = modelSettingsMap[value] || 'moirai_model'
   const defaultModel = defaultModels[value] || 'llama3.1:latest'
@@ -127,6 +156,7 @@ const updateModel = (value: string) => {
   currentModel.value = value
   const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
   localStorage.setItem(settingsKey, value)
+  saveUserSetting(settingsKey, value)
 }
 
 const loadModelsForEndpoint = async (endpoint: string) => {

@@ -43,9 +43,9 @@ ERROR_ACCESS_DENIED = "Access denied"
 SYSTEM_PROMPT = (
     "You are Moirai, a GenAI-native press review agent. "
     "You DO NOT have access to real-time information or the internet directly. "
-    "You MUST use the provided tools (like `list_feeds`, `read_feed`, `list_articles`) to fetch any news or external data. "
+    "You MUST use the provided tools (like `list_feeds`, `read_feed`, `get_recent_articles`, `search_articles`) to fetch any news or external data. "
     "Do not hallucinate headlines. If you need news, CALL A TOOL. "
-    "When asked for recent articles or news, use `list_articles` to see what's already in the database. "
+    "When asked for recent articles or news, use `get_recent_articles` to see what's already in the database. "
     "To fetch fresh articles from a specific feed, use `read_feed` with the feed URL. "
     "To see available feeds, use `list_feeds`. "
     "Some reliable Linux news feeds are: LWN (https://lwn.net/headlines/rss), Phoronix (https://www.phoronix.com/phoronix-rss.php), "
@@ -84,19 +84,29 @@ def extract_tool_calls_from_content(content):
 def run_agent_sync(
     user_message,
     history,
+    userspace_id,
     model=None,
     llm_endpoint=None,
     api_key=None,
     ollama_base_url=None,
 ):
     return asyncio.run(
-        run_agent(user_message, history, model, llm_endpoint, api_key, ollama_base_url)
+        run_agent(
+            user_message,
+            history,
+            userspace_id,
+            model,
+            llm_endpoint,
+            api_key,
+            ollama_base_url,
+        )
     )
 
 
 async def run_agent(
     user_message,
     history,
+    userspace_id,
     model=None,
     llm_endpoint=None,
     api_key=None,
@@ -139,7 +149,12 @@ async def run_agent(
                 openai_tools = _convert_to_openai_tools(mcp_tools)
 
                 return await _run_agent_loop(
-                    messages, llm_provider, target_model, openai_tools, session
+                    messages,
+                    llm_provider,
+                    target_model,
+                    openai_tools,
+                    session,
+                    userspace_id,
                 )
 
     except Exception as e:
@@ -224,7 +239,7 @@ def chat():
     ) or request.headers.get("x-ollama-base-url")
 
     response = run_agent_sync(
-        user_message, history, model, llm_endpoint, api_key, ollama_base_url
+        user_message, history, g.user_id, model, llm_endpoint, api_key, ollama_base_url
     )
     return jsonify({"response": response})
 
@@ -358,7 +373,9 @@ def delete_chat_session(session_id):
         abort(500, description="Failed to delete chat session")
 
 
-async def _run_agent_turn(messages, llm_provider, target_model, openai_tools, session):
+async def _run_agent_turn(
+    messages, llm_provider, target_model, openai_tools, session, userspace_id
+):
     # Filter messages to ensure clean JSON for API
     clean_messages = []
     for m in messages:
@@ -395,7 +412,7 @@ async def _run_agent_turn(messages, llm_provider, target_model, openai_tools, se
             msg_dict["tool_calls"] = mock_tool_calls_data
 
     if tool_calls:
-        await _execute_tool_calls(session, tool_calls, messages)
+        await _execute_tool_calls(session, tool_calls, messages, userspace_id)
         return None  # Continue loop
     else:
         # Final response
@@ -451,7 +468,7 @@ def _create_mock_tool_calls(extracted_tools):
     return tool_calls, mock_tool_calls_data
 
 
-async def _execute_tool_calls(session, tool_calls, messages):
+async def _execute_tool_calls(session, tool_calls, messages, userspace_id):
     # Get admin password for MCP tool authentication
     admin_password = os.environ.get("ADMIN_PASSWORD")
     if not admin_password:
@@ -466,6 +483,10 @@ async def _execute_tool_calls(session, tool_calls, messages):
         # Inject api_key for MCP tool authentication if not already present
         if admin_password and "api_key" not in func_args:
             func_args["api_key"] = admin_password
+
+        # Inject userspace_id if not already present
+        if userspace_id and "userspace" not in func_args:
+            func_args["userspace"] = userspace_id
 
         try:
             logger.info(f"Agent calling tool: {func_name} with args: {func_args}")
@@ -513,10 +534,12 @@ def _convert_to_openai_tools(mcp_tools):
     return openai_tools
 
 
-async def _run_agent_loop(messages, llm_provider, target_model, openai_tools, session):
+async def _run_agent_loop(
+    messages, llm_provider, target_model, openai_tools, session, userspace_id
+):
     for _ in range(MAX_AGENT_TURNS):
         result = await _run_agent_turn(
-            messages, llm_provider, target_model, openai_tools, session
+            messages, llm_provider, target_model, openai_tools, session, userspace_id
         )
         if result:
             return result
