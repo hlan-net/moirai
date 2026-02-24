@@ -1,11 +1,12 @@
 from flask import Blueprint, jsonify, abort, request, Response
 import os
+import json
 import version
 import requests
 import logging
 from typing import Any
 from datetime import datetime, timezone
-from api.extensions import limiter
+from api.extensions import limiter, get_redis_client
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
 from tasks.scheduler_log import get_scheduler_logs
@@ -404,6 +405,19 @@ def list_articles():
     limit = min(max(limit, 1), 200)  # Clamp between 1-200
     skip = max(skip, 0)
 
+    # Caching: Check Redis for default view (no filters, default limit/skip)
+    is_default_view = (limit == 50 and skip == 0 and not since and not feed_id and not issue_id)
+    redis_client = None
+    if is_default_view:
+        try:
+            redis_client = get_redis_client()
+            if redis_client:
+                cached_resp = redis_client.get("articles_default_json")
+                if cached_resp:
+                    return Response(cached_resp, mimetype="application/json")
+        except Exception as e:
+            logger.error(f"Redis error in list_articles: {e}")
+
     selector = build_article_selector(since, feed_id, issue_id)
 
     # If selector indicates no match (e.g., non-existent event/trend), return empty
@@ -433,15 +447,22 @@ def list_articles():
     # Enrichment
     enrich_articles_with_issues(paginated_articles)
 
-    return jsonify(
-        {
-            "articles": paginated_articles,
-            "total_count": total_count,
-            "has_more": has_more,
-            "limit": limit,
-            "skip": skip,
-        }
-    )
+    response_data = {
+        "articles": paginated_articles,
+        "total_count": total_count,
+        "has_more": has_more,
+        "limit": limit,
+        "skip": skip,
+    }
+    
+    # Store in Redis if default view
+    if is_default_view and redis_client:
+        try:
+            redis_client.setex("articles_default_json", 3600, json.dumps(response_data))
+        except Exception as e:
+            logger.error(f"Redis cache set error: {e}")
+
+    return jsonify(response_data)
 
 
 @api_blueprint.route("/stream.rss", methods=["GET"])
@@ -455,6 +476,19 @@ def rss_feed():
     # Fetch all data (reuse logic from list_articles)
     limit = int(request.args.get("limit", 100))  # Default to 100 items for RSS
     limit = min(max(limit, 1), 500)  # Clamp between 1-500
+
+    # Caching: Check Redis for default RSS feed
+    is_default_view = (limit == 100)
+    redis_client = None
+    if is_default_view:
+        try:
+            redis_client = get_redis_client()
+            if redis_client:
+                cached_rss = redis_client.get("stream_rss_xml")
+                if cached_rss:
+                    return Response(cached_rss, mimetype="application/rss+xml")
+        except Exception as e:
+            logger.error(f"Redis error in rss_feed: {e}")
 
     # Query CouchDB directly for RSS
     # Requires index on 'published' field
@@ -499,6 +533,12 @@ def rss_feed():
   </channel>
 </rss>"""
 
+    if is_default_view and redis_client:
+        try:
+            redis_client.setex("stream_rss_xml", 3600, rss_xml)
+        except Exception as e:
+            logger.error(f"Redis cache set error: {e}")
+
     return Response(rss_xml, mimetype="application/rss+xml")
 
 
@@ -510,6 +550,13 @@ def delete_article(article_id):
         abort(404, description="Article not found")
 
     if delete_from_couchdb("articles", article_id, article["_rev"]):
+        # Invalidate cache
+        try:
+            redis_client = get_redis_client()
+            if redis_client:
+                redis_client.delete("stream_rss_xml", "articles_default_json")
+        except Exception as e:
+            logger.error(f"Redis invalidation error: {e}")
         return jsonify({"status": "deleted"})
     else:
         abort(500, description="Failed to delete article")

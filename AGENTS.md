@@ -108,6 +108,11 @@ This document provides essential instructions for AI agents working on the Moira
     if existing:
         doc["_rev"] = existing["_rev"]
     ```
+  - **Caching (Redis):**
+    - Use `api.extensions.get_redis_client()` to get a configured client.
+    - **Keys:** `stream_rss_xml`, `articles_default_json`.
+    - **TTL:** 1 hour (3600s).
+    - **Invalidation:** Cache is actively invalidated in `tasks.article_processor` (on ingestion) and `api.routes.delete_article`.
 
 ### Architecture Components
 1.  **Flask REST API:** Serves UI and admin routes (`api/`).

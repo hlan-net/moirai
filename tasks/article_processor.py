@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 from api.db_config import get_couchdb_uri
+from api.extensions import get_redis_client
 
 # Ensure consistent results for language detection
 DetectorFactory.seed = 0
@@ -107,6 +108,14 @@ class ArticleProcessor:
                 logger.error(
                     f"Failed to store article {article_hash}: {response.status_code} {response.text}"
                 )
+            else:
+                # Invalidate cache on new article
+                try:
+                    redis_client = get_redis_client()
+                    if redis_client:
+                        redis_client.delete("stream_rss_xml", "articles_default_json")
+                except Exception as e:
+                    logger.error(f"Redis invalidation error: {e}")
         except requests.exceptions.RequestException as err:
             logger.error(f"Error storing article {article_hash}: {err}")
         except Exception as err:

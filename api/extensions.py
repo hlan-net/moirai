@@ -1,8 +1,26 @@
 import os
-
+import redis
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from prometheus_flask_exporter import PrometheusMetrics
+
+
+def get_redis_client() -> redis.Redis:
+    """Return a shared Redis client instance (or None if not configured)."""
+    host = os.environ.get("REDIS_HOST")
+    if not host:
+        return None
+    
+    port = int(os.environ.get("REDIS_PORT", 6379))
+    password = os.environ.get("REDIS_PASSWORD")
+    
+    return redis.Redis(
+        host=host,
+        port=port,
+        password=password,
+        db=0,
+        decode_responses=True,  # Return strings instead of bytes
+    )
 
 
 def _get_rate_limit_storage_uri() -> str:
