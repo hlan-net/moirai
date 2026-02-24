@@ -492,13 +492,14 @@ const toggleTheme = () => {
 }
 
 .count {
-    color: #7f8c8d;
+    color: var(--text-color);
+    opacity: 0.8;
     font-size: 0.9rem;
 }
 
 .update-badge {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--primary-color);
   animation: spin 1s linear infinite;
 }
 
@@ -544,7 +545,7 @@ const toggleTheme = () => {
 .refresh-btn:hover:not(:disabled) {
     background: var(--button-bg);
     border-color: var(--primary-color);
-    color: var(--primary-color);
+    color: white;
 }
 
 .refresh-btn:disabled {
@@ -660,7 +661,8 @@ const toggleTheme = () => {
 
 .compact-time {
     font-size: 0.8rem;
-    color: #95a5a6;
+    color: var(--text-color);
+    opacity: 0.7;
     min-width: 60px;
     flex-shrink: 0;
 }
@@ -696,7 +698,8 @@ const toggleTheme = () => {
 
 .item-meta {
     font-size: 0.8rem;
-    color: #95a5a6;
+    color: var(--text-color);
+    opacity: 0.7;
     margin-top: 10px;
     text-align: right;
 }
@@ -859,7 +862,7 @@ const toggleTheme = () => {
 .group-count {
     font-size: 0.85rem;
     font-weight: 400;
-    opacity: 0.6;
+    opacity: 0.85;
 }
 
 /* Inline source tag (compact / time-blocked) */
@@ -868,7 +871,8 @@ const toggleTheme = () => {
     align-items: center;
     gap: 4px;
     font-size: 0.75rem;
-    color: #95a5a6;
+    color: var(--text-color);
+    opacity: 0.8;
     background: rgba(255, 255, 255, 0.06);
     padding: 1px 6px;
     border-radius: 3px;
@@ -884,7 +888,8 @@ const toggleTheme = () => {
     align-items: center;
     gap: 5px;
     font-size: 0.8rem;
-    color: #95a5a6;
+    color: var(--text-color);
+    opacity: 0.8;
     margin-bottom: 4px;
 }
 

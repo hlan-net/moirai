@@ -79,40 +79,42 @@ onMounted(() => {
     loadSettings()
 })
 
+const _setInitialModelDefaults = (config: any) => {
+  // Use server defaults if no local override
+  if (!localStorage.getItem('moirai_llm_endpoint') && config.default_llm_provider) {
+    currentLlmEndpoint.value = config.default_llm_provider
+    
+    const settingsKey = modelSettingsMap[config.default_llm_provider]
+    if (settingsKey && !localStorage.getItem(settingsKey)) {
+       currentModel.value = config.default_model_name
+    }
+  }
+}
+
+const _applyUserSettings = (settings: any) => {
+  if (settings.moirai_llm_endpoint && !localStorage.getItem('moirai_llm_endpoint')) {
+    currentLlmEndpoint.value = settings.moirai_llm_endpoint
+  }
+  
+  const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
+  if (settings[settingsKey] && !localStorage.getItem(settingsKey)) {
+    currentModel.value = settings[settingsKey]
+  }
+}
+
 const fetchConfig = async () => {
   try {
     const response = await authFetch('/api/config')
     if (response.ok) {
       const config = await response.json()
-      // Use server defaults if no local override
-      if (!localStorage.getItem('moirai_llm_endpoint') && config.default_llm_provider) {
-        currentLlmEndpoint.value = config.default_llm_provider
-        
-        // Also update model if not overridden
-        if (config.default_llm_provider === 'gemini' && !localStorage.getItem('moirai_gemini_model')) {
-           currentModel.value = config.default_model_name
-        } else if (config.default_llm_provider === 'ollama' && !localStorage.getItem('moirai_model')) {
-           currentModel.value = config.default_model_name
-        } else if (config.default_llm_provider === 'openai' && !localStorage.getItem('moirai_openai_model')) {
-           currentModel.value = config.default_model_name
-        }
-      }
+      _setInitialModelDefaults(config)
     }
 
     // Fetch user-specific settings to populate model selector
     const userRes = await authFetch('/api/auth/me')
     if (userRes.ok) {
       const userData = await userRes.json()
-      const settings = userData.settings || {}
-      
-      if (settings.moirai_llm_endpoint && !localStorage.getItem('moirai_llm_endpoint')) {
-        currentLlmEndpoint.value = settings.moirai_llm_endpoint
-      }
-      
-      const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
-      if (settings[settingsKey] && !localStorage.getItem(settingsKey)) {
-        currentModel.value = settings[settingsKey]
-      }
+      _applyUserSettings(userData.settings || {})
     }
   } catch (error) {
     console.error('Error fetching config:', error)
@@ -298,6 +300,49 @@ const getHeaders = () => {
     return headers
 }
 
+const _ensureSession = async (userMsg: string) => {
+  if (sessionId.value) return true
+  
+  try {
+    const res = await authFetch('/api/chat/history', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+          title: userMsg,
+          model: currentModel.value,
+          llm_endpoint: currentLlmEndpoint.value
+      })
+    })
+    if (res.ok) {
+      const data = await res.json()
+      sessionId.value = data._id
+      sessions.value.unshift(data)
+      return true
+    }
+  } catch (e) {
+    console.error('Failed to create session:', e)
+  }
+  return false
+}
+
+const _updateSessionMessages = async () => {
+  if (!sessionId.value) return
+  
+  try {
+    await authFetch(`/api/chat/history/${sessionId.value}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+          messages: messages.value,
+          model: currentModel.value,
+          llm_endpoint: currentLlmEndpoint.value
+      })
+    })
+  } catch (e) {
+    console.error('Failed to update session messages:', e)
+  }
+}
+
 const sendMessage = async () => {
   if (!input.value.trim() || loading.value) return
   
@@ -308,33 +353,16 @@ const sendMessage = async () => {
   loading.value = true
   
   try {
-    if (!sessionId.value) {
-      const res = await authFetch('/api/chat/history', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            title: userMsg,
-            model: currentModel.value,
-            llm_endpoint: currentLlmEndpoint.value
-        })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        sessionId.value = data._id
-        sessions.value.unshift(data)
-      }
-    }
+    await _ensureSession(userMsg)
 
     const history = messages.value.slice(0, -1).map(m => ({
       role: m.role,
       content: m.content
     }))
     
-    const headers = getHeaders()
-
     const res = await authFetch('/api/chat', {
       method: 'POST',
-      headers,
+      headers: getHeaders(),
       body: JSON.stringify({ 
           message: userMsg, 
           history, 
@@ -346,18 +374,7 @@ const sendMessage = async () => {
     if (res.ok) {
       const data = await res.json()
       messages.value.push({ role: 'assistant', content: data.response })
-
-      if (sessionId.value) {
-        await authFetch(`/api/chat/history/${sessionId.value}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-              messages: messages.value,
-              model: currentModel.value,
-              llm_endpoint: currentLlmEndpoint.value
-          })
-        })
-      }
+      await _updateSessionMessages()
     } else {
       messages.value.push({ role: 'assistant', content: `Error: ${res.statusText}` })
     }
@@ -565,10 +582,8 @@ const renameSession = async (session: ChatSession) => {
     </div>
     <div class="chat-main">
       <div class="chat-header">
-        <div
+        <button
           class="model-info"
-          role="button"
-          tabindex="0"
           @click="toggleModelSelect"
           @keyup.enter.prevent="toggleModelSelect"
           @keyup.space.prevent="toggleModelSelect"
@@ -576,7 +591,7 @@ const renameSession = async (session: ChatSession) => {
             <span class="provider-label">{{ currentLlmEndpoint }}</span>
             <span class="model-name">{{ currentModel }}</span>
             <span class="model-caret" :class="{ open: modelSelectOpen }">▾</span>
-        </div>
+        </button>
         <button v-if="sessionId" @click="downloadChat" class="download-btn" title="Download Chat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
@@ -927,6 +942,10 @@ const renameSession = async (session: ChatSession) => {
     color: var(--text-color);
     cursor: pointer;
     user-select: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: inherit;
 }
 .model-info:focus-visible {
     outline: 2px solid var(--primary-color);

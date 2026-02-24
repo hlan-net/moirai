@@ -17,7 +17,7 @@ accesslog = "-"
 errorlog = "-"
 
 
-def on_starting(server):
+def on_starting(_server):
     """Initialise databases and default user on gunicorn startup.
 
     Note: The scheduler and enrichment worker are started separately

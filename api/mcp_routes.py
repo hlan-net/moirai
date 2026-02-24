@@ -13,6 +13,11 @@ from pydantic import ValidationError
 
 mcp_blueprint = Blueprint("mcp", __name__)
 
+# Constants for repeated literals
+ERROR_USERSPACE_REQUIRED = "'userspace' query parameter is required"
+ERROR_EVENT_NOT_FOUND = "Event not found"
+ERROR_TREND_NOT_FOUND = "Trend not found"
+
 
 def _normalize_event_payload(payload):
     normalized = dict(payload or {})
@@ -204,7 +209,7 @@ def list_events():
     """
     userspace = request.args.get("userspace")
     if not userspace:
-        abort(400, description="'userspace' query parameter is required")
+        abort(400, description=ERROR_USERSPACE_REQUIRED)
     try:
         validate_userspace_param(userspace)
     except ValueError as e:
@@ -230,7 +235,7 @@ def get_event(event_id):
     """
     userspace = request.args.get("userspace")
     if not userspace:
-        abort(400, description="'userspace' query parameter is required")
+        abort(400, description=ERROR_USERSPACE_REQUIRED)
     try:
         validate_userspace_param(userspace)
     except ValueError as e:
@@ -238,13 +243,13 @@ def get_event(event_id):
 
     event = fetch_from_couchdb("issues", event_id)
     if not event:
-        abort(404, description="Event not found")
+        abort(404, description=ERROR_EVENT_NOT_FOUND)
 
     if event.get("type") != "issue" or event.get("longevity") != "transient":
-        abort(404, description="Event not found")
+        abort(404, description=ERROR_EVENT_NOT_FOUND)
 
     if _extract_userspace(event) != userspace:
-        abort(404, description="Event not found")
+        abort(404, description=ERROR_EVENT_NOT_FOUND)
 
     # Check if we should include full article objects
     include_articles = request.args.get("include_articles", "").lower() == "true"
@@ -306,7 +311,7 @@ def list_trends():
     """
     userspace = request.args.get("userspace")
     if not userspace:
-        abort(400, description="'userspace' query parameter is required")
+        abort(400, description=ERROR_USERSPACE_REQUIRED)
     try:
         validate_userspace_param(userspace)
     except ValueError as e:
@@ -333,7 +338,7 @@ def get_trend(trend_id):
     """
     userspace = request.args.get("userspace")
     if not userspace:
-        abort(400, description="'userspace' query parameter is required")
+        abort(400, description=ERROR_USERSPACE_REQUIRED)
     try:
         validate_userspace_param(userspace)
     except ValueError as e:
@@ -341,13 +346,13 @@ def get_trend(trend_id):
 
     trend = fetch_from_couchdb("issues", trend_id)
     if not trend:
-        abort(404, description="Trend not found")
+        abort(404, description=ERROR_TREND_NOT_FOUND)
 
     if trend.get("type") != "issue" or trend.get("longevity") != "temporal":
-        abort(404, description="Trend not found")
+        abort(404, description=ERROR_TREND_NOT_FOUND)
 
     if _extract_userspace(trend) != userspace:
-        abort(404, description="Trend not found")
+        abort(404, description=ERROR_TREND_NOT_FOUND)
 
     # Check if we should include full event objects
     include_events = request.args.get("include_events", "").lower() == "true"

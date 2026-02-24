@@ -49,10 +49,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -ms /bin/bash appuser && \
+    rm -rf /var/lib/apt/lists/* && \
+    useradd -ms /bin/bash appuser && \
     mkdir -p /app/feeds /app/ui/dist /run/gunicorn && \
     chown -R appuser:appuser /app/feeds /app/ui/dist /run/gunicorn
 

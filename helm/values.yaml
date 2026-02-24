@@ -6,8 +6,8 @@ api:
   replicaCount: 2
   image:
     repository: ghcr.io/hlan-net/moirai
-    tag: "latest"
-    pullPolicy: Always
+    tag: "0.5.2-dev"
+    pullPolicy: IfNotPresent
   # Use image default command (gunicorn) when empty
   command: []
   service:
@@ -40,8 +40,8 @@ ui:
   replicaCount: 1
   image:
     repository: ghcr.io/hlan-net/moirai-ui
-    tag: "latest"
-    pullPolicy: Always
+    tag: "0.5.2-dev"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 80
@@ -163,6 +163,8 @@ redis:
     requests:
       cpu: 50m
       memory: 64Mi
+      ephemeral-storage: "100Mi"
     limits:
       cpu: 200m
       memory: 128Mi
+      ephemeral-storage: "256Mi"

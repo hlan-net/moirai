@@ -114,22 +114,30 @@ def enrich_issues_with_constituents(issues, recursive=True):
         premises = issue.get("premises", [])
         enriched_premises = []
         for premise in premises:
-            p_type = premise.get("type")
-            p_id = premise.get("id")
-            try:
-                if p_type == "message":
-                    doc = fetch_from_couchdb("articles", p_id)
-                elif p_type == "issue":
-                    doc = fetch_from_couchdb("issues", p_id)
-                    if doc and recursive:
-                        enrich_issues_with_constituents([doc], recursive=True)
-                else:
-                    doc = None
-                
-                if doc:
-                    enriched_premises.append(doc)
-            except Exception as e:
-                logger.warning(f"Could not fetch premise {p_id} of type {p_type}: {e}")
+            doc = _fetch_premise_doc(premise, recursive)
+            if doc:
+                enriched_premises.append(doc)
         
         issue["enriched_premises"] = enriched_premises
     return issues
+
+
+def _fetch_premise_doc(premise, recursive):
+    """Helper to fetch a single premise document from CouchDB."""
+    p_type = premise.get("type")
+    p_id = premise.get("id")
+    if not p_id:
+        return None
+
+    try:
+        if p_type == "message":
+            return fetch_from_couchdb("articles", p_id)
+        elif p_type == "issue":
+            doc = fetch_from_couchdb("issues", p_id)
+            if doc and recursive:
+                enrich_issues_with_constituents([doc], recursive=True)
+            return doc
+    except Exception as e:
+        logger.warning(f"Could not fetch premise {p_id} of type {p_type}: {e}")
+    
+    return None

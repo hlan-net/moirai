@@ -10,7 +10,7 @@ os.environ.setdefault("ADMIN_PASSWORD", "test_password")
 import types
 
 for mod_name in (
-    "google", "google.generativeai", "google.generativeai.types",
+    "google", "google.genai", "google.genai.types",
 ):
     if mod_name not in sys.modules:
         sys.modules[mod_name] = types.ModuleType(mod_name)

@@ -382,58 +382,61 @@ def bulk_import_feeds():
     return jsonify(results), 200
 
 
+def _get_cached_articles_view(is_default_view):
+    """Try to get default articles view from Redis."""
+    if not is_default_view:
+        return None
+    try:
+        redis_client = get_redis_client()
+        if redis_client:
+            cached_resp = redis_client.get("articles_default_json")
+            if cached_resp:
+                return Response(cached_resp, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Redis error in list_articles: {e}")
+    return None
+
+
 # --- Articles ---
 @api_blueprint.route("/articles", methods=["GET"])
 def list_articles():
     if not check_public_read_access():
-        response = jsonify({"message": "Unauthorized"})
-        response.status_code = 401
-        return response
+        return jsonify({"message": "Unauthorized"}), 401
+
     # Pagination parameters
     try:
         limit = int(request.args.get("limit", 50))
         skip = int(request.args.get("skip", 0))
     except ValueError:
         abort(400, description="limit and skip must be integers")
-    since = request.args.get("since")  # ISO timestamp to fetch only newer articles
 
-    # New filtering parameters
+    since = request.args.get("since")
     feed_id = request.args.get("feed_id")
     issue_id = request.args.get("issue_id")
 
     # Validate pagination params
-    limit = min(max(limit, 1), 200)  # Clamp between 1-200
+    limit = min(max(limit, 1), 200)
     skip = max(skip, 0)
 
-    # Caching: Check Redis for default view (no filters, default limit/skip)
+    # Caching
     is_default_view = (limit == 50 and skip == 0 and not since and not feed_id and not issue_id)
-    redis_client = None
-    if is_default_view:
-        try:
-            redis_client = get_redis_client()
-            if redis_client:
-                cached_resp = redis_client.get("articles_default_json")
-                if cached_resp:
-                    return Response(cached_resp, mimetype="application/json")
-        except Exception as e:
-            logger.error(f"Redis error in list_articles: {e}")
+    cached = _get_cached_articles_view(is_default_view)
+    if cached:
+        return cached
 
     selector = build_article_selector(since, feed_id, issue_id)
 
     # If selector indicates no match (e.g., non-existent event/trend), return empty
     if selector.get("_id", {}).get("$eq") == "no_match":
-        return jsonify(
-            {
-                "articles": [],
-                "total_count": 0,
-                "has_more": False,
-                "limit": limit,
-                "skip": skip,
-            }
-        )
+        return jsonify({
+            "articles": [],
+            "total_count": 0,
+            "has_more": False,
+            "limit": limit,
+            "skip": skip,
+        })
 
-    # Query CouchDB directly with pagination and sorting
-    # We fetch limit + 1 to determine if there are more results
+    # Query CouchDB
     articles = query_couchdb(
         "articles",
         selector=selector,
@@ -443,8 +446,6 @@ def list_articles():
     )
 
     paginated_articles, has_more, total_count = paginate_results(articles, limit, skip)
-
-    # Enrichment
     enrich_articles_with_issues(paginated_articles)
 
     response_data = {
@@ -455,14 +456,20 @@ def list_articles():
         "skip": skip,
     }
     
-    # Store in Redis if default view
-    if is_default_view and redis_client:
-        try:
-            redis_client.setex("articles_default_json", 3600, json.dumps(response_data))
-        except Exception as e:
-            logger.error(f"Redis cache set error: {e}")
+    if is_default_view:
+        _cache_articles_view(response_data)
 
     return jsonify(response_data)
+
+
+def _cache_articles_view(response_data):
+    """Store default view in Redis."""
+    try:
+        redis_client = get_redis_client()
+        if redis_client:
+            redis_client.setex("articles_default_json", 3600, json.dumps(response_data))
+    except Exception as e:
+        logger.error(f"Redis cache set error: {e}")
 
 
 @api_blueprint.route("/stream.rss", methods=["GET"])

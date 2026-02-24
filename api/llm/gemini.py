@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import json
 from types import SimpleNamespace
 from .base import LLMProvider
@@ -10,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key):
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=api_key)
         self.api_key = api_key
 
     def list_models(self):
         try:
-            models = genai.list_models()
+            models = self.client.models.list()
             # Filter for models that support generation
             return [
                 m.name.replace("models/", "")
@@ -27,113 +28,59 @@ class GeminiProvider(LLMProvider):
             raise e
 
     def create_chat_completion(self, messages, model, tools, tool_choice):
-        # 1. Setup Model
-        gemini_tools = self._convert_tools(tools)
-
+        # 1. Setup Config
         system_instruction = None
         # Extract system prompt if present
         if messages and messages[0]["role"] == "system":
             system_instruction = messages[0]["content"]
             messages = messages[1:]
 
-        # Create model
-        model_name = model if model.startswith("models/") else f"models/{model}"
-        # If model name doesn't exist/invalid, might accept short name.
-
-        generative_model = genai.GenerativeModel(
-            model_name=model_name,
-            tools=gemini_tools if gemini_tools else None,
+        gemini_tools = self._convert_tools(tools)
+        
+        config = types.GenerateContentConfig(
             system_instruction=system_instruction,
+            tools=gemini_tools,
         )
 
         # 2. Convert History
-        gemini_history = self._convert_history(messages)
+        gemini_contents = self._convert_history(messages)
 
-        # 3. Generate Content
-        # We use chat session for easier history management?
-        # But here we are stateless REST API so we reconstruct history.
-        # Actually `start_chat(history=...)` and then `send_message` is good.
-
-        # However, sending the LAST message separate from history is typical usage.
-        if not gemini_history:
-            # Should not happen typically if user sends at least one message
+        if not gemini_contents:
             return self._mock_response("No messages provided.")
 
-        last_message = gemini_history[-1]
-        history_except_last = gemini_history[:-1]
-
-        chat = generative_model.start_chat(history=history_except_last)
-
-        response = chat.send_message(last_message)
-
-        # 4. Map Response back to OpenAI format
-        return self._convert_response(response)
+        # 3. Generate Content
+        try:
+            model_id = model if model.startswith("models/") else f"models/{model}"
+            response = self.client.models.generate_content(
+                model=model_id,
+                contents=gemini_contents,
+                config=config
+            )
+            return self._convert_response(response)
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            return self._mock_response(f"Gemini API error: {str(e)}")
 
     def _convert_tools(self, tools):
         if not tools:
             return None
 
-        gemini_tools = []
+        function_declarations = []
         for tool in tools:
             if tool.get("type") == "function":
                 func = tool["function"]
-
-                # Convert parameters schema
-                # OpenAI uses JSON Schema. Gemini uses a subset.
-                # Ideally we map types. For now, pass raw dict and hope client handles it
-                # (Client often accepts dicts that match the proto structure)
-                # But we might need to be careful with 'type': 'object' etc.
-
-                # Basic mapping:
-                gemini_tools.append(
-                    genai.protos.Tool(
-                        function_declarations=[
-                            genai.protos.FunctionDeclaration(
-                                name=func["name"],
-                                description=func.get("description"),
-                                parameters=self._convert_schema(func.get("parameters")),
-                            )
-                        ]
+                function_declarations.append(
+                    types.FunctionDeclaration(
+                        name=func["name"],
+                        description=func.get("description"),
+                        parameters=func.get("parameters"),
                     )
                 )
-        return gemini_tools
-
-    def _convert_schema(self, schema):
-        # Recursive conversion of JSON Schema to Gemini Schema
-        if not schema:
+        
+        if not function_declarations:
             return None
-
-        type_map = {
-            "string": genai.protos.Type.STRING,
-            "number": genai.protos.Type.NUMBER,
-            "integer": genai.protos.Type.INTEGER,
-            "boolean": genai.protos.Type.BOOLEAN,
-            "array": genai.protos.Type.ARRAY,
-            "object": genai.protos.Type.OBJECT,
-        }
-
-        # If it's a raw type string in some simplified schema
-        type_str = schema.get("type", "object")
-
-        schema_obj = {
-            "type": type_map.get(type_str, genai.protos.Type.OBJECT),
-            "description": schema.get("description"),
-            "nullable": schema.get("nullable", False),
-            "enum": schema.get("enum"),
-        }
-
-        if "properties" in schema:
-            schema_obj["properties"] = {
-                k: self._convert_schema(v) for k, v in schema["properties"].items()
-            }
-
-        if "required" in schema:
-            schema_obj["required"] = schema["required"]
-
-        if "items" in schema:
-            schema_obj["items"] = self._convert_schema(schema["items"])
-
-        return schema_obj
+            
+        return [types.Tool(function_declarations=function_declarations)]
 
     def _convert_history(self, messages):
         gemini_history = []
@@ -148,77 +95,76 @@ class GeminiProvider(LLMProvider):
         content = msg.get("content")
 
         if role == "user":
-            parts = [{"text": content}] if content else []
-            return {"role": "user", "parts": parts}
-
+            return self._convert_user_message(content)
         elif role == "assistant":
-            parts = []
-            if content:
-                parts.append({"text": content})
-
-            # Handle tool calls
-            if "tool_calls" in msg and msg["tool_calls"]:
-                for tc in msg["tool_calls"]:
-                    if isinstance(tc, dict):
-                        func = tc["function"]
-                        func_name = func["name"]
-                        func_args = json.loads(func["arguments"])
-                    else:
-                        # SimpleNamespace (mock or from previous turn)
-                        func = tc.function
-                        func_name = func.name
-                        func_args = json.loads(func.arguments)
-
-                    # FunctionCall part
-                    parts.append(
-                        {"function_call": {"name": func_name, "args": func_args}}
-                    )
-
-            return {"role": "model", "parts": parts}
-
+            return self._convert_assistant_message(msg, content)
         elif role == "tool":
-            # FunctionResponse part
-            parts = [
-                {
-                    "function_response": {
-                        "name": msg["name"],
-                        "response": {"result": content},
-                    }
-                }
-            ]
-            return {"role": "function", "parts": parts}
+            return self._convert_tool_message(msg, content)
 
         return None
 
+    def _convert_user_message(self, content):
+        parts = [types.Part(text=content)] if content else []
+        return types.Content(role="user", parts=parts)
+
+    def _convert_assistant_message(self, msg, content):
+        parts = []
+        if content:
+            parts.append(types.Part(text=content))
+
+        # Handle tool calls
+        if "tool_calls" in msg and msg["tool_calls"]:
+            for tc in msg["tool_calls"]:
+                parts.append(self._convert_tool_call(tc))
+
+        return types.Content(role="model", parts=parts)
+
+    def _convert_tool_call(self, tc):
+        if isinstance(tc, dict):
+            func = tc["function"]
+            func_name = func["name"]
+            func_args = json.loads(func["arguments"])
+        else:
+            # SimpleNamespace (mock or from previous turn)
+            func = tc.function
+            func_name = func.name
+            func_args = json.loads(func.arguments)
+
+        return types.Part(
+            function_call=types.FunctionCall(
+                name=func_name,
+                args=func_args
+            )
+        )
+
+    def _convert_tool_message(self, msg, content):
+        # FunctionResponse part
+        return types.Content(
+            role="user",
+            parts=[
+                types.Part(
+                    function_response=types.FunctionResponse(
+                        name=msg["name"],
+                        response={"result": content},
+                    )
+                )
+            ]
+        )
+
     def _convert_response(self, response):
         # Convert Gemini response to OpenAI-like object
-        # response is a GenerateContentResponse
-
-        # Check for function calls
         content = None
         tool_calls = []
 
-        for part in response.parts:
+        if not response.candidates:
+            return self._mock_response("No candidates in response")
+
+        for part in response.candidates[0].content.parts:
             if part.text:
-                if content is None:
-                    content = ""
-                content += part.text
+                content = (content or "") + part.text
 
             if part.function_call:
-                # Map to OpenAI tool call
-                fc = part.function_call
-                tool_calls.append(
-                    SimpleNamespace(
-                        id=f"call_{fc.name}",  # Dummy ID as Gemini doesn't provide one
-                        type="function",
-                        function=SimpleNamespace(
-                            name=fc.name,
-                            arguments=json.dumps(
-                                dict(fc.args)
-                            ),  # args is a proto Map, dict() converts it
-                        ),
-                    )
-                )
+                tool_calls.append(self._map_function_call(part.function_call))
 
         # Create message object
         message = SimpleNamespace(
@@ -229,6 +175,16 @@ class GeminiProvider(LLMProvider):
 
         choice = SimpleNamespace(message=message)
         return SimpleNamespace(choices=[choice])
+
+    def _map_function_call(self, fc):
+        return SimpleNamespace(
+            id=f"call_{fc.name}",
+            type="function",
+            function=SimpleNamespace(
+                name=fc.name,
+                arguments=json.dumps(dict(fc.args) if fc.args else {}),
+            ),
+        )
 
     def _mock_response(self, text):
         return SimpleNamespace(

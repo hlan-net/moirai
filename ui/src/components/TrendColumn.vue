@@ -362,7 +362,7 @@ h3 {
 .expand-hint {
   font-size: 0.8rem;
   color: var(--text-color);
-  opacity: 0.5;
+  opacity: 0.7;
   cursor: pointer;
   margin-top: 10px;
 }

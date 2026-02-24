@@ -34,7 +34,7 @@ def test_forge_issue_unit(mock_db):
     
     assert "Issue forged with ID: issue_123" in result
     mock_db['store'].assert_called_once()
-    args, kwargs = mock_db['store'].call_args
+    args, _ = mock_db['store'].call_args
     assert args[0] == "issues"
     assert args[1]["logos"] == "Test Logos"
     assert args[1]["longevity"] == "transient"
@@ -54,7 +54,7 @@ def test_add_event_alias_unit(mock_db):
     
     assert "Issue forged with ID: event_123" in result
     mock_db['store'].assert_called_once()
-    args, kwargs = mock_db['store'].call_args
+    args, _ = mock_db['store'].call_args
     assert args[0] == "issues" # Verify it uses issues DB
     assert args[1]["logos"] == "Test Event"
     assert args[1]["longevity"] == "transient"
@@ -75,7 +75,7 @@ def test_add_trend_alias_unit(mock_db):
     
     assert "Issue forged with ID: trend_123" in result
     mock_db['store'].assert_called_once()
-    args, kwargs = mock_db['store'].call_args
+    args, _ = mock_db['store'].call_args
     assert args[0] == "issues" # Verify it uses issues DB
     assert args[1]["logos"] == "Test Trend"
     assert args[1]["longevity"] == "temporal"

@@ -24,7 +24,7 @@ class TestArticleProcessor(unittest.TestCase):
         """
 
         processor = ArticleProcessor()
-        feed_title, articles = processor.process_feed(
+        _, articles = processor.process_feed(
             "http://example.com/feed", feed_content
         )
 

@@ -1,6 +1,44 @@
 from xml.sax.saxutils import escape
 
 
+def _generate_category_tags(article):
+    """Build category tags for events, trends, and AI annotations."""
+    categories = []
+
+    # Events and Trends
+    if "events" in article:
+        for event_name in article["events"]:
+            categories.append(f'    <category domain="event">{escape(event_name)}</category>')
+
+    if "trends" in article:
+        for trend_name in article["trends"]:
+            categories.append(f'    <category domain="trend">{escape(trend_name)}</category>')
+
+    # AI annotations
+    annotations = article.get("annotations")
+    if isinstance(annotations, dict):
+        categories.extend(_generate_annotation_tags(annotations))
+
+    return "\n".join(categories) if categories else ""
+
+
+def _generate_annotation_tags(annotations):
+    """Helper to build XML for AI annotations."""
+    tags = []
+    for topic in annotations.get("topics", []):
+        tags.append(f'    <category domain="topic">{escape(str(topic))}</category>')
+    
+    priority = annotations.get("priority")
+    if priority:
+        tags.append(f'    <category domain="priority">{escape(str(priority))}</category>')
+    
+    sentiment = annotations.get("sentiment")
+    if sentiment:
+        tags.append(f'    <category domain="sentiment">{escape(str(sentiment))}</category>')
+    
+    return tags
+
+
 def generate_rss_item_xml(article, feed_title_map, parse_datetime_func):
     """
     Generate the XML string for a single RSS item.
@@ -19,40 +57,7 @@ def generate_rss_item_xml(article, feed_title_map, parse_datetime_func):
         except Exception:
             pass
 
-    # Build category tags for events and trends
-    categories = []
-
-    if "events" in article:
-        for event_name in article["events"]:
-            categories.append(
-                f'    <category domain="event">{escape(event_name)}</category>'
-            )
-
-    if "trends" in article:
-        for trend_name in article["trends"]:
-            categories.append(
-                f'    <category domain="trend">{escape(trend_name)}</category>'
-            )
-
-    # AI annotations (topics, priority, sentiment)
-    annotations = article.get("annotations")
-    if isinstance(annotations, dict):
-        for topic in annotations.get("topics", []):
-            categories.append(
-                f'    <category domain="topic">{escape(str(topic))}</category>'
-            )
-        priority = annotations.get("priority")
-        if priority:
-            categories.append(
-                f'    <category domain="priority">{escape(str(priority))}</category>'
-            )
-        sentiment = annotations.get("sentiment")
-        if sentiment:
-            categories.append(
-                f'    <category domain="sentiment">{escape(str(sentiment))}</category>'
-            )
-
-    category_xml = "\n".join(categories) if categories else ""
+    category_xml = _generate_category_tags(article)
 
     # Add source feed info
     feed_url = article.get("feed_url", "")

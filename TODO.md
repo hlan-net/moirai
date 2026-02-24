@@ -25,7 +25,7 @@ Intended to enforce schema at the database level. Previously marked done but **n
 ## Frontend (UI)
 
 ### Chat Model Selector Persistence
-- [ ] Persist chat header provider/model changes to server-side user settings (not just localStorage).
+- [x] Persist chat header provider/model changes to server-side user settings (not just localStorage).
 
 ### Lifespan View (Fates V2)
 A new UI view to visualise the "frequency" of the current userspace — how the stream of articles crystallises into active Issues ("Things that ARE") and sealed Issues ("Things that WERE").

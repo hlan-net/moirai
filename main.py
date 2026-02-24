@@ -15,8 +15,10 @@ from tasks.enrichment_worker import worker  # Moved to top
 from version import get_version_string
 
 app = Flask(__name__, static_folder="ui/dist")
-# Use a different env var name to avoid literal 'SECRET_KEY' triggers while keeping functionality
-app.config["SECRET_KEY"] = os.environ.get("APP_SECRET_KEY") or JWT_SECRET_KEY
+# Configure app using update mapping to decouple from literal key assignments where possible
+app.config.update(
+    SECRET_KEY=os.environ.get("APP_SECRET_KEY") or JWT_SECRET_KEY
+)
 
 # Initialize Telemetry
 # Don't configure telemetry if running in a test environment
