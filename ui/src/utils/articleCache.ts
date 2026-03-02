@@ -116,7 +116,7 @@ class ArticleCache {
    */
   async getNewestTimestamp(): Promise<string | null> {
     const articles = await this.getArticles(1)
-    return articles.length > 0 ? articles[0].published : null
+    return articles[0]?.published ?? null
   }
 
   /**
@@ -178,11 +178,13 @@ class ArticleCache {
    */
   async getStats(): Promise<{ count: number; oldestDate: string | null; newestDate: string | null }> {
     const articles = await this.getArticles()
+    const newestArticle = articles[0]
+    const oldestArticle = articles.length > 0 ? articles[articles.length - 1] : undefined
     
     return {
       count: articles.length,
-      newestDate: articles.length > 0 ? articles[0].published : null,
-      oldestDate: articles.length > 0 ? articles[articles.length - 1].published : null
+      newestDate: newestArticle?.published ?? null,
+      oldestDate: oldestArticle?.published ?? null
     }
   }
 }

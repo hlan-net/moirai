@@ -363,7 +363,8 @@ const importSettings = async (event: Event) => {
   const target = event.target as HTMLInputElement
   if (!target.files || target.files.length === 0) return
 
-  const file = target.files[0]
+  const file = target.files.item(0)
+  if (!file) return
   const reader = new FileReader()
 
   reader.onload = async (e) => {
