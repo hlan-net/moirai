@@ -139,7 +139,7 @@ jobs:
         JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
         DISABLE_CSRF: true
       run: |
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --no-build couchdb redis api ui nginx
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --no-build couchdb redis api ui nginx mcp-server
         for i in {1..30}; do
           if curl -fsS http://localhost:8088/api/health > /dev/null; then
             exit 0
@@ -156,3 +156,33 @@ jobs:
         ADMIN_PASSWORD: testpassword
       run: |
         npx playwright test
+
+    - name: Wait for MCP server
+      run: |
+        for i in {1..30}; do
+          if curl -fsS http://localhost:8090/health > /dev/null 2>&1; then
+            echo "MCP server is ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        docker compose logs mcp-server
+        exit 1
+
+    - name: Set up Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-variant: Miniforge3
+        miniforge-version: latest
+        environment-file: environment.yml
+        activate-environment: moirai
+        auto-activate-base: false
+        use-mamba: true
+
+    - name: Run MCP integration tests
+      env:
+        MCP_SERVER_URL: http://localhost:8090/sse
+        ADMIN_USERNAME: testuser
+        ADMIN_PASSWORD: testpassword
+      run: |
+        conda run --name moirai pytest -m integration -v
