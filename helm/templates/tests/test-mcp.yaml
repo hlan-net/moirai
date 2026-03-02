@@ -1,0 +1,89 @@
+{{- if .Values.mcpServer.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "moirai.fullname" . }}-test-mcp"
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test-success
+    "helm.sh/hook-weight": "5"
+spec:
+  initContainers:
+    - name: wait-for-mcp
+      image: busybox
+      command: ['sh', '-c', 'until nc -z -v -w30 {{ include "moirai.fullname" . }}-mcp-server {{ .Values.mcpServer.service.port }}; do echo "Waiting for MCP server..."; sleep 5; done']
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+  containers:
+    - name: mcp-test
+      image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+      imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+      command:
+        - python
+        - -c
+        - |
+          import asyncio, os, base64, sys
+
+          async def run_tests():
+              from mcp.client.sse import sse_client
+              from mcp import ClientSession
+
+              url = os.environ["MCP_SERVER_URL"]
+              user = os.environ["ADMIN_USERNAME"]
+              pwd = os.environ["ADMIN_PASSWORD"]
+              creds = base64.b64encode(f"{user}:{pwd}".encode()).decode()
+              headers = {"Authorization": f"Basic {creds}"}
+
+              print(f"Connecting to MCP server at {url}...")
+              async with sse_client(url, headers=headers) as (read, write):
+                  async with ClientSession(read, write) as session:
+                      await session.initialize()
+                      tools = await session.list_tools()
+                      tool_names = [t.name for t in tools.tools]
+                      print(f"Discovered {len(tool_names)} tools: {tool_names}")
+
+                      required = ["add_feed", "list_feeds", "add_event", "list_events", "add_trend", "list_trends"]
+                      missing = [t for t in required if t not in tool_names]
+                      if missing:
+                          print(f"FAIL: Missing required tools: {missing}")
+                          sys.exit(1)
+
+                      # Smoke test: list_feeds
+                      res = await session.call_tool("list_feeds", {"userspace": "helm-test"})
+                      print(f"list_feeds: {res.content[0].text[:200]}")
+
+                      # Smoke test: list_events
+                      res = await session.call_tool("list_events", {"userspace": "helm-test"})
+                      print(f"list_events: {res.content[0].text[:200]}")
+
+                      print("ALL TESTS PASSED")
+
+          asyncio.run(run_tests())
+      env:
+        - name: MCP_SERVER_URL
+          value: "http://{{ include "moirai.fullname" . }}-mcp-server:{{ .Values.mcpServer.service.port }}/sse"
+        - name: ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "moirai.fullname" . }}-moirai-secret
+              key: adminUsername
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "moirai.fullname" . }}-moirai-secret
+              key: adminPassword
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+  restartPolicy: Never
+{{- end }}
