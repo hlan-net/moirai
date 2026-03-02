@@ -104,6 +104,14 @@ services:
       - couchdb
       - redis # Added dependency on redis
 
+  mcp-inspector:
+    image: ghcr.io/modelcontextprotocol/inspector:latest
+    ports:
+      - "6274:6274"
+      - "6277:6277"
+    depends_on:
+      - mcp-server
+
   couchdb:
     image: couchdb:3
     ports:
