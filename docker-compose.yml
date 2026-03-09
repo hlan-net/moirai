@@ -91,7 +91,7 @@ services:
       - "9000:9000"
     environment:
       - COUCHDB_URI=http://admin:${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}@couchdb:5984/
-      - ADMIN_USERNAME=username
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-username}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}
       - COUCHDB_USER=admin # Explicitly set COUCHDB_USER for create_dbs.sh
