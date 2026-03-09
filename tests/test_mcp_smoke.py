@@ -8,6 +8,7 @@ import os
 import base64
 import json
 import pytest
+import pytest_asyncio
 from mcp.client.sse import sse_client
 from mcp import ClientSession
 
@@ -26,7 +27,7 @@ def _build_headers():
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def mcp_session():
     """Provide a connected MCP client session."""
     headers = _build_headers()
