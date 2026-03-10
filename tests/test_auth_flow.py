@@ -5,10 +5,12 @@ import os
 import base64
 from unittest.mock import patch
 
-# Set environment variables BEFORE importing app
-os.environ["JWT_SECRET_KEY"] = "super_secret_test_key_that_is_at_least_32_chars_long"
-os.environ["ADMIN_USERNAME"] = "admin"
-os.environ["ADMIN_PASSWORD"] = "test_password_123"
+# Set environment variables BEFORE importing app.
+# Use setdefault to avoid overwriting vars already set by the test runner
+# (e.g., integration tests set ADMIN_USERNAME/ADMIN_PASSWORD to specific values).
+os.environ.setdefault("JWT_SECRET_KEY", "super_secret_test_key_that_is_at_least_32_chars_long")
+os.environ.setdefault("ADMIN_USERNAME", "admin")
+os.environ.setdefault("ADMIN_PASSWORD", "test_password_123")
 
 from main import app
 

@@ -41,7 +41,7 @@ RUN conda install -y mamba && \
     true
 
 # Stage 2: Slim runtime image
-FROM debian:bookworm-slim@sha256:98f4b71de414932439ac6ac690d7060df1f27161073c5036a7553723881bffbe AS final-stage
+FROM debian:bookworm-slim@sha256:74d56e3931e0d5a1dd51f8c8a2466d21de84a271cd3b5a733b803aa91abf4421 AS final-stage
 
 # Install only curl (health probes) and CA certs (HTTPS).
 # libffi, libssl, libgomp are already inside the conda env.
