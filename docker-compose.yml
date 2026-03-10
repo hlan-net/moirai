@@ -15,8 +15,8 @@ services:
       - ITERATION_INTERVAL=300
       - MCP_SERVER_URL=http://mcp-server:8090/sse
       - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-username}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}
@@ -68,8 +68,8 @@ services:
       - COUCHDB_USER=admin
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}
       - PYTHONUNBUFFERED=1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-username}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_test_key_that_is_at_least_32_chars_long}

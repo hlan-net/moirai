@@ -2,6 +2,7 @@
 FROM condaforge/miniforge3:26.1.0-0@sha256:df8d10c338351cc245f687c62921f40c8c1664249594b3b1cad37ae5f5ee7483 AS builder
 
 WORKDIR /build
+ENV PIP_ROOT_USER_ACTION=ignore
 
 COPY environment-prod.yml .
 RUN conda install -y mamba && \

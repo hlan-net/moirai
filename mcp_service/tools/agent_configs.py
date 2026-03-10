@@ -58,7 +58,7 @@ def add_agent_config(
         if linked_entity_id is not None:
             agent_config_data["linked_entity_id"] = linked_entity_id
 
-        validated_data = AgentConfigCreateRequest(**agent_config_data).dict()
+        validated_data = AgentConfigCreateRequest(**agent_config_data).model_dump()
     except ValidationError as e:
         return {"status": "error", "message": str(e)}
 
@@ -158,7 +158,7 @@ def update_agent_config(
 
     # Validate update data using Pydantic model
     try:
-        validated_data = AgentConfigUpdateRequest(**update_data).dict(
+        validated_data = AgentConfigUpdateRequest(**update_data).model_dump(
             exclude_unset=True
         )
     except ValidationError as e:
