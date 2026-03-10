@@ -397,7 +397,7 @@ const downloadChat = async () => {
   link.href = url
   const disposition = response.headers.get('Content-Disposition') ?? ''
   const match = disposition.match(/filename="?([^";]+)"?/)
-  link.download = match ? match[1] : 'chat.md'
+  link.download = match?.[1] ?? 'chat.md'
   link.click()
   URL.revokeObjectURL(url)
 }

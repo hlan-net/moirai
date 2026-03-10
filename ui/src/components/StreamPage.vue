@@ -33,19 +33,21 @@ const RSS_REFRESH_MS = 120000
 
 // Feed-grouped: sequential feed grouping (existing behavior)
 const feedGroupedArticles = computed(() => {
-  if (articles.value.length === 0) {
+  const firstArticle = articles.value[0]
+  if (!firstArticle) {
     return []
   }
 
   const groups: ArticleGroup[] = []
   let currentGroup: ArticleGroup = {
-    title: articles.value[0].feed_title || getHostname(articles.value[0].feed_url),
-    favicon: articles.value[0].feed_favicon,
-    articles: [articles.value[0]]
+    title: firstArticle.feed_title || getHostname(firstArticle.feed_url),
+    favicon: firstArticle.feed_favicon,
+    articles: [firstArticle]
   }
 
   for (let i = 1; i < articles.value.length; i++) {
     const article = articles.value[i]
+    if (!article) continue
     const articleFeedTitle = article.feed_title || getHostname(article.feed_url)
     if (articleFeedTitle === currentGroup.title) {
       currentGroup.articles.push(article)
@@ -63,7 +65,6 @@ const feedGroupedArticles = computed(() => {
   return groups
 })
 
-// Time-blocked: group by temporal windows
 const timeGroupedArticles = computed(() => {
   if (articles.value.length === 0) {
     return []
@@ -74,29 +75,32 @@ const timeGroupedArticles = computed(() => {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
 
-  const buckets: Record<string, Article[]> = {
-    'Last Hour': [],
-    'Earlier Today': [],
-    'Yesterday': [],
-    'Older': [],
-  }
+  const lastHour: Article[] = []
+  const earlierToday: Article[] = []
+  const yesterday: Article[] = []
+  const older: Article[] = []
 
   for (const article of articles.value) {
     const pubDate = new Date(article.published)
     if (pubDate >= oneHourAgo) {
-      buckets['Last Hour'].push(article)
+      lastHour.push(article)
     } else if (pubDate >= todayStart) {
-      buckets['Earlier Today'].push(article)
+      earlierToday.push(article)
     } else if (pubDate >= yesterdayStart) {
-      buckets['Yesterday'].push(article)
+      yesterday.push(article)
     } else {
-      buckets['Older'].push(article)
+      older.push(article)
     }
   }
 
-  return Object.entries(buckets)
-    .filter(([, items]) => items.length > 0)
-    .map(([title, items]) => ({ title, favicon: undefined as string | undefined, articles: items }))
+  const groups: ArticleGroup[] = [
+    { title: 'Last Hour', favicon: undefined, articles: lastHour },
+    { title: 'Earlier Today', favicon: undefined, articles: earlierToday },
+    { title: 'Yesterday', favicon: undefined, articles: yesterday },
+    { title: 'Older', favicon: undefined, articles: older },
+  ]
+
+  return groups.filter((group) => group.articles.length > 0)
 })
 
 // Unified accessor for the template
