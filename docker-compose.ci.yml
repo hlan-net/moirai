@@ -2,10 +2,15 @@ services:
   api:
     image: moirai-app:ci
     environment:
+      - ADMIN_USERNAME=testuser
+      - ADMIN_PASSWORD=testpassword
       - DISABLE_CSRF=true
 
   mcp-server:
     image: moirai-app:ci
+    environment:
+      - ADMIN_USERNAME=testuser
+      - ADMIN_PASSWORD=testpassword
 
   ui:
     image: moirai-ui:ci
