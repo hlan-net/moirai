@@ -27,6 +27,50 @@ class AgentTargetDB(str, Enum):
     ARTICLES = "articles"
     ISSUES = "issues"
 
+
+def _validate_uuid(value: str, field_label: str) -> str:
+    try:
+        uuid.UUID(value)
+        return value
+    except ValueError as exc:
+        raise ValueError(f"{field_label} must be a valid UUID/GUID") from exc
+
+
+def _validate_optional_uuid(value: Optional[str], field_label: str) -> Optional[str]:
+    if value is None:
+        return value
+    return _validate_uuid(value, field_label)
+
+
+def _sanitize_optional_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return value
+    return bleach.clean(value, tags=[], strip=True)
+
+
+def _sanitize_text(value: str) -> str:
+    return bleach.clean(value, tags=[], strip=True)
+
+
+def _validate_http_or_https_url(value: str, error_message: str) -> str:
+    if not value.startswith(("http://", "https://")):
+        raise ValueError(error_message)
+    return value
+
+
+def _validate_url_list(values: Optional[list[str]]) -> Optional[list[str]]:
+    if values is None:
+        return values
+    for link in values:
+        if not validators.url(link):
+            raise ValueError(f"Invalid URL: {link}")
+    return values
+
+
+def _validate_required_url_list(values: list[str]) -> list[str]:
+    _validate_url_list(values)
+    return values
+
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     status: AgentStatus = Field(AgentStatus.ACTIVE)
@@ -52,13 +96,7 @@ class AgentConfigBase(BaseModel):
     @field_validator("linked_entity_id")
     @classmethod
     def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except ValueError:
-            raise ValueError("Linked entity ID must be a valid UUID/GUID")
+        return _validate_optional_uuid(v, "Linked entity ID")
 
 
 class AgentConfigCreateRequest(AgentConfigBase):
@@ -69,11 +107,7 @@ class AgentConfigCreateRequest(AgentConfigBase):
     @field_validator("user_id")
     @classmethod
     def validate_user_id(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except ValueError:
-            raise ValueError("User ID must be a valid UUID/GUID")
+        return _validate_uuid(v, "User ID")
 
 
 class AgentConfigUpdateRequest(BaseModel):
@@ -101,13 +135,7 @@ class AgentConfigUpdateRequest(BaseModel):
     @field_validator("linked_entity_id")
     @classmethod
     def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except ValueError:
-            raise ValueError("Linked entity ID must be a valid UUID/GUID")
+        return _validate_optional_uuid(v, "Linked entity ID")
 
 
 class FeedCreateRequest(BaseModel):
@@ -121,17 +149,13 @@ class FeedCreateRequest(BaseModel):
     @classmethod
     def validate_feed_url(cls, v: HttpUrl) -> str:
         """Ensure URL is http/https only"""
-        if not str(v).startswith(("http://", "https://")):
-            raise ValueError("Only HTTP/HTTPS URLs are allowed")
-        return str(v)
+        return _validate_http_or_https_url(str(v), "Only HTTP/HTTPS URLs are allowed")
 
     @field_validator("title", "category")
     @classmethod
     def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
         """Remove any HTML/script tags"""
-        if v is None:
-            return v
-        return bleach.clean(v, tags=[], strip=True)
+        return _sanitize_optional_text(v)
 
 
 class FeedUpdateRequest(BaseModel):
@@ -143,16 +167,16 @@ class FeedUpdateRequest(BaseModel):
     @field_validator("title")
     @classmethod
     def sanitize_title(cls, v: str) -> str:
-        return bleach.clean(v, tags=[], strip=True)
+        return _sanitize_text(v)
 
     @field_validator("new_url")
     @classmethod
     def validate_new_feed_url(cls, v: Optional[HttpUrl]) -> Optional[str]:
         if v is None:
             return v
-        if not str(v).startswith(("http://", "https://")):
-            raise ValueError("Only HTTP/HTTPS URLs are allowed for new_url")
-        return str(v)
+        return _validate_http_or_https_url(
+            str(v), "Only HTTP/HTTPS URLs are allowed for new_url"
+        )
 
 
 class EventCreateRequest(BaseModel):
@@ -167,27 +191,18 @@ class EventCreateRequest(BaseModel):
     @classmethod
     def validate_userspace(cls, v: Optional[str]) -> Optional[str]:
         """Validate userspace is a valid UUID/GUID"""
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except ValueError:
-            raise ValueError("Userspace must be a valid UUID/GUID")
+        return _validate_optional_uuid(v, "Userspace")
 
     @field_validator("title", "description")
     @classmethod
     def sanitize_text(cls, v: str) -> str:
-        return bleach.clean(v, tags=[], strip=True)
+        return _sanitize_text(v)
 
     @field_validator("article_links")
     @classmethod
     def validate_links(cls, v: list[str]) -> list[str]:
         """Validate article links are valid URLs"""
-        for link in v:
-            if not validators.url(link):
-                raise ValueError(f"Invalid URL: {link}")
-        return v
+        return _validate_required_url_list(v)
 
 
 class EventUpdateRequest(BaseModel):
@@ -200,19 +215,12 @@ class EventUpdateRequest(BaseModel):
     @field_validator("title", "description")
     @classmethod
     def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return bleach.clean(v, tags=[], strip=True)
+        return _sanitize_optional_text(v)
 
     @field_validator("article_links")
     @classmethod
     def validate_links(cls, v: Optional[list[str]]) -> Optional[list[str]]:
-        if v is None:
-            return v
-        for link in v:
-            if not validators.url(link):
-                raise ValueError(f"Invalid URL: {link}")
-        return v
+        return _validate_url_list(v)
 
 
 class TrendCreateRequest(BaseModel):
@@ -226,18 +234,12 @@ class TrendCreateRequest(BaseModel):
     @field_validator("userspace")
     @classmethod
     def validate_userspace(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except ValueError:
-            raise ValueError("Userspace must be a valid UUID/GUID")
+        return _validate_optional_uuid(v, "Userspace")
 
     @field_validator("title", "description")
     @classmethod
     def sanitize_text(cls, v: str) -> str:
-        return bleach.clean(v, tags=[], strip=True)
+        return _sanitize_text(v)
 
 
 class TrendUpdateRequest(BaseModel):
@@ -250,9 +252,7 @@ class TrendUpdateRequest(BaseModel):
     @field_validator("title", "description")
     @classmethod
     def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return bleach.clean(v, tags=[], strip=True)
+        return _sanitize_optional_text(v)
 
 
 class ConfigUpdateRequest(BaseModel):
