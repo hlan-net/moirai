@@ -1,28 +1,21 @@
 import os
+import base64
 import json
 import pytest
 
 # Configuration
-# Configuration
 MCP_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8090/sse")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "username")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "password")
 
 
-# Helper to simulate an MCP tool call
-def call_mcp_tool(tool_name, arguments):
-    # In a real MCP client, this would be a JSON-RPC request over SSE
-    # Since we can't easily script a full SSE client here without a library,
-    # we'll use a mocked approach or just rely on unit testing the functions if accessible.
-    # However, since we're testing the deployed server, we can't import the code directly.
-    # We will assume this script is running in an environment where it can import the mcp_server code
-    # OR we can try to use the mcp-cli if installed, but it's not.
-
-    # Actually, for this verification, since we are on the 'edge' node where the source code is,
-    # we can try to import the file and test the functions directly if we mock the DB request helper?
-    # No, that's too complex.
-
-    # Alternative: Use the python 'mcp' client library to connect to the server?
-    # We saw 'mcp' installed in the container environment.
-    pass
+def _build_headers():
+    """Build headers with Host override and Basic Auth for MCP server."""
+    creds = base64.b64encode(f"{ADMIN_USERNAME}:{ADMIN_PASSWORD}".encode()).decode()
+    return {
+        "Host": "localhost:8090",
+        "Authorization": f"Basic {creds}",
+    }
 
 
 @pytest.mark.integration
@@ -32,8 +25,7 @@ async def test_crud_flow():
     from mcp import ClientSession
 
     print(f"Connecting to MCP Server at {MCP_URL}...")
-    # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
-    headers = {"Host": "localhost:8090"}
+    headers = _build_headers()
     async with sse_client(MCP_URL, headers=headers) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()

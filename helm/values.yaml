@@ -76,6 +76,16 @@ mcpServer:
     metricsPort: 9000
     metricsTargetPort: 9000
 
+mcpInspector:
+  enabled: false
+  image:
+    repository: ghcr.io/modelcontextprotocol/inspector
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 6274
+
 scheduler:
   # -- Cron schedule for the feed-fetch scheduler job (default: every 10 minutes)
   schedule: "*/10 * * * *"

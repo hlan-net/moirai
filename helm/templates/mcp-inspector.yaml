@@ -1,0 +1,61 @@
+{{- if .Values.mcpInspector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "moirai.fullname" . }}-mcp-inspector
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-inspector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "moirai.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mcp-inspector
+  template:
+    metadata:
+      labels:
+        {{- include "moirai.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mcp-inspector
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: mcp-inspector
+          image: "{{ .Values.mcpInspector.image.repository }}:{{ .Values.mcpInspector.image.tag }}"
+          imagePullPolicy: {{ .Values.mcpInspector.image.pullPolicy }}
+          ports:
+            - name: ui
+              containerPort: 6274
+            - name: proxy
+              containerPort: 6277
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "moirai.fullname" . }}-mcp-inspector
+  labels:
+    {{- include "moirai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-inspector
+spec:
+  type: {{ .Values.mcpInspector.service.type }}
+  selector:
+    {{- include "moirai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp-inspector
+  ports:
+    - protocol: TCP
+      name: ui
+      port: {{ .Values.mcpInspector.service.port }}
+      targetPort: 6274
+    - protocol: TCP
+      name: proxy
+      port: 6277
+      targetPort: 6277
+{{- end }}

@@ -6,6 +6,10 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+---
+
+## [v0.5.2] — 2026-02-24
+
 ### Service Decoupling (Scheduler and Worker split from API)
 The API process previously launched the enrichment worker and scheduler as background threads via a Gunicorn `on_starting` hook. This prevented the API from being scaled horizontally.
 
@@ -27,6 +31,9 @@ Issues have a **lifecycle**: `active` (currently observed) → `eternal` (passed
 MCP tools reflect this model: `forge_issue` (Clotho), `measure_issue` (Lachesis), `seal_issue` (Atropos), `list_issues`. Legacy `add_event` / `add_trend` tool aliases are preserved for compatibility and redirect to the `issues` database with appropriate longevity values.
 
 Data is stored in a unified `issues` CouchDB database.
+
+### MCP Metrics Port Split
+The MCP server now exposes its Prometheus metrics on a dedicated port, separate from the main SSE endpoint.
 
 ---
 
