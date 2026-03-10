@@ -5,6 +5,7 @@ Input validation utilities for Moirai API
 import uuid
 from enum import Enum
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import bleach
 import validators
@@ -53,7 +54,7 @@ def _sanitize_text(value: str) -> str:
 
 
 def _validate_http_or_https_url(value: str, error_message: str) -> str:
-    if not value.startswith(("http://", "https://")):
+    if urlparse(value).scheme not in {"http", "https"}:
         raise ValueError(error_message)
     return value
 
