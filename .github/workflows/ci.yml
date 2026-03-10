@@ -179,23 +179,6 @@ jobs:
         auto-activate-base: false
         use-mamba: true
 
-    - name: Diagnose auth setup
-      env:
-        ADMIN_USERNAME: testuser
-        ADMIN_PASSWORD: testpassword
-      run: |
-        echo "=== Step env check ==="
-        echo "ADMIN_USERNAME=${ADMIN_USERNAME}"
-        echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
-        echo "=== Container env check ==="
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml exec -T api env | grep -E "ADMIN|DISABLE" | sort
-        echo "=== MCP container env check ==="
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml exec -T mcp-server env | grep -E "ADMIN|DISABLE" | sort
-        echo "=== API auth test ==="
-        curl -si -u "${ADMIN_USERNAME}:${ADMIN_PASSWORD}" http://localhost:8088/api/feeds | head -5
-        echo "=== MCP auth test ==="
-        curl -si -u "${ADMIN_USERNAME}:${ADMIN_PASSWORD}" http://localhost:8090/sse | head -5
-
     - name: Run MCP integration tests
       env:
         MCP_SERVER_URL: http://localhost:8090/sse
