@@ -2,12 +2,13 @@
 Input validation utilities for Moirai API
 """
 
-from typing import Optional, Dict, Any
-from enum import Enum  # Import Enum
-from pydantic import BaseModel, Field, validator, HttpUrl
-import validators
-import bleach
 import uuid
+from enum import Enum
+from typing import Any, Dict, Optional
+
+import bleach
+import validators
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 # Enums for AgentConfig
@@ -48,8 +49,9 @@ class AgentConfigBase(BaseModel):
         None, description="ID of a specific event or trend this agent is managing"
     )
 
-    @validator("linked_entity_id")
-    def validate_linked_entity_id(cls, v):
+    @field_validator("linked_entity_id")
+    @classmethod
+    def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         try:
@@ -64,8 +66,9 @@ class AgentConfigCreateRequest(AgentConfigBase):
         ..., description="The user who created this configuration (GUID)"
     )
 
-    @validator("user_id")
-    def validate_user_id(cls, v):
+    @field_validator("user_id")
+    @classmethod
+    def validate_user_id(cls, v: str) -> str:
         try:
             uuid.UUID(v)
             return v
@@ -95,8 +98,9 @@ class AgentConfigUpdateRequest(BaseModel):
         None, description="ID of a specific event or trend this agent is managing"
     )
 
-    @validator("linked_entity_id")
-    def validate_linked_entity_id(cls, v):
+    @field_validator("linked_entity_id")
+    @classmethod
+    def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         try:
@@ -113,15 +117,17 @@ class FeedCreateRequest(BaseModel):
     title: Optional[str] = Field(None, max_length=200)
     category: Optional[str] = Field(None, max_length=100)
 
-    @validator("url")
-    def validate_feed_url(cls, v):
+    @field_validator("url")
+    @classmethod
+    def validate_feed_url(cls, v: HttpUrl) -> str:
         """Ensure URL is http/https only"""
         if not str(v).startswith(("http://", "https://")):
             raise ValueError("Only HTTP/HTTPS URLs are allowed")
         return str(v)
 
-    @validator("title", "category")
-    def sanitize_text(cls, v):
+    @field_validator("title", "category")
+    @classmethod
+    def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
         """Remove any HTML/script tags"""
         if v is None:
             return v
@@ -134,12 +140,14 @@ class FeedUpdateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     new_url: Optional[HttpUrl] = None  # Added field
 
-    @validator("title")
-    def sanitize_title(cls, v):
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: str) -> str:
         return bleach.clean(v, tags=[], strip=True)
 
-    @validator("new_url")  # New validator for new_url
-    def validate_new_feed_url(cls, v):
+    @field_validator("new_url")
+    @classmethod
+    def validate_new_feed_url(cls, v: Optional[HttpUrl]) -> Optional[str]:
         if v is None:
             return v
         if not str(v).startswith(("http://", "https://")):
@@ -152,11 +160,12 @@ class EventCreateRequest(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=300)
     description: str = Field(..., min_length=1, max_length=2000)
-    article_links: list[str] = Field(default_factory=list, max_items=100)
+    article_links: list[str] = Field(default_factory=list, max_length=100)
     userspace: Optional[str] = None
 
-    @validator("userspace")
-    def validate_userspace(cls, v):
+    @field_validator("userspace")
+    @classmethod
+    def validate_userspace(cls, v: Optional[str]) -> Optional[str]:
         """Validate userspace is a valid UUID/GUID"""
         if v is None:
             return v
@@ -166,12 +175,14 @@ class EventCreateRequest(BaseModel):
         except ValueError:
             raise ValueError("Userspace must be a valid UUID/GUID")
 
-    @validator("title", "description")
-    def sanitize_text(cls, v):
+    @field_validator("title", "description")
+    @classmethod
+    def sanitize_text(cls, v: str) -> str:
         return bleach.clean(v, tags=[], strip=True)
 
-    @validator("article_links")
-    def validate_links(cls, v):
+    @field_validator("article_links")
+    @classmethod
+    def validate_links(cls, v: list[str]) -> list[str]:
         """Validate article links are valid URLs"""
         for link in v:
             if not validators.url(link):
@@ -184,16 +195,18 @@ class EventUpdateRequest(BaseModel):
 
     title: Optional[str] = Field(None, max_length=300)
     description: Optional[str] = Field(None, max_length=2000)
-    article_links: Optional[list[str]] = Field(None, max_items=100)
+    article_links: Optional[list[str]] = Field(None, max_length=100)
 
-    @validator("title", "description")
-    def sanitize_text(cls, v):
+    @field_validator("title", "description")
+    @classmethod
+    def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         return bleach.clean(v, tags=[], strip=True)
 
-    @validator("article_links")
-    def validate_links(cls, v):
+    @field_validator("article_links")
+    @classmethod
+    def validate_links(cls, v: Optional[list[str]]) -> Optional[list[str]]:
         if v is None:
             return v
         for link in v:
@@ -207,11 +220,12 @@ class TrendCreateRequest(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=300)
     description: str = Field(..., min_length=1, max_length=2000)
-    event_ids: list[str] = Field(default_factory=list, max_items=50)
+    event_ids: list[str] = Field(default_factory=list, max_length=50)
     userspace: Optional[str] = None
 
-    @validator("userspace")
-    def validate_userspace(cls, v):
+    @field_validator("userspace")
+    @classmethod
+    def validate_userspace(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         try:
@@ -220,8 +234,9 @@ class TrendCreateRequest(BaseModel):
         except ValueError:
             raise ValueError("Userspace must be a valid UUID/GUID")
 
-    @validator("title", "description")
-    def sanitize_text(cls, v):
+    @field_validator("title", "description")
+    @classmethod
+    def sanitize_text(cls, v: str) -> str:
         return bleach.clean(v, tags=[], strip=True)
 
 
@@ -230,10 +245,11 @@ class TrendUpdateRequest(BaseModel):
 
     title: Optional[str] = Field(None, max_length=300)
     description: Optional[str] = Field(None, max_length=2000)
-    event_ids: Optional[list[str]] = Field(None, max_items=50)
+    event_ids: Optional[list[str]] = Field(None, max_length=50)
 
-    @validator("title", "description")
-    def sanitize_text(cls, v):
+    @field_validator("title", "description")
+    @classmethod
+    def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         return bleach.clean(v, tags=[], strip=True)
@@ -252,8 +268,9 @@ class ConfigUpdateRequest(BaseModel):
     github_client_id: Optional[str] = None
     github_client_secret: Optional[str] = None
 
-    @validator("iteration_interval")
-    def validate_interval(cls, v):
+    @field_validator("iteration_interval")
+    @classmethod
+    def validate_interval(cls, v: Optional[int]) -> Optional[int]:
         if v is not None and v != 0 and v < 60:
             raise ValueError("Iteration interval must be at least 60 seconds")
         return v
