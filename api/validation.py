@@ -58,18 +58,10 @@ def _validate_http_or_https_url(value: str, error_message: str) -> str:
     return value
 
 
-def _validate_url_list(values: Optional[list[str]]) -> Optional[list[str]]:
-    if values is None:
-        return values
+def _ensure_valid_url_list(values: list[str]) -> None:
     for link in values:
         if not validators.url(link):
             raise ValueError(f"Invalid URL: {link}")
-    return values
-
-
-def _validate_required_url_list(values: list[str]) -> list[str]:
-    _validate_url_list(values)
-    return values
 
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -202,7 +194,8 @@ class EventCreateRequest(BaseModel):
     @classmethod
     def validate_links(cls, v: list[str]) -> list[str]:
         """Validate article links are valid URLs"""
-        return _validate_required_url_list(v)
+        _ensure_valid_url_list(v)
+        return v
 
 
 class EventUpdateRequest(BaseModel):
@@ -220,7 +213,10 @@ class EventUpdateRequest(BaseModel):
     @field_validator("article_links")
     @classmethod
     def validate_links(cls, v: Optional[list[str]]) -> Optional[list[str]]:
-        return _validate_url_list(v)
+        if v is None:
+            return v
+        _ensure_valid_url_list(v)
+        return v
 
 
 class TrendCreateRequest(BaseModel):
