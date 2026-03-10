@@ -184,5 +184,7 @@ jobs:
         MCP_SERVER_URL: http://localhost:8090/sse
         ADMIN_USERNAME: testuser
         ADMIN_PASSWORD: testpassword
+        DISABLE_RATE_LIMIT: true
+      shell: bash -el {0}
       run: |
-        conda run --name moirai pytest -m integration -v
+        pytest -m integration -v
