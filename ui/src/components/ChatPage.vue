@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { authFetch } from '../utils/authFetch'
 
 interface Message {
@@ -252,7 +253,7 @@ const toggleModelSelect = () => {
 }
 
 const parsedContent = (content: string) => {
-  return marked(content)
+  return DOMPurify.sanitize(marked(content) as string)
 }
 
 const fetchSessions = async () => {
@@ -379,9 +380,11 @@ const sendMessage = async () => {
       await _updateSessionMessages()
     } else {
       messages.value.push({ role: 'assistant', content: `Error: ${res.statusText}` })
+      await _updateSessionMessages()
     }
   } catch (e) {
     messages.value.push({ role: 'assistant', content: `Error: ${e}` })
+    await _updateSessionMessages()
   } finally {
     loading.value = false
   }

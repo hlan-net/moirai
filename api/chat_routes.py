@@ -17,7 +17,8 @@ from .db import (
     query_couchdb,
 )
 from .auth import jwt_required
-import httpx  # Moved import to top
+import httpx
+import bleach  # Moved import to top
 
 chat_blueprint = Blueprint("chat", __name__)
 
@@ -39,6 +40,7 @@ MAX_AGENT_TURNS = 5
 LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
 ERROR_ACCESS_DENIED = "Access denied"
+CHAT_EXPORT_VERBOSE_SETTING = "moirai_chat_export_verbose"
 
 SYSTEM_PROMPT = (
     "You are Moirai, a GenAI-native press review agent. "
@@ -79,6 +81,58 @@ def extract_tool_calls_from_content(content):
             continue
 
     return tools
+
+
+def _is_verbose_chat_export_enabled(user_doc: dict | None) -> bool:
+    if not user_doc:
+        return False
+    settings = user_doc.get("settings") or {}
+    return bool(settings.get(CHAT_EXPORT_VERBOSE_SETTING, False))
+
+
+def _format_tool_call_markdown(tool_calls) -> str:
+    if not tool_calls:
+        return ""
+    rows = []
+    for tool_call in tool_calls:
+        func_name = "unknown"
+        func_args = "{}"
+        if isinstance(tool_call, dict):
+            function_data = tool_call.get("function") or {}
+            func_name = function_data.get("name", func_name)
+            func_args = function_data.get("arguments", func_args)
+        else:
+            function_data = getattr(tool_call, "function", None)
+            if function_data:
+                func_name = getattr(function_data, "name", func_name)
+                func_args = getattr(function_data, "arguments", func_args)
+        rows.append(f"- `{func_name}` args: `{func_args}`")
+    return "\n".join(rows)
+
+
+from bs4 import BeautifulSoup
+def _strip_internal_reminders(text: str) -> str:
+    if not text:
+        return text
+    if "<system-reminder>" not in text.lower():
+        return text.strip()
+    try:
+        soup = BeautifulSoup(text, "html.parser")
+        for tag in soup.find_all("system-reminder"):
+            tag.decompose()
+        return str(soup).strip()
+    except Exception:
+        return text.strip()
+
+
+def _sanitize_export_value(value):
+    if isinstance(value, str):
+        return _strip_internal_reminders(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_export_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_export_value(item) for item in value]
+    return value
 
 
 def run_agent_sync(
@@ -329,6 +383,35 @@ def update_chat_session(session_id):
         abort(500, description="Failed to update chat session")
 
 
+def _format_export_message(msg, verbose_export):
+    sanitized_msg = _sanitize_export_value(msg)
+    role = sanitized_msg.get("role", "unknown").capitalize()
+    content = sanitized_msg.get("content", "")
+    
+    if isinstance(content, str):
+        content = bleach.clean(content, strip=True)
+        content = content.replace("\n### ", "\n\\#\\#\\# ")
+        if content.startswith("### "):
+            content = "\\#\\#\\# " + content[4:]
+            
+    markdown_chunk = f"### {role}\n{content}\n\n"
+    
+    tool_calls = sanitized_msg.get("tool_calls")
+    tool_count = len(tool_calls) if tool_calls else 0
+    error_count = 1 if sanitized_msg.get("role") == "tool" and isinstance(content, str) and "Tool Execution Error" in content else 0
+    
+    if tool_calls and verbose_export:
+        markdown_chunk += "*(Tool Calls)*\n"
+        markdown_chunk += _format_tool_call_markdown(tool_calls)
+        markdown_chunk += "\n\n"
+        
+    if verbose_export:
+        markdown_chunk += "*(Message Metadata)*\n```json\n"
+        markdown_chunk += json.dumps(sanitized_msg, indent=2, default=str)
+        markdown_chunk += "\n```\n\n"
+        
+    return markdown_chunk, tool_count, error_count
+
 @chat_blueprint.route("/chat/history/<session_id>/export", methods=["GET"])
 @jwt_required
 def export_chat_session(session_id):
@@ -338,6 +421,9 @@ def export_chat_session(session_id):
 
     if session.get("user_id") != g.user_id:
         abort(403, description=ERROR_ACCESS_DENIED)
+
+    user_doc = fetch_from_couchdb("users", g.user_id)
+    verbose_export = _is_verbose_chat_export_enabled(user_doc)
 
     title = session.get("title", "Untitled Chat")
     safe_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", title)
@@ -349,18 +435,24 @@ def export_chat_session(session_id):
     markdown_content += f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     markdown_content += f"Provider: {llm_endpoint}\n"
     markdown_content += f"Model: {model}\n\n"
+    markdown_content += f"Verbose Export: {'enabled' if verbose_export else 'disabled'}\n\n"
     markdown_content += "---\n\n"
 
-    for msg in messages:
-        role = msg.get("role", "unknown").capitalize()
-        content = msg.get("content", "")
-        markdown_content += f"### {role}\n{content}\n\n"
+    tool_call_total = 0
+    tool_error_total = 0
 
-        # Include tool calls if present (for debugging context)
-        if "tool_calls" in msg and msg["tool_calls"]:
-            markdown_content += "*(Tool Calls)*\n```json\n"
-            markdown_content += json.dumps(msg["tool_calls"], indent=2)
-            markdown_content += "\n```\n\n"
+    for msg in messages:
+        chunk, t_count, e_count = _format_export_message(msg, verbose_export)
+        markdown_content += chunk
+        tool_call_total += t_count
+        tool_error_total += e_count
+
+    if verbose_export:
+        markdown_content += "---\n\n"
+        markdown_content += "## Agent Trace Summary\n"
+        markdown_content += f"- Total messages: {len(messages)}\n"
+        markdown_content += f"- Tool calls requested: {tool_call_total}\n"
+        markdown_content += f"- Tool execution errors: {tool_error_total}\n\n"
 
     from flask import Response
 
@@ -369,7 +461,6 @@ def export_chat_session(session_id):
         mimetype="text/markdown",
         headers={"Content-Disposition": f"attachment;filename={safe_title}.md"},
     )
-
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["DELETE"])
 @jwt_required
@@ -409,9 +500,11 @@ async def _run_agent_turn(
     logger.debug(f"Model Raw Response Content: {response_message.content}")
 
     # Store message in history
+    sanitized_content = _strip_internal_reminders(response_message.content or "")
+
     msg_dict = {
         "role": response_message.role,
-        "content": response_message.content,
+        "content": sanitized_content,
         "tool_calls": response_message.tool_calls,
     }
     messages.append(msg_dict)
@@ -419,8 +512,8 @@ async def _run_agent_turn(
     tool_calls = response_message.tool_calls or []
 
     # Fallback: Check content for leaked JSON tool calls
-    if not tool_calls and response_message.content:
-        extracted = extract_tool_calls_from_content(response_message.content)
+    if not tool_calls and sanitized_content:
+        extracted = extract_tool_calls_from_content(sanitized_content)
         if extracted:
             tool_calls, mock_tool_calls_data = _create_mock_tool_calls(extracted)
             msg_dict["tool_calls"] = mock_tool_calls_data
@@ -430,7 +523,7 @@ async def _run_agent_turn(
         return None  # Continue loop
     else:
         # Final response
-        return response_message.content
+        return sanitized_content
 
 
 def _create_http_client(

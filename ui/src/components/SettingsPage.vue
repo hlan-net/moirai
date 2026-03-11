@@ -29,6 +29,7 @@ const geminiApiKey = ref('')
 const geminiModelName = ref('gemini-3-flash')
 const availableGeminiModels = ref([])
 const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
+const verboseChatExport = ref(false)
 const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'authentication']))
 const activeTab = ref('user')
 
@@ -187,7 +188,8 @@ const saveSettings = async () => {
             moirai_gemini_api_key: geminiApiKey.value,
             moirai_gemini_model: geminiModelName.value,
             moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
-            moirai_theme: theme.value
+            moirai_theme: theme.value,
+            moirai_chat_export_verbose: verboseChatExport.value
         })
       })
       if (!res.ok) {
@@ -300,6 +302,7 @@ const fetchUserProfile = async () => {
             if (settings.moirai_gemini_model) geminiModelName.value = settings.moirai_gemini_model
             if (settings.moirai_ollama_endpoint_url) ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
             if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
+            verboseChatExport.value = Boolean(settings.moirai_chat_export_verbose)
             
             // Refresh models based on loaded settings
             if (llmEndpoint.value === 'ollama') fetchOllamaModels()
@@ -518,6 +521,11 @@ onMounted(() => {
               <option value="dark">Dark</option>
               <option value="auto">Auto (System)</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label for="verbose-chat-export">Verbose Chat Export:</label>
+            <input id="verbose-chat-export" type="checkbox" v-model="verboseChatExport" />
+            <small>Include tool calls, metadata, and trace summary in exported chat markdown.</small>
           </div>
         </div>
       </div>
