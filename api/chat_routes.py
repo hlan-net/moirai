@@ -383,6 +383,35 @@ def update_chat_session(session_id):
         abort(500, description="Failed to update chat session")
 
 
+def _format_export_message(msg, verbose_export):
+    sanitized_msg = _sanitize_export_value(msg)
+    role = sanitized_msg.get("role", "unknown").capitalize()
+    content = sanitized_msg.get("content", "")
+    
+    if isinstance(content, str):
+        content = bleach.clean(content, strip=True)
+        content = content.replace("\n### ", "\n\\#\\#\\# ")
+        if content.startswith("### "):
+            content = "\\#\\#\\# " + content[4:]
+            
+    markdown_chunk = f"### {role}\n{content}\n\n"
+    
+    tool_calls = sanitized_msg.get("tool_calls")
+    tool_count = len(tool_calls) if tool_calls else 0
+    error_count = 1 if sanitized_msg.get("role") == "tool" and isinstance(content, str) and "Tool Execution Error" in content else 0
+    
+    if tool_calls and verbose_export:
+        markdown_chunk += "*(Tool Calls)*\n"
+        markdown_chunk += _format_tool_call_markdown(tool_calls)
+        markdown_chunk += "\n\n"
+        
+    if verbose_export:
+        markdown_chunk += "*(Message Metadata)*\n```json\n"
+        markdown_chunk += json.dumps(sanitized_msg, indent=2, default=str)
+        markdown_chunk += "\n```\n\n"
+        
+    return markdown_chunk, tool_count, error_count
+
 @chat_blueprint.route("/chat/history/<session_id>/export", methods=["GET"])
 @jwt_required
 def export_chat_session(session_id):
@@ -413,31 +442,10 @@ def export_chat_session(session_id):
     tool_error_total = 0
 
     for msg in messages:
-        sanitized_msg = _sanitize_export_value(msg)
-        role = sanitized_msg.get("role", "unknown").capitalize()
-        content = sanitized_msg.get("content", "")
-        if isinstance(content, str):
-            content = bleach.clean(content, strip=True)
-            content = content.replace("\n### ", "\n\\#\\#\\# ")
-            if content.startswith("### "):
-                content = "\\#\\#\\# " + content[4:]
-        markdown_content += f"### {role}\n{content}\n\n"
-
-        tool_calls = sanitized_msg.get("tool_calls")
-        if tool_calls:
-            tool_call_total += len(tool_calls)
-            if verbose_export:
-                markdown_content += "*(Tool Calls)*\n"
-                markdown_content += _format_tool_call_markdown(tool_calls)
-                markdown_content += "\n\n"
-
-        if sanitized_msg.get("role") == "tool" and isinstance(content, str) and "Tool Execution Error" in content:
-            tool_error_total += 1
-
-        if verbose_export:
-            markdown_content += "*(Message Metadata)*\n```json\n"
-            markdown_content += json.dumps(sanitized_msg, indent=2, default=str)
-            markdown_content += "\n```\n\n"
+        chunk, t_count, e_count = _format_export_message(msg, verbose_export)
+        markdown_content += chunk
+        tool_call_total += t_count
+        tool_error_total += e_count
 
     if verbose_export:
         markdown_content += "---\n\n"
@@ -453,7 +461,6 @@ def export_chat_session(session_id):
         mimetype="text/markdown",
         headers={"Content-Disposition": f"attachment;filename={safe_title}.md"},
     )
-
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["DELETE"])
 @jwt_required
