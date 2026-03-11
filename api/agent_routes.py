@@ -46,16 +46,31 @@ def _enforce_owner(owner_user_id: str | None) -> str:
     return owner_user_id or g.user_id
 
 
-@agent_blueprint.route("/agents", methods=["GET"])
-@jwt_required
-def list_agents():
-    userspace = request.args.get("userspace")
+def _validate_userspace(userspace: str | None, field_name: str) -> str:
     if not userspace:
-        abort(400, description="'userspace' query parameter is required")
+        abort(400, description=f"'{field_name}' is required")
     try:
         validate_userspace_param(userspace)
     except ValueError as exc:
         abort(400, description=str(exc))
+    return userspace
+
+
+def _get_owned_agent_doc(agent_id: str, userspace: str) -> dict[str, Any]:
+    doc = fetch_from_couchdb("agent_configs", agent_id)
+    if not isinstance(doc, dict) or _extract_userspace(doc) != userspace:
+        abort(404, description="Agent configuration not found")
+
+    if g.user_role != "admin" and doc.get("owner_user_id") != g.user_id:
+        abort(404, description="Agent configuration not found")
+
+    return doc
+
+
+@agent_blueprint.route("/agents", methods=["GET"])
+@jwt_required
+def list_agents():
+    userspace = _validate_userspace(request.args.get("userspace"), "userspace")
 
     migrate_legacy_agent_configs()
 
@@ -92,22 +107,9 @@ def create_agent():
 @agent_blueprint.route("/agents/<agent_id>", methods=["GET"])
 @jwt_required
 def get_agent(agent_id: str):
-    userspace = request.args.get("userspace")
-    if not userspace:
-        abort(400, description="'userspace' query parameter is required")
-    try:
-        validate_userspace_param(userspace)
-    except ValueError as exc:
-        abort(400, description=str(exc))
-
-    doc = fetch_from_couchdb("agent_configs", agent_id)
-    if not isinstance(doc, dict) or _extract_userspace(doc) != userspace:
-        abort(404, description="Agent configuration not found")
-    doc_data: dict[str, Any] = doc
-    if g.user_role != "admin" and doc_data.get("owner_user_id") != g.user_id:
-        abort(404, description="Agent configuration not found")
-
-    return jsonify(doc_data)
+    userspace = _validate_userspace(request.args.get("userspace"), "userspace")
+    doc = _get_owned_agent_doc(agent_id, userspace)
+    return jsonify(doc)
 
 
 @agent_blueprint.route("/agents/<agent_id>", methods=["PUT"])
@@ -115,20 +117,10 @@ def get_agent(agent_id: str):
 def update_agent(agent_id: str):
     payload = _sanitize_update_payload(request.get_json() or {})
 
-    userspace = payload.get("userspace") or request.args.get("userspace")
-    if not userspace:
-        abort(400, description="'userspace' is required")
-    try:
-        validate_userspace_param(userspace)
-    except ValueError as exc:
-        abort(400, description=str(exc))
-
-    doc = fetch_from_couchdb("agent_configs", agent_id)
-    if not isinstance(doc, dict) or _extract_userspace(doc) != userspace:
-        abort(404, description="Agent configuration not found")
-    doc_data: dict[str, Any] = doc
-    if g.user_role != "admin" and doc_data.get("owner_user_id") != g.user_id:
-        abort(404, description="Agent configuration not found")
+    userspace = _validate_userspace(
+        payload.get("userspace") or request.args.get("userspace"), "userspace"
+    )
+    doc_data = _get_owned_agent_doc(agent_id, userspace)
 
     if "owner_user_id" in payload:
         payload["owner_user_id"] = _enforce_owner(payload.get("owner_user_id"))
@@ -149,20 +141,8 @@ def update_agent(agent_id: str):
 @agent_blueprint.route("/agents/<agent_id>", methods=["DELETE"])
 @jwt_required
 def delete_agent(agent_id: str):
-    userspace = request.args.get("userspace")
-    if not userspace:
-        abort(400, description="'userspace' query parameter is required")
-    try:
-        validate_userspace_param(userspace)
-    except ValueError as exc:
-        abort(400, description=str(exc))
-
-    doc = fetch_from_couchdb("agent_configs", agent_id)
-    if not isinstance(doc, dict) or _extract_userspace(doc) != userspace:
-        abort(404, description="Agent configuration not found")
-    doc_data: dict[str, Any] = doc
-    if g.user_role != "admin" and doc_data.get("owner_user_id") != g.user_id:
-        abort(404, description="Agent configuration not found")
+    userspace = _validate_userspace(request.args.get("userspace"), "userspace")
+    doc_data = _get_owned_agent_doc(agent_id, userspace)
 
     rev = doc_data.get("_rev")
     if not rev or not delete_from_couchdb("agent_configs", agent_id, rev):
