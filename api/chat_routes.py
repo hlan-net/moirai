@@ -17,7 +17,8 @@ from .db import (
     query_couchdb,
 )
 from .auth import jwt_required
-import httpx  # Moved import to top
+import httpx
+import bleach  # Moved import to top
 
 chat_blueprint = Blueprint("chat", __name__)
 
@@ -40,9 +41,6 @@ LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
 ERROR_ACCESS_DENIED = "Access denied"
 CHAT_EXPORT_VERBOSE_SETTING = "moirai_chat_export_verbose"
-INTERNAL_REMINDER_PATTERN = re.compile(
-    r"<system-reminder>.*?</system-reminder>", re.IGNORECASE | re.DOTALL
-)
 
 SYSTEM_PROMPT = (
     "You are Moirai, a GenAI-native press review agent. "
@@ -112,10 +110,19 @@ def _format_tool_call_markdown(tool_calls) -> str:
     return "\n".join(rows)
 
 
+from bs4 import BeautifulSoup
 def _strip_internal_reminders(text: str) -> str:
     if not text:
         return text
-    return INTERNAL_REMINDER_PATTERN.sub("", text).strip()
+    if "<system-reminder>" not in text.lower():
+        return text.strip()
+    try:
+        soup = BeautifulSoup(text, "html.parser")
+        for tag in soup.find_all("system-reminder"):
+            tag.decompose()
+        return str(soup).strip()
+    except Exception:
+        return text.strip()
 
 
 def _sanitize_export_value(value):
@@ -409,6 +416,11 @@ def export_chat_session(session_id):
         sanitized_msg = _sanitize_export_value(msg)
         role = sanitized_msg.get("role", "unknown").capitalize()
         content = sanitized_msg.get("content", "")
+        if isinstance(content, str):
+            content = bleach.clean(content, strip=True)
+            content = content.replace("\n### ", "\n\\#\\#\\# ")
+            if content.startswith("### "):
+                content = "\\#\\#\\# " + content[4:]
         markdown_content += f"### {role}\n{content}\n\n"
 
         tool_calls = sanitized_msg.get("tool_calls")
