@@ -6,6 +6,16 @@ import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
 import { authFetch } from '../utils/authFetch'
 
+interface SearchArticleResult {
+  _id: string
+  title?: string
+  description?: string
+  link?: string
+  published?: string
+  feed_url?: string
+  feed_title?: string
+}
+
 const articles = ref<Article[]>([])
 const loading = ref(true)
 const loadingMore = ref(false)
@@ -14,6 +24,9 @@ const hasMore = ref(true)
 const totalCount = ref(0)
 const sentinelEl = ref<HTMLElement | null>(null)
 const searchQuery = ref('')
+const supplementalSearchResults = ref<Article[]>([])
+const searchingDatabase = ref(false)
+let searchDebounceTimer: number | null = null
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore()
@@ -197,6 +210,74 @@ const filteredArticles = computed(() => {
   return filtered
 })
 
+const displayedArticles = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return filteredArticles.value
+  }
+
+  if (filterStore.selectedFeedId || filterStore.selectedIssueId) {
+    return filteredArticles.value
+  }
+
+  const seenIds = new Set(filteredArticles.value.map((article) => article._id))
+  const extraResults = supplementalSearchResults.value.filter((article) => !seenIds.has(article._id))
+  return [...filteredArticles.value, ...extraResults]
+})
+
+const fetchSupplementalSearchResults = async (query: string) => {
+  const q = query.trim()
+  if (q.length < 2) {
+    supplementalSearchResults.value = []
+    searchingDatabase.value = false
+    return
+  }
+
+  if (filterStore.selectedFeedId || filterStore.selectedIssueId) {
+    supplementalSearchResults.value = []
+    searchingDatabase.value = false
+    return
+  }
+
+  searchingDatabase.value = true
+  try {
+    const params = new URLSearchParams({ q, limit: '100' })
+    const response = await authFetch(`/api/articles/search?${params.toString()}`)
+    if (!response.ok) {
+      supplementalSearchResults.value = []
+      return
+    }
+
+    const payload = await response.json()
+    const results: SearchArticleResult[] = Array.isArray(payload.results) ? payload.results : []
+    supplementalSearchResults.value = results.map((result) => ({
+      _id: result._id,
+      title: result.title || 'Untitled',
+      summary: result.description || '',
+      link: result.link || '',
+      published: result.published || '',
+      feed_url: result.feed_url || '',
+      feed_title: result.feed_title || '',
+    }))
+  } catch (error) {
+    console.error('Error fetching supplemental article search results:', error)
+    supplementalSearchResults.value = []
+  } finally {
+    searchingDatabase.value = false
+  }
+}
+
+watch(
+  [() => searchQuery.value, () => filterStore.selectedFeedId, () => filterStore.selectedIssueId],
+  () => {
+    if (searchDebounceTimer !== null) {
+      clearTimeout(searchDebounceTimer)
+    }
+    searchDebounceTimer = globalThis.setTimeout(() => {
+      fetchSupplementalSearchResults(searchQuery.value)
+    }, 300)
+  }
+)
+
 const deleteArticle = async (id: string) => {
   if (!confirm('Delete this article?')) return
   try {
@@ -245,6 +326,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (searchDebounceTimer !== null) {
+    clearTimeout(searchDebounceTimer)
+  }
   if (observer) {
     observer.disconnect()
   }
@@ -292,8 +376,8 @@ const handleRefresh = async () => {
     <div class="column-header">
       <h2>
         Articles
-        <span v-if="totalCount > 0">({{ filteredArticles.length }}/{{ totalCount }})</span>
-        <span v-else-if="!loading">({{ filteredArticles.length }})</span>
+        <span v-if="totalCount > 0">({{ displayedArticles.length }}/{{ totalCount }})</span>
+        <span v-else-if="!loading">({{ displayedArticles.length }})</span>
         <span v-if="fetchingUpdates" class="update-badge">↻</span>
       </h2>
       <div class="header-actions" v-if="isAdmin">
@@ -344,12 +428,13 @@ const handleRefresh = async () => {
     </div>
 
     <div v-if="loading" class="loading-state">Loading articles...</div>
-    <div v-else-if="!filteredArticles.length" class="no-results">
+    <div v-else-if="!displayedArticles.length" class="no-results">
       <span v-if="searchQuery">No articles match "{{ searchQuery }}"</span>
       <span v-else>No articles found yet for the current filters.</span>
     </div>
     <div v-else class="article-list">
-      <div v-for="article in filteredArticles" :key="article._id" class="article-card">
+      <div v-if="searchingDatabase" class="searching-state">Searching database...</div>
+      <div v-for="article in displayedArticles" :key="article._id" class="article-card">
         <div class="card-header">
           <h3>
             <a :href="article.link" target="_blank">{{ article.title }}</a>
@@ -404,6 +489,13 @@ h2 {
   padding: 20px;
   color: var(--text-color);
   opacity: 0.7;
+}
+.searching-state {
+  text-align: center;
+  padding: 8px 20px;
+  color: var(--text-color);
+  opacity: 0.7;
+  font-size: 0.85rem;
 }
 .article-list {
   overflow-y: auto;

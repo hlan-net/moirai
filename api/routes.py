@@ -919,6 +919,7 @@ def search_articles_endpoint():
                 "title": article.get("title", "Untitled"),
                 "link": article.get("link", ""),
                 "published": article.get("published", ""),
+                "feed_url": article.get("feed_url", ""),
                 "feed_title": article.get("feed_title", "Unknown"),
                 "description": article.get("description", "")[:200],
             }
