@@ -54,13 +54,13 @@ def test_add_agent_config_issues_unit(mock_db):
 
 def test_list_agent_configs_unit(mock_db):
     userspace = str(uuid.uuid4())
-    mock_db['query'].side_effect = [[], [{"_id": "agent_1", "userspace": userspace}]]
+    mock_db['query'].return_value = [{"_id": "agent_1", "userspace": userspace}]
     
     result = list_agent_configs(userspace=userspace)
     
     assert result["status"] == "success"
     assert len(result["agent_configs"]) == 1
-    assert mock_db['query'].call_count == 2
+    assert mock_db['query'].call_count == 1
     _, kwargs = mock_db['query'].call_args
     selector = kwargs['selector']['$or']
     assert {"userspace": userspace} in selector
