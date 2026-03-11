@@ -585,7 +585,7 @@ def list_issues():
         response.status_code = 401
         return response
     
-    feed_url = request.args.get("feed_url")
+    feed_filter = request.args.get("feed_url")
     longevity = request.args.get("longevity") # transient, temporal, epic
     status = request.args.get("status") # active, eternal
 
@@ -595,20 +595,37 @@ def list_issues():
     if status:
         selector["status"] = status
 
-    if feed_url:
+    if feed_filter:
+        resolved_feed_url = feed_filter
+        if not feed_filter.startswith(("http://", "https://")):
+            feed_doc = fetch_from_couchdb("feeds", feed_filter)
+            if feed_doc and feed_doc.get("url"):
+                resolved_feed_url = feed_doc["url"]
+
         # 1. Get all article links for this feed
         articles = query_couchdb(
-            "articles", selector={"feed_url": feed_url}, fields=["link"], limit=10000
+            "articles", selector={"feed_url": resolved_feed_url}, fields=["link"], limit=10000
         )
         links = [a.get("link") for a in articles if a.get("link")]
 
         if not links:
             return jsonify([])
 
-        # 2. Find issues containing any of these links in their premises
-        selector["premises"] = {MONGO_ELEM_MATCH: { "id": {MONGO_IN: links} }}
+        # 2. Fetch matching issues and keep:
+        #    - issues linked to the feed's articles
+        #    - issues with no premises (manually or chat-created placeholders)
         issues = query_couchdb("issues", selector=selector, limit=1000)
-        return jsonify(issues)
+        link_set = set(links)
+        filtered_issues = []
+        for issue in issues:
+            premises = issue.get("premises") or []
+            if not premises:
+                filtered_issues.append(issue)
+                continue
+            if any((p or {}).get("id") in link_set for p in premises):
+                filtered_issues.append(issue)
+
+        return jsonify(filtered_issues)
 
     issues = fetch_from_couchdb("issues")
     # Filter based on selector if provided, as fetch_from_couchdb is a simple list

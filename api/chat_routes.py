@@ -104,7 +104,7 @@ def _format_tool_call_markdown(tool_calls) -> str:
             if "name" in tool_call:
                 func_name = tool_call.get("name", func_name)
                 func_status = tool_call.get("status")
-                func_args = tool_call.get("arguments", func_args)
+                func_args = tool_call.get("arguments") or tool_call.get("args") or func_args
             else:
                 function_data = tool_call.get("function") or {}
                 func_name = function_data.get("name", func_name)
@@ -196,8 +196,16 @@ async def _prefetch_recent_articles_context(session, messages, userspace_id, use
     return statuses
 
 
-def _record_tool_trace(trace: dict, name: str, status: str, error: str | None = None):
+def _record_tool_trace(
+    trace: dict,
+    name: str,
+    status: str,
+    arguments: str | None = None,
+    error: str | None = None,
+):
     entry = {"name": name, "status": status}
+    if arguments:
+        entry["arguments"] = arguments
     if error:
         entry["error"] = error
     trace["tool_calls"].append(entry)
@@ -756,16 +764,38 @@ async def _execute_tool_calls(session, tool_calls, messages, userspace_id, trace
         if userspace_id and "userspace" not in func_args:
             func_args["userspace"] = userspace_id
 
+        args_for_trace = json.dumps(func_args, ensure_ascii=True, sort_keys=True)
+
         try:
             logger.info(f"Agent calling tool: {func_name} with args: {func_args}")
             result = await session.call_tool(func_name, func_args)
             result_text = result.content[0].text if result.content else "Success"
             logger.debug(f"Tool result (truncated): {result_text[:200]}...")
-            _record_tool_trace(trace, func_name, "ok")
+
+            result_is_error = bool(getattr(result, "isError", False))
+            if not result_is_error and result_text.strip().lower().startswith("error"):
+                result_is_error = True
+
+            if result_is_error:
+                _record_tool_trace(
+                    trace,
+                    func_name,
+                    "error",
+                    arguments=args_for_trace,
+                    error=result_text[:500],
+                )
+            else:
+                _record_tool_trace(trace, func_name, "ok", arguments=args_for_trace)
         except Exception as tool_err:
             result_text = f"Tool Execution Error: {tool_err}"
             logger.error(f"Tool Error: {tool_err}")
-            _record_tool_trace(trace, func_name, "error", str(tool_err))
+            _record_tool_trace(
+                trace,
+                func_name,
+                "error",
+                arguments=args_for_trace,
+                error=str(tool_err),
+            )
 
         messages.append(
             {
