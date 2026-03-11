@@ -2,7 +2,7 @@ import bleach
 import uuid
 from flask import Blueprint, abort, g, jsonify, request
 from pydantic import ValidationError
-from typing import Any
+from typing import Any, cast
 
 from api.auth import jwt_required
 from api.db import delete_from_couchdb, fetch_from_couchdb, query_couchdb, update_couchdb_doc
@@ -11,7 +11,6 @@ from api.validation import (
     AgentConfigUpdateRequest,
     validate_userspace_param,
 )
-from tasks.agent_config_migration import migrate_legacy_agent_configs
 
 agent_blueprint = Blueprint("agents", __name__)
 
@@ -24,20 +23,20 @@ def _extract_userspace(doc: dict) -> str | None:
     return doc.get("userspace") or doc.get("namespace")
 
 
-def _sanitize_create_payload(payload: dict) -> dict:
+def _sanitize_agent_payload(payload: dict) -> dict:
     sanitized = dict(payload)
     for field in ["name", "logic_module", "schedule_interval"]:
         if field in sanitized and isinstance(sanitized[field], str):
             sanitized[field] = bleach.clean(sanitized[field], strip=True)
     return sanitized
+
+
+def _sanitize_create_payload(payload: dict) -> dict:
+    return _sanitize_agent_payload(payload)
 
 
 def _sanitize_update_payload(payload: dict) -> dict:
-    sanitized = dict(payload)
-    for field in ["name", "logic_module", "schedule_interval"]:
-        if field in sanitized and isinstance(sanitized[field], str):
-            sanitized[field] = bleach.clean(sanitized[field], strip=True)
-    return sanitized
+    return _sanitize_agent_payload(payload)
 
 
 def _enforce_owner(owner_user_id: str | None) -> str:
@@ -49,30 +48,30 @@ def _enforce_owner(owner_user_id: str | None) -> str:
 def _validate_userspace(userspace: str | None, field_name: str) -> str:
     if not userspace:
         abort(400, description=f"'{field_name}' is required")
+    validated_userspace = cast(str, userspace)
     try:
-        validate_userspace_param(userspace)
+        validate_userspace_param(validated_userspace)
     except ValueError as exc:
         abort(400, description=str(exc))
-    return userspace
+    return validated_userspace
 
 
 def _get_owned_agent_doc(agent_id: str, userspace: str) -> dict[str, Any]:
     doc = fetch_from_couchdb("agent_configs", agent_id)
     if not isinstance(doc, dict) or _extract_userspace(doc) != userspace:
         abort(404, description="Agent configuration not found")
+    doc_data = cast(dict[str, Any], doc)
 
-    if g.user_role != "admin" and doc.get("owner_user_id") != g.user_id:
+    if g.user_role != "admin" and doc_data.get("owner_user_id") != g.user_id:
         abort(404, description="Agent configuration not found")
 
-    return doc
+    return doc_data
 
 
 @agent_blueprint.route("/agents", methods=["GET"])
 @jwt_required
 def list_agents():
     userspace = _validate_userspace(request.args.get("userspace"), "userspace")
-
-    migrate_legacy_agent_configs()
 
     owner_only = request.args.get("owner_only", "true").lower() != "false"
     selector: dict = _userspace_selector(userspace)
@@ -95,7 +94,7 @@ def create_agent():
     except ValidationError as exc:
         abort(400, description=str(exc))
 
-    agent_id = validated.get("_id") or str(uuid.uuid4())
+    agent_id = str(uuid.uuid4())
     doc = {"_id": agent_id, **validated}
 
     if not update_couchdb_doc("agent_configs", agent_id, doc):

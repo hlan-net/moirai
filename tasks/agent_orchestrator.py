@@ -99,6 +99,10 @@ class AgentOrchestrator(threading.Thread):
     def run(self):
         self.running = True
         logger.info(f"Agent Orchestrator {self.leader_id} started.")
+
+        migrate_result = migrate_legacy_agent_configs()
+        if migrate_result.get("migrated"):
+            logger.info("Migrated %s legacy agent configs", migrate_result.get("migrated"))
         
         while self.running:
             try:
@@ -132,10 +136,6 @@ class AgentOrchestrator(threading.Thread):
         self.running = False
 
     def check_and_run_agents(self):
-        migrate_result = migrate_legacy_agent_configs()
-        if migrate_result.get("migrated"):
-            logger.info("Migrated %s legacy agent configs", migrate_result.get("migrated"))
-
         active_agents = query_couchdb(
             self.agent_configs_db, selector={"status": AgentStatus.ACTIVE.value}
         )

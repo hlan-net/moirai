@@ -49,9 +49,7 @@ def test_release_lock(orchestrator, mock_redis):
 
 @patch('tasks.agent_orchestrator.query_couchdb')
 @patch('tasks.agent_orchestrator.update_couchdb_doc')
-@patch('tasks.agent_orchestrator.migrate_legacy_agent_configs')
-def test_check_and_run_agents_scheduled(mock_migrate, mock_update, mock_query, orchestrator):
-    mock_migrate.return_value = {"status": "success", "migrated": 0, "skipped": 0}
+def test_check_and_run_agents_scheduled(mock_update, mock_query, orchestrator):
     # Setup mock agent config
     agent_id = "test-agent"
     last_run = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()

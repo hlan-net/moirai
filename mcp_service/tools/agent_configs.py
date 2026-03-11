@@ -117,8 +117,6 @@ def list_agent_configs(userspace: str, owner_user_id: Optional[str] = None) -> d
     Returns:
         A list of dictionaries, each representing an agent configuration.
     """
-    migrate_legacy_agent_configs()
-
     userspace_selector: dict[str, Any] = {
         "$or": [{"userspace": userspace}, {"namespace": userspace}]
     }
@@ -160,11 +158,11 @@ def update_agent_config(
             "message": f"Agent configuration {agent_id} not found.",
         }
 
-    update_data: dict[str, Any] = {
-        k: v
-        for k, v in locals().items()
-        if v is not None and k not in ["agent_id", "existing_config", "update_data"]
-    }
+    update_data: dict[str, Any] = {}
+    excluded_keys = {"agent_id", "existing_config", "update_data", "userspace"}
+    for key, value in locals().items():
+        if value is not None and key not in excluded_keys:
+            update_data[key] = value
 
     try:
         validated_data = AgentConfigUpdateRequest(**update_data).model_dump(
