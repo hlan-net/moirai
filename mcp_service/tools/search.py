@@ -1,6 +1,7 @@
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from ..core import mcp, auth_required, validate_userspace
 from ..db import db_request
 from api.db_constants import MONGO_REGEX, MONGO_OR
@@ -50,7 +51,7 @@ def _build_date_filter(date_from, date_to):
     return date_filter
 
 def _search_issues_internal(
-    query: str, userspace: str, longevity: str = None, limit: int = 50
+    query: str, userspace: str, longevity: Optional[str] = None, limit: int = 50
 ) -> str:
     """Internal implementation of issue search."""
     if not query.strip():
@@ -71,10 +72,11 @@ def _search_issues_internal(
         ],
     }
 
+    issue_selector = text_selector
     if longevity:
-        text_selector["longevity"] = longevity
+        issue_selector = {"$and": [text_selector, {"longevity": longevity}]}
 
-    selector = {"$and": [build_userspace_selector(userspace), text_selector]}
+    selector = {"$and": [build_userspace_selector(userspace), issue_selector]}
 
     try:
         query_payload = {
@@ -117,13 +119,17 @@ def _search_issues_internal(
 @auth_required
 def search_articles(
     query: str,
-    userspace: str = None,
+    userspace: Optional[str] = None,
     date_from: str = "",
     date_to: str = "",
     limit: int = 50,
 ) -> str:
     """
-    Search articles by keyword. Optionally filter by userspace.
+    Search articles by keyword across the shared global article corpus.
+
+    Notes:
+    - `userspace` is accepted for backward compatibility with older callers,
+      but it is intentionally ignored for article retrieval.
     """
     if not query.strip():
         return json.dumps({"error": "Query cannot be empty"})
@@ -141,8 +147,6 @@ def search_articles(
     }
 
     filters = [text_selector]
-    if userspace:
-        filters.append(build_userspace_selector(userspace))
 
     try:
         date_filter = _build_date_filter(date_from, date_to)
@@ -183,7 +187,7 @@ def search_articles(
             {
                 "total": len(results),
                 "query": query,
-                "userspace": userspace,
+                "userspace": None,
                 "results": results,
             },
             indent=2,
@@ -196,10 +200,14 @@ def search_articles(
 @mcp.tool()
 @auth_required
 def get_recent_articles(
-    userspace: str = None, hours: int = 24, limit: int = 50
+    userspace: Optional[str] = None, hours: int = 24, limit: int = 50
 ) -> str:
     """
-    Get most recent articles. Optionally filter by userspace.
+    Get most recent articles from the shared global article corpus.
+
+    Notes:
+    - `userspace` is accepted for backward compatibility with older callers,
+      but it is intentionally ignored for article retrieval.
     """
     hours = min(hours, 168)
     limit = min(limit, 200)
@@ -207,8 +215,6 @@ def get_recent_articles(
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     selector = {"published": {"$gte": cutoff.isoformat()}}
-    if userspace:
-        selector = {"$and": [build_userspace_selector(userspace), selector]}
 
     try:
         query_payload = {
@@ -238,7 +244,7 @@ def get_recent_articles(
             {
                 "total": len(results),
                 "hours": hours,
-                "userspace": userspace,
+                "userspace": None,
                 "results": results,
             },
             indent=2,
@@ -251,7 +257,7 @@ def get_recent_articles(
 @mcp.tool()
 @auth_required
 def search_issues(
-    query: str, userspace: str, longevity: str = None, limit: int = 50
+    query: str, userspace: str, longevity: Optional[str] = None, limit: int = 50
 ) -> str:
     """
     Search Issues (Resonances) by keyword within a userspace.

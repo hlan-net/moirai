@@ -1,14 +1,19 @@
+import asyncio
+import json
+import logging
+import os
 import re
 import uuid
-import logging
-import asyncio
-import os  # Re-added
-import json  # Re-added
-from datetime import datetime, timezone  # Re-added
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from flask import Blueprint, request, jsonify, abort, g
+
+import bleach
+import httpx
+from bs4 import BeautifulSoup
+from flask import Blueprint, abort, g, jsonify, request
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+
 from .llm.factory import LLMProviderFactory
 from .db import (
     fetch_from_couchdb,
@@ -17,8 +22,6 @@ from .db import (
     query_couchdb,
 )
 from .auth import jwt_required
-import httpx
-import bleach  # Moved import to top
 
 chat_blueprint = Blueprint("chat", __name__)
 
@@ -40,7 +43,7 @@ MAX_AGENT_TURNS = 5
 LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
 ERROR_ACCESS_DENIED = "Access denied"
-CHAT_EXPORT_VERBOSE_SETTING = "moirai_chat_export_verbose"
+CHAT_EXPORT_VERBOSE_SETTING = "chat_export_verbose"
 
 SYSTEM_PROMPT = (
     "You are Moirai, a GenAI-native press review agent. "
@@ -83,11 +86,10 @@ def extract_tool_calls_from_content(content):
     return tools
 
 
-def _is_verbose_chat_export_enabled(user_doc: dict | None) -> bool:
-    if not user_doc:
+def _is_verbose_chat_export_enabled(config_doc: dict | None) -> bool:
+    if not config_doc:
         return False
-    settings = user_doc.get("settings") or {}
-    return bool(settings.get(CHAT_EXPORT_VERBOSE_SETTING, False))
+    return bool(config_doc.get(CHAT_EXPORT_VERBOSE_SETTING, False))
 
 
 def _format_tool_call_markdown(tool_calls) -> str:
@@ -97,20 +99,28 @@ def _format_tool_call_markdown(tool_calls) -> str:
     for tool_call in tool_calls:
         func_name = "unknown"
         func_args = "{}"
+        func_status = None
         if isinstance(tool_call, dict):
-            function_data = tool_call.get("function") or {}
-            func_name = function_data.get("name", func_name)
-            func_args = function_data.get("arguments", func_args)
+            if "name" in tool_call:
+                func_name = tool_call.get("name", func_name)
+                func_status = tool_call.get("status")
+                func_args = tool_call.get("arguments", func_args)
+            else:
+                function_data = tool_call.get("function") or {}
+                func_name = function_data.get("name", func_name)
+                func_args = function_data.get("arguments", func_args)
         else:
             function_data = getattr(tool_call, "function", None)
             if function_data:
                 func_name = getattr(function_data, "name", func_name)
                 func_args = getattr(function_data, "arguments", func_args)
-        rows.append(f"- `{func_name}` args: `{func_args}`")
+        if func_status:
+            rows.append(f"- `{func_name}` status: `{func_status}` args: `{func_args}`")
+        else:
+            rows.append(f"- `{func_name}` args: `{func_args}`")
     return "\n".join(rows)
 
 
-from bs4 import BeautifulSoup
 def _strip_internal_reminders(text: str) -> str:
     if not text:
         return text
@@ -133,6 +143,117 @@ def _sanitize_export_value(value):
     if isinstance(value, list):
         return [_sanitize_export_value(item) for item in value]
     return value
+
+
+def _latest_user_message(messages) -> str:
+    for message in reversed(messages):
+        if message.get("role") == "user":
+            return (message.get("content") or "").lower()
+    return ""
+
+
+def _should_prefetch_recent_articles(user_message: str) -> bool:
+    prompt = (user_message or "").lower()
+    trigger_terms = [
+        "latest",
+        "recent",
+        "currently",
+        "news",
+        "headlines",
+        "what is happening",
+        "what's happening",
+        "where is",
+    ]
+    return any(term in prompt for term in trigger_terms)
+
+
+async def _prefetch_recent_articles_context(session, messages, userspace_id, user_message):
+    statuses = []
+
+    async def _call_tool(tool_name, args, context_title):
+        try:
+            if userspace_id:
+                args["userspace"] = userspace_id
+            result = await session.call_tool(tool_name, args)
+            result_text = result.content[0].text if result.content else "[]"
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"Tool context from {context_title} (JSON):\n{result_text[:8000]}",
+                }
+            )
+            statuses.append((tool_name, "ok", None))
+        except Exception as exc:
+            logger.warning(f"Prefetch {tool_name} failed: {exc}")
+            statuses.append((tool_name, "error", str(exc)))
+
+    await _call_tool("get_recent_articles", {"limit": 20}, "get_recent_articles")
+    await _call_tool(
+        "search_articles",
+        {"query": user_message, "limit": 20},
+        "search_articles",
+    )
+    return statuses
+
+
+def _record_tool_trace(trace: dict, name: str, status: str, error: str | None = None):
+    entry = {"name": name, "status": status}
+    if error:
+        entry["error"] = error
+    trace["tool_calls"].append(entry)
+    if status == "error":
+        trace["tool_execution_errors"] += 1
+
+
+def _has_recent_articles_tool_result(messages) -> bool:
+    for message in messages:
+        if message.get("role") == "tool" and message.get("name") == "get_recent_articles":
+            return True
+    return False
+
+
+def _should_force_recent_articles(messages, assistant_content: str) -> bool:
+    user_text = _latest_user_message(messages)
+    if not user_text:
+        return False
+
+    news_intent_terms = [
+        "latest",
+        "recent",
+        "currently",
+        "news",
+        "headlines",
+        "what is happening",
+        "what's happening",
+        "where is",
+    ]
+    no_data_terms = [
+        "don't have access",
+        "do not have access",
+        "real-time",
+        "cannot provide current",
+        "no recent articles",
+    ]
+
+    has_news_intent = any(term in user_text for term in news_intent_terms)
+    returned_no_data = any(term in assistant_content.lower() for term in no_data_terms)
+
+    return has_news_intent and returned_no_data and not _has_recent_articles_tool_result(messages)
+
+
+def _create_get_recent_articles_call():
+    tool_call_id = f"call_{uuid.uuid4().hex[:8]}"
+    mock_call = SimpleNamespace(
+        id=tool_call_id,
+        function=SimpleNamespace(name="get_recent_articles", arguments=json.dumps({"limit": 20})),
+        type="function",
+    )
+    mock_data = {
+        "id": tool_call_id,
+        "type": "function",
+        "function": {"name": "get_recent_articles", "arguments": json.dumps({"limit": 20})},
+    }
+    return mock_call, mock_data
 
 
 def run_agent_sync(
@@ -189,6 +310,8 @@ async def run_agent(
 
     target_model = model or MODEL_NAME
 
+    trace = {"tool_calls": [], "tool_execution_errors": 0}
+
     try:
         # Connect to MCP Server
         # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
@@ -207,14 +330,27 @@ async def run_agent(
                 mcp_tools = await session.list_tools()
                 openai_tools = _convert_to_openai_tools(mcp_tools)
 
-                return await _run_agent_loop(
+                if _should_prefetch_recent_articles(user_message):
+                    prefetch_statuses = await _prefetch_recent_articles_context(
+                        session, messages, userspace_id, user_message
+                    )
+                    for name, status, error in prefetch_statuses:
+                        _record_tool_trace(trace, name, status, error)
+
+                final_response = await _run_agent_loop(
                     messages,
                     llm_provider,
                     target_model,
                     openai_tools,
                     session,
                     userspace_id,
+                    trace,
                 )
+                return {
+                    "response": final_response,
+                    "tool_calls": trace["tool_calls"],
+                    "tool_execution_errors": trace["tool_execution_errors"],
+                }
 
     except Exception as e:
         logger.error("Error running agent loop", exc_info=True)
@@ -224,9 +360,17 @@ async def run_agent(
             error_msgs = []
             for exc in e.exceptions:
                 error_msgs.append(str(exc))
-            return f"Agent Error: {'; '.join(error_msgs)}"
+            return {
+                "response": f"Agent Error: {'; '.join(error_msgs)}",
+                "tool_calls": trace["tool_calls"],
+                "tool_execution_errors": trace["tool_execution_errors"],
+            }
 
-        return f"System Error: {str(e)}"
+        return {
+            "response": f"System Error: {str(e)}",
+            "tool_calls": trace["tool_calls"],
+            "tool_execution_errors": trace["tool_execution_errors"],
+        }
 
 
 @chat_blueprint.route("/models", methods=["GET"])
@@ -293,23 +437,44 @@ def chat():
     if not api_key:
         api_key = request.headers.get("x-gemini-api-key")
 
+    api_key = _get_api_key(llm_endpoint, api_key)
+
+    if llm_endpoint in {"openai", "gemini"} and not api_key:
+        return (
+            jsonify(
+                {
+                    "response": (
+                        f"Error: Missing API key for provider '{llm_endpoint}'. "
+                        "Add it in Settings or send it in request headers."
+                    )
+                }
+            ),
+            400,
+        )
+
     ollama_base_url = user_settings.get(
         "moirai_ollama_endpoint_url"
     ) or request.headers.get("x-ollama-base-url")
 
     auth_token = request.headers.get("Authorization")
 
-    response = run_agent_sync(
-        user_message,
-        history,
-        g.user_id,
-        model,
-        llm_endpoint,
-        api_key,
-        ollama_base_url,
-        auth_token,
-    )
-    return jsonify({"response": response})
+    try:
+        response = run_agent_sync(
+            user_message,
+            history,
+            g.user_id,
+            model,
+            llm_endpoint,
+            api_key,
+            ollama_base_url,
+            auth_token,
+        )
+        if isinstance(response, dict):
+            return jsonify(response)
+        return jsonify({"response": response, "tool_calls": [], "tool_execution_errors": 0})
+    except Exception as exc:
+        logger.error("Error in /api/chat", exc_info=True)
+        return jsonify({"response": f"Error: {str(exc)}"}), 500
 
 
 @chat_blueprint.route("/chat/history", methods=["GET"])
@@ -422,8 +587,8 @@ def export_chat_session(session_id):
     if session.get("user_id") != g.user_id:
         abort(403, description=ERROR_ACCESS_DENIED)
 
-    user_doc = fetch_from_couchdb("users", g.user_id)
-    verbose_export = _is_verbose_chat_export_enabled(user_doc)
+    config_doc = fetch_from_couchdb("config", "main")
+    verbose_export = _is_verbose_chat_export_enabled(config_doc)
 
     title = session.get("title", "Untitled Chat")
     safe_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", title)
@@ -454,6 +619,8 @@ def export_chat_session(session_id):
         markdown_content += f"- Tool calls requested: {tool_call_total}\n"
         markdown_content += f"- Tool execution errors: {tool_error_total}\n\n"
 
+    markdown_content = _strip_internal_reminders(markdown_content)
+
     from flask import Response
 
     return Response(
@@ -479,7 +646,7 @@ def delete_chat_session(session_id):
 
 
 async def _run_agent_turn(
-    messages, llm_provider, target_model, openai_tools, session, userspace_id
+    messages, llm_provider, target_model, openai_tools, session, userspace_id, trace
 ):
     # Filter messages to ensure clean JSON for API
     clean_messages = []
@@ -519,9 +686,14 @@ async def _run_agent_turn(
             msg_dict["tool_calls"] = mock_tool_calls_data
 
     if tool_calls:
-        await _execute_tool_calls(session, tool_calls, messages, userspace_id)
+        await _execute_tool_calls(session, tool_calls, messages, userspace_id, trace)
         return None  # Continue loop
     else:
+        if _should_force_recent_articles(messages, sanitized_content):
+            forced_call, forced_call_data = _create_get_recent_articles_call()
+            msg_dict["tool_calls"] = [forced_call_data]
+            await _execute_tool_calls(session, [forced_call], messages, userspace_id, trace)
+            return None
         # Final response
         return sanitized_content
 
@@ -575,7 +747,7 @@ def _create_mock_tool_calls(extracted_tools):
     return tool_calls, mock_tool_calls_data
 
 
-async def _execute_tool_calls(session, tool_calls, messages, userspace_id):
+async def _execute_tool_calls(session, tool_calls, messages, userspace_id, trace):
     for tool_call in tool_calls:
         func_name = tool_call.function.name
         func_args = json.loads(tool_call.function.arguments)
@@ -589,9 +761,11 @@ async def _execute_tool_calls(session, tool_calls, messages, userspace_id):
             result = await session.call_tool(func_name, func_args)
             result_text = result.content[0].text if result.content else "Success"
             logger.debug(f"Tool result (truncated): {result_text[:200]}...")
+            _record_tool_trace(trace, func_name, "ok")
         except Exception as tool_err:
             result_text = f"Tool Execution Error: {tool_err}"
             logger.error(f"Tool Error: {tool_err}")
+            _record_tool_trace(trace, func_name, "error", str(tool_err))
 
         messages.append(
             {
@@ -631,11 +805,11 @@ def _convert_to_openai_tools(mcp_tools):
 
 
 async def _run_agent_loop(
-    messages, llm_provider, target_model, openai_tools, session, userspace_id
+    messages, llm_provider, target_model, openai_tools, session, userspace_id, trace
 ):
     for _ in range(MAX_AGENT_TURNS):
         result = await _run_agent_turn(
-            messages, llm_provider, target_model, openai_tools, session, userspace_id
+            messages, llm_provider, target_model, openai_tools, session, userspace_id, trace
         )
         if result:
             return result

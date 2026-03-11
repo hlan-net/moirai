@@ -131,6 +131,10 @@ moirai:
 openai:
   apiKey: ""
 
+# -- Gemini API key
+gemini:
+  apiKey: ""
+
 # -- Ollama endpoint
 ollama:
   endpoint: "https://ollama.example.com"

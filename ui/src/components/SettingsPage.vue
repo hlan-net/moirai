@@ -188,8 +188,7 @@ const saveSettings = async () => {
             moirai_gemini_api_key: geminiApiKey.value,
             moirai_gemini_model: geminiModelName.value,
             moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
-            moirai_theme: theme.value,
-            moirai_chat_export_verbose: verboseChatExport.value
+            moirai_theme: theme.value
         })
       })
       if (!res.ok) {
@@ -203,10 +202,11 @@ const saveSettings = async () => {
               'Authorization': `Bearer ${authStore.token}`,
               'Content-Type': 'application/json'
           } : { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-               allow_public_read: allowPublicRead.value,
-               iteration_interval: schedulerEnabled.value ? iterationInterval.value : 0,
-              google_client_id: googleClientId.value,
+           body: JSON.stringify({ 
+                allow_public_read: allowPublicRead.value,
+                chat_export_verbose: verboseChatExport.value,
+                iteration_interval: schedulerEnabled.value ? iterationInterval.value : 0,
+               google_client_id: googleClientId.value,
               entra_client_id: entraClientId.value,
               entra_tenant_id: entraTenantId.value,
               github_client_id: githubClientId.value,
@@ -302,7 +302,6 @@ const fetchUserProfile = async () => {
             if (settings.moirai_gemini_model) geminiModelName.value = settings.moirai_gemini_model
             if (settings.moirai_ollama_endpoint_url) ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
             if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
-            verboseChatExport.value = Boolean(settings.moirai_chat_export_verbose)
             
             // Refresh models based on loaded settings
             if (llmEndpoint.value === 'ollama') fetchOllamaModels()
@@ -430,6 +429,9 @@ const fetchConfig = async () => {
             console.log("Config loaded:", config)
             componentVersions.value = buildComponentVersions(config)
             if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
+            if (config.chat_export_verbose !== undefined) {
+              verboseChatExport.value = Boolean(config.chat_export_verbose)
+            }
             if (config.iteration_interval !== undefined) {
               const intervalValue = Number(config.iteration_interval)
               schedulerEnabled.value = intervalValue > 0
@@ -521,11 +523,6 @@ onMounted(() => {
               <option value="dark">Dark</option>
               <option value="auto">Auto (System)</option>
             </select>
-          </div>
-          <div class="form-group">
-            <label for="verbose-chat-export">Verbose Chat Export:</label>
-            <input id="verbose-chat-export" type="checkbox" v-model="verboseChatExport" />
-            <small>Include tool calls, metadata, and trace summary in exported chat markdown.</small>
           </div>
         </div>
       </div>
@@ -655,6 +652,13 @@ onMounted(() => {
           <label for="interval">Feed Refresh Interval (seconds):</label>
           <input type="number" id="interval" v-model="iterationInterval" min="60" step="60" :disabled="!schedulerEnabled" />
           <small>How often the system checks for new articles.</small>
+        </div>
+        <div class="form-group checkbox-group">
+          <label for="verbose-chat-export" class="checkbox-label">
+            <input id="verbose-chat-export" type="checkbox" v-model="verboseChatExport" />
+            Verbose Chat Export
+          </label>
+          <small>Include tool calls, metadata, and trace summary in exported chat markdown for all users.</small>
         </div>
         <div class="button-group">
           <button class="secondary" @click="openSchedulerLogs">View Scheduler Logs</button>

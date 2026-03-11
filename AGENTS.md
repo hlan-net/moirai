@@ -62,6 +62,19 @@ This document provides essential instructions for AI agents working on the Moira
   ```bash
   docker compose up --build
   ```
+- **Local Build Metadata (non-GitHub builds):**
+  ```bash
+  BUILD_LABEL="CI $(date '+%Y-%m-%d %H:%M') build"
+
+  docker build -f api/Dockerfile \
+    --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+    -t rgsty.hlan.net/moirai:main .
+
+  docker build -f ui/Dockerfile ui \
+    --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+    -t rgsty.hlan.net/moirai-ui:main .
+  ```
+  This makes About show a custom build string instead of `build unknown`/empty for local images.
 
 ## 2. Code Style & Conventions
 

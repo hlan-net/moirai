@@ -73,7 +73,9 @@ class GeminiProvider(LLMProvider):
                     types.FunctionDeclaration(
                         name=func["name"],
                         description=func.get("description"),
-                        parameters=func.get("parameters"),
+                        parameters=self._sanitize_schema_for_gemini(
+                            func.get("parameters")
+                        ),
                     )
                 )
         
@@ -81,6 +83,18 @@ class GeminiProvider(LLMProvider):
             return None
             
         return [types.Tool(function_declarations=function_declarations)]
+
+    def _sanitize_schema_for_gemini(self, schema):
+        if isinstance(schema, dict):
+            cleaned = {}
+            for key, value in schema.items():
+                if key == "additionalProperties":
+                    continue
+                cleaned[key] = self._sanitize_schema_for_gemini(value)
+            return cleaned
+        if isinstance(schema, list):
+            return [self._sanitize_schema_for_gemini(item) for item in schema]
+        return schema
 
     def _convert_history(self, messages):
         gemini_history = []

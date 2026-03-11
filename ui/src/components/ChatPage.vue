@@ -7,6 +7,8 @@ import { authFetch } from '../utils/authFetch'
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  tool_calls?: Array<{ name?: string; status?: string; error?: string }>
+  tool_execution_errors?: number
 }
 
 interface ChatSession {
@@ -36,6 +38,22 @@ const modelFetchError = ref('')
 const availableModels = ref<string[]>([])
 const availableOpenAiModels = ref<string[]>([])
 const availableGeminiModels = ref<string[]>([])
+const copyStatus = ref('')
+
+const stripInternalReminders = (content: string) => {
+  if (!content) return content
+  return content.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, '').trim()
+}
+
+const normalizeErrorMessage = (raw: string) => {
+  const withoutReminders = stripInternalReminders(raw)
+  const withoutHtml = withoutReminders.replace(/<[^>]*>/g, ' ')
+  const compact = withoutHtml.replace(/\s+/g, ' ').trim()
+  if (!compact || compact === 'Error:') {
+    return 'Error: Request failed. Check API logs for details.'
+  }
+  return compact
+}
 
 const modelSettingsMap: Record<string, string> = {
   openai: 'moirai_openai_model',
@@ -253,7 +271,7 @@ const toggleModelSelect = () => {
 }
 
 const parsedContent = (content: string) => {
-  return DOMPurify.sanitize(marked(content) as string)
+  return DOMPurify.sanitize(marked(stripInternalReminders(content)) as string)
 }
 
 const fetchSessions = async () => {
@@ -376,14 +394,43 @@ const sendMessage = async () => {
     
     if (res.ok) {
       const data = await res.json()
-      messages.value.push({ role: 'assistant', content: data.response })
+      messages.value.push({
+        role: 'assistant',
+        content: stripInternalReminders(data.response ?? ''),
+        tool_calls: Array.isArray(data.tool_calls) ? data.tool_calls : [],
+        tool_execution_errors: Number(data.tool_execution_errors || 0),
+      })
       await _updateSessionMessages()
     } else {
-      messages.value.push({ role: 'assistant', content: `Error: ${res.statusText}` })
+      let serverMessage = ''
+      try {
+        const payload = await res.json()
+        if (payload && typeof payload.response === 'string') {
+          serverMessage = payload.response
+        } else if (payload && typeof payload.error === 'string') {
+          serverMessage = payload.error
+        }
+      } catch {
+        const body = await res.text()
+        serverMessage = body
+      }
+
+      const fallback = `Error: ${res.status} ${res.statusText}`
+      messages.value.push({
+        role: 'assistant',
+        content: normalizeErrorMessage(serverMessage || fallback),
+        tool_calls: [],
+        tool_execution_errors: 0,
+      })
       await _updateSessionMessages()
     }
   } catch (e) {
-    messages.value.push({ role: 'assistant', content: `Error: ${e}` })
+    messages.value.push({
+      role: 'assistant',
+      content: normalizeErrorMessage(`Error: ${String(e)}`),
+      tool_calls: [],
+      tool_execution_errors: 0,
+    })
     await _updateSessionMessages()
   } finally {
     loading.value = false
@@ -403,6 +450,27 @@ const downloadChat = async () => {
   link.download = match?.[1] ?? 'chat.md'
   link.click()
   URL.revokeObjectURL(url)
+}
+
+const copyChat = async () => {
+  if (!sessionId.value) return
+  try {
+    const response = await authFetch(`/api/chat/history/${sessionId.value}/export`)
+    if (!response.ok) {
+      copyStatus.value = 'Copy failed'
+      return
+    }
+    const markdown = await response.text()
+    await navigator.clipboard.writeText(markdown)
+    copyStatus.value = 'Copied'
+  } catch (error) {
+    console.error('Failed to copy chat export:', error)
+    copyStatus.value = 'Copy failed'
+  } finally {
+    globalThis.setTimeout(() => {
+      copyStatus.value = ''
+    }, 2000)
+  }
 }
 
 const filteredSessions = computed(() => {
@@ -597,12 +665,20 @@ const renameSession = async (session: ChatSession) => {
             <span class="model-name">{{ currentModel }}</span>
             <span class="model-caret" :class="{ open: modelSelectOpen }">▾</span>
         </button>
-        <button v-if="sessionId" @click="downloadChat" class="download-btn" title="Download Chat">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <div v-if="sessionId" class="chat-header-actions">
+          <button @click="copyChat" class="download-btn" :title="copyStatus || 'Copy Chat to Clipboard'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            {{ copyStatus || 'Copy' }}
+          </button>
+          <button @click="downloadChat" class="download-btn" title="Download Chat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-          </svg>
-          Download
-        </button>
+            </svg>
+            Download
+          </button>
+        </div>
       </div>
       <div v-if="modelSelectOpen" class="model-select-panel">
         <div class="model-select-row">
@@ -650,6 +726,13 @@ const renameSession = async (session: ChatSession) => {
             <div class="bubble">
               <strong>{{ msg.role === 'user' ? 'You' : 'GenAI' }}:</strong>
               <div class="msg-content" v-html="parsedContent(msg.content)"></div>
+              <div
+                v-if="msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length"
+                class="tool-usage"
+              >
+                Tools used: {{ msg.tool_calls.length }}
+                <span v-if="msg.tool_execution_errors">(errors: {{ msg.tool_execution_errors }})</span>
+              </div>
             </div>
           </div>
           <div v-if="loading" class="message assistant">
@@ -1034,6 +1117,11 @@ const renameSession = async (session: ChatSession) => {
     border-color: var(--primary-color);
     color: var(--primary-color);
 }
+.chat-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 .download-btn {
     display: flex;
     align-items: center;
@@ -1108,6 +1196,12 @@ const renameSession = async (session: ChatSession) => {
   white-space: pre-wrap;
   font-family: inherit;
   margin: 0;
+}
+
+.tool-usage {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.8;
 }
 .input-area {
   padding: 15px;

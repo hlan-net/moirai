@@ -25,6 +25,21 @@ Three main services:
 docker compose up --build
 ```
 
+### Local Docker build metadata (non-GitHub builds)
+Set `BUILD_NUMBER` when building local images so About displays a meaningful build label instead of `build unknown`/empty.
+
+```bash
+BUILD_LABEL="CI $(date '+%Y-%m-%d %H:%M') build"
+
+docker build -f api/Dockerfile \
+  --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+  -t rgsty.hlan.net/moirai:main .
+
+docker build -f ui/Dockerfile ui \
+  --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+  -t rgsty.hlan.net/moirai-ui:main .
+```
+
 ### Backend (local dev)
 ```bash
 mamba env create -f environment.yml   # or: pip install -r requirements.txt

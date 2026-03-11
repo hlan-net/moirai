@@ -171,6 +171,14 @@ def get_iteration_interval_setting():
     return ITERATION_INTERVAL_ENV
 
 
+def get_chat_export_verbose_setting() -> bool:
+    """Checks DB for chat export verbosity setting, defaults to False."""
+    config = get_config_doc()
+    if config and "chat_export_verbose" in config:
+        return bool(config["chat_export_verbose"])
+    return False
+
+
 @api_blueprint.after_request
 def add_security_headers(response):
     """Add security headers to all responses."""
@@ -672,6 +680,7 @@ def get_config():
     return jsonify(
         {
             "allow_public_read": get_public_read_setting(),
+            "chat_export_verbose": get_chat_export_verbose_setting(),
             "iteration_interval": get_iteration_interval_setting(),
             "version": version.get_version_string(),
             "components": get_component_versions(),
@@ -702,6 +711,9 @@ def update_config():
 
     if validated.allow_public_read is not None:
         new_doc["allow_public_read"] = validated.allow_public_read
+
+    if validated.chat_export_verbose is not None:
+        new_doc["chat_export_verbose"] = validated.chat_export_verbose
 
     if validated.iteration_interval is not None:
         new_doc["iteration_interval"] = validated.iteration_interval

@@ -57,6 +57,11 @@ spec:
                   secretKeyRef:
                     name: {{ .Release.Name }}-openai-secret
                     key: apiKey
+              - name: GEMINI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Release.Name }}-gemini-secret
+                    key: apiKey
               - name: ADMIN_USERNAME
                 valueFrom:
                   secretKeyRef:

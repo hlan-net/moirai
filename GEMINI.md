@@ -41,3 +41,18 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 ## How to Build and Run
 1.  **App & DB:** `docker compose up --build` (Port 8088).
 2.  **MCP Server:** Activate Miniforge env, then `mamba run -n moirai python mcp_server.py` (Port 8090).
+
+### Local Docker build metadata (non-GitHub builds)
+Use `BUILD_NUMBER` during local image builds so About shows an explicit build label (instead of `build unknown`/empty):
+
+```bash
+BUILD_LABEL="CI $(date '+%Y-%m-%d %H:%M') build"
+
+docker build -f api/Dockerfile \
+  --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+  -t rgsty.hlan.net/moirai:main .
+
+docker build -f ui/Dockerfile ui \
+  --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+  -t rgsty.hlan.net/moirai-ui:main .
+```

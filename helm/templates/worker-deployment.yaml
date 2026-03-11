@@ -19,6 +19,7 @@ spec:
         checksum/couchdb-secret: {{ include (print $.Template.BasePath "/couchdb-secret.yaml") . | sha256sum }}
         checksum/moirai-secret: {{ include (print $.Template.BasePath "/moirai-secret.yaml") . | sha256sum }}
         checksum/openai-secret: {{ include (print $.Template.BasePath "/openai-secret.yaml") . | sha256sum }}
+        checksum/gemini-secret: {{ include (print $.Template.BasePath "/gemini-secret.yaml") . | sha256sum }}
       labels:
         {{- include "moirai.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
@@ -81,6 +82,11 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-openai-secret
+                key: apiKey
+          - name: GEMINI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-gemini-secret
                 key: apiKey
           - name: ADMIN_USERNAME
             valueFrom:

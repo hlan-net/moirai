@@ -256,6 +256,7 @@ class ConfigUpdateRequest(BaseModel):
     """Validation for config updates"""
 
     allow_public_read: Optional[bool] = None
+    chat_export_verbose: Optional[bool] = None
     iteration_interval: Optional[int] = Field(
         None, ge=0, le=86400
     )  # 0 disables, 1 minute to 24 hours
