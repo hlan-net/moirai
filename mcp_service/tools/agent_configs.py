@@ -1,13 +1,19 @@
+import uuid
+from typing import Any, Optional
+
+from pydantic import ValidationError
+
 from api.db import (
     query_couchdb,
     fetch_from_couchdb,
     update_couchdb_doc,
     delete_from_couchdb,
 )
-from mcp_service.core import mcp
 from api.validation import AgentConfigCreateRequest, AgentConfigUpdateRequest
-from pydantic import ValidationError
-import uuid
+from mcp_service.core import mcp
+from tasks.agent_config_migration import migrate_legacy_agent_configs
+
+from .userspace import extract_userspace
 
 # Database name for agent configurations
 AGENT_CONFIGS_DB = "agent_configs"
@@ -15,24 +21,28 @@ AGENT_CONFIGS_DB = "agent_configs"
 
 @mcp.tool(name="add_agent_config", description="Adds a new agent configuration.")
 def add_agent_config(
-    user_id: str,
+    userspace: str,
     name: str,
     trigger_type: str,
     target_db: str,
     logic_module: str,
-    schedule_interval: str = None,
-    llm_model_config: dict = None,
-    parameters: dict = None,
-    linked_entity_id: str = None,
+    owner_user_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    schedule_interval: Optional[str] = None,
+    llm_model_config: Optional[dict[str, Any]] = None,
+    parameters: Optional[dict[str, Any]] = None,
+    linked_entity_id: Optional[str] = None,
 ) -> dict:
     """
     Adds a new agent configuration to monitor and act on data.
     Args:
-        user_id: The GUID of the user creating the agent config.
+        userspace: The userspace GUID where this agent can operate.
         name: A descriptive name for the agent config.
         trigger_type: How the agent is triggered ('on_new_article', 'scheduled').
         target_db: The database the agent primarily monitors ('articles', 'issues', 'feeds').
         logic_module: Reference to a Python module/function for agent logic (e.g., 'tasks.agent_logic.create_event').
+        owner_user_id: The GUID of the user that owns model credentials for this agent.
+        user_id: Deprecated alias for owner_user_id.
         schedule_interval: (Optional) If trigger_type is 'scheduled', the interval (e.g., '1h', '1d', 'every 30m').
         llm_model_config: (Optional) LLM specific configurations (model_name, provider).
         parameters: (Optional) User-defined parameters for the agent logic.
@@ -41,9 +51,10 @@ def add_agent_config(
         A dictionary representing the created agent configuration.
     """
     try:
-        # Pydantic validation
-        agent_config_data = {
-            "user_id": user_id,
+        resolved_owner_user_id = owner_user_id or user_id
+        agent_config_data: dict[str, Any] = {
+            "userspace": userspace,
+            "owner_user_id": resolved_owner_user_id,
             "name": name,
             "trigger_type": trigger_type,
             "target_db": target_db,
@@ -74,39 +85,46 @@ def add_agent_config(
 @mcp.tool(
     name="get_agent_config", description="Retrieves an agent configuration by ID."
 )
-def get_agent_config(agent_id: str) -> dict:
+def get_agent_config(agent_id: str, userspace: str) -> dict:
     """
     Retrieves a specific agent configuration.
     Args:
         agent_id: The GUID of the agent configuration.
+        userspace: Userspace GUID for scope enforcement.
     Returns:
         A dictionary representing the agent configuration or an error message.
     """
     config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
-    if config:
+    if isinstance(config, dict) and extract_userspace(config) == userspace:
         return {"status": "success", "agent_config": config}
-    else:
-        return {
-            "status": "error",
-            "message": f"Agent configuration {agent_id} not found.",
-        }
+
+    return {
+        "status": "error",
+        "message": f"Agent configuration {agent_id} not found.",
+    }
 
 
 @mcp.tool(
     name="list_agent_configs",
-    description="Lists agent configurations, optionally filtered by user_id.",
+    description="Lists agent configurations filtered by userspace.",
 )
-def list_agent_configs(user_id: str = None) -> list[dict]:
+def list_agent_configs(userspace: str, owner_user_id: Optional[str] = None) -> dict:
     """
-    Lists all agent configurations, or those belonging to a specific user.
+    Lists all agent configurations in a userspace.
     Args:
-        user_id: (Optional) Filter agent configurations by this user ID.
+        userspace: Required userspace to filter agent configurations.
+        owner_user_id: (Optional) Filter by owner user ID.
     Returns:
         A list of dictionaries, each representing an agent configuration.
     """
-    selector = {}
-    if user_id:
-        selector["user_id"] = user_id
+    migrate_legacy_agent_configs()
+
+    userspace_selector: dict[str, Any] = {
+        "$or": [{"userspace": userspace}, {"namespace": userspace}]
+    }
+    selector: dict[str, Any] = userspace_selector
+    if owner_user_id:
+        selector = {"$and": [userspace_selector, {"owner_user_id": owner_user_id}]}
 
     configs = query_couchdb(AGENT_CONFIGS_DB, selector=selector)
     return {"status": "success", "agent_configs": configs}
@@ -117,46 +135,37 @@ def list_agent_configs(user_id: str = None) -> list[dict]:
 )
 def update_agent_config(
     agent_id: str,
-    name: str = None,
-    status: str = None,
-    trigger_type: str = None,
-    target_db: str = None,
-    logic_module: str = None,
-    schedule_interval: str = None,
-    llm_model_config: dict = None,
-    parameters: dict = None,
-    linked_entity_id: str = None,
+    userspace: str,
+    name: Optional[str] = None,
+    status: Optional[str] = None,
+    owner_user_id: Optional[str] = None,
+    trigger_type: Optional[str] = None,
+    target_db: Optional[str] = None,
+    logic_module: Optional[str] = None,
+    schedule_interval: Optional[str] = None,
+    llm_model_config: Optional[dict[str, Any]] = None,
+    parameters: Optional[dict[str, Any]] = None,
+    linked_entity_id: Optional[str] = None,
 ) -> dict:
     """
     Updates an existing agent configuration.
-    Args:
-        agent_id: The GUID of the agent configuration to update.
-        name: (Optional) A descriptive name for the agent config.
-        status: (Optional) New status for the agent ('active', 'paused', 'error').
-        trigger_type: (Optional) How the agent is triggered ('on_new_article', 'scheduled').
-        target_db: (Optional) The database the agent primarily monitors ('articles', 'events', 'trends').
-        logic_module: (Optional) Reference to a Python module/function for agent logic.
-        schedule_interval: (Optional) If trigger_type is 'scheduled', the interval.
-        llm_model_config: (Optional) LLM specific configurations.
-        parameters: (Optional) User-defined parameters for the agent logic.
-        linked_entity_id: (Optional) ID of a specific event or trend this agent is managing.
-    Returns:
-        A dictionary representing the updated agent configuration or an error message.
     """
     existing_config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
-    if not existing_config:
+    if (
+        not isinstance(existing_config, dict)
+        or extract_userspace(existing_config) != userspace
+    ):
         return {
             "status": "error",
             "message": f"Agent configuration {agent_id} not found.",
         }
 
-    update_data = {
+    update_data: dict[str, Any] = {
         k: v
         for k, v in locals().items()
         if v is not None and k not in ["agent_id", "existing_config", "update_data"]
     }
 
-    # Validate update data using Pydantic model
     try:
         validated_data = AgentConfigUpdateRequest(**update_data).model_dump(
             exclude_unset=True
@@ -164,7 +173,6 @@ def update_agent_config(
     except ValidationError as e:
         return {"status": "error", "message": str(e)}
 
-    # Apply updates
     existing_config.update(validated_data)
 
     if update_couchdb_doc(AGENT_CONFIGS_DB, agent_id, existing_config):
@@ -174,16 +182,12 @@ def update_agent_config(
 
 
 @mcp.tool(name="delete_agent_config", description="Deletes an agent configuration.")
-def delete_agent_config(agent_id: str) -> dict:
+def delete_agent_config(agent_id: str, userspace: str) -> dict:
     """
     Deletes a specific agent configuration.
-    Args:
-        agent_id: The GUID of the agent configuration to delete.
-    Returns:
-        A dictionary indicating success or failure.
     """
     config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
-    if not config:
+    if not isinstance(config, dict) or extract_userspace(config) != userspace:
         return {
             "status": "error",
             "message": f"Agent configuration {agent_id} not found.",
@@ -196,3 +200,11 @@ def delete_agent_config(agent_id: str) -> dict:
         }
     else:
         return {"status": "error", "message": "Failed to delete agent configuration."}
+
+
+@mcp.tool(
+    name="migrate_agent_configs_userspace",
+    description="Migrates legacy agent configs to userspace + owner_user_id fields.",
+)
+def migrate_agent_configs_userspace() -> dict:
+    return migrate_legacy_agent_configs()

@@ -30,19 +30,26 @@ def create_event_from_articles(
     """
     Agent logic to analyze new articles and potentially create new events.
     """
-    user_id = agent_config.get("user_id")
+    userspace = agent_config.get("userspace")
+    owner_user_id = agent_config.get("owner_user_id")
     agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     llm_config = agent_config.get("llm_model_config", {})
     params = agent_config.get("parameters", {})
 
+    if not userspace:
+        logger.warning(
+            f"Agent '{agent_name}' is missing userspace; skipping execution."
+        )
+        return
+
     if not new_articles:
         logger.info(
-            f"Agent '{agent_name}' ({user_id}) - No new articles to process for event creation."
+            f"Agent '{agent_name}' ({userspace}) - No new articles to process for event creation."
         )
         return
 
     logger.info(
-        f"Agent '{agent_name}' ({user_id}) - Processing {len(new_articles)} new articles for event creation."
+        f"Agent '{agent_name}' ({userspace}) - Processing {len(new_articles)} new articles for event creation."
     )
 
     # Construct a prompt for the LLM to identify potential new events
@@ -58,7 +65,7 @@ def create_event_from_articles(
 
 Agent parameters: {params}"""
 
-    llm_response = _call_llm(mcp_client, prompt, llm_config, user_id)
+    llm_response = _call_llm(mcp_client, prompt, llm_config, owner_user_id or userspace or "unknown")
 
     if llm_response and "New event suggested" in llm_response:
         # Parse LLM response to create event
@@ -69,29 +76,29 @@ Agent parameters: {params}"""
         ]  # For now, all links from new articles
 
         logger.info(
-            f"Agent '{agent_name}' ({user_id}) - Proposing new event: {event_name}"
+            f"Agent '{agent_name}' ({userspace}) - Proposing new event: {event_name}"
         )
         # Call MCP tool to add event
         try:
             # MCP tools typically return dict with 'status' and 'message' or 'event'
             result = mcp_client.call_tool(
-                "add_event",
-                user_id=user_id,
-                name=event_name,
-                description=event_description,
-                article_links=article_links,
+                    "add_event",
+                    userspace=userspace,
+                    name=event_name,
+                    description=event_description,
+                    article_links=article_links,
             )
             if result.get("status") == "success":
                 logger.info(
-                    f"Agent '{agent_name}' ({user_id}) - Successfully created event: {result['event']['_id']}"
+                    f"Agent '{agent_name}' ({userspace}) - Successfully created event: {result['event']['_id']}"
                 )
             else:
                 logger.error(
-                    f"Agent '{agent_name}' ({user_id}) - Failed to create event: {result.get('message', 'Unknown error')}"
+                    f"Agent '{agent_name}' ({userspace}) - Failed to create event: {result.get('message', 'Unknown error')}"
                 )
         except Exception as e:
             logger.error(
-                f"Agent '{agent_name}' ({user_id}) - Error calling add_event MCP tool: {e}"
+                f"Agent '{agent_name}' ({userspace}) - Error calling add_event MCP tool: {e}"
             )
 
 
@@ -101,32 +108,41 @@ def add_articles_to_event(
     """
     Agent logic to analyze new articles and add relevant ones to a specific event.
     """
-    user_id = agent_config.get("user_id")
+    userspace = agent_config.get("userspace")
+    owner_user_id = agent_config.get("owner_user_id")
     agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     llm_config = agent_config.get("llm_model_config", {})
     event_id = agent_config.get("linked_entity_id")
     params = agent_config.get("parameters", {})
 
+    if not userspace:
+        logger.warning(
+            f"Agent '{agent_name}' is missing userspace; skipping execution."
+        )
+        return
+
     if not event_id:
         logger.warning(
-            f"Agent '{agent_name}' ({user_id}) - No linked_entity_id (event_id) specified for adding articles."
+            f"Agent '{agent_name}' ({userspace}) - No linked_entity_id (event_id) specified for adding articles."
         )
         return
     if not new_articles:
         logger.info(
-            f"Agent '{agent_name}' ({user_id}) - No new articles to process for event {event_id}."
+            f"Agent '{agent_name}' ({userspace}) - No new articles to process for event {event_id}."
         )
         return
 
     logger.info(
-        f"Agent '{agent_name}' ({user_id}) - Processing {len(new_articles)} new articles for event {event_id}."
+        f"Agent '{agent_name}' ({userspace}) - Processing {len(new_articles)} new articles for event {event_id}."
     )
 
     # Fetch the event to get its current context
-    event_doc_result = mcp_client.call_tool("get_event", event_id=event_id)
+    event_doc_result = mcp_client.call_tool(
+        "get_event", event_id=event_id, userspace=userspace
+    )
     if event_doc_result.get("status") != "success":
         logger.error(
-            f"Agent '{agent_name}' ({user_id}) - Failed to retrieve event {event_id}: {event_doc_result.get('message')}"
+            f"Agent '{agent_name}' ({userspace}) - Failed to retrieve event {event_id}: {event_doc_result.get('message')}"
         )
         return
     event_doc = event_doc_result["event"]
@@ -150,7 +166,7 @@ And these new articles:
 
 Identify which new articles are relevant to this event. List the full URLs of relevant articles only. Agent parameters: {params}"""
 
-    llm_response = _call_llm(mcp_client, prompt, llm_config, user_id)
+    llm_response = _call_llm(mcp_client, prompt, llm_config, owner_user_id or userspace or "unknown")
 
     if llm_response:
         relevant_article_links = [
@@ -167,66 +183,75 @@ Identify which new articles are relevant to this event. List the full URLs of re
                 )
                 result = mcp_client.call_tool(
                     "update_event",
-                    user_id=user_id,
+                    userspace=userspace,
                     event_id=event_id,
                     article_links=updated_links,
                 )
                 if result.get("status") == "success":
                     logger.info(
-                        f"Agent '{agent_name}' ({user_id}) - Successfully added {len(relevant_article_links)} articles to event {event_id}."
+                        f"Agent '{agent_name}' ({userspace}) - Successfully added {len(relevant_article_links)} articles to event {event_id}."
                     )
                 else:
                     logger.error(
-                        f"Agent '{agent_name}' ({user_id}) - Failed to add articles to event {event_id}: {result.get('message', 'Unknown error')}"
+                        f"Agent '{agent_name}' ({userspace}) - Failed to add articles to event {event_id}: {result.get('message', 'Unknown error')}"
                     )
             except Exception as e:
                 logger.error(
-                    f"Agent '{agent_name}' ({user_id}) - Error calling update_event MCP tool: {e}"
+                    f"Agent '{agent_name}' ({userspace}) - Error calling update_event MCP tool: {e}"
                 )
 
 
-def _update_staleness_status(mcp_client, agent_name: str, user_id: str, event_id: str, should_be_stale: bool):
+def _update_staleness_status(mcp_client, agent_name: str, userspace: str, event_id: str, should_be_stale: bool):
     """Helper to update event staleness via MCP tool."""
     action = "marking it as stale" if should_be_stale else "unmarking it"
-    logger.info(f"Agent '{agent_name}' ({user_id}) - Event {event_id} status change: {action}.")
+    logger.info(f"Agent '{agent_name}' ({userspace}) - Event {event_id} status change: {action}.")
     
     result = mcp_client.call_tool(
         "mark_entity_stale",
+        userspace=userspace,
         entity_type="event",
         entity_id=event_id,
         is_stale=should_be_stale,
     )
     
     if result.get("status") == "success":
-        logger.info(f"Agent '{agent_name}' ({user_id}) - Successfully updated event {event_id}.")
+        logger.info(f"Agent '{agent_name}' ({userspace}) - Successfully updated event {event_id}.")
     else:
-        logger.error(f"Agent '{agent_name}' ({user_id}) - Failed to update event {event_id}: {result.get('message', 'Unknown error')}")
+        logger.error(f"Agent '{agent_name}' ({userspace}) - Failed to update event {event_id}: {result.get('message', 'Unknown error')}")
 
 def check_event_staleness(agent_config: Dict[str, Any], mcp_client):
     """
     Agent logic to check if a linked event is stale and mark it as such.
     """
-    user_id = agent_config.get("user_id")
+    userspace = agent_config.get("userspace")
     agent_name = agent_config.get("name", DEFAULT_AGENT_NAME)
     event_id = agent_config.get("linked_entity_id")
     params = agent_config.get("parameters", {})
     staleness_threshold_days = params.get("staleness_threshold_days", 30)
 
+    if not userspace:
+        logger.warning(
+            f"Agent '{agent_name}' is missing userspace; skipping execution."
+        )
+        return
+
     if not event_id:
-        logger.warning(f"Agent '{agent_name}' ({user_id}) - No event_id specified for staleness check.")
+        logger.warning(f"Agent '{agent_name}' ({userspace}) - No event_id specified for staleness check.")
         return
 
     # Fetch the event
-    event_doc_result = mcp_client.call_tool("get_event", event_id=event_id)
+    event_doc_result = mcp_client.call_tool(
+        "get_event", event_id=event_id, userspace=userspace
+    )
     if event_doc_result.get("status") != "success":
-        logger.error(f"Agent '{agent_name}' ({user_id}) - Failed to retrieve event {event_id}: {event_doc_result.get('message')}")
+        logger.error(f"Agent '{agent_name}' ({userspace}) - Failed to retrieve event {event_id}: {event_doc_result.get('message')}")
         return
     
     event_doc = event_doc_result["event"]
     last_activity_at_str = event_doc.get("updated_at") or event_doc.get("created_at")
     
     if not last_activity_at_str:
-        logger.warning(f"Agent '{agent_name}' ({user_id}) - Event {event_id} missing activity timestamps.")
+        logger.warning(f"Agent '{agent_name}' ({userspace}) - Event {event_id} missing activity timestamps.")
         return
 
     try:
@@ -234,7 +259,7 @@ def check_event_staleness(agent_config: Dict[str, Any], mcp_client):
         if last_activity_date.tzinfo is None:
             last_activity_date = last_activity_date.replace(tzinfo=timezone.utc)
     except ValueError:
-        logger.error(f"Agent '{agent_name}' ({user_id}) - Invalid date format in event {event_id}")
+        logger.error(f"Agent '{agent_name}' ({userspace}) - Invalid date format in event {event_id}")
         return
 
     now = datetime.now(timezone.utc)
@@ -243,10 +268,9 @@ def check_event_staleness(agent_config: Dict[str, Any], mcp_client):
     is_beyond_threshold = days_since_activity > staleness_threshold_days
 
     if is_beyond_threshold and not is_currently_stale:
-        _update_staleness_status(mcp_client, agent_name, user_id, event_id, True)
+        _update_staleness_status(mcp_client, agent_name, userspace, event_id, True)
     elif not is_beyond_threshold and is_currently_stale:
-        _update_staleness_status(mcp_client, agent_name, user_id, event_id, False)
+        _update_staleness_status(mcp_client, agent_name, userspace, event_id, False)
     else:
         status_msg = "stale" if is_currently_stale else "active"
-        logger.info(f"Agent '{agent_name}' ({user_id}) - Event {event_id} remains {status_msg} ({days_since_activity} days).")
-
+        logger.info(f"Agent '{agent_name}' ({userspace}) - Event {event_id} remains {status_msg} ({days_since_activity} days).")

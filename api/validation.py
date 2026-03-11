@@ -93,19 +93,27 @@ class AgentConfigBase(BaseModel):
 
 
 class AgentConfigCreateRequest(AgentConfigBase):
-    user_id: str = Field(
-        ..., description="The user who created this configuration (GUID)"
+    userspace: str = Field(..., description="Userspace GUID for this agent configuration")
+    owner_user_id: str = Field(
+        ..., description="The user who owns credentials for this agent (GUID)"
     )
 
-    @field_validator("user_id")
+    @field_validator("userspace")
     @classmethod
-    def validate_user_id(cls, v: str) -> str:
-        return _validate_uuid(v, "User ID")
+    def validate_userspace(cls, v: str) -> str:
+        return _validate_uuid(v, "Userspace")
+
+    @field_validator("owner_user_id")
+    @classmethod
+    def validate_owner_user_id(cls, v: str) -> str:
+        return _validate_uuid(v, "Owner user ID")
 
 
 class AgentConfigUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     status: Optional[AgentStatus] = None
+    userspace: Optional[str] = None
+    owner_user_id: Optional[str] = None
     trigger_type: Optional[AgentTriggerType] = None
     schedule_interval: Optional[str] = Field(
         None, description="e.g., '1h', '1d', 'every 30m'"
@@ -129,6 +137,16 @@ class AgentConfigUpdateRequest(BaseModel):
     @classmethod
     def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
         return _validate_optional_uuid(v, "Linked entity ID")
+
+    @field_validator("userspace")
+    @classmethod
+    def validate_userspace(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_optional_uuid(v, "Userspace")
+
+    @field_validator("owner_user_id")
+    @classmethod
+    def validate_owner_user_id(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_optional_uuid(v, "Owner user ID")
 
 
 class FeedCreateRequest(BaseModel):

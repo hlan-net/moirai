@@ -15,26 +15,32 @@ def mock_db():
 def test_add_agent_config_unit(mock_db):
     mock_db['update'].return_value = True
     user_id = str(uuid.uuid4())
+    userspace = str(uuid.uuid4())
     
     result = add_agent_config(
-        user_id=user_id,
+        userspace=userspace,
+        owner_user_id=user_id,
         name="Test Agent",
         trigger_type="on_new_article",
         target_db="articles",
-        logic_module="tasks.agent_logic.create_event"
+        logic_module="tasks.agent_logic.create_event_from_articles"
     )
     
     assert result["status"] == "success"
     assert result["agent_config"]["name"] == "Test Agent"
+    assert result["agent_config"]["userspace"] == userspace
+    assert result["agent_config"]["owner_user_id"] == user_id
     mock_db['update'].assert_called_once()
 
 def test_add_agent_config_issues_unit(mock_db):
     mock_db['update'].return_value = True
     user_id = str(uuid.uuid4())
+    userspace = str(uuid.uuid4())
     
     # Test targeting the new issues database
     result = add_agent_config(
-        user_id=user_id,
+        userspace=userspace,
+        owner_user_id=user_id,
         name="Issue Agent",
         trigger_type="scheduled",
         target_db="issues",
@@ -47,12 +53,14 @@ def test_add_agent_config_issues_unit(mock_db):
     mock_db['update'].assert_called_once()
 
 def test_list_agent_configs_unit(mock_db):
-    mock_db['query'].return_value = [{"_id": "agent_1"}]
+    userspace = str(uuid.uuid4())
+    mock_db['query'].side_effect = [[], [{"_id": "agent_1", "userspace": userspace}]]
     
-    result = list_agent_configs(user_id="user_123")
+    result = list_agent_configs(userspace=userspace)
     
     assert result["status"] == "success"
     assert len(result["agent_configs"]) == 1
-    mock_db['query'].assert_called_once()
+    assert mock_db['query'].call_count == 2
     _, kwargs = mock_db['query'].call_args
-    assert kwargs['selector']['user_id'] == "user_123"
+    selector = kwargs['selector']['$or']
+    assert {"userspace": userspace} in selector
