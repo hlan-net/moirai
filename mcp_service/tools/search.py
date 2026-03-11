@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 from ..core import mcp, auth_required, validate_userspace
 from ..db import db_request
 from api.db_constants import MONGO_REGEX, MONGO_OR
@@ -65,18 +65,17 @@ def _search_issues_internal(
     safe_query = re.escape(query)
 
     # Mango selector
-    text_selector = {
+    text_selector: dict[str, Any] = {
         MONGO_OR: [
             {"logos": {MONGO_REGEX: f"(?i){safe_query}"}},
             {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
         ],
     }
 
-    issue_selector = text_selector
     if longevity:
-        issue_selector = {"$and": [text_selector, {"longevity": longevity}]}
+        text_selector["longevity"] = longevity
 
-    selector = {"$and": [build_userspace_selector(userspace), issue_selector]}
+    selector = {"$and": [build_userspace_selector(userspace), text_selector]}
 
     try:
         query_payload = {
