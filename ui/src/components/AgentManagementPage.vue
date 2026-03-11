@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { authFetch } from '../utils/authFetch'
 
 const authStore = useAuthStore()
 
@@ -27,9 +28,30 @@ const draftAgent = ref({
   parameters: '{\n  "staleness_threshold_days": 30\n}',
 })
 
+type AgentDoc = {
+  _id: string
+  name: string
+  userspace: string
+  owner_user_id: string
+  status: string
+  trigger_type: string
+  target_db: string
+  logic_module: string
+  schedule_interval?: string
+  linked_entity_id?: string
+}
+
+const agents = ref<AgentDoc[]>([])
+const loading = ref(false)
+const saving = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
+
 const ownerHint = computed(() => {
   return authStore.user?._id || authStore.user?.id || ''
 })
+
+const userspaceReady = computed(() => draftAgent.value.userspace.trim().length > 0)
 
 const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
   if (template === 'stale') {
@@ -56,6 +78,105 @@ const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
   draftAgent.value.logic_module = 'tasks.agent_logic.add_articles_to_event'
   draftAgent.value.parameters = '{\n  "min_relevance": 0.7\n}'
 }
+
+const resetFeedback = () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+}
+
+const loadAgents = async () => {
+  resetFeedback()
+  if (!userspaceReady.value) {
+    agents.value = []
+    return
+  }
+
+  loading.value = true
+  try {
+    const response = await authFetch(
+      `/api/agents?userspace=${encodeURIComponent(draftAgent.value.userspace)}&owner_only=true`
+    )
+    if (!response.ok) {
+      const msg = await response.text()
+      throw new Error(msg || 'Failed to load agents')
+    }
+    agents.value = await response.json()
+  } catch (error) {
+    errorMessage.value = `Load failed: ${String(error)}`
+  } finally {
+    loading.value = false
+  }
+}
+
+const createAgent = async () => {
+  resetFeedback()
+  saving.value = true
+  try {
+    const ownerUserId = draftAgent.value.owner_user_id.trim() || ownerHint.value
+    const parsedParameters = draftAgent.value.parameters.trim()
+      ? JSON.parse(draftAgent.value.parameters)
+      : {}
+
+    const payload = {
+      name: draftAgent.value.name,
+      userspace: draftAgent.value.userspace,
+      owner_user_id: ownerUserId,
+      status: draftAgent.value.status,
+      trigger_type: draftAgent.value.trigger_type,
+      schedule_interval:
+        draftAgent.value.trigger_type === 'scheduled'
+          ? draftAgent.value.schedule_interval
+          : undefined,
+      target_db: draftAgent.value.target_db,
+      logic_module: draftAgent.value.logic_module,
+      linked_entity_id: draftAgent.value.linked_entity_id || undefined,
+      parameters: parsedParameters,
+    }
+
+    const response = await authFetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      const msg = await response.text()
+      throw new Error(msg || 'Failed to create agent')
+    }
+
+    successMessage.value = 'Agent created'
+    await loadAgents()
+  } catch (error) {
+    errorMessage.value = `Create failed: ${String(error)}`
+  } finally {
+    saving.value = false
+  }
+}
+
+const deleteAgent = async (agentId: string) => {
+  resetFeedback()
+  try {
+    const response = await authFetch(
+      `/api/agents/${encodeURIComponent(agentId)}?userspace=${encodeURIComponent(draftAgent.value.userspace)}`,
+      { method: 'DELETE' }
+    )
+    if (!response.ok) {
+      const msg = await response.text()
+      throw new Error(msg || 'Failed to delete agent')
+    }
+
+    successMessage.value = 'Agent deleted'
+    await loadAgents()
+  } catch (error) {
+    errorMessage.value = `Delete failed: ${String(error)}`
+  }
+}
+
+onMounted(() => {
+  if (ownerHint.value) {
+    draftAgent.value.owner_user_id = ownerHint.value
+  }
+})
 </script>
 
 <template>
@@ -92,8 +213,8 @@ const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
     </section>
 
     <section class="card">
-      <h2>Draft Agent Form</h2>
-      <p class="muted">Draft only for now. Backend wiring comes next.</p>
+      <h2>Create Agent</h2>
+      <p class="muted">Userspace-scoped config with owner-bound credentials.</p>
 
       <div class="form-grid">
         <label>
@@ -163,6 +284,39 @@ const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
         Parameters JSON
         <textarea v-model="draftAgent.parameters" rows="8" />
       </label>
+
+      <div class="actions">
+        <button class="secondary" type="button" @click="loadAgents" :disabled="loading || !userspaceReady">
+          {{ loading ? 'Loading...' : 'Refresh List' }}
+        </button>
+        <button type="button" @click="createAgent" :disabled="saving || !userspaceReady || !draftAgent.name.trim()">
+          {{ saving ? 'Creating...' : 'Create Agent' }}
+        </button>
+      </div>
+
+      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+      <p v-if="successMessage" class="success-text">{{ successMessage }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Existing Agents (This Userspace)</h2>
+      <div v-if="!userspaceReady" class="muted">Enter a userspace UUID to load agents.</div>
+      <div v-else-if="loading" class="muted">Loading agents...</div>
+      <div v-else-if="!agents.length" class="muted">No agents found in this userspace.</div>
+      <div v-else class="agent-list">
+        <article v-for="agent in agents" :key="agent._id" class="agent-item">
+          <div>
+            <strong>{{ agent.name }}</strong>
+            <div class="agent-meta">
+              <span>{{ agent.status }}</span>
+              <span>{{ agent.trigger_type }}</span>
+              <span>{{ agent.target_db }}</span>
+            </div>
+            <code>{{ agent.logic_module }}</code>
+          </div>
+          <button class="danger" type="button" @click="deleteAgent(agent._id)">Delete</button>
+        </article>
+      </div>
     </section>
   </div>
 </template>
@@ -264,5 +418,68 @@ textarea {
 
 .full-width {
   margin-top: 12px;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--primary-color);
+  color: var(--bg-color);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--text-color);
+}
+
+.danger {
+  background: transparent;
+  color: #d9534f;
+}
+
+.error-text {
+  margin-top: 10px;
+  color: #d9534f;
+}
+
+.success-text {
+  margin-top: 10px;
+  color: #2d8a5f;
+}
+
+.agent-list {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-item {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.agent-meta {
+  display: flex;
+  gap: 10px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+  margin: 4px 0;
 }
 </style>
