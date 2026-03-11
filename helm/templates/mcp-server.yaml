@@ -108,6 +108,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "moirai.fullname" . }}-moirai-secret
                   key: adminPassword
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "moirai.fullname" . }}-moirai-secret
+                  key: jwtSecretKey
+                  optional: true
             - name: COUCHDB_SECRET
               valueFrom:
                 secretKeyRef:

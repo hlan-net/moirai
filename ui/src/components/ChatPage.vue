@@ -379,9 +379,11 @@ const sendMessage = async () => {
       await _updateSessionMessages()
     } else {
       messages.value.push({ role: 'assistant', content: `Error: ${res.statusText}` })
+      await _updateSessionMessages()
     }
   } catch (e) {
     messages.value.push({ role: 'assistant', content: `Error: ${e}` })
+    await _updateSessionMessages()
   } finally {
     loading.value = false
   }
