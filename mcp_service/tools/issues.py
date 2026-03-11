@@ -271,16 +271,10 @@ def read_event(event_id: str, userspace: str) -> str:
 
 @mcp.tool()
 @auth_required
-def get_event(event_id: str, userspace: str = None) -> dict:
+def get_event(event_id: str, userspace: str) -> dict:
     """
     (Alias for read_issue) Returns the event document as a dictionary.
     """
-    if not userspace:
-        doc = get_doc("issues", event_id)
-        if doc:
-            return {"status": "success", "event": doc}
-        return {"status": "error", "message": "Event not found"}
-
     res = _read_issue_internal(event_id, userspace)
     try:
         data = json.loads(res)
@@ -354,16 +348,10 @@ def read_trend(trend_id: str, userspace: str) -> str:
 
 @mcp.tool()
 @auth_required
-def get_trend(trend_id: str, userspace: str = None) -> dict:
+def get_trend(trend_id: str, userspace: str) -> dict:
     """
     (Alias for read_issue) Returns the trend document as a dictionary.
     """
-    if not userspace:
-        doc = get_doc("issues", trend_id)
-        if doc:
-            return {"status": "success", "trend": doc}
-        return {"status": "error", "message": "Trend not found"}
-
     res = _read_issue_internal(trend_id, userspace)
     try:
         data = json.loads(res)

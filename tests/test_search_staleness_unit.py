@@ -59,10 +59,11 @@ def test_search_events_alias_unit(mock_db):
 
 def test_mark_entity_stale_unit(mock_db):
     entity_id = "issue_123"
-    mock_db['fetch'].return_value = {"_id": entity_id, "is_stale": False}
+    userspace = "00000000-0000-0000-0000-000000000000"
+    mock_db['fetch'].return_value = {"_id": entity_id, "is_stale": False, "userspace": userspace}
     mock_db['update'].return_value = True
     
-    result = mark_entity_stale(entity_type="event", entity_id=entity_id, is_stale=True)
+    result = mark_entity_stale(entity_type="event", entity_id=entity_id, is_stale=True, userspace=userspace)
     
     assert result["status"] == "success"
     mock_db['fetch'].assert_called_once_with("issues", entity_id) # Verify it uses issues DB

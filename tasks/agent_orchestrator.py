@@ -8,6 +8,7 @@ import redis # Added for Redis client
 
 from api.db import query_couchdb, update_couchdb_doc
 from api.validation import AgentStatus, AgentTriggerType
+from tasks.agent_config_migration import migrate_legacy_agent_configs
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,10 @@ class AgentOrchestrator(threading.Thread):
     def run(self):
         self.running = True
         logger.info(f"Agent Orchestrator {self.leader_id} started.")
+
+        migrate_result = migrate_legacy_agent_configs()
+        if migrate_result.get("migrated"):
+            logger.info("Migrated %s legacy agent configs", migrate_result.get("migrated"))
         
         while self.running:
             try:
@@ -157,6 +162,17 @@ class AgentOrchestrator(threading.Thread):
         self.last_article_check_time = datetime.now(timezone.utc)
 
         for agent_config in active_agents:
+            if not (agent_config.get("userspace") or agent_config.get("namespace")):
+                logger.error(
+                    "Agent %s missing userspace after migration; marking as error.",
+                    agent_config.get("_id", "N/A"),
+                )
+                agent_config["status"] = AgentStatus.ERROR.value
+                update_couchdb_doc(
+                    self.agent_configs_db, agent_config["_id"], agent_config
+                )
+                continue
+
             # Ensure last_run_at is initialized for scheduled agents
             if (
                 agent_config.get("trigger_type") == AgentTriggerType.SCHEDULED.value
@@ -206,7 +222,7 @@ class AgentOrchestrator(threading.Thread):
                 )
 
     def is_scheduled_agent_due(
-        self, last_run_at_str: str, schedule_interval: str
+        self, last_run_at_str: str | None, schedule_interval: str | None
     ) -> bool:
         if not schedule_interval:
             return False

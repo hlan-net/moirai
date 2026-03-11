@@ -55,6 +55,7 @@ def test_check_and_run_agents_scheduled(mock_update, mock_query, orchestrator):
     last_run = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
     agent_config = {
         "_id": agent_id,
+        "userspace": "00000000-0000-0000-0000-000000000000",
         "status": AgentStatus.ACTIVE.value,
         "trigger_type": AgentTriggerType.SCHEDULED.value,
         "schedule_interval": "1h",
