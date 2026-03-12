@@ -94,8 +94,19 @@ class AgentMockDB:
             u = self.get_user_by_email(selector["email"])
             return [u] if u else []
         if db_name == "agent_configs":
-            # Handle $and / $or selectors used by list_agents
+            # Apply basic owner_user_id filtering to mirror the API's list behaviour.
+            # The selector may be nested as {"$and": [{"$or": [...]}, {"owner_user_id": ...}]}.
             results = list(self.agent_configs.values())
+            owner_id = None
+            if "$and" in selector:
+                for clause in selector["$and"]:
+                    if "owner_user_id" in clause:
+                        owner_id = clause["owner_user_id"]
+                        break
+            elif "owner_user_id" in selector:
+                owner_id = selector["owner_user_id"]
+            if owner_id:
+                results = [r for r in results if r.get("owner_user_id") == owner_id]
             return results
         return []
 
@@ -116,14 +127,11 @@ def db():
 
 
 def _make_patches(db_instance: AgentMockDB) -> list:
+    # Patch each function at the location where it is *used* (imported into),
+    # not only at the source (api.db.*).  Each module that imports from api.db
+    # gets its own reference, so both the source and the usage sites must be
+    # patched to guarantee full interception across all code paths.
     return [
-        patch("api.db.get_user_by_email", side_effect=db_instance.get_user_by_email),
-        patch("api.db.create_user", side_effect=db_instance.create_user),
-        patch("api.db.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
-        patch("api.db.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
-        patch("api.db.delete_from_couchdb", side_effect=db_instance.delete_from_couchdb),
-        patch("api.db.query_couchdb", side_effect=db_instance.query_couchdb),
-        patch("api.db.store_to_couchdb", side_effect=db_instance.store_to_couchdb),
         patch("api.auth.get_user_by_email", side_effect=db_instance.get_user_by_email),
         patch("api.auth.create_user", side_effect=db_instance.create_user),
         patch("api.auth.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
@@ -135,6 +143,15 @@ def _make_patches(db_instance: AgentMockDB) -> list:
         patch("api.agent_routes.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
         patch("api.agent_routes.delete_from_couchdb", side_effect=db_instance.delete_from_couchdb),
         patch("api.agent_routes.query_couchdb", side_effect=db_instance.query_couchdb),
+        # api.db-level patches handle any code paths that call db functions
+        # indirectly through the module object rather than the imported name.
+        patch("api.db.get_user_by_email", side_effect=db_instance.get_user_by_email),
+        patch("api.db.create_user", side_effect=db_instance.create_user),
+        patch("api.db.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
+        patch("api.db.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
+        patch("api.db.delete_from_couchdb", side_effect=db_instance.delete_from_couchdb),
+        patch("api.db.query_couchdb", side_effect=db_instance.query_couchdb),
+        patch("api.db.store_to_couchdb", side_effect=db_instance.store_to_couchdb),
         patch("tasks.init.init_db"),
     ]
 
@@ -142,7 +159,8 @@ def _make_patches(db_instance: AgentMockDB) -> list:
 @pytest.fixture(scope="module")
 def client(db):
     patches = _make_patches(db)
-    started = [p.start() for p in patches]
+    for p in patches:
+        p.start()
     flask_client = app.test_client()
     yield flask_client
     for p in patches:
