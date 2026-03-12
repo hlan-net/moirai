@@ -142,6 +142,65 @@ def _sanitize_export_value(value):
     return value
 
 
+def _flatten_exception_messages(exc: Exception, limit: int = 6) -> list[str]:
+    """Collect concise messages from nested exceptions / exception groups."""
+    seen = set()
+    messages: list[str] = []
+
+    def _add(message: str):
+        text = (message or "").strip()
+        if not text:
+            return
+        if text in seen:
+            return
+        seen.add(text)
+        messages.append(text)
+
+    def _walk(err, depth: int = 0):
+        if err is None or len(messages) >= limit or depth > 8:
+            return
+
+        _add(f"{type(err).__name__}: {err}")
+
+        if hasattr(err, "exceptions"):
+            for inner in getattr(err, "exceptions", []) or []:
+                _walk(inner, depth + 1)
+
+        _walk(getattr(err, "__cause__", None), depth + 1)
+        _walk(getattr(err, "__context__", None), depth + 1)
+
+    _walk(exc)
+    return messages
+
+
+def _format_agent_error_message(
+    llm_endpoint: str,
+    ollama_base_url: str | None,
+    messages: list[str],
+) -> str:
+    """Build user-facing error text with provider-specific guidance."""
+    if llm_endpoint == "ollama":
+        connection_markers = [
+            "APIConnectionError",
+            "ConnectError",
+            "Connection error",
+            "Name or service not known",
+            "Temporary failure in name resolution",
+            "Connection refused",
+            "timed out",
+        ]
+        if any(any(marker in msg for marker in connection_markers) for msg in messages):
+            endpoint = ollama_base_url or OLLAMA_BASE_URL
+            return (
+                "Agent Error: Could not reach Ollama endpoint "
+                f"`{endpoint}`. Check Settings -> Ollama Endpoint URL and ensure the host is reachable from the API pod."
+            )
+
+    if messages:
+        return f"Agent Error: {'; '.join(messages[:3])}"
+    return "Agent Error: Unknown error while running the agent loop."
+
+
 def _latest_user_message(messages) -> str:
     for message in reversed(messages):
         if message.get("role") == "user":
@@ -497,20 +556,10 @@ async def run_agent(
 
     except Exception as e:
         logger.error("Error running agent loop", exc_info=True)
-
-        # Unwrap ExceptionGroup if present (common in anyio/asyncio)
-        if hasattr(e, "exceptions"):
-            error_msgs = []
-            for exc in e.exceptions:
-                error_msgs.append(str(exc))
-            return {
-                "response": f"Agent Error: {'; '.join(error_msgs)}",
-                "tool_calls": trace["tool_calls"],
-                "tool_execution_errors": trace["tool_execution_errors"],
-            }
-
+        error_msgs = _flatten_exception_messages(e)
+        response_text = _format_agent_error_message(llm_endpoint, ollama_base_url, error_msgs)
         return {
-            "response": f"System Error: {str(e)}",
+            "response": response_text,
             "tool_calls": trace["tool_calls"],
             "tool_execution_errors": trace["tool_execution_errors"],
         }

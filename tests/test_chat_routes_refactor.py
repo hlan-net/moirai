@@ -119,6 +119,27 @@ class TestChatRoutesRefactor(unittest.TestCase):
         title = self.chat_routes._derive_context_session_title(context, "fallback")
         self.assertEqual(title, "Issue: US-Israel-Iran Bombing Campaign")
 
+    def test_format_agent_error_message_for_ollama_connectivity(self):
+        messages = [
+            "APIConnectionError: Connection error.",
+            "ConnectError: [Errno -2] Name or service not known",
+        ]
+
+        text = self.chat_routes._format_agent_error_message(
+            "ollama",
+            "http://host.docker.internal:11434/v1",
+            messages,
+        )
+        self.assertIn("Could not reach Ollama endpoint", text)
+        self.assertIn("host.docker.internal", text)
+
+    def test_format_agent_error_message_generic(self):
+        messages = ["ValueError: bad schema", "RuntimeError: failure"]
+
+        text = self.chat_routes._format_agent_error_message("openai", None, messages)
+        self.assertTrue(text.startswith("Agent Error:"))
+        self.assertIn("ValueError: bad schema", text)
+
 
 if __name__ == "__main__":
     unittest.main()
