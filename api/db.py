@@ -146,6 +146,88 @@ def update_couchdb_doc(db_name, doc_id, doc):
         return False
 
 
+def update_couchdb_doc_safe(
+    db_name: str,
+    doc_id: str,
+    updates: dict,
+    max_retries: int = 3,
+) -> bool:
+    """Conflict-safe document update using optimistic concurrency control.
+
+    Fetches the latest ``_rev`` from CouchDB before each PUT attempt and
+    retries automatically on HTTP 409 (document update conflict).  This
+    prevents the orchestrator from silently marking agents as ERROR when a
+    concurrent API or MCP write modified the same document between the
+    initial query and the write.
+
+    Args:
+        db_name: Name of the CouchDB database.
+        doc_id: Document ``_id`` to update.
+        updates: Dict of fields to merge into the latest version of the document.
+        max_retries: Maximum number of attempts before giving up (default 3).
+
+    Returns:
+        ``True`` if the update succeeded, ``False`` otherwise.
+    """
+    if db_name not in ALLOWED_DBS:
+        abort(400, description=ERROR_INVALID_DB_NAME)
+
+    safe_db_name = urllib.parse.quote(db_name, safe="")
+    safe_doc_id = urllib.parse.quote(doc_id, safe="")
+
+    for attempt in range(1, max_retries + 1):
+        # Always fetch the latest revision before writing
+        current = fetch_from_couchdb(db_name, doc_id)
+        if not isinstance(current, dict):
+            logger.error(
+                "update_couchdb_doc_safe: doc %s/%s not found on attempt %d",
+                db_name,
+                doc_id,
+                attempt,
+            )
+            return False
+
+        merged = {**current, **updates}
+        merged["_rev"] = current["_rev"]
+
+        try:
+            response = _request(
+                "PUT",
+                f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}",
+                json=merged,
+            )
+            if response.status_code in (200, 201):
+                return True
+            if response.status_code == 409:
+                logger.warning(
+                    "update_couchdb_doc_safe: 409 conflict on %s/%s (attempt %d/%d), retrying",
+                    db_name,
+                    doc_id,
+                    attempt,
+                    max_retries,
+                )
+                continue
+            logger.error(
+                "update_couchdb_doc_safe: unexpected status %d for %s/%s: %s",
+                response.status_code,
+                db_name,
+                doc_id,
+                response.text,
+            )
+            return False
+        except requests.exceptions.RequestException as exc:
+            logger.error("update_couchdb_doc_safe: request error for %s/%s: %s", db_name, doc_id, exc)
+            return False
+
+    logger.error(
+        "update_couchdb_doc_safe: exhausted %d retries for %s/%s",
+        max_retries,
+        db_name,
+        doc_id,
+    )
+    return False
+
+
 def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None):
     """Query CouchDB using Mango query syntax for efficient filtering."""
     if db_name not in ALLOWED_DBS:
