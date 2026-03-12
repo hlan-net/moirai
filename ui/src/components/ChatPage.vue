@@ -9,6 +9,7 @@ interface Message {
   content: string
   tool_calls?: Array<{ name?: string; status?: string; error?: string }>
   tool_execution_errors?: number
+  timing_ms?: number
 }
 
 interface ChatSession {
@@ -418,6 +419,7 @@ const sendMessage = async () => {
         content: stripInternalReminders(data.response ?? ''),
         tool_calls: Array.isArray(data.tool_calls) ? data.tool_calls : [],
         tool_execution_errors: Number(data.tool_execution_errors || 0),
+        timing_ms: Number(data.timing_ms || 0),
       })
       await _updateSessionMessages()
     } else {
@@ -765,6 +767,9 @@ const renameSession = async (session: ChatSession) => {
             <div class="bubble">
               <strong>{{ msg.role === 'user' ? 'You' : 'GenAI' }}:</strong>
               <div class="msg-content" v-html="parsedContent(msg.content)"></div>
+              <div v-if="msg.role === 'assistant' && msg.timing_ms" class="msg-timing">
+                {{ (msg.timing_ms / 1000).toFixed(1) }}s
+              </div>
               <div
                 v-if="msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length"
                 class="tool-usage"
@@ -1239,6 +1244,12 @@ const renameSession = async (session: ChatSession) => {
   white-space: pre-wrap;
   font-family: inherit;
   margin: 0;
+}
+
+.msg-timing {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.75;
 }
 
 .tool-usage {

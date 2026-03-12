@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -601,6 +602,8 @@ def chat():
 
     auth_token = request.headers.get("Authorization")
 
+    request_started = time.perf_counter()
+
     try:
         response = run_agent_sync(
             user_message,
@@ -613,12 +616,22 @@ def chat():
             ollama_base_url,
             auth_token,
         )
+        elapsed_ms = int((time.perf_counter() - request_started) * 1000)
         if isinstance(response, dict):
+            response["timing_ms"] = elapsed_ms
             return jsonify(response)
-        return jsonify({"response": response, "tool_calls": [], "tool_execution_errors": 0})
+        return jsonify(
+            {
+                "response": response,
+                "tool_calls": [],
+                "tool_execution_errors": 0,
+                "timing_ms": elapsed_ms,
+            }
+        )
     except Exception as exc:
         logger.error("Error in /api/chat", exc_info=True)
-        return jsonify({"response": f"Error: {str(exc)}"}), 500
+        elapsed_ms = int((time.perf_counter() - request_started) * 1000)
+        return jsonify({"response": f"Error: {str(exc)}", "timing_ms": elapsed_ms}), 500
 
 
 @chat_blueprint.route("/chat/history", methods=["GET"])

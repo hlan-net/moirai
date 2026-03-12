@@ -10,6 +10,13 @@ interface Message {
   content: string
   tool_calls?: Array<{ name?: string; status?: string; error?: string }>
   tool_execution_errors?: number
+  timing_ms?: number
+}
+
+interface QuickAction {
+  label: string
+  message: string
+  action?: 'wizard'
 }
 
 const chatContextStore = useChatContextStore()
@@ -19,6 +26,10 @@ const input = ref('')
 const loading = ref(false)
 const sessionId = ref<string | null>(null)
 const copyStatus = ref('')
+const raiseWizardOpen = ref(false)
+const raiseWizardLoading = ref(false)
+const raiseWizardQuestions = ref<string[]>([])
+const raiseWizardAnswers = ref<string[]>(['', '', ''])
 
 const currentLlmEndpoint = ref(localStorage.getItem('moirai_llm_endpoint') || 'ollama')
 
@@ -86,12 +97,13 @@ const contextTitle = computed(() => {
   return 'Context chat'
 })
 
-const quickActions = computed(() => {
+const quickActions = computed<QuickAction[]>(() => {
   if (chatContextStore.contextType === 'article') {
     return [
       {
         label: 'Raise as Issue',
         message: 'Please create a new Issue from this article',
+        action: 'wizard',
       },
     ]
   }
@@ -284,6 +296,7 @@ const sendMessage = async () => {
         content: stripInternalReminders(payload.response || ''),
         tool_calls: Array.isArray(payload.tool_calls) ? payload.tool_calls : [],
         tool_execution_errors: Number(payload.tool_execution_errors || 0),
+        timing_ms: Number(payload.timing_ms || 0),
       })
     } else {
       const text = await response.text()
@@ -299,7 +312,83 @@ const sendMessage = async () => {
   }
 }
 
-const applyQuickAction = (message: string) => {
+const askWizardQuestions = async () => {
+  if (!chatContextStore.contextPayload) return
+  raiseWizardLoading.value = true
+  try {
+    const response = await authFetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message:
+          'You are preparing issue creation from this article context. Ask exactly 3 concise clarifying questions that help define a reusable, generic issue. Return only a numbered list.',
+        history: [],
+        model: currentModel.value,
+        llm_endpoint: currentLlmEndpoint.value,
+        context: chatContextStore.contextPayload,
+      }),
+    })
+
+    if (response.ok) {
+      const payload = await response.json()
+      const lines = String(payload.response || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => /^\d+[.)]\s+/.test(line))
+        .slice(0, 3)
+        .map((line) => line.replace(/^\d+[.)]\s+/, '').trim())
+
+      if (lines.length === 3) {
+        raiseWizardQuestions.value = lines
+        return
+      }
+    }
+
+    raiseWizardQuestions.value = [
+      'What is the generic issue this article represents beyond this single event?',
+      'What time horizon best matches the issue (short-term event, ongoing trend, or long arc)?',
+      'Which core drivers or signals should define this issue for future matching?',
+    ]
+  } catch (error) {
+    console.error('Failed to ask wizard questions:', error)
+    raiseWizardQuestions.value = [
+      'What is the generic issue this article represents beyond this single event?',
+      'What time horizon best matches the issue (short-term event, ongoing trend, or long arc)?',
+      'Which core drivers or signals should define this issue for future matching?',
+    ]
+  } finally {
+    raiseWizardLoading.value = false
+  }
+}
+
+const openRaiseWizard = async () => {
+  raiseWizardOpen.value = true
+  raiseWizardAnswers.value = ['', '', '']
+  raiseWizardQuestions.value = []
+  await askWizardQuestions()
+}
+
+const submitRaiseWizard = async () => {
+  const q = raiseWizardQuestions.value
+  const a = raiseWizardAnswers.value
+  const prompt = [
+    'Please create a new Issue from this article using these clarifications:',
+    `1) ${q[0] || 'Issue framing'}: ${a[0] || '(not provided)'}`,
+    `2) ${q[1] || 'Time horizon'}: ${a[1] || '(not provided)'}`,
+    `3) ${q[2] || 'Core drivers'}: ${a[2] || '(not provided)'}`,
+    'If this article can map to more than one issue, suggest the second issue after creating the primary one.',
+  ].join('\n')
+
+  raiseWizardOpen.value = false
+  input.value = prompt
+  await sendMessage()
+}
+
+const applyQuickAction = (message: string, action?: string) => {
+  if (action === 'wizard' && chatContextStore.contextType === 'article') {
+    openRaiseWizard()
+    return
+  }
   input.value = message
   if (inputRef.value) {
     inputRef.value.focus()
@@ -372,10 +461,26 @@ const copyChat = async () => {
           v-for="action in quickActions"
           :key="action.label"
           class="quick-action-btn"
-          @click="applyQuickAction(action.message)"
+          @click="applyQuickAction(action.message, action.action)"
         >
           {{ action.label }}
         </button>
+      </div>
+
+      <div v-if="raiseWizardOpen" class="wizard-panel">
+        <h4>Issue Raise Wizard</h4>
+        <p class="wizard-hint">Answer briefly so the issue is generic and reusable.</p>
+        <div v-if="raiseWizardLoading" class="wizard-hint">Generating questions...</div>
+        <div v-else>
+          <div v-for="(question, index) in raiseWizardQuestions" :key="index" class="wizard-question">
+            <label>{{ index + 1 }}. {{ question }}</label>
+            <textarea v-model="raiseWizardAnswers[index]" rows="2"></textarea>
+          </div>
+          <div class="wizard-actions">
+            <button class="quick-action-btn" @click="submitRaiseWizard">Create via Chat</button>
+            <button class="quick-action-btn" @click="raiseWizardOpen = false">Cancel</button>
+          </div>
+        </div>
       </div>
 
       <div class="messages-area">
@@ -384,6 +489,9 @@ const copyChat = async () => {
         </div>
         <div v-for="(message, index) in messages" :key="index" :class="['message', message.role]">
           <div class="bubble" v-html="renderMarkdown(message.content)"></div>
+          <div v-if="message.role === 'assistant' && message.timing_ms" class="message-timing">
+            {{ (message.timing_ms / 1000).toFixed(1) }}s
+          </div>
         </div>
       </div>
 
@@ -522,6 +630,45 @@ const copyChat = async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.message-timing {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.wizard-panel {
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 14px;
+}
+
+.wizard-hint {
+  margin: 4px 0 8px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.wizard-question {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wizard-question textarea {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.wizard-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .empty-state {

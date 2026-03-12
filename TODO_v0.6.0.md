@@ -32,3 +32,9 @@ This file tracks follow-up work after the v0.6.0 release.
 - [ ] Move `on_new_article` triggering toward CouchDB `_changes`-driven dispatch.
 - [ ] Keep scheduled-agent scanning as a periodic fallback.
 - [ ] Add telemetry for dispatch lag and processing outcomes.
+
+### 6) Add Dashboard Issue-Raising Wizard
+- [ ] Add a guided "Raise Issue" wizard in the dashboard article context chat flow.
+- [ ] Prioritize speed: minimal required fields first, optional refinement after issue creation.
+- [ ] Bias toward generic issue framing by default (avoid over-specific one-article wording).
+- [ ] Keep final result resumable in `/chat` as the same contextual session.
