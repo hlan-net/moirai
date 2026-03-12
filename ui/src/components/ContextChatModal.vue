@@ -18,6 +18,7 @@ const messages = ref<Message[]>([])
 const input = ref('')
 const loading = ref(false)
 const sessionId = ref<string | null>(null)
+const copyStatus = ref('')
 
 const currentLlmEndpoint = ref(localStorage.getItem('moirai_llm_endpoint') || 'ollama')
 
@@ -304,6 +305,38 @@ const applyQuickAction = (message: string) => {
     inputRef.value.focus()
   }
 }
+
+const fallbackMarkdown = () => {
+  return messages.value
+    .map((msg) => `## ${msg.role === 'user' ? 'User' : 'Assistant'}\n\n${msg.content}`)
+    .join('\n\n---\n\n')
+}
+
+const copyChat = async () => {
+  try {
+    let markdown = ''
+    if (sessionId.value) {
+      const response = await authFetch(`/api/chat/history/${sessionId.value}/export`)
+      if (response.ok) {
+        markdown = await response.text()
+      }
+    }
+
+    if (!markdown) {
+      markdown = fallbackMarkdown()
+    }
+
+    await navigator.clipboard.writeText(markdown)
+    copyStatus.value = 'Copied'
+  } catch (error) {
+    console.error('Failed to copy contextual chat:', error)
+    copyStatus.value = 'Copy failed'
+  } finally {
+    globalThis.setTimeout(() => {
+      copyStatus.value = ''
+    }, 1500)
+  }
+}
 </script>
 
 <template>
@@ -321,7 +354,17 @@ const applyQuickAction = (message: string) => {
           <h3 id="context-chat-title" class="context-title" :title="contextTitle">{{ contextTitle }}</h3>
           <p class="model-meta">{{ currentLlmEndpoint }} / {{ currentModel }}</p>
         </div>
-        <button class="close-btn" @click="closeModal" aria-label="Close contextual chat">×</button>
+        <div class="header-actions">
+          <button
+            class="icon-btn"
+            @click="copyChat"
+            :title="copyStatus || 'Copy chat to clipboard'"
+            aria-label="Copy chat to clipboard"
+          >
+            {{ copyStatus || '📋' }}
+          </button>
+          <button class="close-btn" @click="closeModal" aria-label="Close contextual chat">×</button>
+        </div>
       </header>
 
       <div v-if="quickActions.length" class="quick-actions">
@@ -429,6 +472,22 @@ const applyQuickAction = (message: string) => {
   margin: 0;
   opacity: 0.6;
   font-size: 0.8rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-color);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
 }
 
 .close-btn {
