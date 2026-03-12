@@ -1,7 +1,7 @@
 """Tests for update_couchdb_doc_safe conflict-handling behaviour."""
 
 import os
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -58,7 +58,9 @@ class TestUpdateCouchdbDocSafe:
 
         with patch(
             "api.db.fetch_from_couchdb", side_effect=fetch_side_effects
-        ), patch("api.db._request", side_effect=request_side_effects) as mock_req:
+        ), patch("api.db._request", side_effect=request_side_effects) as mock_req, patch(
+            "api.db.time"
+        ):
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}, max_retries=3
             )
@@ -75,12 +77,16 @@ class TestUpdateCouchdbDocSafe:
 
         with patch(
             "api.db.fetch_from_couchdb", return_value=existing_doc
-        ), patch("api.db._request", return_value=_make_response(409)):
+        ), patch("api.db._request", return_value=_make_response(409)) as mock_req, patch(
+            "api.db.time"
+        ):
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}, max_retries=2
             )
 
         assert result is False
+        # Confirms all retry attempts were actually made (2 retries = 2 PUT calls)
+        assert mock_req.call_count == 2
 
     def test_returns_false_when_doc_not_found(self):
         """Should return False immediately if the document does not exist."""
@@ -100,12 +106,14 @@ class TestUpdateCouchdbDocSafe:
 
         with patch(
             "api.db.fetch_from_couchdb", return_value=existing_doc
-        ), patch("api.db._request", return_value=_make_response(500, "Server error")):
+        ), patch("api.db._request", return_value=_make_response(500, "Server error")) as mock_req:
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}
             )
 
         assert result is False
+        # Non-409 errors must not trigger retries — only one PUT attempt
+        assert mock_req.call_count == 1
 
     def test_merged_doc_preserves_existing_fields(self):
         """update_couchdb_doc_safe merges updates into existing doc without losing fields."""

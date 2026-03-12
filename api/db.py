@@ -1,5 +1,6 @@
 from flask import abort
 import requests
+import time
 import urllib.parse
 import re
 import logging
@@ -187,8 +188,8 @@ def update_couchdb_doc_safe(
             )
             return False
 
-        merged = {**current, **updates}
-        merged["_rev"] = current["_rev"]
+        # Merge updates into current doc, always using the freshly fetched _rev
+        merged = {**current, **updates, "_rev": current["_rev"]}
 
         try:
             response = _request(
@@ -206,6 +207,8 @@ def update_couchdb_doc_safe(
                     attempt,
                     max_retries,
                 )
+                # Small back-off to reduce contention under high write concurrency
+                time.sleep(0.05 * attempt)
                 continue
             logger.error(
                 "update_couchdb_doc_safe: unexpected status %d for %s/%s: %s",

@@ -6,7 +6,7 @@ import logging
 import uuid # Added for unique leader ID
 import redis # Added for Redis client
 
-from api.db import query_couchdb, update_couchdb_doc, update_couchdb_doc_safe
+from api.db import query_couchdb, update_couchdb_doc_safe
 from api.validation import AgentStatus, AgentTriggerType
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 
