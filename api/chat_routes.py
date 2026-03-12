@@ -35,11 +35,7 @@ DEFAULT_LLM_PROVIDER = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1")
 
 CHAT_HISTORY_LIMIT = 6
-MAX_AGENT_TURNS = 5
-LLM_TIMEOUT_SECONDS = 600.0
-
-CHAT_HISTORY_LIMIT = 6
-MAX_AGENT_TURNS = 5
+MAX_AGENT_TURNS = int(os.environ.get("MAX_AGENT_TURNS", "8"))
 LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
 ERROR_ACCESS_DENIED = "Access denied"
@@ -987,4 +983,17 @@ async def _run_agent_loop(
         )
         if result:
             return result
-    return "Agent max turns reached without final answer."
+
+    last_tool_name = None
+    for msg in reversed(messages):
+        if msg.get("role") == "tool" and msg.get("name"):
+            last_tool_name = msg.get("name")
+            break
+
+    if last_tool_name:
+        return (
+            "I hit the agent turn limit while repeatedly using tool "
+            f"`{last_tool_name}`. The conversation is saved, so you can continue in Chat and I can finish there."
+        )
+
+    return "I hit the agent turn limit before producing a final answer. The conversation is saved, so you can continue in Chat."

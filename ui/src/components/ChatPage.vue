@@ -19,6 +19,8 @@ interface ChatSession {
   llm_endpoint?: string;
   context?: {
     type?: 'article' | 'issue' | 'feed'
+    entity_id?: string
+    entity_data?: Record<string, unknown>
   }
 }
 
@@ -295,6 +297,19 @@ const loadSession = (session: ChatSession) => {
   messages.value = session.messages
 }
 
+const getActiveSessionContext = () => {
+  if (!sessionId.value) return undefined
+  const session = sessions.value.find((s) => s._id === sessionId.value)
+  if (!session?.context?.type || !session.context?.entity_id || !session.context?.entity_data) {
+    return undefined
+  }
+  return {
+    type: session.context.type,
+    entity_id: session.context.entity_id,
+    entity_data: session.context.entity_data,
+  }
+}
+
 const newChat = () => {
   sessionId.value = null
   messages.value = []
@@ -391,7 +406,8 @@ const sendMessage = async () => {
           message: userMsg, 
           history, 
           model: currentModel.value,
-          llm_endpoint: currentLlmEndpoint.value
+          llm_endpoint: currentLlmEndpoint.value,
+          context: getActiveSessionContext()
       })
     })
     
