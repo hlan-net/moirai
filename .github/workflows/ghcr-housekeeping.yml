@@ -40,7 +40,7 @@ jobs:
           fi
 
           # Container package names in GHCR for this repository.
-          PACKAGES=("moirai" "moirai-ui")
+          PACKAGES=("moirai" "moirai-ui" "moirai-api")
 
           get_versions() {
             local package_name="$1"
