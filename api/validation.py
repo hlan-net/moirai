@@ -81,6 +81,29 @@ def _validate_schedule_interval_format(value: str) -> str:
     return value
 
 
+# Allowlist of permitted agent logic modules.
+# Single source of truth shared by API validation, MCP layer, orchestrator, and UI.
+ALLOWED_LOGIC_MODULES: list[str] = [
+    "tasks.agent_logic.create_event_from_articles",
+    "tasks.agent_logic.add_articles_to_event",
+    "tasks.agent_logic.check_event_staleness",
+]
+
+
+def _validate_logic_module_value(v: str) -> str:
+    """Reject logic_module values not in the allowlist.
+
+    Shared by AgentConfigBase and AgentConfigUpdateRequest to avoid
+    duplicating the same validation logic in both classes.
+    """
+    if v not in ALLOWED_LOGIC_MODULES:
+        raise ValueError(
+            f"logic_module '{v}' is not permitted. "
+            f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+        )
+    return v
+
+
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     status: AgentStatus = Field(AgentStatus.ACTIVE)
@@ -91,7 +114,10 @@ class AgentConfigBase(BaseModel):
     target_db: AgentTargetDB
     logic_module: str = Field(
         ...,
-        description="Reference to Python module/function (e.g., 'tasks.agent_logic.create_event')",
+        description=(
+            "Python module path for agent logic. "
+            f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+        ),
     )
     llm_model_config: Optional[Dict[str, Any]] = Field(
         None, description="LLM specific configs like model_name, provider, etc."
@@ -110,6 +136,12 @@ class AgentConfigBase(BaseModel):
         if v is None:
             return v
         return _validate_schedule_interval_format(v)
+
+    @field_validator("logic_module")
+    @classmethod
+    def validate_logic_module(cls, v: str) -> str:
+        """Reject logic_module values not in the allowlist at write time."""
+        return _validate_logic_module_value(v)
 
     @field_validator("linked_entity_id")
     @classmethod
@@ -165,10 +197,22 @@ class AgentConfigUpdateRequest(BaseModel):
         None, description="e.g., '30m', '2h', '1d' (positive integer + unit s/m/h/d)"
     )
     target_db: Optional[AgentTargetDB] = None
-    logic_module: Optional[str] = Field(None, description="Python module path for agent logic")
-    llm_model_config: Optional[Dict[str, Any]] = Field(None, description="LLM config overrides")
-    parameters: Optional[Dict[str, Any]] = Field(None, description="Agent logic parameters")
-    linked_entity_id: Optional[str] = Field(None, description="Linked issue entity ID (UUID)")
+    logic_module: Optional[str] = Field(
+        None,
+        description=(
+            "Python module path for agent logic. "
+            f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+        ),
+    )
+    llm_model_config: Optional[Dict[str, Any]] = Field(
+        None, description="LLM specific configs like model_name, provider, etc."
+    )
+    parameters: Optional[Dict[str, Any]] = Field(
+        None, description="User-defined parameters for agent logic"
+    )
+    linked_entity_id: Optional[str] = Field(
+        None, description="ID of a specific event or trend this agent is managing"
+    )
 
     @field_validator("schedule_interval")
     @classmethod
@@ -176,6 +220,14 @@ class AgentConfigUpdateRequest(BaseModel):
         if v is None:
             return v
         return _validate_schedule_interval_format(v)
+
+    @field_validator("logic_module")
+    @classmethod
+    def validate_logic_module(cls, v: Optional[str]) -> Optional[str]:
+        """Reject logic_module values not in the allowlist at write time."""
+        if v is None:
+            return v
+        return _validate_logic_module_value(v)
 
     @field_validator("linked_entity_id")
     @classmethod

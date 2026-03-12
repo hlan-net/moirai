@@ -48,8 +48,8 @@ def test_release_lock(orchestrator, mock_redis):
     mock_redis.eval.assert_called_once()
 
 @patch('tasks.agent_orchestrator.query_couchdb')
-@patch('tasks.agent_orchestrator.update_couchdb_doc')
-def test_check_and_run_agents_scheduled(mock_update, mock_query, orchestrator):
+@patch('tasks.agent_orchestrator.update_couchdb_doc_safe')
+def test_check_and_run_agents_scheduled(mock_update_safe, mock_query, orchestrator):
     # Setup mock agent config
     agent_id = "test-agent"
     last_run = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
@@ -84,25 +84,29 @@ def test_is_scheduled_agent_due(orchestrator):
     assert orchestrator.is_scheduled_agent_due((now - timedelta(days=2)).isoformat(), "1d") is True
 
 @patch('importlib.import_module')
-@patch('tasks.agent_orchestrator.update_couchdb_doc')
-def test_execute_agent_logic(mock_update, mock_import, orchestrator):
+@patch('tasks.agent_orchestrator.update_couchdb_doc_safe')
+def test_execute_agent_logic(mock_update_safe, mock_import, orchestrator):
     mock_module = MagicMock()
     mock_func = MagicMock()
     # Use a whitelisted module name
     whitelisted_module = "tasks.agent_logic"
     whitelisted_func = "create_event_from_articles"
-    
+
+    mock_update_safe.return_value = True
     setattr(mock_module, whitelisted_func, mock_func)
     mock_import.return_value = mock_module
-    
+
     agent_config = {
         "_id": "agent1",
         "logic_module": f"{whitelisted_module}.{whitelisted_func}"
     }
-    
+
     orchestrator.execute_agent_logic(agent_config)
-    
+
     mock_import.assert_called_once_with(whitelisted_module)
     mock_func.assert_called_once()
-    mock_update.assert_called_once()
-    assert "last_run_at" in agent_config
+    mock_update_safe.assert_called_once_with(
+        orchestrator.agent_configs_db,
+        "agent1",
+        {"last_run_at": mock_update_safe.call_args[0][2]["last_run_at"]},
+    )

@@ -6,8 +6,8 @@ import logging
 import uuid # Added for unique leader ID
 import redis # Added for Redis client
 
-from api.db import query_couchdb, update_couchdb_doc
-from api.validation import AgentStatus, AgentTriggerType
+from api.db import query_couchdb, update_couchdb_doc_safe
+from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 
 logger = logging.getLogger(__name__)
@@ -162,14 +162,16 @@ class AgentOrchestrator(threading.Thread):
         self.last_article_check_time = datetime.now(timezone.utc)
 
         for agent_config in active_agents:
+            agent_id = agent_config.get("_id", "N/A")
             if not (agent_config.get("userspace") or agent_config.get("namespace")):
                 logger.error(
                     "Agent %s missing userspace after migration; marking as error.",
-                    agent_config.get("_id", "N/A"),
+                    agent_id,
                 )
-                agent_config["status"] = AgentStatus.ERROR.value
-                update_couchdb_doc(
-                    self.agent_configs_db, agent_config["_id"], agent_config
+                update_couchdb_doc_safe(
+                    self.agent_configs_db,
+                    agent_id,
+                    {"status": AgentStatus.ERROR.value},
                 )
                 continue
 
@@ -178,23 +180,26 @@ class AgentOrchestrator(threading.Thread):
                 agent_config.get("trigger_type") == AgentTriggerType.SCHEDULED.value
                 and "last_run_at" not in agent_config
             ):
-                agent_config["last_run_at"] = (
+                initial_last_run = (
                     datetime.now(timezone.utc) - timedelta(days=365)
-                ).isoformat()  # Initialize to a year ago
-                update_couchdb_doc(
-                    self.agent_configs_db, agent_config["_id"], agent_config
-                )  # Persist update
+                ).isoformat()
+                update_couchdb_doc_safe(
+                    self.agent_configs_db,
+                    agent_id,
+                    {"last_run_at": initial_last_run},
+                )
+                agent_config["last_run_at"] = initial_last_run
 
             try:
                 self.run_agent_if_due(agent_config, new_articles)
             except Exception as e:
                 logger.error(
-                    f"Error running agent {agent_config.get('_id', 'N/A')}: {e}"
+                    f"Error running agent {agent_id}: {e}"
                 )
-                # Optionally update agent status to ERROR
-                agent_config["status"] = AgentStatus.ERROR.value
-                update_couchdb_doc(
-                    self.agent_configs_db, agent_config["_id"], agent_config
+                update_couchdb_doc_safe(
+                    self.agent_configs_db,
+                    agent_id,
+                    {"status": AgentStatus.ERROR.value},
                 )
 
     def run_agent_if_due(self, agent_config: dict, new_articles: list[dict]):
@@ -261,13 +266,7 @@ class AgentOrchestrator(threading.Thread):
             )
             return
 
-        # Security: Whitelist allowed logic modules to prevent arbitrary code execution
-        ALLOWED_LOGIC_MODULES = [
-            "tasks.agent_logic.create_event_from_articles",
-            "tasks.agent_logic.add_articles_to_event",
-            "tasks.agent_logic.check_event_staleness",
-        ]
-
+        # Security: only execute modules in the shared allowlist (defined in api.validation)
         if logic_module_path not in ALLOWED_LOGIC_MODULES:
             logger.error(f"Logic module {logic_module_path} is not in the allowed whitelist.")
             return
@@ -282,9 +281,12 @@ class AgentOrchestrator(threading.Thread):
                 agent_config=agent_config, mcp_client=self.mcp_client, **kwargs
             )
 
-            # Update last_run_at
-            agent_config["last_run_at"] = datetime.now(timezone.utc).isoformat()
-            update_couchdb_doc(self.agent_configs_db, agent_config["_id"], agent_config)
+            # Update last_run_at using conflict-safe write
+            update_couchdb_doc_safe(
+                self.agent_configs_db,
+                agent_config["_id"],
+                {"last_run_at": datetime.now(timezone.utc).isoformat()},
+            )
 
         except Exception as e:
             logger.error(
