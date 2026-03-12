@@ -684,6 +684,8 @@ const toggleTheme = () => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
 }
 
 .compact-tags {
@@ -910,5 +912,41 @@ const toggleTheme = () => {
     height: 14px;
     flex-shrink: 0;
     object-fit: contain;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 767px) {
+  .stream-page {
+    padding: 12px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .page-header h2 {
+    font-size: 1.4rem;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .density-btn,
+  .theme-btn,
+  .refresh-btn,
+  .rss-link {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+  }
+
+  .inline-source {
+    flex-shrink: 1;
+    max-width: min(140px, 30vw);
+  }
 }
 </style>
