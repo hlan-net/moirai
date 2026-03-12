@@ -150,10 +150,10 @@ class AgentConfigCreateRequest(AgentConfigBase):
 class AgentConfigUpdateRequest(BaseModel):
     """Partial update model for agent configs — all fields are optional.
 
-    Format and cross-field rules from AgentConfigBase are re-applied where
-    applicable.  Full state-aware validation (e.g. changing trigger_type
-    without also setting schedule_interval) is performed in api/agent_routes.py
-    where the current document is available.
+    Per-field format validators are applied where applicable.  Cross-field
+    validation (e.g. trigger_type vs schedule_interval consistency) requires
+    the full current document state and is therefore performed in
+    api/agent_routes.py after merging the update into the existing doc.
     """
 
     name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -191,15 +191,6 @@ class AgentConfigUpdateRequest(BaseModel):
     @classmethod
     def validate_owner_user_id(cls, v: Optional[str]) -> Optional[str]:
         return _validate_optional_uuid(v, "Owner user ID")
-
-    @model_validator(mode="after")
-    def validate_schedule_cross_fields(self) -> "AgentConfigUpdateRequest":
-        """Reject self-contradictory payloads where both fields are supplied together."""
-        if self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE and self.schedule_interval:
-            raise ValueError(
-                "schedule_interval must not be set when trigger_type is 'on_new_article'."
-            )
-        return self
 
 
 class FeedCreateRequest(BaseModel):
