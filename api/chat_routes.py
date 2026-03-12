@@ -277,6 +277,74 @@ def _safe_text(value, max_length=240):
     return _truncate_text(bleach.clean(str(value or ""), strip=True), max_length)
 
 
+def _build_article_context_lines(entity_data):
+    title = _safe_text(entity_data.get("title", "Untitled article"), 240)
+    published = _safe_text(entity_data.get("published", ""), 80)
+    source = _safe_text(
+        entity_data.get("feed_title") or entity_data.get("feed_url") or entity_data.get("source") or "",
+        160,
+    )
+    language = _safe_text(entity_data.get("language", ""), 32)
+    summary = _safe_text(
+        entity_data.get("description") or entity_data.get("summary") or entity_data.get("content") or "",
+        480,
+    )
+
+    issue_names = []
+    for issue in entity_data.get("issues") or []:
+        if isinstance(issue, dict) and issue.get("logos"):
+            issue_names.append(_safe_text(issue.get("logos"), 120))
+
+    lines = [
+        f"Article title: {title}",
+        f"Article published: {published or 'unknown'}",
+        f"Article source: {source or 'unknown'}",
+        f"Article language: {language or 'unknown'}",
+        f"Article summary: {summary or 'none'}",
+    ]
+    if issue_names:
+        lines.append(f"Currently linked issues: {', '.join(issue_names[:8])}")
+    else:
+        lines.append("Currently linked issues: none")
+    return lines
+
+
+def _build_issue_context_lines(entity_data):
+    logos = _safe_text(entity_data.get("logos", "Untitled issue"), 240)
+    description = _safe_text(entity_data.get("description", ""), 480)
+    longevity = _safe_text(entity_data.get("longevity", ""), 32)
+    status = _safe_text(entity_data.get("status", ""), 32)
+    premises = entity_data.get("premises")
+    premises_count = len(premises) if isinstance(premises, list) else 0
+    return [
+        f"Issue logos: {logos}",
+        f"Issue description: {description or 'none'}",
+        f"Issue longevity: {longevity or 'unknown'}",
+        f"Issue status: {status or 'unknown'}",
+        f"Issue premises_count: {premises_count}",
+    ]
+
+
+def _build_feed_context_lines(entity_data):
+    title = _safe_text(entity_data.get("title") or entity_data.get("url") or "Untitled feed", 240)
+    url = _safe_text(entity_data.get("url", ""), 240)
+    category = _safe_text(entity_data.get("category", ""), 80)
+    last_fetch = _safe_text(entity_data.get("last_fetch_at", ""), 80)
+    return [
+        f"Feed title: {title}",
+        f"Feed url: {url or 'unknown'}",
+        f"Feed category: {category or 'unknown'}",
+        f"Feed last_fetch_at: {last_fetch or 'unknown'}",
+    ]
+
+
+CONTEXT_LINE_BUILDERS = {
+    "article": _build_article_context_lines,
+    "issue": _build_issue_context_lines,
+    "feed": _build_feed_context_lines,
+}
+
+
 def _build_context_preamble(context):
     if not isinstance(context, dict):
         return ""
@@ -285,7 +353,8 @@ def _build_context_preamble(context):
     entity_id = context.get("entity_id") or ""
     entity_data = context.get("entity_data")
 
-    if context_type not in {"article", "issue", "feed"} or not isinstance(entity_data, dict):
+    line_builder = CONTEXT_LINE_BUILDERS.get(context_type)
+    if line_builder is None or not isinstance(entity_data, dict):
         return ""
 
     lines = [
@@ -296,74 +365,7 @@ def _build_context_preamble(context):
     if entity_id:
         lines.append(f"Context entity_id: {_safe_text(entity_id, 120)}")
 
-    if context_type == "article":
-        title = _safe_text(entity_data.get("title", "Untitled article"), 240)
-        published = _safe_text(entity_data.get("published", ""), 80)
-        source = _safe_text(
-            entity_data.get("feed_title")
-            or entity_data.get("feed_url")
-            or entity_data.get("source")
-            or "",
-            160,
-        )
-        language = _safe_text(entity_data.get("language", ""), 32)
-        summary = _safe_text(
-            entity_data.get("description")
-            or entity_data.get("summary")
-            or entity_data.get("content")
-            or "",
-            480,
-        )
-
-        issue_names = []
-        for issue in entity_data.get("issues", []) or []:
-            if isinstance(issue, dict) and issue.get("logos"):
-                issue_names.append(_safe_text(issue.get("logos"), 120))
-
-        lines.extend(
-            [
-                f"Article title: {title}",
-                f"Article published: {published or 'unknown'}",
-                f"Article source: {source or 'unknown'}",
-                f"Article language: {language or 'unknown'}",
-                f"Article summary: {summary or 'none'}",
-            ]
-        )
-        if issue_names:
-            lines.append(f"Currently linked issues: {', '.join(issue_names[:8])}")
-        else:
-            lines.append("Currently linked issues: none")
-
-    elif context_type == "issue":
-        logos = _safe_text(entity_data.get("logos", "Untitled issue"), 240)
-        description = _safe_text(entity_data.get("description", ""), 480)
-        longevity = _safe_text(entity_data.get("longevity", ""), 32)
-        status = _safe_text(entity_data.get("status", ""), 32)
-        premises = entity_data.get("premises")
-        premises_count = len(premises) if isinstance(premises, list) else 0
-        lines.extend(
-            [
-                f"Issue logos: {logos}",
-                f"Issue description: {description or 'none'}",
-                f"Issue longevity: {longevity or 'unknown'}",
-                f"Issue status: {status or 'unknown'}",
-                f"Issue premises_count: {premises_count}",
-            ]
-        )
-
-    elif context_type == "feed":
-        title = _safe_text(entity_data.get("title") or entity_data.get("url") or "Untitled feed", 240)
-        url = _safe_text(entity_data.get("url", ""), 240)
-        category = _safe_text(entity_data.get("category", ""), 80)
-        last_fetch = _safe_text(entity_data.get("last_fetch_at", ""), 80)
-        lines.extend(
-            [
-                f"Feed title: {title}",
-                f"Feed url: {url or 'unknown'}",
-                f"Feed category: {category or 'unknown'}",
-                f"Feed last_fetch_at: {last_fetch or 'unknown'}",
-            ]
-        )
+    lines.extend(line_builder(entity_data))
 
     lines.append(
         "Use this context to ground your response and actions. If asked to create/update issues, call tools explicitly."

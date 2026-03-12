@@ -308,11 +308,10 @@ const applyQuickAction = (message: string) => {
 
 <template>
   <div v-if="chatContextStore.isOpen" class="modal-overlay" @click="closeModal">
-    <aside
+    <dialog
       ref="modalContentRef"
+      open
       class="context-chat-drawer"
-      role="dialog"
-      aria-modal="true"
       aria-labelledby="context-chat-title"
       @click.stop
     >
@@ -357,7 +356,7 @@ const applyQuickAction = (message: string) => {
           {{ loading ? 'Sending...' : 'Send' }}
         </button>
       </footer>
-    </aside>
+    </dialog>
   </div>
 </template>
 
@@ -372,6 +371,12 @@ const applyQuickAction = (message: string) => {
 }
 
 .context-chat-drawer {
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: none;
+  outline: none;
+  max-width: none;
+  max-height: none;
   width: min(620px, 100%);
   height: 100%;
   background: var(--card-bg);
@@ -379,6 +384,10 @@ const applyQuickAction = (message: string) => {
   display: flex;
   flex-direction: column;
   box-shadow: -12px 0 24px rgba(0, 0, 0, 0.35);
+}
+
+.context-chat-drawer::backdrop {
+  background: transparent;
 }
 
 .drawer-header {
