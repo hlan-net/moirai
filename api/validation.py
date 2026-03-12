@@ -66,8 +66,8 @@ def _ensure_valid_url_list(values: list[str]) -> None:
             raise ValueError(f"Invalid URL: {link}")
 
 
-# Valid schedule interval format: a positive integer followed by s/m/h/d
-SCHEDULE_INTERVAL_PATTERN = re.compile(r"^\d+[smhd]$")
+# Valid schedule interval format: a positive (non-zero) integer followed by s/m/h/d
+SCHEDULE_INTERVAL_PATTERN = re.compile(r"^[1-9]\d*[smhd]$")
 
 
 def _validate_schedule_interval_format(value: str) -> str:
@@ -148,33 +148,31 @@ class AgentConfigCreateRequest(AgentConfigBase):
 
 
 class AgentConfigUpdateRequest(BaseModel):
+    """Partial update model for agent configs — all fields are optional.
+
+    Format and cross-field rules from AgentConfigBase are re-applied where
+    applicable.  Full state-aware validation (e.g. changing trigger_type
+    without also setting schedule_interval) is performed in api/agent_routes.py
+    where the current document is available.
+    """
+
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     status: Optional[AgentStatus] = None
     userspace: Optional[str] = None
     owner_user_id: Optional[str] = None
     trigger_type: Optional[AgentTriggerType] = None
     schedule_interval: Optional[str] = Field(
-        None, description="e.g., '30m', '2h', '1d' (integer + unit s/m/h/d)"
+        None, description="e.g., '30m', '2h', '1d' (positive integer + unit s/m/h/d)"
     )
     target_db: Optional[AgentTargetDB] = None
-    logic_module: Optional[str] = Field(
-        None,
-        description="Reference to Python module/function (e.g., 'tasks.agent_logic.create_event')",
-    )
-    llm_model_config: Optional[Dict[str, Any]] = Field(
-        None, description="LLM specific configs like model_name, provider, etc."
-    )
-    parameters: Optional[Dict[str, Any]] = Field(
-        None, description="User-defined parameters for agent logic"
-    )
-    linked_entity_id: Optional[str] = Field(
-        None, description="ID of a specific event or trend this agent is managing"
-    )
+    logic_module: Optional[str] = Field(None, description="Python module path for agent logic")
+    llm_model_config: Optional[Dict[str, Any]] = Field(None, description="LLM config overrides")
+    parameters: Optional[Dict[str, Any]] = Field(None, description="Agent logic parameters")
+    linked_entity_id: Optional[str] = Field(None, description="Linked issue entity ID (UUID)")
 
     @field_validator("schedule_interval")
     @classmethod
     def validate_schedule_interval(cls, v: Optional[str]) -> Optional[str]:
-        """Validate the format of schedule_interval when provided."""
         if v is None:
             return v
         return _validate_schedule_interval_format(v)
@@ -196,19 +194,8 @@ class AgentConfigUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_schedule_cross_fields(self) -> "AgentConfigUpdateRequest":
-        """Enforce cross-field rules when both trigger_type and schedule_interval are being updated."""
-        if (
-            self.trigger_type == AgentTriggerType.SCHEDULED
-            and self.schedule_interval is not None
-            and not self.schedule_interval
-        ):
-            raise ValueError(
-                "schedule_interval is required when trigger_type is 'scheduled'."
-            )
-        if (
-            self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE
-            and self.schedule_interval is not None
-        ):
+        """Reject self-contradictory payloads where both fields are supplied together."""
+        if self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE and self.schedule_interval:
             raise ValueError(
                 "schedule_interval must not be set when trigger_type is 'on_new_article'."
             )
