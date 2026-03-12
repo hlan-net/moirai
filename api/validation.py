@@ -64,6 +64,16 @@ def _ensure_valid_url_list(values: list[str]) -> None:
         if not validators.url(link):
             raise ValueError(f"Invalid URL: {link}")
 
+
+# Allowlist of permitted agent logic modules.
+# Single source of truth shared by API validation, MCP layer, orchestrator, and UI.
+ALLOWED_LOGIC_MODULES: list[str] = [
+    "tasks.agent_logic.create_event_from_articles",
+    "tasks.agent_logic.add_articles_to_event",
+    "tasks.agent_logic.check_event_staleness",
+]
+
+
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     status: AgentStatus = Field(AgentStatus.ACTIVE)
@@ -74,7 +84,10 @@ class AgentConfigBase(BaseModel):
     target_db: AgentTargetDB
     logic_module: str = Field(
         ...,
-        description="Reference to Python module/function (e.g., 'tasks.agent_logic.create_event')",
+        description=(
+            "Python module path for agent logic. "
+            f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+        ),
     )
     llm_model_config: Optional[Dict[str, Any]] = Field(
         None, description="LLM specific configs like model_name, provider, etc."
@@ -85,6 +98,17 @@ class AgentConfigBase(BaseModel):
     linked_entity_id: Optional[str] = Field(
         None, description="ID of a specific event or trend this agent is managing"
     )
+
+    @field_validator("logic_module")
+    @classmethod
+    def validate_logic_module(cls, v: str) -> str:
+        """Reject logic_module values not in the allowlist at write time."""
+        if v not in ALLOWED_LOGIC_MODULES:
+            raise ValueError(
+                f"logic_module '{v}' is not permitted. "
+                f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+            )
+        return v
 
     @field_validator("linked_entity_id")
     @classmethod
@@ -121,7 +145,10 @@ class AgentConfigUpdateRequest(BaseModel):
     target_db: Optional[AgentTargetDB] = None
     logic_module: Optional[str] = Field(
         None,
-        description="Reference to Python module/function (e.g., 'tasks.agent_logic.create_event')",
+        description=(
+            "Python module path for agent logic. "
+            f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+        ),
     )
     llm_model_config: Optional[Dict[str, Any]] = Field(
         None, description="LLM specific configs like model_name, provider, etc."
@@ -132,6 +159,19 @@ class AgentConfigUpdateRequest(BaseModel):
     linked_entity_id: Optional[str] = Field(
         None, description="ID of a specific event or trend this agent is managing"
     )
+
+    @field_validator("logic_module")
+    @classmethod
+    def validate_logic_module(cls, v: Optional[str]) -> Optional[str]:
+        """Reject logic_module values not in the allowlist at write time."""
+        if v is None:
+            return v
+        if v not in ALLOWED_LOGIC_MODULES:
+            raise ValueError(
+                f"logic_module '{v}' is not permitted. "
+                f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+            )
+        return v
 
     @field_validator("linked_entity_id")
     @classmethod
