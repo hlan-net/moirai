@@ -2,7 +2,6 @@ from starlette.responses import JSONResponse, Response
 from starlette.requests import Request
 from starlette.routing import Route
 from starlette.applications import Starlette
-from starlette.middleware.base import BaseHTTPMiddleware
 from .core import mcp
 from api.telemetry import configure_telemetry
 from api.auth_utils import verify_auth_header
@@ -21,19 +20,30 @@ logger = logging.getLogger(__name__)
 _metrics_started = False
 
 # --- Auth Middleware ---
-class AuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Exempt health
-        if request.url.path in ["/health"]:
-            return await call_next(request)
-        
-        auth_header = request.headers.get("Authorization")
+class AuthMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if path == "/health":
+            await self.app(scope, receive, send)
+            return
+
+        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
+        auth_header = headers.get("authorization")
         success, error_msg, _ = verify_auth_header(auth_header)
-        
+
         if not success:
-            return JSONResponse({"error": error_msg}, status_code=401)
-            
-        return await call_next(request)
+            response = JSONResponse({"error": error_msg}, status_code=401)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
 
 # Print version info
 logger.info(f"{get_version_string()} starting...")

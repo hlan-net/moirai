@@ -11,6 +11,11 @@ pidfile = "/run/gunicorn/gunicorn.pid"
 workers = int(os.environ.get("WEB_CONCURRENCY", 1))
 worker_class = "sync"
 worker_tmp_dir = "/dev/shm"
+# Chat requests can include multi-turn tool execution and slow LLM responses.
+# Raise worker timeout to avoid premature SIGKILL during legitimate long runs.
+timeout = int(os.environ.get("GUNICORN_TIMEOUT", 300))
+graceful_timeout = int(os.environ.get("GUNICORN_GRACEFUL_TIMEOUT", 30))
+keepalive = int(os.environ.get("GUNICORN_KEEPALIVE", 5))
 
 # Logging
 accesslog = "-"

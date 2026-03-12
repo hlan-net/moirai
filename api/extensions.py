@@ -1,7 +1,9 @@
 import os
+import hashlib
 import redis
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask import request
 from prometheus_flask_exporter import PrometheusMetrics
 
 
@@ -39,8 +41,37 @@ def _get_rate_limit_storage_uri() -> str:
     return "memory://"
 
 
+def _rate_limit_key() -> str:
+    """Build a stable limiter key with auth-aware fallbacks.
+
+    Priority:
+    1) Bearer token hash (distinguishes users behind shared proxies)
+    2) X-Forwarded-For first hop
+    3) X-Real-IP
+    4) Remote address fallback
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        if token:
+            token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            return f"token:{token_hash[:16]}"
+
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if x_forwarded_for:
+        forwarded_ip = x_forwarded_for.split(",")[0].strip()
+        if forwarded_ip:
+            return f"ip:{forwarded_ip}"
+
+    x_real_ip = request.headers.get("X-Real-IP", "").strip()
+    if x_real_ip:
+        return f"ip:{x_real_ip}"
+
+    return f"ip:{get_remote_address()}"
+
+
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_rate_limit_key,
     default_limits=["200 per day", "50 per hour"],
     headers_enabled=True,
     storage_uri=_get_rate_limit_storage_uri(),
