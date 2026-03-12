@@ -428,13 +428,6 @@ def test_admin_can_create_agent_for_any_owner(client):
 # Payload validation
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    reason=(
-        "logic_module allowlist not yet enforced at write time on this branch. "
-        "Will pass once improvement/logic-module-allowlist is merged."
-    ),
-    strict=True,
-)
 def test_create_agent_invalid_logic_module(client):
     """POST /api/agents with an unknown logic_module must return 400."""
     headers = {"Authorization": f"Bearer {_tokens['user']}"}
