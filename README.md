@@ -50,6 +50,18 @@ The UI includes a Chat interface to interact with the Agent.
 2. Open **Settings**.
 3. Configure your LLM endpoint (e.g., Ollama at `http://host.docker.internal:11434/v1`) and model (e.g., `llama3.1`).
 
+Dashboard contextual chat is also available directly from cards:
+
+- Articles: open chat with article context, and use **Raise as Issue**
+- Issues/Trends: open chat with issue context, and use **Refine Description**
+- Feeds: open chat with feed context
+
+Contextual chat sessions are persisted and can be resumed from the `/chat` page.
+
+For article issue creation, the dashboard supports a guided **Raise Issue wizard** that asks clarifying questions before submitting a structured issue-creation prompt.
+
+Chat responses expose timing metadata, and the UI shows per-response duration to help identify slow requests.
+
 ### 3. Agent Workflow
 
 1. **Add Feeds:** Ask the agent to "Add the RSS feed for Hacker News".

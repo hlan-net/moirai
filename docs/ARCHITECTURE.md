@@ -43,10 +43,13 @@ The core abstraction is the **Hourglass**: articles are grains of sand (raw sign
 ### 2.5 Frontend (Vue.js 3)
 - **Role:** Administrative dashboard for human operators.
 - **Features:** Feeds, articles, issues management; aggregated stream view; chat interface; namespace filtering.
+- **Contextual chat:** Dashboard cards can open contextual chat (article/issue/feed), persisted to `chat_history` and resumable from `/chat`.
+- **Issue raise wizard:** Article contextual chat includes a guided issue-raise flow with clarifying questions for generic/reusable issue framing.
 - **Technology:** Vue 3, TypeScript, Pinia, Vite.
 
 ### 2.6 Nginx (Reverse Proxy)
 - **Role:** Single entry point. Routes `/api/*` and `/mcp/*` to the API service, everything else to the UI static files.
+- **Timeouts:** `/api` proxy timeouts are tuned for longer chat/tool-assisted operations.
 
 ### 2.7 Data Storage (CouchDB)
 - **`feeds`** — RSS source URLs and metadata.
@@ -55,6 +58,7 @@ The core abstraction is the **Hourglass**: articles are grains of sand (raw sign
 - **`issues`** — emergent issues (unified store, replaces legacy `events` and `trends`).
 - **`config`** — system configuration and worker state (e.g., `enrichment_last_seq`).
 - **`chat_history`** — agent conversation history.
+  - Includes contextual session metadata for dashboard-origin chats.
 - **`users`** — user accounts.
 
 ---
@@ -119,6 +123,7 @@ UI / API
 - **Isolation:** All data operations require a `userspace` GUID, preventing data leakage between agent contexts.
 - **Input sanitisation:** All text inputs sanitised with `bleach.clean()`.
 - **Rate limiting:** Flask-Limiter (disabled in local dev via `DISABLE_RATE_LIMIT`).
+- **Rate-limit keying:** auth-aware key derivation is used to reduce false throttling when clients are behind shared proxies.
 
 ---
 
