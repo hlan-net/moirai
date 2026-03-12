@@ -74,6 +74,20 @@ ALLOWED_LOGIC_MODULES: list[str] = [
 ]
 
 
+def _validate_logic_module_value(v: str) -> str:
+    """Reject logic_module values not in the allowlist.
+
+    Shared by AgentConfigBase and AgentConfigUpdateRequest to avoid
+    duplicating the same validation logic in both classes.
+    """
+    if v not in ALLOWED_LOGIC_MODULES:
+        raise ValueError(
+            f"logic_module '{v}' is not permitted. "
+            f"Allowed values: {ALLOWED_LOGIC_MODULES}"
+        )
+    return v
+
+
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     status: AgentStatus = Field(AgentStatus.ACTIVE)
@@ -103,12 +117,7 @@ class AgentConfigBase(BaseModel):
     @classmethod
     def validate_logic_module(cls, v: str) -> str:
         """Reject logic_module values not in the allowlist at write time."""
-        if v not in ALLOWED_LOGIC_MODULES:
-            raise ValueError(
-                f"logic_module '{v}' is not permitted. "
-                f"Allowed values: {ALLOWED_LOGIC_MODULES}"
-            )
-        return v
+        return _validate_logic_module_value(v)
 
     @field_validator("linked_entity_id")
     @classmethod
@@ -166,12 +175,7 @@ class AgentConfigUpdateRequest(BaseModel):
         """Reject logic_module values not in the allowlist at write time."""
         if v is None:
             return v
-        if v not in ALLOWED_LOGIC_MODULES:
-            raise ValueError(
-                f"logic_module '{v}' is not permitted. "
-                f"Allowed values: {ALLOWED_LOGIC_MODULES}"
-            )
-        return v
+        return _validate_logic_module_value(v)
 
     @field_validator("linked_entity_id")
     @classmethod
