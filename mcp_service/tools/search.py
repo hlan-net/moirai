@@ -134,16 +134,26 @@ def search_articles(
         return json.dumps({"error": "Query cannot be empty"})
 
     limit = min(limit, 200)
-    safe_query = re.escape(query)
 
-    # Build Mango selector
-    text_selector = {
-        MONGO_OR: [
-            {"title": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"content": {MONGO_REGEX: f"(?i){safe_query}"}},
-        ]
-    }
+    # Split multi-word queries into individual terms so that e.g. "TPS ice hockey"
+    # matches documents containing all three words (in any field, in any order),
+    # rather than requiring the exact phrase "TPS ice hockey" to appear verbatim.
+    terms = query.strip().split()
+    term_selectors = []
+    for term in terms:
+        safe_term = re.escape(term)
+        term_selectors.append(
+            {
+                MONGO_OR: [
+                    {"title": {MONGO_REGEX: f"(?i){safe_term}"}},
+                    {"description": {MONGO_REGEX: f"(?i){safe_term}"}},
+                    {"content": {MONGO_REGEX: f"(?i){safe_term}"}},
+                ]
+            }
+        )
+
+    # All terms must match (AND), each across any of the three fields (OR)
+    text_selector = {"$and": term_selectors} if len(term_selectors) > 1 else term_selectors[0]
 
     filters = [text_selector]
 
