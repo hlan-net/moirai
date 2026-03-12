@@ -3,6 +3,7 @@ import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
 import { authFetch } from '../utils/authFetch'
+import IssueChatActions from './IssueChatActions.vue'
 
 interface Premise {
   type: 'message' | 'issue'
@@ -270,6 +271,8 @@ onUnmounted(() => {
             </div>
             <p v-if="issue.description" class="summary">{{ issue.description }}</p>
 
+            <IssueChatActions v-if="authStore.isAuthenticated" :issue="issue" />
+
             <div v-if="expandedIssues.has(issue._id)" class="premises-section">
               <h4>Constituents ({{ (issue.premises || []).length }})</h4>
               <ul>
@@ -334,6 +337,8 @@ onUnmounted(() => {
               </div>
             </div>
             <p v-if="issue.description" class="summary">{{ issue.description }}</p>
+
+            <IssueChatActions v-if="authStore.isAuthenticated" :issue="issue" />
 
             <div v-if="expandedIssues.has(issue._id)" class="premises-section">
               <h4>Constituents ({{ (issue.premises || []).length }})</h4>

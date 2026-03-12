@@ -3,6 +3,7 @@ import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
 import { authFetch } from '../utils/authFetch'
+import IssueChatActions from './IssueChatActions.vue'
 
 interface Premise {
   type: 'message' | 'issue'
@@ -218,6 +219,8 @@ onUnmounted(() => {
           </button>
         </div>
         <p v-if="issue.description" class="summary">{{ issue.description }}</p>
+
+        <IssueChatActions v-if="authStore.isAuthenticated" :issue="issue" />
         
         <div class="status-tags">
             <span :class="['status-tag', issue.status]">{{ issue.status }}</span>

@@ -3,6 +3,7 @@ import { onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from './stores/auth'
+import ContextChatModal from './components/ContextChatModal.vue'
 
 const { initTheme } = useTheme()
 const authStore = useAuthStore()
@@ -47,6 +48,8 @@ onMounted(() => {
         </keep-alive>
       </router-view>
     </div>
+
+    <ContextChatModal />
   </div>
 </template>
 

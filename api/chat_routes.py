@@ -264,10 +264,142 @@ def _create_get_recent_articles_call():
     return mock_call, mock_data
 
 
+def _truncate_text(value, max_length=240):
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if len(text) <= max_length:
+        return text
+    return f"{text[: max_length - 3]}..."
+
+
+def _safe_text(value, max_length=240):
+    return _truncate_text(bleach.clean(str(value or ""), strip=True), max_length)
+
+
+def _build_article_context_lines(entity_data):
+    title = _safe_text(entity_data.get("title", "Untitled article"), 240)
+    published = _safe_text(entity_data.get("published", ""), 80)
+    source = _safe_text(
+        entity_data.get("feed_title") or entity_data.get("feed_url") or entity_data.get("source") or "",
+        160,
+    )
+    language = _safe_text(entity_data.get("language", ""), 32)
+    summary = _safe_text(
+        entity_data.get("description") or entity_data.get("summary") or entity_data.get("content") or "",
+        480,
+    )
+
+    issue_names = []
+    for issue in entity_data.get("issues") or []:
+        if isinstance(issue, dict) and issue.get("logos"):
+            issue_names.append(_safe_text(issue.get("logos"), 120))
+
+    lines = [
+        f"Article title: {title}",
+        f"Article published: {published or 'unknown'}",
+        f"Article source: {source or 'unknown'}",
+        f"Article language: {language or 'unknown'}",
+        f"Article summary: {summary or 'none'}",
+    ]
+    if issue_names:
+        lines.append(f"Currently linked issues: {', '.join(issue_names[:8])}")
+    else:
+        lines.append("Currently linked issues: none")
+    return lines
+
+
+def _build_issue_context_lines(entity_data):
+    logos = _safe_text(entity_data.get("logos", "Untitled issue"), 240)
+    description = _safe_text(entity_data.get("description", ""), 480)
+    longevity = _safe_text(entity_data.get("longevity", ""), 32)
+    status = _safe_text(entity_data.get("status", ""), 32)
+    premises = entity_data.get("premises")
+    premises_count = len(premises) if isinstance(premises, list) else 0
+    return [
+        f"Issue logos: {logos}",
+        f"Issue description: {description or 'none'}",
+        f"Issue longevity: {longevity or 'unknown'}",
+        f"Issue status: {status or 'unknown'}",
+        f"Issue premises_count: {premises_count}",
+    ]
+
+
+def _build_feed_context_lines(entity_data):
+    title = _safe_text(entity_data.get("title") or entity_data.get("url") or "Untitled feed", 240)
+    url = _safe_text(entity_data.get("url", ""), 240)
+    category = _safe_text(entity_data.get("category", ""), 80)
+    last_fetch = _safe_text(entity_data.get("last_fetch_at", ""), 80)
+    return [
+        f"Feed title: {title}",
+        f"Feed url: {url or 'unknown'}",
+        f"Feed category: {category or 'unknown'}",
+        f"Feed last_fetch_at: {last_fetch or 'unknown'}",
+    ]
+
+
+CONTEXT_LINE_BUILDERS = {
+    "article": _build_article_context_lines,
+    "issue": _build_issue_context_lines,
+    "feed": _build_feed_context_lines,
+}
+
+
+def _build_context_preamble(context):
+    if not isinstance(context, dict):
+        return ""
+
+    context_type = str(context.get("type") or "").strip().lower()
+    entity_id = context.get("entity_id") or ""
+    entity_data = context.get("entity_data")
+
+    line_builder = CONTEXT_LINE_BUILDERS.get(context_type)
+    if line_builder is None or not isinstance(entity_data, dict):
+        return ""
+
+    lines = [
+        "You are in a contextual chat session.",
+        f"Context type: {context_type}",
+    ]
+
+    if entity_id:
+        lines.append(f"Context entity_id: {_safe_text(entity_id, 120)}")
+
+    lines.extend(line_builder(entity_data))
+
+    lines.append(
+        "Use this context to ground your response and actions. If asked to create/update issues, call tools explicitly."
+    )
+    return "\n".join(lines)
+
+
+def _derive_context_session_title(context, fallback_title="New Chat"):
+    if not isinstance(context, dict):
+        return fallback_title
+
+    context_type = str(context.get("type") or "").strip().lower()
+    entity_data = context.get("entity_data")
+    if context_type not in {"article", "issue", "feed"} or not isinstance(entity_data, dict):
+        return fallback_title
+
+    if context_type == "article":
+        label = "Article"
+        name = entity_data.get("title") or "Untitled"
+    elif context_type == "issue":
+        label = "Issue"
+        name = entity_data.get("logos") or "Untitled"
+    else:
+        label = "Feed"
+        name = entity_data.get("title") or entity_data.get("url") or "Untitled"
+
+    return f"{label}: {_safe_text(name, 80)}"
+
+
 def run_agent_sync(
     user_message,
     history,
     userspace_id,
+    context=None,
     model=None,
     llm_endpoint=None,
     api_key=None,
@@ -279,6 +411,7 @@ def run_agent_sync(
             user_message,
             history,
             userspace_id,
+            context,
             model,
             llm_endpoint,
             api_key,
@@ -292,6 +425,7 @@ async def run_agent(
     user_message,
     history,
     userspace_id,
+    context=None,
     model=None,
     llm_endpoint=None,
     api_key=None,
@@ -306,6 +440,10 @@ async def run_agent(
 
     # System prompt
     _ensure_system_message(messages)
+
+    context_preamble = _build_context_preamble(context)
+    if context_preamble:
+        messages.insert(1, {"role": "system", "content": context_preamble})
 
     messages.append({"role": "user", "content": user_message})
 
@@ -426,6 +564,7 @@ def chat():
     data = request.json
     user_message = data.get("message")
     history = data.get("history", [])
+    context = data.get("context")
     model = data.get("model")
     llm_endpoint = data.get("llm_endpoint") or DEFAULT_LLM_PROVIDER
 
@@ -471,6 +610,7 @@ def chat():
             user_message,
             history,
             g.user_id,
+            context,
             model,
             llm_endpoint,
             api_key,
@@ -511,7 +651,8 @@ def get_chat_session(session_id):
 @jwt_required
 def create_chat_session():
     data = request.json
-    title = data.get("title", "New Chat")
+    context = data.get("context")
+    title = _derive_context_session_title(context, data.get("title", "New Chat"))
     session_id = str(uuid.uuid4())
     session = {
         "_id": session_id,
@@ -520,6 +661,7 @@ def create_chat_session():
         "messages": [],
         "model": data.get("model"),
         "llm_endpoint": data.get("llm_endpoint"),
+        "context": context if isinstance(context, dict) else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if update_couchdb_doc("chat_history", session_id, session):
@@ -549,6 +691,8 @@ def update_chat_session(session_id):
         session["llm_endpoint"] = data["llm_endpoint"]
     if "title" in data:
         session["title"] = data["title"]
+    if "context" in data:
+        session["context"] = data["context"] if isinstance(data["context"], dict) else None
 
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)
