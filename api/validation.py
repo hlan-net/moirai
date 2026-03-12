@@ -2,6 +2,7 @@
 Input validation utilities for Moirai API
 """
 
+import re
 import uuid
 from enum import Enum
 from typing import Any, Dict, Optional
@@ -9,7 +10,7 @@ from urllib.parse import urlparse
 
 import bleach
 import validators
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 
 # Enums for AgentConfig
@@ -64,12 +65,28 @@ def _ensure_valid_url_list(values: list[str]) -> None:
         if not validators.url(link):
             raise ValueError(f"Invalid URL: {link}")
 
+
+# Valid schedule interval format: a positive integer followed by s/m/h/d
+SCHEDULE_INTERVAL_PATTERN = re.compile(r"^\d+[smhd]$")
+
+
+def _validate_schedule_interval_format(value: str) -> str:
+    """Validate that a schedule_interval string matches the expected format (e.g. '30m', '2h')."""
+    if not SCHEDULE_INTERVAL_PATTERN.match(value):
+        raise ValueError(
+            f"Invalid schedule_interval '{value}'. "
+            "Must be a positive integer followed by a unit: s (seconds), "
+            "m (minutes), h (hours), or d (days). Example: '30m', '2h', '1d'."
+        )
+    return value
+
+
 class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     status: AgentStatus = Field(AgentStatus.ACTIVE)
     trigger_type: AgentTriggerType
     schedule_interval: Optional[str] = Field(
-        None, description="e.g., '1h', '1d', 'every 30m'"
+        None, description="e.g., '30m', '2h', '1d' (integer + unit s/m/h/d)"
     )
     target_db: AgentTargetDB
     logic_module: str = Field(
@@ -86,10 +103,31 @@ class AgentConfigBase(BaseModel):
         None, description="ID of a specific event or trend this agent is managing"
     )
 
+    @field_validator("schedule_interval")
+    @classmethod
+    def validate_schedule_interval(cls, v: Optional[str]) -> Optional[str]:
+        """Validate the format of schedule_interval when provided."""
+        if v is None:
+            return v
+        return _validate_schedule_interval_format(v)
+
     @field_validator("linked_entity_id")
     @classmethod
     def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
         return _validate_optional_uuid(v, "Linked entity ID")
+
+    @model_validator(mode="after")
+    def validate_schedule_cross_fields(self) -> "AgentConfigBase":
+        """Enforce cross-field rules between trigger_type and schedule_interval."""
+        if self.trigger_type == AgentTriggerType.SCHEDULED and not self.schedule_interval:
+            raise ValueError(
+                "schedule_interval is required when trigger_type is 'scheduled'."
+            )
+        if self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE and self.schedule_interval:
+            raise ValueError(
+                "schedule_interval must not be set when trigger_type is 'on_new_article'."
+            )
+        return self
 
 
 class AgentConfigCreateRequest(AgentConfigBase):
@@ -116,7 +154,7 @@ class AgentConfigUpdateRequest(BaseModel):
     owner_user_id: Optional[str] = None
     trigger_type: Optional[AgentTriggerType] = None
     schedule_interval: Optional[str] = Field(
-        None, description="e.g., '1h', '1d', 'every 30m'"
+        None, description="e.g., '30m', '2h', '1d' (integer + unit s/m/h/d)"
     )
     target_db: Optional[AgentTargetDB] = None
     logic_module: Optional[str] = Field(
@@ -133,6 +171,14 @@ class AgentConfigUpdateRequest(BaseModel):
         None, description="ID of a specific event or trend this agent is managing"
     )
 
+    @field_validator("schedule_interval")
+    @classmethod
+    def validate_schedule_interval(cls, v: Optional[str]) -> Optional[str]:
+        """Validate the format of schedule_interval when provided."""
+        if v is None:
+            return v
+        return _validate_schedule_interval_format(v)
+
     @field_validator("linked_entity_id")
     @classmethod
     def validate_linked_entity_id(cls, v: Optional[str]) -> Optional[str]:
@@ -147,6 +193,26 @@ class AgentConfigUpdateRequest(BaseModel):
     @classmethod
     def validate_owner_user_id(cls, v: Optional[str]) -> Optional[str]:
         return _validate_optional_uuid(v, "Owner user ID")
+
+    @model_validator(mode="after")
+    def validate_schedule_cross_fields(self) -> "AgentConfigUpdateRequest":
+        """Enforce cross-field rules when both trigger_type and schedule_interval are being updated."""
+        if (
+            self.trigger_type == AgentTriggerType.SCHEDULED
+            and self.schedule_interval is not None
+            and not self.schedule_interval
+        ):
+            raise ValueError(
+                "schedule_interval is required when trigger_type is 'scheduled'."
+            )
+        if (
+            self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE
+            and self.schedule_interval is not None
+        ):
+            raise ValueError(
+                "schedule_interval must not be set when trigger_type is 'on_new_article'."
+            )
+        return self
 
 
 class FeedCreateRequest(BaseModel):
