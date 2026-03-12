@@ -94,20 +94,21 @@ class AgentMockDB:
             u = self.get_user_by_email(selector["email"])
             return [u] if u else []
         if db_name == "agent_configs":
-            # Apply basic owner_user_id filtering to mirror the API's list behaviour.
-            # The selector may be nested as {"$and": [{"$or": [...]}, {"owner_user_id": ...}]}.
             results = list(self.agent_configs.values())
-            owner_id = None
-            if "$and" in selector:
-                for clause in selector["$and"]:
-                    if "owner_user_id" in clause:
-                        owner_id = clause["owner_user_id"]
-                        break
-            elif "owner_user_id" in selector:
-                owner_id = selector["owner_user_id"]
-            if owner_id:
-                results = [r for r in results if r.get("owner_user_id") == owner_id]
-            return results
+
+            def doc_matches(doc: dict, sel: dict) -> bool:
+                for key, value in sel.items():
+                    if key == "$or":
+                        if not any(doc_matches(doc, sub_sel) for sub_sel in value):
+                            return False
+                    elif key == "$and":
+                        if not all(doc_matches(doc, sub_sel) for sub_sel in value):
+                            return False
+                    elif doc.get(key) != value:
+                        return False
+                return True
+
+            return [doc for doc in results if doc_matches(doc, selector)]
         return []
 
     def store_to_couchdb(self, db_name: str, doc: dict) -> Any:
