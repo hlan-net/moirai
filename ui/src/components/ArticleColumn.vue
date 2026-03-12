@@ -4,6 +4,7 @@ import { articleCache, type Article } from '../utils/articleCache'
 import { formatDate, stripHtml, getHostname } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
+import { useChatContextStore } from '../stores/chatContext'
 import { authFetch } from '../utils/authFetch'
 
 interface SearchArticleResult {
@@ -30,6 +31,7 @@ let searchDebounceTimer: number | null = null
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore()
+const chatContextStore = useChatContextStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 let observer: IntersectionObserver | null = null
@@ -369,6 +371,19 @@ const handleRefresh = async () => {
     refreshingFeed.value = false
   }
 }
+
+const openArticleChat = (article: Article) => {
+  chatContextStore.open('article', article._id, article as unknown as Record<string, unknown>)
+}
+
+const raiseArticleAsIssue = (article: Article) => {
+  chatContextStore.open(
+    'article',
+    article._id,
+    article as unknown as Record<string, unknown>,
+    'Please create a new Issue from this article'
+  )
+}
 </script>
 
 <template>
@@ -456,6 +471,10 @@ const handleRefresh = async () => {
           <span v-for="issue in article.issues" :key="issue.id" class="tag">
             {{ issue.longevity === 'transient' ? 'Event' : 'Trend' }}: {{ issue.logos }}
           </span>
+        </div>
+        <div v-if="authStore.isAuthenticated" class="card-actions">
+          <button class="mini-action" @click="openArticleChat(article)">💬 Chat</button>
+          <button class="mini-action" @click="raiseArticleAsIssue(article)">↑ Issue</button>
         </div>
       </div>
 
@@ -547,6 +566,27 @@ h2 {
   margin-right: 5px;
   font-size: 0.8rem;
 }
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mini-action {
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.mini-action:hover {
+  opacity: 0.9;
+}
+
 .delete-btn {
   background: none;
   border: none;

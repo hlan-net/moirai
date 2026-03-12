@@ -2,6 +2,7 @@
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
+import { useChatContextStore } from '../stores/chatContext'
 import { authFetch } from '../utils/authFetch'
 
 interface Premise {
@@ -27,6 +28,7 @@ let refreshInterval: number | null = null
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore()
+const chatContextStore = useChatContextStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Filtered issues based on search query
@@ -136,6 +138,19 @@ const toggleExpand = (id: string) => {
   }
 }
 
+const openIssueChat = (issue: Issue) => {
+  chatContextStore.open('issue', issue._id, issue as unknown as Record<string, unknown>)
+}
+
+const openRefineIssueChat = (issue: Issue) => {
+  chatContextStore.open(
+    'issue',
+    issue._id,
+    issue as unknown as Record<string, unknown>,
+    'Help me refine the description of this Issue based on its linked articles'
+  )
+}
+
 onMounted(() => {
   fetchIssues()
   refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
@@ -219,6 +234,11 @@ onUnmounted(() => {
           </button>
         </div>
         <p v-if="issue.description" class="summary">{{ issue.description }}</p>
+
+        <div v-if="authStore.isAuthenticated" class="card-actions" @click.stop>
+          <button class="mini-action" @click="openIssueChat(issue)">💬 Chat</button>
+          <button class="mini-action" @click="openRefineIssueChat(issue)">✏️ Refine</button>
+        </div>
         
         <div class="status-tags">
             <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
@@ -328,6 +348,22 @@ h3 {
     display: flex;
     gap: 5px;
     margin-top: 5px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mini-action {
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
 .status-tag {

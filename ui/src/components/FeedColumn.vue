@@ -3,6 +3,7 @@ import { onMounted, ref, computed, watch, nextTick } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter' // Import the new filter store
+import { useChatContextStore } from '../stores/chatContext'
 import { authFetch } from '../utils/authFetch'
 
 interface Feed {
@@ -36,6 +37,7 @@ const searchQuery = ref('')
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore() // Initialize the filter store
+const chatContextStore = useChatContextStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Refs for modal accessibility
@@ -176,6 +178,15 @@ onMounted(() => {
 
 const openFeedInNewTab = (url: string) => {
   globalThis.open(url, '_blank')
+}
+
+const openFeedChat = (feed: Feed) => {
+  chatContextStore.open(
+    'feed',
+    feed._id,
+    feed as unknown as Record<string, unknown>,
+    'What has this feed been covering recently?'
+  )
 }
 
 const handleFaviconError = (event: Event) => {
@@ -543,6 +554,14 @@ const bulkImportFeeds = async () => {
                 d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
               />
             </svg>
+          </button>
+          <button
+            v-if="authStore.isAuthenticated"
+            @click="openFeedChat(feed)"
+            class="icon-btn"
+            title="Chat about feed"
+          >
+            💬
           </button>
           <button v-if="isAdmin" @click="startRename(feed)" class="icon-btn" title="Rename Feed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

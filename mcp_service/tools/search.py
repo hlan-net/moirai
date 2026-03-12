@@ -17,6 +17,7 @@ def _process_article_docs(docs):
     """Common logic to format article documents for tool output."""
     results = []
     for doc in docs:
+        description = doc.get("description") or doc.get("summary", "")
         results.append(
             {
                 "_id": doc.get("_id"),
@@ -24,7 +25,8 @@ def _process_article_docs(docs):
                 "link": doc.get("link", ""),
                 "published": doc.get("published", ""),
                 "feed_title": doc.get("feed_title", "Unknown"),
-                "description": doc.get("description", "")[:200],
+                "description": description[:200],
+                "language": doc.get("language", ""),
                 "userspace": extract_userspace(doc),
             }
         )
@@ -167,6 +169,8 @@ def search_articles(
                 "published",
                 "feed_title",
                 "description",
+                "summary",
+                "language",
                 "userspace",
                 "namespace",
             ],
@@ -227,6 +231,8 @@ def get_recent_articles(
                 "published",
                 "feed_title",
                 "description",
+                "summary",
+                "language",
                 "userspace",
                 "namespace",
             ],

@@ -2,6 +2,7 @@
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
+import { useChatContextStore } from '../stores/chatContext'
 import { authFetch } from '../utils/authFetch'
 
 interface Premise {
@@ -30,6 +31,7 @@ let refreshInterval: number | null = null
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore()
+const chatContextStore = useChatContextStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 const tierLabels: Record<LongevityTier, { label: string; color: string }> = {
@@ -164,6 +166,19 @@ const removePremise = async (issueId: string, premiseId: string) => {
   }
 }
 
+const openIssueChat = (issue: Issue) => {
+  chatContextStore.open('issue', issue._id, issue as unknown as Record<string, unknown>)
+}
+
+const openRefineIssueChat = (issue: Issue) => {
+  chatContextStore.open(
+    'issue',
+    issue._id,
+    issue as unknown as Record<string, unknown>,
+    'Help me refine the description of this Issue based on its linked articles'
+  )
+}
+
 onMounted(() => {
   fetchIssues()
   refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
@@ -270,6 +285,11 @@ onUnmounted(() => {
             </div>
             <p v-if="issue.description" class="summary">{{ issue.description }}</p>
 
+            <div v-if="authStore.isAuthenticated" class="card-actions" @click.stop>
+              <button class="mini-action" @click="openIssueChat(issue)">💬 Chat</button>
+              <button class="mini-action" @click="openRefineIssueChat(issue)">✏️ Refine</button>
+            </div>
+
             <div v-if="expandedIssues.has(issue._id)" class="premises-section">
               <h4>Constituents ({{ (issue.premises || []).length }})</h4>
               <ul>
@@ -334,6 +354,11 @@ onUnmounted(() => {
               </div>
             </div>
             <p v-if="issue.description" class="summary">{{ issue.description }}</p>
+
+            <div v-if="authStore.isAuthenticated" class="card-actions" @click.stop>
+              <button class="mini-action" @click="openIssueChat(issue)">💬 Chat</button>
+              <button class="mini-action" @click="openRefineIssueChat(issue)">✏️ Refine</button>
+            </div>
 
             <div v-if="expandedIssues.has(issue._id)" class="premises-section">
               <h4>Constituents ({{ (issue.premises || []).length }})</h4>
@@ -509,6 +534,22 @@ h3 {
   opacity: 0.9;
   line-height: 1.4;
   margin: 5px 0;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mini-action {
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
 .longevity-tag {

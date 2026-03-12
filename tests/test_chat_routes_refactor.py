@@ -17,6 +17,8 @@ class TestChatRoutesRefactor(unittest.TestCase):
                 "api.db": MagicMock(),
                 "api.auth": MagicMock(),
                 "httpx": MagicMock(),
+                "bleach": MagicMock(clean=lambda value, strip=True: value),
+                "bs4": MagicMock(),
             },
         )
         self.modules_patcher.start()
@@ -84,6 +86,38 @@ class TestChatRoutesRefactor(unittest.TestCase):
         # httpx is mocked
         client = self.chat_routes._create_http_client()
         self.assertTrue(client)
+
+    def test_build_context_preamble_for_article(self):
+        context = {
+            "type": "article",
+            "entity_id": "article-1",
+            "entity_data": {
+                "title": "TPS pyytää lisää tukea",
+                "feed_title": "Helsingin Sanomat",
+                "published": "2026-03-12T10:00:00Z",
+                "language": "fi",
+                "summary": "Article summary text",
+                "issues": [
+                    {"logos": "TPS economy"},
+                    {"logos": "Hockey financing"},
+                ],
+            },
+        }
+
+        preamble = self.chat_routes._build_context_preamble(context)
+        self.assertIn("Context type: article", preamble)
+        self.assertIn("Article title: TPS pyytää lisää tukea", preamble)
+        self.assertIn("Article summary: Article summary text", preamble)
+        self.assertIn("Currently linked issues: TPS economy, Hockey financing", preamble)
+
+    def test_derive_context_session_title(self):
+        context = {
+            "type": "issue",
+            "entity_data": {"logos": "US-Israel-Iran Bombing Campaign"},
+        }
+
+        title = self.chat_routes._derive_context_session_title(context, "fallback")
+        self.assertEqual(title, "Issue: US-Israel-Iran Bombing Campaign")
 
 
 if __name__ == "__main__":

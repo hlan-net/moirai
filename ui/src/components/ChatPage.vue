@@ -17,6 +17,9 @@ interface ChatSession {
   messages: Message[];
   model?: string;
   llm_endpoint?: string;
+  context?: {
+    type?: 'article' | 'issue' | 'feed'
+  }
 }
 
 const messages = ref<Message[]>([])
@@ -524,6 +527,19 @@ const getProviderColor = (provider?: string) => {
   }
 }
 
+const getContextTag = (session: ChatSession) => {
+  switch (session.context?.type) {
+    case 'article':
+      return { label: '📰 Article', color: '#0d6efd' }
+    case 'issue':
+      return { label: '🔗 Issue', color: '#a23bd8' }
+    case 'feed':
+      return { label: '📡 Feed', color: '#2e8b57' }
+    default:
+      return null
+  }
+}
+
 const startRename = (session: ChatSession, event: Event) => {
   event.stopPropagation()
   renamingSessionId.value = session._id
@@ -634,6 +650,13 @@ const renameSession = async (session: ChatSession) => {
               </span>
               <span class="tag model-tag" v-if="session.model">
                 {{ session.model }}
+              </span>
+              <span
+                v-if="getContextTag(session)"
+                class="tag context-tag"
+                :style="{ backgroundColor: getContextTag(session)?.color }"
+              >
+                {{ getContextTag(session)?.label }}
               </span>
             </div>
           </div>
@@ -915,6 +938,10 @@ const renameSession = async (session: ChatSession) => {
   background: #444;
   font-family: monospace;
   font-size: 0.55rem;
+}
+
+.context-tag {
+  color: white;
 }
 .rename-mode {
   padding: 5px 0;
