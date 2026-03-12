@@ -7,7 +7,7 @@ import uuid # Added for unique leader ID
 import redis # Added for Redis client
 
 from api.db import query_couchdb, update_couchdb_doc_safe
-from api.validation import AgentStatus, AgentTriggerType
+from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 
 logger = logging.getLogger(__name__)
@@ -266,13 +266,7 @@ class AgentOrchestrator(threading.Thread):
             )
             return
 
-        # Security: Whitelist allowed logic modules to prevent arbitrary code execution
-        ALLOWED_LOGIC_MODULES = [
-            "tasks.agent_logic.create_event_from_articles",
-            "tasks.agent_logic.add_articles_to_event",
-            "tasks.agent_logic.check_event_staleness",
-        ]
-
+        # Security: only execute modules in the shared allowlist (defined in api.validation)
         if logic_module_path not in ALLOWED_LOGIC_MODULES:
             logger.error(f"Logic module {logic_module_path} is not in the allowed whitelist.")
             return

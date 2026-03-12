@@ -2,14 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { authFetch } from '../utils/authFetch'
+import { ALLOWED_LOGIC_MODULES } from '../utils/agentConstants'
 
 const authStore = useAuthStore()
 
-const logicModules = [
-  'tasks.agent_logic.create_event_from_articles',
-  'tasks.agent_logic.add_articles_to_event',
-  'tasks.agent_logic.check_event_staleness',
-]
+// Single source of truth: mirrors api/validation.py::ALLOWED_LOGIC_MODULES
+const logicModules = ALLOWED_LOGIC_MODULES
 
 const triggerTypes = ['on_new_article', 'scheduled']
 const statuses = ['active', 'paused']
