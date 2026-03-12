@@ -71,10 +71,13 @@ const filteredFeeds = computed(() => {
   if (!searchQuery.value.trim()) return feeds.value
 
   const query = searchQuery.value.toLowerCase()
+
+  const toSearchable = (value: unknown) => String(value ?? '').toLowerCase()
+
   return feeds.value.filter((feed) => {
-    const title = (feed.title || '').toLowerCase()
-    const url = feed.url.toLowerCase()
-    const category = (feed.category || '').toLowerCase()
+    const title = toSearchable(feed.title)
+    const url = toSearchable(feed.url)
+    const category = toSearchable(feed.category)
     return title.includes(query) || url.includes(query) || category.includes(query)
   })
 })
@@ -699,6 +702,14 @@ h2 {
   overflow-y: auto;
   flex: 1;
 }
+
+.no-results {
+  padding: 12px;
+  color: var(--text-color);
+  opacity: 0.8;
+  font-style: italic;
+}
+
 .feed-item {
   margin: 10px 0;
   padding: 8px;
