@@ -26,19 +26,21 @@ docker compose up --build
 ```
 
 ### Local Docker build metadata (non-GitHub builds)
-Set `BUILD_NUMBER` when building local images so About displays a meaningful build label instead of `build unknown`/empty.
+Set `BUILD_NUMBER` with a timestamp when building locally so the About page shows when the build was created.
 
 ```bash
-BUILD_LABEL="CI $(date '+%Y-%m-%d %H:%M') build"
+BUILD_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 docker build -f api/Dockerfile \
-  --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+  --build-arg BUILD_NUMBER="$BUILD_TIMESTAMP" \
   -t rgsty.hlan.net/moirai:main .
 
 docker build -f ui/Dockerfile ui \
-  --build-arg BUILD_NUMBER="$BUILD_LABEL" \
+  --build-arg BUILD_NUMBER="$BUILD_TIMESTAMP" \
   -t rgsty.hlan.net/moirai-ui:main .
 ```
+
+This way you can always tell which local build you're testing by checking the timestamp in the About page.
 
 ### Backend (local dev)
 ```bash
@@ -174,7 +176,7 @@ Notable optional: `ALLOW_PUBLIC_READ`, `ARTICLE_EXPIRATION_DAYS` (default 30), `
 
 **Convention:**
 - **APP_VERSION**: Image tag (e.g., `"main"` for dev builds, `"0.6.1"` for releases). Injected via Docker `ARG APP_VERSION` and Helm environment variables.
-- **BUILD_NUMBER**: GitHub Actions run number (e.g., `123`). Injected via CI environment variable. Can be overridden locally with a custom label like `"2026-03-13 14:30"`.
+- **BUILD_NUMBER**: GitHub Actions run number in CI (e.g., `123`). For local dev builds, use a timestamp (e.g., `"2026-03-13 14:30:45"`) to identify when the build was created.
 
 **Build workflows:**
 - **docker-dev.yml** (pushed to `main` branch): Tags images as `:main` and `:sha-<hash>`. Sets `APP_VERSION=dev` at build time (default fallback).
