@@ -34,7 +34,22 @@ This file tracks follow-up work after the v0.6.0 release.
 - [ ] Add telemetry for dispatch lag and processing outcomes.
 
 ### 6) Add Dashboard Issue-Raising Wizard
-- [ ] Add a guided "Raise Issue" wizard in the dashboard article context chat flow.
-- [ ] Prioritize speed: minimal required fields first, optional refinement after issue creation.
-- [ ] Bias toward generic issue framing by default (avoid over-specific one-article wording).
-- [ ] Keep final result resumable in `/chat` as the same contextual session.
+- [x] Add a guided "Raise Issue" wizard in the dashboard article context chat flow.
+- [x] Prioritize speed: minimal required fields first, optional refinement after issue creation.
+- [x] Bias toward generic issue framing by default (avoid over-specific one-article wording).
+- [x] Keep final result resumable in `/chat` as the same contextual session.
+
+### 7) Improve Chat Reliability and Observability
+- [x] Show per-response timing in dashboard chat and `/chat`.
+- [x] Surface actionable provider-specific errors for nested TaskGroup failures (for example, Ollama endpoint reachability).
+- [x] Tune API reverse-proxy timeout behavior for longer chat/tool-assisted requests.
+
+## Next Iteration Candidates
+
+### A) Add Direct Issue-Creation Fast Path
+- [ ] Add a dedicated API path for article-to-issue creation to avoid long agent loops for common raise flows.
+- [ ] Keep wizard-driven clarification UX, but execute final creation via a deterministic backend path.
+
+### B) Harden LLM Endpoint Diagnostics
+- [ ] Add a lightweight settings test for Ollama/OpenAI/Gemini endpoint reachability and DNS failure hints.
+- [ ] Show clear in-UI status before sending long chat requests.
