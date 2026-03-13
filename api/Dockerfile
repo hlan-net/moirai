@@ -69,8 +69,10 @@ COPY . .
 # Build arguments placed late so they don't bust earlier layer caches
 ARG APP_VERSION=dev
 ARG BUILD_NUMBER=unknown
-ENV APP_VERSION=${APP_VERSION}
-ENV BUILD_NUMBER=${BUILD_NUMBER}
+
+# Create build info file with version and build number
+RUN mkdir -p /etc/moirai && \
+    printf "APP_VERSION=%s\nBUILD_NUMBER=%s\n" "${APP_VERSION}" "${BUILD_NUMBER}" > /etc/moirai/build-info
 
 # Final permission lockdown
 RUN chown -R root:appuser /app && \
@@ -78,7 +80,8 @@ RUN chown -R root:appuser /app && \
     chmod -R 700 /app/feeds && \
     chmod -R 770 /app/ui/dist && \
     chmod +x /app/create_dbs.sh && \
-    chmod 1777 /tmp
+    chmod 1777 /tmp && \
+    chmod 644 /etc/moirai/build-info
 
 USER appuser
 
