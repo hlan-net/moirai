@@ -362,6 +362,12 @@ def _build_article_context_lines(entity_data):
         lines.append(f"Currently linked issues: {', '.join(issue_names[:8])}")
     else:
         lines.append("Currently linked issues: none")
+
+    # Instructions for issue creation from article
+    article_id = entity_data.get("_id", "")
+    if article_id:
+        lines.append(f"To create an Issue from this article, use the add_event tool with article_links=['{article_id}']")
+
     return lines
 
 
@@ -422,6 +428,13 @@ def _build_context_preamble(context):
         lines.append(f"Context entity_id: {_safe_text(entity_id, 120)}")
 
     lines.extend(line_builder(entity_data))
+
+    # Add context-specific guidance
+    if context_type == "article":
+        lines.append(
+            "If asked to create an Issue from this article: Use the add_event tool (not forge_issue). "
+            "Pass the article ID in article_links parameter."
+        )
 
     lines.append(
         "Use this context to ground your response and actions. If asked to create/update issues, call tools explicitly."
