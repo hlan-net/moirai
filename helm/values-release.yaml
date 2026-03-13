@@ -1,0 +1,26 @@
+# Release/production environment overrides
+# Deploy with: helm install moirai . -f values-release.yaml -n moirai-release
+
+# Use semantic version tag (e.g., :0.6.1, :latest)
+# Update to match the current release version
+api:
+  image:
+    tag: "latest"  # Or pin to specific version like "0.6.1"
+
+ui:
+  image:
+    tag: "latest"  # Or pin to specific version like "0.6.1"
+
+# Production-specific settings
+environment: production
+api:
+  replicaCount: 2  # Higher availability in production
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 15
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+
+ui:
+  replicaCount: 1
