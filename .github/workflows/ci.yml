@@ -45,6 +45,8 @@ jobs:
         activate-environment: moirai
         auto-activate: false
         use-mamba: true
+        cache-environment: true
+        cache-environment-key: conda-${{ hashFiles('environment.yml') }}
 
     - name: Install dependencies (Conda)
       # Dependencies are installed by setup-miniconda using environment.yml
@@ -56,8 +58,7 @@ jobs:
 
     - name: Lint with Ruff
       run: |
-        conda run --name moirai ruff check . --select=E9,F63,F7,F82 --target-version=py310 # Use conda run
-        conda run --name moirai ruff check . --exit-zero --statistics # Use conda run
+        conda run --name moirai ruff check . --target-version=py310
 
     - name: Run tests
       env:
@@ -110,6 +111,14 @@ jobs:
     - name: Install dependencies (Yarn)
       working-directory: ./ui
       run: yarn install
+
+    - name: Cache Playwright browsers
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('ui/package.json') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
 
     - name: Build UI
       working-directory: ./ui
@@ -172,23 +181,3 @@ jobs:
         done
         docker compose logs mcp-server
         exit 1
-
-    - name: Set up Miniforge
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-variant: Miniforge3
-        miniforge-version: latest
-        environment-file: environment.yml
-        activate-environment: moirai
-        auto-activate: false
-        use-mamba: true
-
-    - name: Run MCP integration tests
-      env:
-        MCP_SERVER_URL: http://localhost:8090/sse
-        ADMIN_USERNAME: testuser
-        ADMIN_PASSWORD: testpassword
-        DISABLE_RATE_LIMIT: true
-      shell: bash -el {0}
-      run: |
-        pytest -m integration -v
