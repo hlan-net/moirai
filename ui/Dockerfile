@@ -12,8 +12,10 @@ RUN yarn install
 # Copy the rest of the UI source code
 COPY . .
 
-# Build argument placed after dependency install so it doesn't bust the cache
+# Build arguments placed after dependency install so they don't bust the cache
+ARG APP_VERSION=dev
 ARG BUILD_NUMBER
+ENV APP_VERSION=$APP_VERSION
 ENV BUILD_NUMBER=$BUILD_NUMBER
 
 # Build the application
