@@ -14,7 +14,6 @@ In Kubernetes this is invoked by a CronJob on a configurable schedule
 """
 
 import logging
-import os
 import sys
 
 from tasks import init

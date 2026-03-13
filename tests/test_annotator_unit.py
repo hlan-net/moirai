@@ -1,7 +1,6 @@
 """Unit tests for tasks/annotator.py — validation and LLM annotation logic."""
 
 import os
-import sys
 
 os.environ.setdefault("ADMIN_PASSWORD", "test_password")
 

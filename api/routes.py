@@ -29,10 +29,8 @@ from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
 from api.article_ops import build_article_selector, paginate_results
 from api.db_constants import (
-    MONGO_ELEM_MATCH,
     MONGO_REGEX,
     MONGO_OR,
-    MONGO_IN,
     MONGO_GT,
     MONGO_GTE,
     MONGO_LTE,

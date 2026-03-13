@@ -87,7 +87,6 @@ def test_context_preamble_for_non_article_unchanged():
 
 def test_add_event_works_with_article_id():
     """Test that add_event (the alias) works correctly."""
-    from mcp_service.tools.issues import _forge_issue_internal
 
     # Mock article links as they would come from add_event
     article_links = ["article-789", "article-790"]
