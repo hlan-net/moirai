@@ -450,7 +450,8 @@ const copyChat = async () => {
             :title="copyStatus || 'Copy chat to clipboard'"
             aria-label="Copy chat to clipboard"
           >
-            {{ copyStatus || '📋' }}
+            <span aria-hidden="true">{{ copyStatus || '📋' }}</span>
+            <span class="sr-only">Copy chat to clipboard</span>
           </button>
           <button class="close-btn" @click="closeModal" aria-label="Close contextual chat">×</button>
         </div>
@@ -720,5 +721,17 @@ const copyChat = async () => {
   .context-chat-drawer {
     width: 100%;
   }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </style>
