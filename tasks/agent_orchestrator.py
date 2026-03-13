@@ -218,6 +218,18 @@ class AgentOrchestrator(threading.Thread):
 
     def _dispatch_on_new_article_agents(self, new_docs: list[dict]) -> None:
         """Dispatch on_new_article agents with articles from their own userspace."""
+        # Pre-group documents by userspace for efficient dispatch (O(docs + agents) instead of O(docs * agents))
+        docs_by_userspace: dict[str, list[dict]] = {}
+        for doc in new_docs:
+            userspace = doc.get("userspace")
+            if userspace:
+                if userspace not in docs_by_userspace:
+                    docs_by_userspace[userspace] = []
+                docs_by_userspace[userspace].append(doc)
+
+        if not docs_by_userspace:
+            return
+
         # Query active on_new_article agents
         active_agents = query_couchdb(
             self.agent_configs_db,
@@ -236,8 +248,8 @@ class AgentOrchestrator(threading.Thread):
                 )
                 continue
 
-            # Filter articles to only this agent's userspace
-            agent_articles = [d for d in new_docs if d.get("userspace") == userspace]
+            # Get articles for this agent's userspace
+            agent_articles = docs_by_userspace.get(userspace)
             if not agent_articles:
                 continue
 
