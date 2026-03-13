@@ -84,20 +84,8 @@ def _collect_article_links(issue):
     return links
 
 
-def run_cleanup():
-    logger.info("Cleanup: Starting maintenance cycle...")
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-
-    issues = get_all_docs("issues")
-    linked_issue_ids = _collect_linked_issue_ids(issues)
-
-    logger.info(
-        "Cleanup: Found %s temporal issues referencing %s transient issues.",
-        len([i for i in issues if i.get("longevity") == "temporal"]),
-        len(linked_issue_ids),
-    )
-
+def _process_issues(issues, linked_issue_ids, now):
+    """Process issues for cleanup and return deletion count + active article links."""
     active_article_links = set()
     issues_deleted = 0
     issues_kept = 0
@@ -122,9 +110,7 @@ def run_cleanup():
         age = now - dt
 
         should_delete = (
-            issue_id not in linked_issue_ids
-            and age.days > 365
-            and status != "eternal"
+            issue_id not in linked_issue_ids and age.days > 365 and status != "eternal"
         )
 
         if should_delete:
@@ -139,14 +125,11 @@ def run_cleanup():
             issues_kept += 1
             active_article_links.update(_collect_article_links(issue))
 
-    logger.info(
-        "Cleanup: Issues processed. Deleted: %s. Kept: %s. Active referenced articles: %s",
-        issues_deleted,
-        issues_kept,
-        len(active_article_links),
-    )
+    return issues_deleted, issues_kept, active_article_links
 
-    articles = get_all_docs("articles")
+
+def _process_articles(articles, active_article_links, now):
+    """Process articles for cleanup and return deletion count."""
     articles_deleted = 0
 
     for article in articles:
@@ -162,12 +145,44 @@ def run_cleanup():
         should_delete = link not in active_article_links and age.days > 30
         if should_delete:
             logger.info(
-                "Cleanup: Deleting orphaned article %s (Age: %s days)",
+                "Cleanup: Deleting orphaned article %s (Age: %s days, Link: %s)",
                 article_id,
                 age.days,
+                link,
             )
             if delete_doc("articles", article_id, article.get("_rev")):
                 articles_deleted += 1
+
+    return articles_deleted
+
+
+def run_cleanup():
+    logger.info("Cleanup: Starting maintenance cycle...")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    issues = get_all_docs("issues")
+    linked_issue_ids = _collect_linked_issue_ids(issues)
+
+    logger.info(
+        "Cleanup: Found %s temporal issues referencing %s transient issues.",
+        len([i for i in issues if i.get("longevity") == "temporal"]),
+        len(linked_issue_ids),
+    )
+
+    issues_deleted, issues_kept, active_article_links = _process_issues(
+        issues, linked_issue_ids, now
+    )
+
+    logger.info(
+        "Cleanup: Issues processed. Deleted: %s. Kept: %s. Active referenced articles: %s",
+        issues_deleted,
+        issues_kept,
+        len(active_article_links),
+    )
+
+    articles = get_all_docs("articles")
+    articles_deleted = _process_articles(articles, active_article_links, now)
 
     logger.info(
         "Cleanup: Finished. Deleted %s issues and %s articles.",

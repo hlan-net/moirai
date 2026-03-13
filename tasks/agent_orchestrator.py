@@ -208,7 +208,7 @@ class AgentOrchestrator(threading.Thread):
 
         elif response.status_code == 404:
             # DB doesn't exist yet — wait and retry
-            logger.debug(f"AgentOrchestrator: articles DB not found, retrying...")
+            logger.debug("AgentOrchestrator: articles DB not found, retrying...")
             time.sleep(10)
         else:
             logger.error(
