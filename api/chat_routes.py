@@ -89,28 +89,36 @@ def _is_verbose_chat_export_enabled(config_doc: dict | None) -> bool:
     return bool(config_doc.get(CHAT_EXPORT_VERBOSE_SETTING, False))
 
 
+def _extract_tool_call_info(tool_call):
+    """Extract tool name, args, and status from tool call object."""
+    func_name = "unknown"
+    func_args = "{}"
+    func_status = None
+
+    if isinstance(tool_call, dict):
+        if "name" in tool_call:
+            func_name = tool_call.get("name", func_name)
+            func_status = tool_call.get("status")
+            func_args = tool_call.get("arguments") or tool_call.get("args") or func_args
+        else:
+            function_data = tool_call.get("function") or {}
+            func_name = function_data.get("name", func_name)
+            func_args = function_data.get("arguments", func_args)
+    else:
+        function_data = getattr(tool_call, "function", None)
+        if function_data:
+            func_name = getattr(function_data, "name", func_name)
+            func_args = getattr(function_data, "arguments", func_args)
+
+    return func_name, func_args, func_status
+
+
 def _format_tool_call_markdown(tool_calls) -> str:
     if not tool_calls:
         return ""
     rows = []
     for tool_call in tool_calls:
-        func_name = "unknown"
-        func_args = "{}"
-        func_status = None
-        if isinstance(tool_call, dict):
-            if "name" in tool_call:
-                func_name = tool_call.get("name", func_name)
-                func_status = tool_call.get("status")
-                func_args = tool_call.get("arguments") or tool_call.get("args") or func_args
-            else:
-                function_data = tool_call.get("function") or {}
-                func_name = function_data.get("name", func_name)
-                func_args = function_data.get("arguments", func_args)
-        else:
-            function_data = getattr(tool_call, "function", None)
-            if function_data:
-                func_name = getattr(function_data, "name", func_name)
-                func_args = getattr(function_data, "arguments", func_args)
+        func_name, func_args, func_status = _extract_tool_call_info(tool_call)
         if func_status:
             rows.append(f"- `{func_name}` status: `{func_status}` args: `{func_args}`")
         else:

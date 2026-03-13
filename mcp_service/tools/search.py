@@ -10,6 +10,7 @@ from .userspace import build_userspace_selector, extract_userspace
 # Database names
 ISSUES_DB = "issues"
 ARTICLES_DB = "articles"
+COUCHDB_FIND_ENDPOINT = "/_find"
 
 # ===== INTERNAL LOGIC =====
 
@@ -86,7 +87,7 @@ def _search_issues_internal(
             "fields": ["_id", "logos", "description", "premises", "longevity", "status"],
         }
 
-        resp = db_request("POST", ISSUES_DB, "/_find", json_data=query_payload)
+        resp = db_request("POST", ISSUES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload)
 
         if resp.status_code != 200:
             return json.dumps({"error": f"Search failed: {resp.text}"})
@@ -248,7 +249,7 @@ def get_recent_articles(
             ],
         }
 
-        resp = db_request("POST", ARTICLES_DB, "/_find", json_data=query_payload)
+        resp = db_request("POST", ARTICLES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload)
 
         if resp.status_code != 200:
             return json.dumps({"error": f"Fetch failed: {resp.text}"})
