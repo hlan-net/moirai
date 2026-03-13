@@ -11,7 +11,7 @@ Moirai is a GenAI-native press review platform built on the Model Context Protoc
 Three main services:
 
 - **Flask REST API** (`main.py`, `api/`) — port 8088, serves UI and admin CRUD. Uses gunicorn in production, with worker/scheduler started separately via `run_worker.py`.
-- **MCP Server** (`mcp_server.py` → `mcp_service/`) — Starlette/FastMCP SSE server on port 8090. Tool modules live in `mcp_service/tools/` (feeds, issues, search, staleness, users, agent_configs, annotations). Includes Redis cache, AgentOrchestrator background thread, and a dedicated Prometheus metrics server on port 9000.
+- **MCP Server** (`mcp_server.py` → `mcp_service/`) — Starlette/FastMCP SSE server on port 8090. Tool modules live in `mcp_service/tools/` (feeds, issues, search, staleness, users, agent_configs, annotations). Includes Redis cache, **AgentOrchestrator** (distributed leader lock + changes feed for agent dispatch), **AnnotationWorker** (longpoll articles/_changes), and a dedicated Prometheus metrics server on port 9000.
 - **Vue.js 3 UI** (`ui/`) — Vite + TypeScript + Pinia. 4-column admin layout (Feeds, Articles, Events, Trends) with chat interface.
 
 **Data storage:** CouchDB (databases: `feeds`, `articles`, `issues`/events/trends). Redis for caching (TTL 3600s, invalidated on ingestion/deletion).
@@ -94,12 +94,27 @@ GitHub Actions (`ci.yml`): two jobs — `test` (conda env + ruff + pytest + Dock
 - All text inputs sanitized with `bleach.clean()`. Request validation via Pydantic models in `api/validation.py`.
 - CSRF enabled by default (Flask-WTF); disabled in test mode or via `DISABLE_CSRF=true`.
 
-### CouchDB Pattern
-Always fetch latest `_rev` before updates to avoid 409 conflicts:
+### CouchDB Patterns
+
+**Conflict-safe updates:**
+Always fetch latest `_rev` before updates to avoid 409 conflicts. Use `update_couchdb_doc_safe()` for automatic retry:
 ```python
 existing = get_doc(db_name, doc_id)
 if existing:
     doc["_rev"] = existing["_rev"]
+
+# OR: use conflict-safe helper with automatic _rev retry
+update_couchdb_doc_safe(db_name, doc_id, {"field": "value"})
+```
+
+**Changes feed (event-driven):**
+For listening to document changes (e.g., new articles), use longpoll pattern with sequence tracking in config DB (see `AnnotationWorker` and `AgentOrchestrator._run_changes_feed()`):
+```python
+def _process_changes(self) -> None:
+    changes_url = f"{get_couchdb_uri()}{db_name}/_changes"
+    params = {"feed": "longpoll", "since": self.last_seq, "include_docs": "true", "timeout": 30000}
+    response = requests.get(changes_url, params=params, timeout=35)
+    # Extract docs and persist last_seq for restart safety
 ```
 
 ### Python Style
@@ -121,6 +136,31 @@ Define in `mcp_service/tools/` with `@mcp.tool()`. First arg must be `userspace:
 ### Adding an API Endpoint
 1. Pydantic model in `api/validation.py` with `bleach.clean()` sanitization.
 2. Route in `api/routes.py` with `@requires_auth` and `@limiter.limit()`.
+
+### Agent Orchestrator & Distributed Execution
+The `AgentOrchestrator` runs in the MCP server as a daemon thread:
+- **Leadership:** Uses Redis distributed lock to ensure only one instance (of potentially many) runs agents at a time.
+- **SCHEDULED agents:** Checked every 60s (poll interval). Respects `last_run_at` and `schedule_interval`.
+- **ON_NEW_ARTICLE agents:** Dispatched via `_changes` feed longpoll on `articles` database. Each agent receives only articles from its own `userspace`. Sequence tracking persists across restarts.
+- **Errors:** On exception, agent is marked with `status: ERROR` and logged; `last_run_at` is updated before dispatch so failed runs still count.
+
+### Adding Agent Logic
+Agent orchestration supports two trigger types: `SCHEDULED` (runs on interval) and `ON_NEW_ARTICLE` (runs when articles arrive).
+
+1. **Create logic function** in `tasks/agent_logic.py`:
+   - Signature: `def my_logic(agent_config: dict, mcp_client, new_articles: list[dict] = None, llm_config: dict = None) -> None`
+   - Add function name to `ALLOWED_LOGIC_MODULES` in `api/validation.py` (allowlist for security)
+   - Use `mcp_client.call_tool()` to invoke MCP tools (must pass `userspace` from agent_config)
+
+2. **Configure agent** via admin UI or API:
+   - Set `trigger_type` to `SCHEDULED` (with `schedule_interval` like `"1h"`, `"2d"`) or `ON_NEW_ARTICLE`
+   - Set `logic_module` to `"tasks.agent_logic.my_logic"`
+   - Set `userspace` (UUID) for the agent's data scope
+   - Set `llm_model_config` if the logic uses LLM calls
+
+3. **Testing:**
+   - Dispatch is automatic: `SCHEDULED` agents checked every 60s, `ON_NEW_ARTICLE` agents triggered within 1s of article arrival (via changes feed)
+   - Mock `query_couchdb()`, `update_couchdb_doc_safe()`, and `mcp_client` in tests
 
 ## Environment Variables
 
