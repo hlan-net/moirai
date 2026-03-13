@@ -172,6 +172,21 @@ watch(
     }
     await loadFromCache()
     await fetchArticlesAndCache(0)
+
+    // Report feed URLs to filter store when an issue is selected
+    if (filterStore.selectedIssueId) {
+      const feedUrls = [
+        ...new Set(
+          articles.value
+            .map((a: Article) => a.feed_url)
+            .filter((url): url is string => Boolean(url))
+        )
+      ]
+      filterStore.setContextualFeedUrls(feedUrls.length > 0 ? feedUrls : null)
+    } else {
+      filterStore.setContextualFeedUrls(null)
+    }
+
     loading.value = false
     setupIntersectionObserver()
   }
