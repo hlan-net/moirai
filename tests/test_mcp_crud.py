@@ -6,7 +6,7 @@ import pytest
 # Configuration
 MCP_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8090/sse")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "username")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "password")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "testpass")  # noqa: S105
 
 
 def _build_headers():
