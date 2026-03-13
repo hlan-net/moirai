@@ -20,6 +20,7 @@ import sys
 from tasks import init
 from tasks.enrichment_worker import worker
 from tasks.annotation_worker import annotation_worker
+from version import get_version_string
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
+    logger.info(f"{get_version_string()} starting...")
     logger.info("Initialising database...")
     init.run()
     logger.info("Database initialised. Starting workers...")
