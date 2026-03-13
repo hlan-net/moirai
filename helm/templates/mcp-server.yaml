@@ -80,6 +80,10 @@ spec:
           env:
             - name: ENVIRONMENT
               value: {{ .Values.environment | quote }}
+            - name: APP_VERSION
+              value: {{ .Values.api.image.tag | quote }}
+            - name: BUILD_NUMBER
+              value: {{ .Values.buildNumber | default "unknown" | quote }}
             - name: METRICS_PORT
               value: {{ .Values.mcpServer.service.metricsTargetPort | quote }}
             - name: OLLAMA_BASE_URL
