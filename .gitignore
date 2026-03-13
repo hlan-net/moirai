@@ -168,9 +168,11 @@ helm/charts/tests/k6/load_test.js
 ui/playwright-report/
 ui/test-results/
 
-# Local Helm overrides
+# Local Helm overrides (for internal development, not in public repo)
 custom-values.yaml
 helm/custom-values.yaml
+helm/values-dev.yaml
+helm/values-*.local.yaml
 
 # Yarn install state (auto-generated)
 ui/.yarn/

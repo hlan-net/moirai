@@ -9,7 +9,7 @@ Helm chart for deploying Moirai (GenAI Press Review platform).
 - Helm 3.x
 - CouchDB, Redis credentials
 
-### Single Instance (Default)
+### Installation
 
 ```bash
 helm install moirai . -n moirai --create-namespace \
@@ -19,115 +19,48 @@ helm install moirai . -n moirai --create-namespace \
   --set redis.password=yourredispass
 ```
 
-## Multi-Environment Deployments (Dev + Release)
+### Update to Specific Release
 
-Use environment-specific values files to run both dev and release instances on the same cluster.
-
-### Architecture
-- **Shared:** CouchDB instance (both environments read/write same data)
-- **Separate:** Redis, API, Worker, MCP Server, UI (one per environment)
-
-### Deploy Development Instance
+Pin to a release version:
 
 ```bash
-helm install moirai-dev . \
-  -f values-dev.yaml \
-  -n moirai-dev \
-  --create-namespace \
-  --set couchdb.adminPassword=yourpassword \
-  --set moirai.adminPassword=yourpassword \
-  --set moirai.jwtSecretKey=your-secret-key \
-  --set redis.password=yourredispass-dev
-```
-
-This deployment will:
-- Use `:main` images (from docker-dev.yml pushes to main branch)
-- Run with 1 API replica (dev sizing)
-- Display `environment: development` in config
-
-### Deploy Release Instance
-
-```bash
-helm install moirai-release . \
-  -f values-release.yaml \
-  -n moirai-release \
-  --create-namespace \
-  --set couchdb.adminPassword=yourpassword \
-  --set moirai.adminPassword=yourpassword \
-  --set moirai.jwtSecretKey=your-secret-key \
-  --set redis.password=yourredispass-release
-```
-
-This deployment will:
-- Use `:latest` images (or pin to specific version like `:0.6.1`)
-- Run with 2 API replicas (HA)
-- Display `environment: production` in config
-
-### Update Release to New Version
-
-After pushing a new release tag `v0.6.2`, update the release deployment:
-
-```bash
-# Edit values-release.yaml
-# Change: api.image.tag: "0.6.2"
-#         ui.image.tag: "0.6.2"
-
-helm upgrade moirai-release . \
-  -f values-release.yaml \
-  -n moirai-release
-```
-
-Or directly via command line:
-
-```bash
-helm upgrade moirai-release . \
-  -f values-release.yaml \
-  -n moirai-release \
-  --set api.image.tag=0.6.2 \
-  --set ui.image.tag=0.6.2
+helm upgrade moirai . \
+  -n moirai \
+  --set api.image.tag=0.6.1 \
+  --set ui.image.tag=0.6.1
 ```
 
 ## Configuration
 
-### Shared CouchDB
-Both dev and release instances connect to the same CouchDB (same `COUCHDB_URI`). Data is stored per-userspace, so users are isolated.
+See `values.yaml` for all available options:
 
-### Separate Redis Instances
-Each environment has its own Redis for rate-limiter sync and agent orchestrator locking:
-- Dev: `moirai-dev-redis`
-- Release: `moirai-release-redis`
+- **Image tags:** `api.image.tag`, `ui.image.tag` (default: `main`)
+- **Replicas:** `api.replicaCount`, `ui.replicaCount`
+- **Environment:** `environment` (development/production)
+- **Resources:** CPU/memory requests and limits per service
+- **Probes:** Readiness and liveness probe settings
 
-Use different Redis passwords for each environment in production.
+## Storage
 
-## Monitoring
+CouchDB uses persistent volumes for data. Configure:
+- `couchdb.persistentVolume.enabled` (default: true)
+- `couchdb.persistentVolume.size` (default: 10Gi)
+- `couchdb.persistentVolume.storageClass` (must match your cluster)
 
-Check deployments:
+## Multi-Namespace Deployments
 
-```bash
-kubectl get pods -n moirai-dev
-kubectl get pods -n moirai-release
-
-# Check logs
-kubectl logs -n moirai-dev deployment/moirai-dev-api
-kubectl logs -n moirai-release deployment/moirai-release-api
-
-# Port forward to test
-kubectl port-forward -n moirai-dev svc/moirai-dev-nginx 8080:80
-# Visit: http://localhost:8080
-```
-
-## Cleanup
-
-Remove a deployment:
+To run multiple instances (e.g., dev and release), deploy to separate namespaces with different configurations:
 
 ```bash
-helm uninstall moirai-dev -n moirai-dev
-helm uninstall moirai-release -n moirai-release
+# Release instance
+helm install moirai-release . \
+  -f values-release.yaml \
+  -n moirai-release \
+  --create-namespace
+
+# Dev instance (internal use only)
+# Uses: values-dev.yaml (not in public repo)
+# Deploy with custom image tags and environment settings as needed
 ```
 
-Delete the namespace (warning: deletes all resources):
-
-```bash
-kubectl delete namespace moirai-dev
-kubectl delete namespace moirai-release
-```
+Each instance has its own Redis for isolation. CouchDB data is scoped per userspace, so instances can share the same database safely.
