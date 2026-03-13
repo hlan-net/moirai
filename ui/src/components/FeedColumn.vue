@@ -82,6 +82,14 @@ const filteredFeeds = computed(() => {
   })
 })
 
+// Computed: Feeds filtered by contextual selection (articles from selected event)
+const contextuallyFilteredFeeds = computed(() => {
+  if (!filterStore.contextualFeedUrls) return filteredFeeds.value
+  return filteredFeeds.value.filter(feed =>
+    filterStore.contextualFeedUrls!.includes(feed.url)
+  )
+})
+
 const showNotification = (message: string, type: 'error' | 'success' | 'warning') => {
   notification.value = { message, type }
   setTimeout(() => {
@@ -435,7 +443,11 @@ const bulkImportFeeds = async () => {
 <template>
   <div class="column-container">
     <div class="column-header">
-      <h2>Feeds ({{ filteredFeeds.length }})</h2>
+      <h2>
+        Feeds ({{ contextuallyFilteredFeeds.length
+        }}<span v-if="filterStore.contextualFeedUrls && contextuallyFilteredFeeds.length !== filteredFeeds.length">
+          &nbsp;/ {{ filteredFeeds.length }}</span>)
+      </h2>
       <div class="header-actions" v-if="isAdmin">
         <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -483,13 +495,17 @@ const bulkImportFeeds = async () => {
       </button>
     </div>
 
+    <div v-if="filterStore.contextualFeedUrls" class="context-filter-hint">
+      Showing feeds from selected event
+    </div>
+
     <div v-if="loading">Loading...</div>
-    <div v-else-if="!filteredFeeds.length && searchQuery" class="no-results">
+    <div v-else-if="!contextuallyFilteredFeeds.length && searchQuery" class="no-results">
       No feeds match "{{ searchQuery }}"
     </div>
-    <ul v-else-if="filteredFeeds.length" class="feed-list">
+    <ul v-else-if="contextuallyFilteredFeeds.length" class="feed-list">
       <li
-        v-for="feed in filteredFeeds"
+        v-for="feed in contextuallyFilteredFeeds"
         :key="feed._id"
         class="feed-item"
         @click="
@@ -1061,5 +1077,13 @@ h2 {
   background: #fff3cd;
   color: #856404;
   border-left: 4px solid #ffc107;
+}
+
+.context-filter-hint {
+  font-size: 0.75rem;
+  opacity: 0.65;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-style: italic;
 }
 </style>
