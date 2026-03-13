@@ -451,10 +451,11 @@ grep -E "sk_|ghp_|AIza" ~/.claude/mcp-servers.json  # Should return nothing!
 git log -p --all -- ~/.claude/mcp-servers.json
 ```
 
-**Current Status:** ✅ mcp-servers.json uses environment variable placeholders
-- SONARQUBE_TOKEN uses `$SONARQUBE_TOKEN`
-- GOOGLE_API_KEY uses `$GOOGLE_API_KEY`
-- Never commit actual secrets!
+**Current Status:** ✅ Claude Code uses `~/.claude.json` (not committed to git)
+- Environment variables referenced in docker args (passed via env when running Claude Code)
+- HTTP headers support credentials via CLI-provided headers
+- Never store secrets in `.claude.json` or `.mcp.json`
+- Always use environment variables at runtime
 
 ### 2. **Rate Limiting**
 - Remote APIs (Google, Microsoft) have rate limits

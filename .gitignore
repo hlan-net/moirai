@@ -175,3 +175,8 @@ helm/custom-values.yaml
 # Yarn install state (auto-generated)
 ui/.yarn/
 ui/.yarn/install-state.gz
+
+# User-specific config (contains credentials)
+.claude/
+.claude.json
+.env.local
