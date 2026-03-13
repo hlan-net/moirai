@@ -167,3 +167,20 @@ Agent orchestration supports two trigger types: `SCHEDULED` (runs on interval) a
 Required: `COUCHDB_URI`, `COUCHDB_USER`, `COUCHDB_PASSWORD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JWT_SECRET_KEY`, `REDIS_PASSWORD`.
 
 Notable optional: `ALLOW_PUBLIC_READ`, `ARTICLE_EXPIRATION_DAYS` (default 30), `MODEL_NAME`, `DEFAULT_LLM_PROVIDER` (ollama/openai/gemini), `METRICS_PORT` (default 9000), `DISABLE_CSRF`, `DISABLE_RATE_LIMIT`.
+
+### Version and Build Metadata
+
+`APP_VERSION` and `BUILD_NUMBER` are injected at build/deployment time for display in the About page.
+
+**Convention:**
+- **APP_VERSION**: Image tag (e.g., `"main"` for dev builds, `"0.6.1"` for releases). Injected via Docker `ARG APP_VERSION` and Helm environment variables.
+- **BUILD_NUMBER**: GitHub Actions run number (e.g., `123`). Injected via CI environment variable. Can be overridden locally with a custom label like `"2026-03-13 14:30"`.
+
+**Build workflows:**
+- **docker-dev.yml** (pushed to `main` branch): Tags images as `:main` and `:sha-<hash>`. Sets `APP_VERSION=dev` at build time (default fallback).
+- **docker-release.yml** (pushed to `v*.*.*` tags): Tags images with semantic versions (`:0.6.1`, `:0.6`, `:0`, `:latest`). Extracts clean version from git tag and injects via `APP_VERSION=<version>`.
+
+**Kubernetes deployment:**
+- Helm `values.yaml` specifies `api.image.tag` and `ui.image.tag` (default: `"main"`). These tag values are passed to containers as `APP_VERSION` environment variable.
+- Override in custom values: `helm install moirai . --set api.image.tag=0.6.1` for release deployments.
+- Display format: `Moirai v<APP_VERSION> (<BUILD_NUMBER>)` (e.g., `"Moirai v0.6.1 (2025)"`).
