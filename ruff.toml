@@ -1,0 +1,16 @@
+# Ruff configuration for Moirai project
+# Ignore non-project files and build artifacts
+
+exclude = [
+    "get-pip.py",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".tox",
+    ".venv",
+    "venv",
+    "node_modules",
+]
+
+target-version = "py310"
