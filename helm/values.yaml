@@ -6,7 +6,7 @@ api:
   replicaCount: 2
   image:
     repository: ghcr.io/hlan-net/moirai
-    tag: "0.5.2-dev"
+    tag: "main"
     pullPolicy: IfNotPresent
   # Use image default command (gunicorn) when empty
   command: []
@@ -40,7 +40,7 @@ ui:
   replicaCount: 1
   image:
     repository: ghcr.io/hlan-net/moirai-ui
-    tag: "0.5.2-dev"
+    tag: "main"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
