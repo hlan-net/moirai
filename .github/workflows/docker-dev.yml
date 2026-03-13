@@ -9,9 +9,6 @@ on:
     branches: [ main ]
     paths-ignore:
       - 'helm/**'
-  pull_request:
-    paths-ignore:
-      - 'helm/**'
 
 jobs:
   test:
