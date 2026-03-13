@@ -14,7 +14,7 @@ from mcp import ClientSession
 # Configuration
 MCP_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8090/sse")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "username")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "password")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "testpass")  # noqa: S105
 USERSPACE = "smoke-test-userspace"
 
 
@@ -115,7 +115,7 @@ async def test_user_lifecycle():
             # Add user
             res = await session.call_tool(
                 "add_user",
-                {"email": "smoketest@example.com", "password": "testpass123", "role": "user"},
+                {"email": "smoketest@example.com", "password": "testpass123", "role": "user"},  # noqa: S106
             )
             result_text = res.content[0].text
             assert result_text is not None

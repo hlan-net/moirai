@@ -1,0 +1,207 @@
+name: Docker Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    env:
+      ADMIN_USERNAME: testuser
+      ADMIN_PASSWORD: testpassword
+      COUCHDB_PASSWORD: testpassword
+      REDIS_PASSWORD: testpassword
+      JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
+      DEFAULT_LLM_PROVIDER: gemini
+      MODEL_NAME: gemini-3-flash
+      DISABLE_RATE_LIMIT: true
+      DISABLE_CSRF: true
+      TEST_TARGET: docker
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Set up Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-variant: Miniforge3
+          miniforge-version: latest
+          environment-file: environment.yml
+          activate-environment: moirai
+          auto-activate: false
+          use-mamba: true
+
+      - name: Install dependencies (Conda)
+        run: |
+          conda run -n moirai pip install google-genai==1.3.0 google-auth==2.38.0 tenacity==9.1.4 structlog==25.5.0 passlib==1.7.4
+
+      - name: Run unit tests (no services required)
+        run: |
+          conda run -n moirai pytest tests/test_article_processor.py tests/test_live_lwn.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: ui/yarn.lock
+
+      - name: Install Frontend dependencies
+        working-directory: ui
+        run: yarn install
+
+      - name: Build UI
+        working-directory: ui
+        run: yarn build
+
+      - name: Install Playwright Browsers
+        working-directory: ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Build service images (no cache)
+        run: |
+          docker buildx build --load \
+            -t moirai-app:ci \
+            -f api/Dockerfile .
+          docker buildx build --load \
+            -t moirai-ui:ci \
+            -f ui/Dockerfile ui
+
+      - name: Start backend services
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --no-build
+
+      - name: Wait for services to be ready
+        run: |
+          set -x  # Enable debug output
+          echo "Waiting for services to start..."
+          echo "Checking running containers:"
+          docker compose ps
+
+          # Wait for main API
+          echo "=== Checking Backend API ==="
+          API_READY=false
+          for i in {1..60}; do
+            if curl -f http://localhost:8088/api/health > /dev/null 2>&1; then
+              echo "✓ Backend API is ready!"
+              API_READY=true
+              break
+            fi
+            echo "Waiting for API... ($i/60)"
+            sleep 2
+          done
+
+          if [ "$API_READY" = false ]; then
+            echo "❌ Backend API failed to become ready"
+            docker compose logs api
+            exit 1
+          fi
+
+          echo "=== Checking MCP Server ==="
+          # Wait for MCP server
+          MCP_READY=false
+          for i in {1..30}; do
+            if curl -f http://localhost:8090/health > /dev/null 2>&1; then
+              echo "✓ MCP Server is ready!"
+              MCP_READY=true
+              break
+            fi
+            echo "Waiting for MCP server... ($i/30)"
+            sleep 2
+          done
+
+          if [ "$MCP_READY" = false ]; then
+            echo "❌ MCP Server failed to become ready"
+            echo "Container status:"
+            docker compose ps mcp-server
+            echo "MCP Server logs:"
+            docker compose logs mcp-server
+            exit 1
+          fi
+
+          echo "=== All services ready ==="
+          sleep 5
+
+      - name: Run integration tests (requires services)
+        env:
+          DISABLE_RATE_LIMIT: true
+        run: |
+          # Run security API tests (should all pass)
+          conda run -n moirai pytest -m integration tests/test_security_api.py
+
+          # Skip MCP test for now - it requires complex SSE connection setup
+          # PYTHONPATH=. pytest tests/test_mcp_crud.py
+
+      - name: Run Playwright tests
+        working-directory: ui
+        env:
+          ADMIN_USERNAME: testuser
+          ADMIN_PASSWORD: testpassword
+          TEST_TARGET: docker
+        run: npx playwright test --workers=2 --reporter=github --quiet
+
+      - name: Stop backend services
+        run: docker compose down
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: ghcr.io/${{ github.repository }}
+            context: .
+            file: api/Dockerfile
+          - image: ghcr.io/${{ github.repository }}-ui
+            context: ui
+            file: ui/Dockerfile
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Docker Metadata
+        uses: docker/metadata-action@v6
+        id: docker_meta
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (no cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ env.APP_VERSION }}
+            BUILD_NUMBER=${{ github.run_number }}

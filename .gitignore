@@ -180,3 +180,6 @@ ui/.yarn/install-state.gz
 .claude/
 .claude.json
 .env.local
+
+# pip bootstrap script
+get-pip.py

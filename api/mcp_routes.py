@@ -122,6 +122,28 @@ def _trend_payload_from_issue(issue):
     payload["event_ids"] = _extract_event_ids(issue)
     return payload
 
+def _filter_articles_by_date(articles: list, since_str: str) -> list:
+    """Filter articles by 'since' ISO 8601 timestamp."""
+    try:
+        since_dt = datetime.fromisoformat(since_str.replace("Z", "+00:00"))
+    except ValueError:
+        abort(400, description="Invalid 'since' parameter. Use ISO 8601 format.")
+
+    filtered = []
+    for article in articles:
+        if "published" not in article:
+            continue
+        try:
+            article_dt = datetime.fromisoformat(
+                article["published"].replace("Z", "+00:00")
+            )
+            if article_dt >= since_dt:
+                filtered.append(article)
+        except (ValueError, AttributeError):
+            continue  # Skip articles with invalid date format
+    return filtered
+
+
 # Articles Endpoints
 
 
@@ -137,23 +159,7 @@ def retrieve_articles():
     # Filter by 'since' parameter if provided
     since = request.args.get("since")
     if since:
-        try:
-            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-            filtered_articles = []
-            for article in articles:
-                if "published" in article:
-                    try:
-                        article_dt = datetime.fromisoformat(
-                            article["published"].replace("Z", "+00:00")
-                        )
-                        if article_dt >= since_dt:
-                            filtered_articles.append(article)
-                    except (ValueError, AttributeError):
-                        # Skip articles with invalid date format
-                        continue
-            articles = filtered_articles
-        except ValueError:
-            abort(400, description="Invalid 'since' parameter. Use ISO 8601 format.")
+        articles = _filter_articles_by_date(articles, since)
 
     return jsonify(articles)
 

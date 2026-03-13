@@ -2,8 +2,6 @@ import os
 import jwt
 import datetime
 import logging
-import base64
-import secrets
 from functools import wraps
 from flask import Blueprint, request, jsonify, g
 from passlib.hash import bcrypt
@@ -20,8 +18,6 @@ from .auth_utils import (
     JWT_SECRET_KEY,
     JWT_ALGORITHM,
     ADMIN_USERNAME,
-    ADMIN_PASSWORD,
-    decode_token,
     verify_auth_header,
 )
 
@@ -39,10 +35,6 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 ENTRA_CLIENT_ID = os.environ.get("ENTRA_CLIENT_ID", "")
 ENTRA_TENANT_ID = os.environ.get("ENTRA_TENANT_ID", "")
 ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}"
-
-# Basic Auth Configuration
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
 
 def get_auth_config():

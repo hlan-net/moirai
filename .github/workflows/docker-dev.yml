@@ -1,4 +1,4 @@
-name: Build and Push Docker Image (amd64 & arm64)
+name: Docker Dev Build
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -6,18 +6,13 @@ concurrency:
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*.*.*'
+    branches: [ main ]
     paths-ignore:
       - 'helm/**'
-      - '.github/workflows/helm-package.yml'
 
 jobs:
   test:
     name: Run Tests
-    if: startsWith(github.ref, 'refs/tags/') || (github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'release:'))
     runs-on: ubuntu-latest
     env:
       ADMIN_USERNAME: testuser
@@ -43,7 +38,7 @@ jobs:
           key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'environment-prod.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
           restore-keys: |
             buildx-${{ runner.os }}-
-      
+
       - name: Set up Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -53,22 +48,22 @@ jobs:
           activate-environment: moirai
           auto-activate: false
           use-mamba: true
-          
+
       - name: Install dependencies (Conda)
         run: |
           conda run -n moirai pip install google-genai==1.3.0 google-auth==2.38.0 tenacity==9.1.4 structlog==25.5.0 passlib==1.7.4
-          
+
       - name: Run unit tests (no services required)
         run: |
           conda run -n moirai pytest tests/test_article_processor.py tests/test_live_lwn.py
-          
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'yarn'
           cache-dependency-path: ui/yarn.lock
-          
+
       - name: Install Frontend dependencies
         working-directory: ui
         run: yarn install
@@ -76,7 +71,7 @@ jobs:
       - name: Build UI
         working-directory: ui
         run: yarn build
-        
+
       - name: Install Playwright Browsers
         working-directory: ui
         run: npx playwright install --with-deps chromium
@@ -105,7 +100,7 @@ jobs:
           echo "Waiting for services to start..."
           echo "Checking running containers:"
           docker compose ps
-          
+
           # Wait for main API
           echo "=== Checking Backend API ==="
           API_READY=false
@@ -118,13 +113,13 @@ jobs:
             echo "Waiting for API... ($i/60)"
             sleep 2
           done
-          
+
           if [ "$API_READY" = false ]; then
             echo "❌ Backend API failed to become ready"
             docker compose logs api
             exit 1
           fi
-          
+
           echo "=== Checking MCP Server ==="
           # Wait for MCP server
           MCP_READY=false
@@ -137,7 +132,7 @@ jobs:
             echo "Waiting for MCP server... ($i/30)"
             sleep 2
           done
-          
+
           if [ "$MCP_READY" = false ]; then
             echo "❌ MCP Server failed to become ready"
             echo "Container status:"
@@ -146,20 +141,20 @@ jobs:
             docker compose logs mcp-server
             exit 1
           fi
-          
+
           echo "=== All services ready ==="
           sleep 5
-          
+
       - name: Run integration tests (requires services)
         env:
           DISABLE_RATE_LIMIT: true
         run: |
           # Run security API tests (should all pass)
           conda run -n moirai pytest -m integration tests/test_security_api.py
-          
+
           # Skip MCP test for now - it requires complex SSE connection setup
           # PYTHONPATH=. pytest tests/test_mcp_crud.py
-        
+
       - name: Run Playwright tests
         working-directory: ui
         env:
@@ -167,12 +162,11 @@ jobs:
           ADMIN_PASSWORD: testpassword
           TEST_TARGET: docker
         run: npx playwright test --workers=2 --reporter=github --quiet
-        
+
       - name: Stop backend services
         run: docker compose down
 
   build:
-    if: startsWith(github.ref, 'refs/tags/') || (github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'release:'))
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -197,13 +191,7 @@ jobs:
         with:
           images: ${{ matrix.image }}
           tags: |
-            type=schedule
             type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
             type=sha
 
       - name: Set up QEMU
@@ -231,4 +219,5 @@ jobs:
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           build-args: |
+            APP_VERSION=dev
             BUILD_NUMBER=${{ github.run_number }}

@@ -1,9 +1,8 @@
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 from tasks.agent_orchestrator import AgentOrchestrator
 from api.validation import AgentStatus, AgentTriggerType
-import json
 
 @pytest.fixture
 def mock_redis():

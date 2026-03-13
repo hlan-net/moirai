@@ -87,6 +87,19 @@ class AgentMockDB:
             return True
         return False
 
+    def _doc_matches_selector(self, doc: dict, sel: dict) -> bool:
+        """Check if document matches selector (recursive $or/$and support)."""
+        for key, value in sel.items():
+            if key == "$or":
+                if not any(self._doc_matches_selector(doc, sub_sel) for sub_sel in value):
+                    return False
+            elif key == "$and":
+                if not all(self._doc_matches_selector(doc, sub_sel) for sub_sel in value):
+                    return False
+            elif doc.get(key) != value:
+                return False
+        return True
+
     def query_couchdb(
         self, db_name: str, selector: dict, **kwargs: Any
     ) -> list[dict]:
@@ -95,20 +108,7 @@ class AgentMockDB:
             return [u] if u else []
         if db_name == "agent_configs":
             results = list(self.agent_configs.values())
-
-            def doc_matches(doc: dict, sel: dict) -> bool:
-                for key, value in sel.items():
-                    if key == "$or":
-                        if not any(doc_matches(doc, sub_sel) for sub_sel in value):
-                            return False
-                    elif key == "$and":
-                        if not all(doc_matches(doc, sub_sel) for sub_sel in value):
-                            return False
-                    elif doc.get(key) != value:
-                        return False
-                return True
-
-            return [doc for doc in results if doc_matches(doc, selector)]
+            return [doc for doc in results if self._doc_matches_selector(doc, selector)]
         return []
 
     def store_to_couchdb(self, db_name: str, doc: dict) -> Any:

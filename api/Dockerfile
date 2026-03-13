@@ -67,8 +67,9 @@ WORKDIR /app
 COPY . .
 
 # Build arguments placed late so they don't bust earlier layer caches
-ARG VERSION=0.5.2-dev
+ARG APP_VERSION=dev
 ARG BUILD_NUMBER=unknown
+ENV APP_VERSION=${APP_VERSION}
 ENV BUILD_NUMBER=${BUILD_NUMBER}
 
 # Final permission lockdown
