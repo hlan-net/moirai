@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { authFetch } from '../utils/authFetch'
+import { supportsToolCalling } from '../utils/modelCapabilities'
+import { useSettingsStore } from '../stores/settings'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -36,8 +38,6 @@ const deleteConfirmId = ref<string | null>(null)
 const renamingSessionId = ref<string | null>(null)
 const newSessionTitle = ref('')
 
-const currentLlmEndpoint = ref('ollama')
-const currentModel = ref('llama3.1:latest')
 const modelSelectOpen = ref(false)
 const loadingModels = ref(false)
 const modelFetchError = ref('')
@@ -45,6 +45,8 @@ const availableModels = ref<string[]>([])
 const availableOpenAiModels = ref<string[]>([])
 const availableGeminiModels = ref<string[]>([])
 const copyStatus = ref('')
+
+const settingsStore = useSettingsStore()
 
 const stripInternalReminders = (content: string) => {
   if (!content) return content
@@ -61,34 +63,22 @@ const normalizeErrorMessage = (raw: string) => {
   return compact
 }
 
-const modelSettingsMap: Record<string, string> = {
-  openai: 'moirai_openai_model',
-  gemini: 'moirai_gemini_model',
-  ollama: 'moirai_model'
-}
-
-const defaultModels: Record<string, string> = {
-  openai: 'gpt-4-turbo',
-  gemini: 'gemini-1.5-pro',
-  ollama: 'llama3.1:latest'
-}
-
 const endpointSelection = computed({
-  get: () => currentLlmEndpoint.value,
+  get: () => settingsStore.llmEndpoint,
   set: (value: string) => {
     updateEndpoint(value)
   }
 })
 
 const modelSelection = computed({
-  get: () => currentModel.value,
+  get: () => settingsStore.getCurrentModel(),
   set: (value: string) => {
     updateModel(value)
   }
 })
 
 const modelOptions = computed(() => {
-  switch (currentLlmEndpoint.value) {
+  switch (settingsStore.llmEndpoint) {
     case 'openai':
       return availableOpenAiModels.value
     case 'gemini':
@@ -101,58 +91,37 @@ const modelOptions = computed(() => {
 onMounted(() => {
     fetchConfig()
     fetchSessions()
-    loadSettings()
 })
 
-const _setInitialModelDefaults = (config: any) => {
-  // Use server defaults if no local override
-  if (!localStorage.getItem('moirai_llm_endpoint') && config.default_llm_provider) {
-    currentLlmEndpoint.value = config.default_llm_provider
-    
-    const settingsKey = modelSettingsMap[config.default_llm_provider]
-    if (settingsKey && !localStorage.getItem(settingsKey)) {
-       currentModel.value = config.default_model_name
-    }
-  }
-}
-
-const _applyUserSettings = (settings: any) => {
-  if (settings.moirai_llm_endpoint && !localStorage.getItem('moirai_llm_endpoint')) {
-    currentLlmEndpoint.value = settings.moirai_llm_endpoint
-  }
-  
-  const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
-  if (settings[settingsKey] && !localStorage.getItem(settingsKey)) {
-    currentModel.value = settings[settingsKey]
-  }
-}
+onUnmounted(() => {
+    // No need to remove listeners - Pinia handles reactivity
+})
 
 const fetchConfig = async () => {
   try {
     const response = await authFetch('/api/config')
     if (response.ok) {
       const config = await response.json()
-      _setInitialModelDefaults(config)
+      // Use server defaults if endpoint is still default
+      if (settingsStore.llmEndpoint === 'ollama' && config.default_llm_provider) {
+        settingsStore.llmEndpoint = config.default_llm_provider
+        if (config.default_model_name) {
+          settingsStore.setCurrentModel(config.default_model_name)
+        }
+      }
     }
 
     // Fetch user-specific settings to populate model selector
     const userRes = await authFetch('/api/auth/me')
     if (userRes.ok) {
       const userData = await userRes.json()
-      _applyUserSettings(userData.settings || {})
+      if (userData.settings) {
+        settingsStore.loadFromBackend(userData.settings)
+      }
     }
   } catch (error) {
     console.error('Error fetching config:', error)
   }
-}
-
-const loadSettings = () => {
-    currentLlmEndpoint.value = localStorage.getItem('moirai_llm_endpoint') || 'ollama'
-
-    const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
-    const defaultModel = defaultModels[currentLlmEndpoint.value] || 'llama3.1:latest'
-    
-    currentModel.value = localStorage.getItem(settingsKey) || defaultModel
 }
 
 const saveUserSetting = async (key: string, value: string) => {
@@ -167,23 +136,28 @@ const saveUserSetting = async (key: string, value: string) => {
   }
 }
 
-const updateEndpoint = (value: string) => {
-  if (currentLlmEndpoint.value === value) return
-  currentLlmEndpoint.value = value
-  localStorage.setItem('moirai_llm_endpoint', value)
+const updateEndpoint = async (value: string) => {
+  if (settingsStore.llmEndpoint === value) return
+  settingsStore.llmEndpoint = value
   saveUserSetting('moirai_llm_endpoint', value)
 
-  const settingsKey = modelSettingsMap[value] || 'moirai_model'
-  const defaultModel = defaultModels[value] || 'llama3.1:latest'
-  currentModel.value = localStorage.getItem(settingsKey) || defaultModel
-  loadModelsForEndpoint(value)
+  // Auto-load models when provider changes
+  await loadModelsForEndpoint(value)
 }
 
 const updateModel = (value: string) => {
-  currentModel.value = value
-  const settingsKey = modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model'
-  localStorage.setItem(settingsKey, value)
-  saveUserSetting(settingsKey, value)
+  // Validate tool support for Ollama models
+  if (settingsStore.llmEndpoint === 'ollama' && !supportsToolCalling(value)) {
+    console.warn(`Model ${value} does not support tool calling. Some features may not work.`)
+    modelFetchError.value = `Warning: ${value} doesn't support tool calling. Agent features will not work.`
+    // Don't prevent selection, just warn - user might want to use it anyway
+  } else {
+    modelFetchError.value = ''
+  }
+
+  settingsStore.setCurrentModel(value)
+  const modelKey = settingsStore.getCurrentModelKey()
+  saveUserSetting(modelKey, value)
 }
 
 const _fetchModels = async (endpoint: string, apiKey: string | null, headers: Record<string, string> = {}) => {
@@ -205,14 +179,13 @@ const _fetchModels = async (endpoint: string, apiKey: string | null, headers: Re
 
 const _loadOpenAiModels = async () => {
   if (availableOpenAiModels.value.length > 0) return
-  const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
-  if (!openaiApiKey) {
+  if (!settingsStore.openaiApiKey) {
     modelFetchError.value = 'Add an OpenAI API key in Settings to fetch models.'
     return
   }
   loadingModels.value = true
   try {
-    availableOpenAiModels.value = await _fetchModels('openai', openaiApiKey)
+    availableOpenAiModels.value = await _fetchModels('openai', settingsStore.openaiApiKey)
   } catch (error) {
     console.error('Error fetching OpenAI models:', error)
     modelFetchError.value = 'Failed to load OpenAI models.'
@@ -223,14 +196,13 @@ const _loadOpenAiModels = async () => {
 
 const _loadGeminiModels = async () => {
   if (availableGeminiModels.value.length > 0) return
-  const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
-  if (!geminiApiKey) {
+  if (!settingsStore.geminiApiKey) {
     modelFetchError.value = 'Add a Gemini API key in Settings to fetch models.'
     return
   }
   loadingModels.value = true
   try {
-    availableGeminiModels.value = await _fetchModels('gemini', geminiApiKey)
+    availableGeminiModels.value = await _fetchModels('gemini', settingsStore.geminiApiKey)
   } catch (error) {
     console.error('Error fetching Gemini models:', error)
     modelFetchError.value = 'Failed to load Gemini models.'
@@ -244,9 +216,8 @@ const _loadOllamaModels = async () => {
   loadingModels.value = true
   try {
     const headers: Record<string, string> = {}
-    const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
-    if (ollamaEndpointUrl) {
-      headers['x-ollama-base-url'] = ollamaEndpointUrl
+    if (settingsStore.ollamaEndpointUrl) {
+      headers['x-ollama-base-url'] = settingsStore.ollamaEndpointUrl
     }
     availableModels.value = await _fetchModels('ollama', null, headers)
   } catch (error) {
@@ -272,7 +243,38 @@ const loadModelsForEndpoint = async (endpoint: string) => {
 const toggleModelSelect = () => {
   modelSelectOpen.value = !modelSelectOpen.value
   if (modelSelectOpen.value) {
-    loadModelsForEndpoint(currentLlmEndpoint.value)
+    loadModelsForEndpoint(settingsStore.llmEndpoint)
+  }
+}
+
+const getProviderStatusClass = () => {
+  if (settingsStore.llmEndpoint === 'ollama') return 'status-ok'
+
+  const apiKey = settingsStore.llmEndpoint === 'openai'
+    ? settingsStore.openaiApiKey
+    : settingsStore.geminiApiKey
+
+  return apiKey ? 'status-ok' : 'status-warning'
+}
+
+const getProviderStatusText = () => {
+  if (settingsStore.llmEndpoint === 'ollama') return '✓ Ready'
+
+  const apiKey = settingsStore.llmEndpoint === 'openai'
+    ? settingsStore.openaiApiKey
+    : settingsStore.geminiApiKey
+
+  return apiKey ? '✓ API Key Set' : '⚠ API Key Required'
+}
+
+const getModelPlaceholder = () => {
+  switch (settingsStore.llmEndpoint) {
+    case 'openai':
+      return 'e.g., gpt-4-turbo'
+    case 'gemini':
+      return 'e.g., gemini-1.5-pro'
+    default:
+      return 'e.g., llama3.1:latest'
   }
 }
 
@@ -321,36 +323,31 @@ const getHeaders = () => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     }
-    if (currentLlmEndpoint.value === 'openai') {
-      const openaiApiKey = localStorage.getItem('moirai_openai_api_key')
-      if (openaiApiKey) {
-        headers['x-openai-api-key'] = openaiApiKey
+    if (settingsStore.llmEndpoint === 'openai') {
+      if (settingsStore.openaiApiKey) {
+        headers['x-openai-api-key'] = settingsStore.openaiApiKey
       }
-    } else if (currentLlmEndpoint.value === 'gemini') {
-      const geminiApiKey = localStorage.getItem('moirai_gemini_api_key')
-      if (geminiApiKey) {
-        headers['x-gemini-api-key'] = geminiApiKey
+    } else if (settingsStore.llmEndpoint === 'gemini') {
+      if (settingsStore.geminiApiKey) {
+        headers['x-gemini-api-key'] = settingsStore.geminiApiKey
       }
-    } else {
-      const ollamaEndpointUrl = localStorage.getItem('moirai_ollama_endpoint_url')
-      if (ollamaEndpointUrl) {
-        headers['x-ollama-base-url'] = ollamaEndpointUrl
-      }
+    } else if (settingsStore.ollamaEndpointUrl) {
+      headers['x-ollama-base-url'] = settingsStore.ollamaEndpointUrl
     }
     return headers
 }
 
 const _ensureSession = async (userMsg: string) => {
   if (sessionId.value) return true
-  
+
   try {
-    const res = await authFetch('/api/chat/history', { 
+    const res = await authFetch('/api/chat/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
           title: userMsg,
-          model: currentModel.value,
-          llm_endpoint: currentLlmEndpoint.value
+          model: settingsStore.getCurrentModel(),
+          llm_endpoint: settingsStore.llmEndpoint
       })
     })
     if (res.ok) {
@@ -367,15 +364,15 @@ const _ensureSession = async (userMsg: string) => {
 
 const _updateSessionMessages = async () => {
   if (!sessionId.value) return
-  
+
   try {
     await authFetch(`/api/chat/history/${sessionId.value}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
           messages: messages.value,
-          model: currentModel.value,
-          llm_endpoint: currentLlmEndpoint.value
+          model: settingsStore.getCurrentModel(),
+          llm_endpoint: settingsStore.llmEndpoint
       })
     })
   } catch (e) {
@@ -403,11 +400,11 @@ const sendMessage = async () => {
     const res = await authFetch('/api/chat', {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ 
-          message: userMsg, 
-          history, 
-          model: currentModel.value,
-          llm_endpoint: currentLlmEndpoint.value,
+      body: JSON.stringify({
+          message: userMsg,
+          history,
+          model: settingsStore.getCurrentModel(),
+          llm_endpoint: settingsStore.llmEndpoint,
           context: getActiveSessionContext()
       })
     })
@@ -702,8 +699,8 @@ const renameSession = async (session: ChatSession) => {
           @keyup.enter.prevent="toggleModelSelect"
           @keyup.space.prevent="toggleModelSelect"
         >
-            <span class="provider-label">{{ currentLlmEndpoint }}</span>
-            <span class="model-name">{{ currentModel }}</span>
+            <span class="provider-label">{{ settingsStore.llmEndpoint }}</span>
+            <span class="model-name">{{ settingsStore.getCurrentModel() }}</span>
             <span class="model-caret" :class="{ open: modelSelectOpen }">▾</span>
         </button>
         <div v-if="sessionId" class="chat-header-actions">
@@ -722,24 +719,45 @@ const renameSession = async (session: ChatSession) => {
         </div>
       </div>
       <div v-if="modelSelectOpen" class="model-select-panel">
+        <div class="model-select-header">
+          <h3>Select Model Provider &amp; Model</h3>
+          <button class="model-select-close-icon" @click="modelSelectOpen = false" title="Close">×</button>
+        </div>
+        
         <div class="model-select-row">
-          <label class="model-select-label" for="chat-provider">Provider</label>
+          <label class="model-select-label" for="chat-provider">
+            Provider
+            <span class="provider-status" :class="getProviderStatusClass()">
+              {{ getProviderStatusText() }}
+            </span>
+          </label>
           <select id="chat-provider" v-model="endpointSelection" class="model-select">
-            <option value="ollama">Ollama</option>
-            <option value="openai">OpenAI</option>
-            <option value="gemini">Gemini</option>
+            <option value="ollama">Ollama (Local)</option>
+            <option value="openai">OpenAI (API Key Required)</option>
+            <option value="gemini">Gemini (API Key Required)</option>
           </select>
         </div>
+        
         <div class="model-select-row">
-          <label class="model-select-label" for="chat-model">Model</label>
+          <label class="model-select-label" for="chat-model">
+            Model
+            <span v-if="loadingModels" class="loading-indicator">⟳ Loading...</span>
+          </label>
           <select
             v-if="modelOptions.length"
             id="chat-model"
             v-model="modelSelection"
             class="model-select"
+            :disabled="loadingModels"
           >
-            <option v-for="model in modelOptions" :key="model" :value="model">
+            <option 
+              v-for="model in modelOptions" 
+              :key="model" 
+              :value="model"
+              :disabled="settingsStore.llmEndpoint === 'ollama' && !supportsToolCalling(model)"
+            >
               {{ model }}
+              {{ settingsStore.llmEndpoint === 'ollama' && !supportsToolCalling(model) ? ' (No tool support)' : '' }}
             </option>
           </select>
           <input
@@ -747,15 +765,26 @@ const renameSession = async (session: ChatSession) => {
             id="chat-model"
             v-model="modelSelection"
             class="model-input"
-            placeholder="e.g. llama3.1:latest"
+            :placeholder="getModelPlaceholder()"
+            :disabled="loadingModels"
           />
         </div>
-        <div class="model-select-meta">
-          <span v-if="loadingModels">Loading models...</span>
-          <span v-else-if="modelFetchError">{{ modelFetchError }}</span>
-          <span v-else-if="!modelOptions.length">No models fetched. You can type a model name.</span>
+        
+        <div class="model-select-footer">
+          <div class="model-select-meta">
+            <span v-if="modelFetchError" class="error-message">⚠ {{ modelFetchError }}</span>
+            <span v-else-if="!loadingModels && !modelOptions.length" class="info-message">
+              ℹ No models loaded. Enter a model name manually or check your API key in Settings.
+            </span>
+            <span v-else-if="!loadingModels && modelOptions.length && settingsStore.llmEndpoint === 'ollama'" class="info-message">
+              ℹ {{ modelOptions.length }} model(s) available. Models without tool support are disabled.
+            </span>
+            <span v-else-if="!loadingModels && modelOptions.length" class="success-message">
+              ✓ {{ modelOptions.length }} model(s) available
+            </span>
+          </div>
+          <button class="model-select-apply" @click="modelSelectOpen = false">Apply &amp; Close</button>
         </div>
-        <button class="model-select-close" @click="modelSelectOpen = false">Done</button>
       </div>
       <div class="chat-container">
         <div class="messages">
@@ -1072,16 +1101,22 @@ const renameSession = async (session: ChatSession) => {
 }
 .model-info {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
-    font-size: 0.9rem;
-    color: var(--text-color);
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
     cursor: pointer;
-    user-select: none;
-    background: transparent;
-    border: none;
-    padding: 0;
-    font-family: inherit;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.model-info:hover {
+    background: var(--button-bg);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.15);
+    transform: translateY(-1px);
 }
 .model-info:focus-visible {
     outline: 2px solid var(--primary-color);
@@ -1113,57 +1148,149 @@ const renameSession = async (session: ChatSession) => {
     max-width: 800px;
     width: 100%;
     margin: 0 auto 12px auto;
-    padding: 12px;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--card-bg) 80%, transparent);
-    border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
+}
+.model-select-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+.model-select-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-color);
+}
+.model-select-close-icon {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+.model-select-close-icon:hover {
+    background: var(--button-bg);
+    color: var(--primary-color);
 }
 .model-select-row {
-    display: grid;
-    grid-template-columns: 90px 1fr;
-    gap: 10px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 .model-select-label {
-    font-size: 0.85rem;
-    opacity: 0.8;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.provider-status {
+    font-size: 0.75rem;
+    font-weight: normal;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+.provider-status.status-ok {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+.provider-status.status-warning {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fcd34d;
+}
+.loading-indicator {
+    font-size: 0.8rem;
+    color: var(--primary-color);
+    font-weight: normal;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 .model-select,
 .model-input {
     width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    padding: 10px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
     background: var(--input-bg);
     color: var(--input-text);
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    transition: all 0.2s;
 }
 .model-select:focus,
 .model-input:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+.model-select:disabled,
+.model-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.model-select option:disabled {
+    opacity: 0.5;
+    color: #999;
+    font-style: italic;
+}
+.model-select-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
 }
 .model-select-meta {
-    font-size: 0.8rem;
-    opacity: 0.75;
+    flex: 1;
+    font-size: 0.85rem;
 }
-.model-select-close {
-    align-self: flex-end;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: transparent;
+.error-message {
+    color: #ef4444;
+}
+.info-message {
     color: var(--text-color);
+    opacity: 0.7;
+}
+.success-message {
+    color: #22c55e;
+}
+.model-select-apply {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary-color);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
 }
-.model-select-close:hover {
-    background: var(--button-bg);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+.model-select-apply:hover {
+    background: color-mix(in srgb, var(--primary-color) 85%, black);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
 }
 .chat-header-actions {
     display: flex;

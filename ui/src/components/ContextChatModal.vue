@@ -4,6 +4,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { authFetch } from '../utils/authFetch'
 import { useChatContextStore } from '../stores/chatContext'
+import { useSettingsStore } from '../stores/settings'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -20,6 +21,7 @@ interface QuickAction {
 }
 
 const chatContextStore = useChatContextStore()
+const settingsStore = useSettingsStore()
 
 const messages = ref<Message[]>([])
 const input = ref('')
@@ -30,26 +32,6 @@ const raiseWizardOpen = ref(false)
 const raiseWizardLoading = ref(false)
 const raiseWizardQuestions = ref<string[]>([])
 const raiseWizardAnswers = ref<string[]>(['', '', ''])
-
-const currentLlmEndpoint = ref(localStorage.getItem('moirai_llm_endpoint') || 'ollama')
-
-const modelSettingsMap: Record<string, string> = {
-  openai: 'moirai_openai_model',
-  gemini: 'moirai_gemini_model',
-  ollama: 'moirai_model',
-}
-
-const defaultModels: Record<string, string> = {
-  openai: 'gpt-4-turbo',
-  gemini: 'gemini-1.5-pro',
-  ollama: 'llama3.1:latest',
-}
-
-const currentModel = ref(
-  localStorage.getItem(modelSettingsMap[currentLlmEndpoint.value] || 'moirai_model') ||
-    defaultModels[currentLlmEndpoint.value] ||
-    'llama3.1:latest'
-)
 
 const modalContentRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -186,6 +168,7 @@ const initializeModalState = async () => {
   sessionId.value = null
   input.value = chatContextStore.initialMessage || ''
 
+  // Settings are automatically reactive from store
   await nextTick()
   if (inputRef.value) {
     inputRef.value.focus()
@@ -222,8 +205,8 @@ const ensureSession = async (userMsg: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: userMsg,
-        model: currentModel.value,
-        llm_endpoint: currentLlmEndpoint.value,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -249,8 +232,8 @@ const updateSession = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: messages.value,
-        model: currentModel.value,
-        llm_endpoint: currentLlmEndpoint.value,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -283,8 +266,8 @@ const sendMessage = async () => {
       body: JSON.stringify({
         message: userMsg,
         history,
-        model: currentModel.value,
-        llm_endpoint: currentLlmEndpoint.value,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -323,8 +306,8 @@ const askWizardQuestions = async () => {
         message:
           'You are preparing issue creation from this article context. Ask exactly 3 concise clarifying questions that help define a reusable, generic issue. Return only a numbered list.',
         history: [],
-        model: currentModel.value,
-        llm_endpoint: currentLlmEndpoint.value,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -441,7 +424,7 @@ const copyChat = async () => {
         <div class="header-title-block">
           <span class="context-badge">{{ contextEmoji }} {{ contextLabel }}</span>
           <h3 id="context-chat-title" class="context-title" :title="contextTitle">{{ contextTitle }}</h3>
-          <p class="model-meta">{{ currentLlmEndpoint }} / {{ currentModel }}</p>
+          <p class="model-meta">{{ settingsStore.llmEndpoint }} / {{ settingsStore.getCurrentModel() }}</p>
         </div>
         <div class="header-actions">
           <button

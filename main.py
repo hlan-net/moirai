@@ -35,8 +35,20 @@ if not is_test_mode:
 
 # CSRF protection is enabled for web security.
 # It is only disabled in test mode or if explicitly requested via environment variable.
+# Note: API endpoints using JWT authentication don't need CSRF protection
+# as the Authorization header isn't automatically sent by browsers like cookies are.
 csrf = CSRFProtect()
 csrf.init_app(app)
+
+# Exempt API routes from CSRF — these endpoints authenticate via JWT Bearer tokens
+# in the Authorization header, which browsers do not attach automatically (unlike
+# cookies), so CSRF attacks cannot exploit them.  NOSONAR (python:S4502)
+csrf.exempt(auth_blueprint)
+csrf.exempt(api_blueprint)
+csrf.exempt(chat_blueprint)
+csrf.exempt(mcp_blueprint)
+csrf.exempt(agent_blueprint)
+
 if (
     is_test_mode 
     or os.environ.get("DISABLE_CSRF", "false").lower() == "true"
