@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue.js application
-FROM node:25-alpine@sha256:18e02657e2a2cc3a87210ee421e9769ff28a1ac824865d64f74d6d2d59f74b6b AS build-stage
+FROM node:25-alpine@sha256:5209bcaca9836eb3448b650396213dbe9d9a34d31840c2ae1f206cb2986a8543 AS build-stage
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ RUN mkdir -p /app/public && \
 RUN yarn build
 
 # Stage 2: Serve the application with Nginx
-FROM nginx:stable-alpine@sha256:15e96e59aa3b0aada3a121296e3bce117721f42d88f5f64217ef4b18f458c6ab
+FROM nginx:stable-alpine@sha256:5b4900b042ccfa8b0a73df622c3a60f2322faeb2be800cbee5aa7b44d241649e
 
 # Build arguments for version info
 ARG APP_VERSION=dev
