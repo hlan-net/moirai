@@ -388,13 +388,25 @@ def _build_issue_context_lines(entity_data):
     status = _safe_text(entity_data.get("status", ""), 32)
     premises = entity_data.get("premises")
     premises_count = len(premises) if isinstance(premises, list) else 0
-    return [
+    already_linked = []
+    if isinstance(premises, list):
+        for p in premises[:20]:
+            if isinstance(p, dict) and p.get("id"):
+                already_linked.append(_safe_text(p["id"], 200))
+    lines = [
         f"Issue logos: {logos}",
         f"Issue description: {description or 'none'}",
         f"Issue longevity: {longevity or 'unknown'}",
         f"Issue status: {status or 'unknown'}",
         f"Issue premises_count: {premises_count}",
     ]
+    if already_linked:
+        lines.append(f"Already linked article IDs (do not suggest these): {', '.join(already_linked)}")
+    lines.append(
+        "If asked to find new coverage: use search_articles with keywords from the issue name and description. "
+        "Exclude already linked articles from suggestions."
+    )
+    return lines
 
 
 def _build_feed_context_lines(entity_data):

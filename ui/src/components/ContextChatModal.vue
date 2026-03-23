@@ -95,6 +95,13 @@ const quickActions = computed<QuickAction[]>(() => {
         label: 'Refine Description',
         message: 'Help me refine the description of this Issue based on its linked articles',
       },
+      {
+        label: 'Find new coverage',
+        message:
+          'Search for recent articles that relate to this issue but are not yet linked to it. ' +
+          'Use the issue name and description as search terms. ' +
+          'List the most relevant matches and suggest which ones should be linked.',
+      },
     ]
   }
   if (chatContextStore.contextType === 'feed') {
