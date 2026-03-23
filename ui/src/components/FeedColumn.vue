@@ -27,6 +27,8 @@ const bulkImporting = ref(false)
 const bulkImportResults = ref<any>(null)
 const notification = ref<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null)
 const searchQuery = ref('')
+const bulkDeleteMode = ref(false)
+const selectedFeedIds = ref<Set<string>>(new Set())
 
 // Inject feed selection from parent (used in template) - NO LONGER USED, replaced by filterStore
 // const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
@@ -101,7 +103,9 @@ const fetchFeeds = async () => {
   try {
     const response = await authFetch('/api/feeds')
     if (response.ok) {
-      feeds.value = await response.json()
+      const allFeeds = await response.json()
+      // Filter out CouchDB design documents (internal structures)
+      feeds.value = allFeeds.filter((f: Feed) => !f._id.startsWith('_design/'))
     }
   } catch (error) {
     console.error('Error fetching feeds:', error)
@@ -146,6 +150,79 @@ const deleteFeed = async (id: string) => {
   } catch (e) {
     console.error(e)
     showNotification('Error deleting feed', 'error')
+  }
+}
+
+const toggleBulkDeleteMode = () => {
+  bulkDeleteMode.value = !bulkDeleteMode.value
+  if (!bulkDeleteMode.value) {
+    selectedFeedIds.value.clear()
+  }
+}
+
+const toggleFeedSelection = (feedId: string) => {
+  if (selectedFeedIds.value.has(feedId)) {
+    selectedFeedIds.value.delete(feedId)
+  } else {
+    selectedFeedIds.value.add(feedId)
+  }
+}
+
+const selectAllFeeds = () => {
+  contextuallyFilteredFeeds.value.forEach(feed => {
+    selectedFeedIds.value.add(feed._id)
+  })
+}
+
+const selectNoneFeeds = () => {
+  selectedFeedIds.value.clear()
+}
+
+const bulkDeleteFeeds = async () => {
+  const count = selectedFeedIds.value.size
+  if (count === 0) {
+    showNotification('No feeds selected', 'warning')
+    return
+  }
+
+  const message = `Delete ${count} feed${count > 1 ? 's' : ''}?\n\n` +
+    `Note: Articles from these feeds will remain in your collection. ` +
+    `Only the feed subscriptions will be removed.`
+  
+  if (!confirm(message)) return
+
+  let successCount = 0
+  let failCount = 0
+
+  for (const feedId of selectedFeedIds.value) {
+    try {
+      const res = await authFetch(`/api/feeds/${feedId}`, { method: 'DELETE' })
+      if (res.ok) {
+        successCount++
+        feeds.value = feeds.value.filter((f) => f._id !== feedId)
+        // If the deleted feed was selected, clear the selection
+        if (filterStore.selectedFeedId === feedId) {
+          filterStore.setSelectedFeedId(null)
+        }
+      } else {
+        failCount++
+      }
+    } catch (e) {
+      console.error(e)
+      failCount++
+    }
+  }
+
+  selectedFeedIds.value.clear()
+  bulkDeleteMode.value = false
+
+  if (failCount === 0) {
+    showNotification(`Successfully deleted ${successCount} feed${successCount > 1 ? 's' : ''}`, 'success')
+  } else {
+    showNotification(
+      `Deleted ${successCount} feed${successCount > 1 ? 's' : ''}, ${failCount} failed`,
+      failCount > successCount ? 'error' : 'warning'
+    )
   }
 }
 
@@ -449,6 +526,16 @@ const bulkImportFeeds = async () => {
           &nbsp;/ {{ filteredFeeds.length }}</span>)
       </h2>
       <div class="header-actions" v-if="isAdmin">
+        <button 
+          @click="toggleBulkDeleteMode" 
+          :class="['action-btn', { active: bulkDeleteMode }]" 
+          title="Bulk Delete Feeds"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+          </svg>
+          {{ bulkDeleteMode ? 'Cancel' : 'Delete' }}
+        </button>
         <button @click="openBulkImportModal" class="action-btn" title="Bulk Import Feeds">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
@@ -499,6 +586,25 @@ const bulkImportFeeds = async () => {
       Showing feeds from selected event
     </div>
 
+    <!-- Bulk Delete Controls -->
+    <div v-if="bulkDeleteMode" class="bulk-delete-controls">
+      <div class="bulk-select-actions">
+        <button @click="selectAllFeeds" class="bulk-action-btn">Select All</button>
+        <button @click="selectNoneFeeds" class="bulk-action-btn">Select None</button>
+        <span class="selection-count">{{ selectedFeedIds.size }} selected</span>
+      </div>
+      <button 
+        @click="bulkDeleteFeeds" 
+        :disabled="selectedFeedIds.size === 0"
+        class="bulk-delete-btn"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+        </svg>
+        Delete {{ selectedFeedIds.size }} Feed{{ selectedFeedIds.size !== 1 ? 's' : '' }}
+      </button>
+    </div>
+
     <div v-if="loading">Loading...</div>
     <div v-else-if="!contextuallyFilteredFeeds.length && searchQuery" class="no-results">
       No feeds match "{{ searchQuery }}"
@@ -509,7 +615,9 @@ const bulkImportFeeds = async () => {
         :key="feed._id"
         class="feed-item"
         @click="
-          filterStore.setSelectedFeedId(filterStore.selectedFeedId === feed._id ? null : feed._id)
+          bulkDeleteMode 
+            ? toggleFeedSelection(feed._id)
+            : filterStore.setSelectedFeedId(filterStore.selectedFeedId === feed._id ? null : feed._id)
         "
         :class="{ 'selected-feed': filterStore.selectedFeedId === feed._id }"
       >
@@ -522,6 +630,15 @@ const bulkImportFeeds = async () => {
         </div>
         <div v-else class="feed-info">
           <div class="feed-name-container">
+            <input
+              v-if="bulkDeleteMode"
+              type="checkbox"
+              :checked="selectedFeedIds.has(feed._id)"
+              @click.stop="toggleFeedSelection(feed._id)"
+              @change.stop
+              class="feed-checkbox"
+              :title="`Select ${feed.title || getHostname(feed.url)}`"
+            />
             <img
               v-if="feed.favicon_url"
               :src="feed.favicon_url"
@@ -1085,5 +1202,92 @@ h2 {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border-color);
   font-style: italic;
+}
+
+/* Bulk Delete Styles */
+.action-btn.active {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.action-btn.active:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+.bulk-delete-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background-color: rgba(220, 53, 69, 0.1);
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.bulk-select-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bulk-action-btn {
+  padding: 4px 12px;
+  background-color: #2c3e50;
+  color: #fff;
+  border: 1px solid #42b983;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s;
+}
+
+.bulk-action-btn:hover {
+  background-color: #34495e;
+}
+
+.selection-count {
+  font-size: 0.85rem;
+  color: var(--text-color);
+  font-weight: bold;
+}
+
+.bulk-delete-btn {
+  padding: 6px 16px;
+  background-color: #dc3545;
+  color: #fff;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.bulk-delete-btn:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.bulk-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feed-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.feed-item.selected-feed .feed-checkbox {
+  /* Ensure checkbox is visible on selected items */
+  filter: brightness(1.2);
 }
 </style>

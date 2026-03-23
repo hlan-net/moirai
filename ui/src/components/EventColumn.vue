@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
 import { authFetch } from '../utils/authFetch'
 import IssueChatActions from './IssueChatActions.vue'
+import { SYNC_REFRESH_INTERVAL } from '../config/polling'
 
 interface Premise {
   type: 'message' | 'issue'
@@ -48,6 +49,7 @@ const filteredIssues = computed(() => {
 
 const fetchIssues = async (isRefresh = false) => {
   if (isRefresh) {
+    filterStore.markRefreshStart()
     refreshing.value = true
   } else {
     loading.value = true
@@ -78,6 +80,9 @@ const fetchIssues = async (isRefresh = false) => {
   } finally {
     loading.value = false
     refreshing.value = false
+    if (isRefresh) {
+      filterStore.markRefreshComplete()
+    }
   }
 }
 
@@ -138,7 +143,7 @@ const toggleExpand = (id: string) => {
 
 onMounted(() => {
   fetchIssues()
-  refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
+  refreshInterval = globalThis.setInterval(() => fetchIssues(true), SYNC_REFRESH_INTERVAL)
 })
 
 onUnmounted(() => {

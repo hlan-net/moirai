@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
 import { useChatContextStore } from '../stores/chatContext'
 import { authFetch } from '../utils/authFetch'
+import { SYNC_REFRESH_INTERVAL } from '../config/polling'
 
 interface SearchArticleResult {
   _id: string
@@ -98,6 +99,7 @@ const fetchLatestUpdates = async () => {
     return
   }
 
+  filterStore.markRefreshStart()
   fetchingUpdates.value = true
   try {
     const newestTimestamp = await articleCache.getNewestTimestamp()
@@ -123,6 +125,7 @@ const fetchLatestUpdates = async () => {
     console.error('Error fetching updates:', error)
   } finally {
     fetchingUpdates.value = false
+    filterStore.markRefreshComplete()
   }
 }
 
@@ -332,14 +335,10 @@ onMounted(async () => {
   setupIntersectionObserver()
   articleCache.clearOldArticles().catch(console.error)
 
+  // Sync polling interval with other columns and always refresh (no conditional check)
   refreshInterval = globalThis.setInterval(() => {
-    if (
-      !filterStore.selectedFeedId &&
-      !filterStore.selectedIssueId
-    ) {
-      fetchLatestUpdates()
-    }
-  }, 120000)
+    fetchLatestUpdates()
+  }, SYNC_REFRESH_INTERVAL)
 })
 
 onUnmounted(() => {

@@ -5,6 +5,8 @@ export const useFilterStore = defineStore('filter', {
     selectedFeedId: null as string | null,
     selectedIssueId: null as string | null,
     contextualFeedUrls: null as string[] | null,
+    lastUpdated: null as Date | null,
+    isRefreshing: false,
   }),
   getters: {
     selectedEventId: (state) => state.selectedIssueId,
@@ -44,6 +46,13 @@ export const useFilterStore = defineStore('filter', {
       this.selectedFeedId = null
       this.selectedIssueId = null
       this.contextualFeedUrls = null
+    },
+    markRefreshStart() {
+      this.isRefreshing = true
+    },
+    markRefreshComplete() {
+      this.isRefreshing = false
+      this.lastUpdated = new Date()
     },
   },
 })

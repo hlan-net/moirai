@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import FeedColumn from './FeedColumn.vue'
 import ArticleColumn from './ArticleColumn.vue'
 import EventColumn from './EventColumn.vue'
 import TrendColumn from './TrendColumn.vue'
 import { useFilterStore } from '../stores/filter' // Import the new filter store
+import { TIME_DISPLAY_UPDATE_INTERVAL } from '../config/polling'
 
 defineProps<{ msg: string }>()
 
@@ -31,10 +32,52 @@ const hasActiveFilters = computed(() => {
     filterStore.selectedIssueId !== null
   )
 })
+
+// Time display formatting
+const timeAgoDisplay = ref('')
+let timeUpdateInterval: number | null = null
+
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  
+  if (seconds < 10) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  return `${Math.floor(seconds / 3600)}h ago`
+}
+
+function updateTimeDisplay() {
+  if (filterStore.lastUpdated) {
+    timeAgoDisplay.value = formatTimeAgo(filterStore.lastUpdated)
+  }
+}
+
+onMounted(() => {
+  timeUpdateInterval = window.setInterval(() => {
+    updateTimeDisplay()
+  }, TIME_DISPLAY_UPDATE_INTERVAL)
+})
+
+onUnmounted(() => {
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval)
+  }
+})
 </script>
 
 <template>
   <div class="main-page">
+    <div class="dashboard-status">
+      <div v-if="filterStore.isRefreshing" class="status-indicator refreshing">
+        <span class="spinner"></span>
+        Refreshing data...
+      </div>
+      <div v-else-if="filterStore.lastUpdated" class="status-indicator">
+        <span class="check-icon">✓</span>
+        Updated {{ timeAgoDisplay }}
+      </div>
+    </div>
+
     <div class="header-container">
       <div class="title-wrapper">
         <h1>{{ msg }}</h1>
@@ -115,6 +158,51 @@ const hasActiveFilters = computed(() => {
   flex-direction: column;
   padding: 10px;
   box-sizing: border-box;
+}
+
+.dashboard-status {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: flex-end;
+  margin: -10px -10px 10px -10px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  opacity: 0.7;
+}
+
+.status-indicator.refreshing {
+  color: var(--color-heading);
+  opacity: 1;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.check-icon {
+  color: #42b983;
+  font-weight: bold;
 }
 
 .header-container {
@@ -257,6 +345,10 @@ h1 {
 @media (min-width: 1200px) {
   .main-page {
     padding: 20px;
+  }
+
+  .dashboard-status {
+    margin: -20px -20px 15px -20px;
   }
 
   .header-container {

@@ -1,0 +1,24 @@
+# Development instance - with own CouchDB
+api:
+  image:
+    tag: "main"
+  replicaCount: 1
+
+ui:
+  image:
+    tag: "main"
+  replicaCount: 1
+
+environment: development
+
+# Enable CouchDB for dev instance (separate from release)
+couchdb:
+  enabled: true
+  persistentVolume:
+    enabled: true
+    size: 10Gi
+    storageClass: "your-storage-class"
+
+# Create separate Redis
+redis:
+  enabled: true

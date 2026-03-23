@@ -1,8 +1,13 @@
 import logging
+import json
 from api.db import query_couchdb, fetch_from_couchdb
 from api.db_constants import MONGO_ELEM_MATCH, MONGO_IN
+from api.extensions import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+# Cache TTL for enrichment data (5 minutes)
+ENRICHMENT_CACHE_TTL = 300
 
 
 def enrich_articles_with_issues(articles):
@@ -17,11 +22,9 @@ def enrich_articles_with_issues(articles):
     if not article_links:
         return articles
 
-    issues, feeds = _fetch_related_data(article_links)
+    issues, (feed_title_map, feed_favicon_map) = _fetch_related_data(article_links)
 
-    article_issue_map, feed_title_map, feed_favicon_map = (
-        _build_mappings(issues, feeds)
-    )
+    article_issue_map = _build_article_issue_map(issues)
 
     _apply_enrichment(
         articles,
@@ -31,6 +34,53 @@ def enrich_articles_with_issues(articles):
     )
 
     return articles
+
+
+def _get_cached_feed_mappings():
+    """
+    Get cached feed title and favicon mappings.
+    
+    Returns:
+        Tuple of (feed_title_map, feed_favicon_map) or None if not cached
+    """
+    try:
+        redis_client = get_redis_client()
+        cached = redis_client.get("enrichment:feed_mappings")
+        
+        if cached:
+            data = json.loads(cached)
+            return data.get("titles", {}), data.get("favicons", {})
+    except Exception as e:
+        logger.warning(f"Failed to get cached feed mappings: {e}")
+    
+    return None, None
+
+
+def _cache_feed_mappings(feed_title_map, feed_favicon_map):
+    """Cache feed mappings in Redis."""
+    try:
+        redis_client = get_redis_client()
+        data = {
+            "titles": feed_title_map,
+            "favicons": feed_favicon_map
+        }
+        redis_client.setex(
+            "enrichment:feed_mappings",
+            ENRICHMENT_CACHE_TTL,
+            json.dumps(data)
+        )
+    except Exception as e:
+        logger.warning(f"Failed to cache feed mappings: {e}")
+
+
+def invalidate_feed_mappings_cache():
+    """Invalidate the feed mappings cache. Call when feeds are modified."""
+    try:
+        redis_client = get_redis_client()
+        redis_client.delete("enrichment:feed_mappings")
+        logger.info("Invalidated feed mappings cache")
+    except Exception as e:
+        logger.warning(f"Failed to invalidate feed mappings cache: {e}")
 
 
 def _fetch_related_data(article_links):
@@ -44,21 +94,27 @@ def _fetch_related_data(article_links):
             limit=1000,
         )
 
-    # Pre-fetch feed info for title and favicon mapping
-    feeds = fetch_from_couchdb("feeds")
-    return issues, feeds
+    # Try to get feed mappings from cache first
+    feed_title_map, feed_favicon_map = _get_cached_feed_mappings()
+    
+    if feed_title_map is None or feed_favicon_map is None:
+        # Cache miss - fetch from database
+        feeds = fetch_from_couchdb("feeds")
+        feed_title_map = {
+            feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
+        }
+        feed_favicon_map = {
+            feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")
+        }
+        
+        # Cache for next time
+        _cache_feed_mappings(feed_title_map, feed_favicon_map)
+    
+    return issues, (feed_title_map, feed_favicon_map)
 
 
-def _build_mappings(issues, feeds):
-    """Builds lookup maps for enrichment."""
-    feed_title_map = {
-        feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
-    }
-    feed_favicon_map = {
-        feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")
-    }
-
-    # Build article link to issue logos and IDs mapping
+def _build_article_issue_map(issues):
+    """Builds article link to issue logos and IDs mapping."""
     article_issue_map = {}
 
     for issue in issues:
@@ -79,7 +135,7 @@ def _build_mappings(issues, feeds):
                         "status": issue.get("status")
                     })
 
-    return article_issue_map, feed_title_map, feed_favicon_map
+    return article_issue_map
 
 
 def _apply_enrichment(

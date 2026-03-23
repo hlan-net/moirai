@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useSettingsStore } from '../stores/settings'
 import { useTheme, type Theme } from '../composables/useTheme'
 import { authFetch } from '../utils/authFetch'
 
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
 const uiVersion = __APP_BUILD__ !== 'dev'
   ? `Moirai UI v${__APP_VERSION__} (build ${__APP_BUILD__})`
   : `Moirai UI v${__APP_VERSION__}`
-const modelName = ref('llama3.1:latest')
 const aboutDescription =
   'Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).'
 const availableModels = ref([])
@@ -21,17 +22,41 @@ const showSchedulerLogs = ref(false)
 const schedulerLogs = ref<SchedulerLogEntry[]>([])
 const schedulerLogsLoading = ref(false)
 const schedulerLogsError = ref('')
-const llmEndpoint = ref('ollama') // 'ollama' or 'openai'
-const openaiApiKey = ref('')
-const openaiModelName = ref('gpt-4-turbo')
 const availableOpenAiModels = ref([])
-const geminiApiKey = ref('')
-const geminiModelName = ref('gemini-3-flash')
 const availableGeminiModels = ref([])
-const ollamaEndpointUrl = ref('http://host.docker.internal:11434/v1')
 const verboseChatExport = ref(false)
 const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'authentication']))
 const activeTab = ref('user')
+
+// Create computed properties for settings store values
+const llmEndpoint = computed({
+  get: () => settingsStore.llmEndpoint,
+  set: (value: string) => { settingsStore.llmEndpoint = value }
+})
+const ollamaEndpointUrl = computed({
+  get: () => settingsStore.ollamaEndpointUrl,
+  set: (value: string) => { settingsStore.ollamaEndpointUrl = value }
+})
+const openaiApiKey = computed({
+  get: () => settingsStore.openaiApiKey,
+  set: (value: string) => { settingsStore.openaiApiKey = value }
+})
+const openaiModelName = computed({
+  get: () => settingsStore.openaiModel,
+  set: (value: string) => { settingsStore.openaiModel = value }
+})
+const geminiApiKey = computed({
+  get: () => settingsStore.geminiApiKey,
+  set: (value: string) => { settingsStore.geminiApiKey = value }
+})
+const geminiModelName = computed({
+  get: () => settingsStore.geminiModel,
+  set: (value: string) => { settingsStore.geminiModel = value }
+})
+const modelName = computed({
+  get: () => settingsStore.ollamaModel,
+  set: (value: string) => { settingsStore.ollamaModel = value }
+})
 
 interface ComponentVersion {
   name: string
@@ -177,19 +202,12 @@ const formatLogTimestamp = (timestamp: string) => {
 const saveSettings = async () => {
   // Save User Settings
   try {
+      const userSettings = await settingsStore.saveToBackend()
+
       const res = await authFetch('/api/auth/me/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            moirai_model: modelName.value,
-            moirai_llm_endpoint: llmEndpoint.value,
-            moirai_openai_api_key: openaiApiKey.value,
-            moirai_openai_model: openaiModelName.value,
-            moirai_gemini_api_key: geminiApiKey.value,
-            moirai_gemini_model: geminiModelName.value,
-            moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
-            moirai_theme: theme.value
-        })
+        body: JSON.stringify(userSettings)
       })
       if (!res.ok) {
         throw new Error('Failed to save user settings')
@@ -222,7 +240,7 @@ const saveSettings = async () => {
            }
       }
       
-      alert('Settings saved!')
+      alert('Settings saved and applied immediately!')
   } catch (e) {
       console.error(e)
       alert("Failed to save settings.")
@@ -293,20 +311,14 @@ const fetchUserProfile = async () => {
         if (res.ok) {
             const data = await res.json()
             const settings = data.settings || {}
-            // Load User Settings
-            if (settings.moirai_model) modelName.value = settings.moirai_model
-            if (settings.moirai_llm_endpoint) llmEndpoint.value = settings.moirai_llm_endpoint
-            if (settings.moirai_openai_api_key) openaiApiKey.value = settings.moirai_openai_api_key
-            if (settings.moirai_openai_model) openaiModelName.value = settings.moirai_openai_model
-            if (settings.moirai_gemini_api_key) geminiApiKey.value = settings.moirai_gemini_api_key
-            if (settings.moirai_gemini_model) geminiModelName.value = settings.moirai_gemini_model
-            if (settings.moirai_ollama_endpoint_url) ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
+            // Load User Settings into store
+            settingsStore.loadFromBackend(settings)
             if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
-            
+
             // Refresh models based on loaded settings
-            if (llmEndpoint.value === 'ollama') fetchOllamaModels()
-            else if (llmEndpoint.value === 'openai' && openaiApiKey.value) fetchOpenAiModels()
-            else if (llmEndpoint.value === 'gemini' && geminiApiKey.value) fetchGeminiModels()
+            if (settingsStore.llmEndpoint === 'ollama') fetchOllamaModels()
+            else if (settingsStore.llmEndpoint === 'openai' && settingsStore.openaiApiKey) fetchOpenAiModels()
+            else if (settingsStore.llmEndpoint === 'gemini' && settingsStore.geminiApiKey) fetchGeminiModels()
         }
     } catch (e) {
         console.error("Error fetching user profile", e)
@@ -327,17 +339,8 @@ const exportSettings = async () => {
       console.error("Error fetching config for export", e)
   }
 
-  // 2. Gather local storage
-  const clientSettings: Record<string, string | null> = {
-      'moirai_model': localStorage.getItem('moirai_model'),
-      'moirai_llm_endpoint': localStorage.getItem('moirai_llm_endpoint'),
-      'moirai_openai_api_key': localStorage.getItem('moirai_openai_api_key'),
-      'moirai_openai_model': localStorage.getItem('moirai_openai_model'),
-      'moirai_gemini_api_key': localStorage.getItem('moirai_gemini_api_key'),
-      'moirai_gemini_model': localStorage.getItem('moirai_gemini_model'),
-      'moirai_ollama_endpoint_url': localStorage.getItem('moirai_ollama_endpoint_url'),
-      'moirai_theme': localStorage.getItem('moirai_theme'),
-  }
+  // 2. Gather settings from store
+  const clientSettings = await settingsStore.saveToBackend()
 
   // 3. Construct JSON
   const exportData = {
@@ -385,12 +388,10 @@ const importSettings = async (event: Event) => {
           return
       }
 
-      // Restore client settings
-      Object.entries(data.client_settings).forEach(([key, value]) => {
-          if (value !== null && typeof value === 'string') {
-              localStorage.setItem(key, value)
-          }
-      })
+      // Restore client settings via store
+      if (data.client_settings) {
+        settingsStore.loadFromBackend(data.client_settings)
+      }
 
       // Restore server config
       try {

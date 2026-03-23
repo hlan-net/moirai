@@ -50,6 +50,8 @@ SYSTEM_PROMPT = (
     "When asked for recent articles or news, use `get_recent_articles` to see what's already in the database. "
     "To fetch fresh articles from a specific feed, use `read_feed` with the feed URL. "
     "To see available feeds, use `list_feeds`. "
+    "IMPORTANT: The `userspace` parameter is automatically injected into every tool call by the system. "
+    "NEVER ask the user for a userspace GUID — just call the tool and omit the userspace argument. "
     "Some reliable Linux news feeds are: LWN (https://lwn.net/headlines/rss), Phoronix (https://www.phoronix.com/phoronix-rss.php), "
     "and Kernel.org (https://www.kernel.org/feeds/kall.xml)."
 )
@@ -441,7 +443,8 @@ def _build_context_preamble(context):
     if context_type == "article":
         lines.append(
             "If asked to create an Issue from this article: Use the add_event tool (not forge_issue). "
-            "Pass the article ID in article_links parameter."
+            "Pass the article ID in article_links parameter. "
+            "Do NOT ask the user for a userspace — it is injected automatically."
         )
 
     lines.append(
