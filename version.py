@@ -31,4 +31,4 @@ VERSION, BUILD_NUMBER = _read_build_info()
 
 def get_version_string():
     """Returns formatted version string"""
-    return f"Moirai v{VERSION} ({BUILD_NUMBER})"
+    return f"Moirai v{VERSION} (build {BUILD_NUMBER})"

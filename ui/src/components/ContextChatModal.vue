@@ -28,6 +28,7 @@ const input = ref('')
 const loading = ref(false)
 const sessionId = ref<string | null>(null)
 const copyStatus = ref('')
+const pendingQuickAction = ref<QuickAction | null>(null)
 const raiseWizardOpen = ref(false)
 const raiseWizardLoading = ref(false)
 const raiseWizardQuestions = ref<string[]>([])
@@ -94,6 +95,13 @@ const quickActions = computed<QuickAction[]>(() => {
       {
         label: 'Refine Description',
         message: 'Help me refine the description of this Issue based on its linked articles',
+      },
+      {
+        label: 'Find new coverage',
+        message:
+          'Search for recent articles that relate to this issue but are not yet linked to it. ' +
+          'Use the issue name and description as search terms. ' +
+          'List the most relevant matches and suggest which ones should be linked.',
       },
     ]
   }
@@ -424,8 +432,28 @@ const submitRaiseWizard = async () => {
   }
 }
 
-const applyQuickAction = (message: string, action?: string) => {
-  if (action === 'wizard' && chatContextStore.contextType === 'article') {
+const applyQuickAction = (qa: QuickAction) => {
+  pendingQuickAction.value = qa
+}
+
+const confirmQuickAction = async () => {
+  if (!pendingQuickAction.value) return
+  const { message, action } = pendingQuickAction.value
+  pendingQuickAction.value = null
+  if (action === 'wizard') {
+    openRaiseWizard()
+    return
+  }
+  input.value = message
+  await sendMessage()
+}
+
+const declineQuickAction = () => {
+  if (!pendingQuickAction.value) return
+  const { message, action } = pendingQuickAction.value
+  pendingQuickAction.value = null
+  if (action === 'wizard') {
+    // wizard has no prefill fallback — open it directly
     openRaiseWizard()
     return
   }
@@ -502,10 +530,29 @@ const copyChat = async () => {
           v-for="action in quickActions"
           :key="action.label"
           class="quick-action-btn"
-          @click="applyQuickAction(action.message, action.action)"
+          @click="applyQuickAction(action)"
         >
           {{ action.label }}
         </button>
+      </div>
+
+      <div v-if="pendingQuickAction" class="confirm-panel">
+        <p class="confirm-label">{{ pendingQuickAction.label }}</p>
+        <div class="confirm-actions">
+          <button class="quick-action-btn confirm-yes" @click="confirmQuickAction">
+            {{ pendingQuickAction.action === 'wizard' ? 'Open wizard' : 'Yes, run it' }}
+          </button>
+          <button
+            v-if="pendingQuickAction.action !== 'wizard'"
+            class="quick-action-btn"
+            @click="declineQuickAction"
+          >
+            No, let me edit
+          </button>
+          <button class="quick-action-btn confirm-cancel" @click="pendingQuickAction = null">
+            Cancel
+          </button>
+        </div>
       </div>
 
       <div v-if="raiseWizardOpen" class="wizard-panel">
@@ -677,6 +724,33 @@ const copyChat = async () => {
   margin-top: 4px;
   font-size: 0.75rem;
   opacity: 0.75;
+}
+
+.confirm-panel {
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px 14px;
+  background: var(--button-bg);
+}
+
+.confirm-label {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.confirm-yes {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.confirm-cancel {
+  opacity: 0.7;
 }
 
 .wizard-panel {

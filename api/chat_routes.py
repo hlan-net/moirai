@@ -388,13 +388,25 @@ def _build_issue_context_lines(entity_data):
     status = _safe_text(entity_data.get("status", ""), 32)
     premises = entity_data.get("premises")
     premises_count = len(premises) if isinstance(premises, list) else 0
-    return [
+    already_linked = []
+    if isinstance(premises, list):
+        for p in premises[:20]:
+            if isinstance(p, dict) and p.get("id"):
+                already_linked.append(_safe_text(p["id"], 200))
+    lines = [
         f"Issue logos: {logos}",
         f"Issue description: {description or 'none'}",
         f"Issue longevity: {longevity or 'unknown'}",
         f"Issue status: {status or 'unknown'}",
         f"Issue premises_count: {premises_count}",
     ]
+    if already_linked:
+        lines.append(f"Already linked article IDs (do not suggest these): {', '.join(already_linked)}")
+    lines.append(
+        "If asked to find new coverage: use search_articles with keywords from the issue name and description. "
+        "Exclude already linked articles from suggestions."
+    )
+    return lines
 
 
 def _build_feed_context_lines(entity_data):
@@ -442,9 +454,19 @@ def _build_context_preamble(context):
     # Add context-specific guidance
     if context_type == "article":
         lines.append(
+            "You already have the full article context above. "
             "If asked to create an Issue from this article: Use the add_event tool (not forge_issue). "
-            "Pass the article ID in article_links parameter. "
+            "Use the Context entity_id value above as the article_links parameter. "
+            "Do NOT ask the user for the article URL, title, or ID — it is already in this context. "
             "Do NOT ask the user for a userspace — it is injected automatically."
+        )
+
+    if context_type == "issue":
+        lines.append(
+            "You already have the full issue context above. "
+            "The Context entity_id is this issue's ID — use it directly for any tool calls that require an issue ID. "
+            "Do NOT ask the user for an Issue ID, issue name, or any other identifier — everything is already in this context. "
+            "This applies to ALL operations: refining, summarising, linking articles, updating, or any other action on this issue."
         )
 
     lines.append(
