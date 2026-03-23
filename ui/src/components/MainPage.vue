@@ -53,7 +53,7 @@ function updateTimeDisplay() {
 }
 
 onMounted(() => {
-  timeUpdateInterval = window.setInterval(() => {
+  timeUpdateInterval = globalThis.setInterval(() => {
     updateTimeDisplay()
   }, TIME_DISPLAY_UPDATE_INTERVAL)
 })

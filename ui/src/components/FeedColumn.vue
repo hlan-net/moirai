@@ -178,6 +178,23 @@ const selectNoneFeeds = () => {
   selectedFeedIds.value.clear()
 }
 
+const deleteSingleFeed = async (feedId: string): Promise<boolean> => {
+  try {
+    const res = await authFetch(`/api/feeds/${feedId}`, { method: 'DELETE' })
+    if (!res.ok) return false
+    feeds.value = feeds.value.filter((f) => f._id !== feedId)
+    if (filterStore.selectedFeedId === feedId) {
+      filterStore.setSelectedFeedId(null)
+    }
+    return true
+  } catch (e) {
+    console.error(e)
+    return false
+  }
+}
+
+const pluralize = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`
+
 const bulkDeleteFeeds = async () => {
   const count = selectedFeedIds.value.size
   if (count === 0) {
@@ -185,43 +202,31 @@ const bulkDeleteFeeds = async () => {
     return
   }
 
-  const message = `Delete ${count} feed${count > 1 ? 's' : ''}?\n\n` +
+  const message =
+    `Delete ${pluralize(count, 'feed')}?\n\n` +
     `Note: Articles from these feeds will remain in your collection. ` +
     `Only the feed subscriptions will be removed.`
-  
+
   if (!confirm(message)) return
 
   let successCount = 0
   let failCount = 0
 
   for (const feedId of selectedFeedIds.value) {
-    try {
-      const res = await authFetch(`/api/feeds/${feedId}`, { method: 'DELETE' })
-      if (res.ok) {
-        successCount++
-        feeds.value = feeds.value.filter((f) => f._id !== feedId)
-        // If the deleted feed was selected, clear the selection
-        if (filterStore.selectedFeedId === feedId) {
-          filterStore.setSelectedFeedId(null)
-        }
-      } else {
-        failCount++
-      }
-    } catch (e) {
-      console.error(e)
-      failCount++
-    }
+    const ok = await deleteSingleFeed(feedId)
+    ok ? successCount++ : failCount++
   }
 
   selectedFeedIds.value.clear()
   bulkDeleteMode.value = false
 
+  const label = pluralize(successCount, 'feed')
   if (failCount === 0) {
-    showNotification(`Successfully deleted ${successCount} feed${successCount > 1 ? 's' : ''}`, 'success')
+    showNotification(`Successfully deleted ${label}`, 'success')
   } else {
     showNotification(
-      `Deleted ${successCount} feed${successCount > 1 ? 's' : ''}, ${failCount} failed`,
-      failCount > successCount ? 'error' : 'warning'
+      `Deleted ${label}, ${failCount} failed`,
+      failCount > successCount ? 'error' : 'warning',
     )
   }
 }

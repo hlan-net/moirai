@@ -331,10 +331,8 @@ const getHeaders = () => {
       if (settingsStore.geminiApiKey) {
         headers['x-gemini-api-key'] = settingsStore.geminiApiKey
       }
-    } else {
-      if (settingsStore.ollamaEndpointUrl) {
-        headers['x-ollama-base-url'] = settingsStore.ollamaEndpointUrl
-      }
+    } else if (settingsStore.ollamaEndpointUrl) {
+      headers['x-ollama-base-url'] = settingsStore.ollamaEndpointUrl
     }
     return headers
 }
@@ -1212,11 +1210,11 @@ const renameSession = async (session: ChatSession) => {
 }
 .provider-status.status-ok {
     background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
+    color: #4ade80;
 }
 .provider-status.status-warning {
     background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
+    color: #fcd34d;
 }
 .loading-indicator {
     font-size: 0.8rem;

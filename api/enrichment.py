@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 # Cache TTL for enrichment data (5 minutes)
 ENRICHMENT_CACHE_TTL = 300
+ENRICHMENT_CACHE_KEY = ENRICHMENT_CACHE_KEY
 
 
 def enrich_articles_with_issues(articles):
@@ -46,7 +47,7 @@ def _get_cached_feed_mappings():
     """
     try:
         redis_client = get_redis_client()
-        cached = redis_client.get("enrichment:feed_mappings")
+        cached = redis_client.get(ENRICHMENT_CACHE_KEY)
         
         if cached:
             data = json.loads(cached)
@@ -66,7 +67,7 @@ def _cache_feed_mappings(feed_title_map, feed_favicon_map):
             "favicons": feed_favicon_map
         }
         redis_client.setex(
-            "enrichment:feed_mappings",
+            ENRICHMENT_CACHE_KEY,
             ENRICHMENT_CACHE_TTL,
             json.dumps(data)
         )
@@ -78,7 +79,7 @@ def invalidate_feed_mappings_cache():
     """Invalidate the feed mappings cache. Call when feeds are modified."""
     try:
         redis_client = get_redis_client()
-        redis_client.delete("enrichment:feed_mappings")
+        redis_client.delete(ENRICHMENT_CACHE_KEY)
         logger.info("Invalidated feed mappings cache")
     except redis.exceptions.RedisError as e:
         logger.warning(f"Failed to invalidate feed mappings cache: {e}")
