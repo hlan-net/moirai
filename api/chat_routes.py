@@ -464,8 +464,9 @@ def _build_context_preamble(context):
     if context_type == "issue":
         lines.append(
             "You already have the full issue context above. "
-            "When asked to refine, summarise, or work with this issue, use the data provided directly. "
-            "Do NOT ask the user for an Issue ID or any identifier — it is already in this context."
+            "The Context entity_id is this issue's ID — use it directly for any tool calls that require an issue ID. "
+            "Do NOT ask the user for an Issue ID, issue name, or any other identifier — everything is already in this context. "
+            "This applies to ALL operations: refining, summarising, linking articles, updating, or any other action on this issue."
         )
 
     lines.append(
