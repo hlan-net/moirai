@@ -454,9 +454,18 @@ def _build_context_preamble(context):
     # Add context-specific guidance
     if context_type == "article":
         lines.append(
-            "If asked to create an Issue from this article: Use the add_event tool (not forge_issue). "
-            "Pass the article ID in article_links parameter. "
+            "You already have the full article context above. "
+            "If asked to create an Issue from this article: use the add_event tool (not forge_issue). "
+            "Use the Context entity_id value above as the article_links parameter. "
+            "Do NOT ask the user for the article URL, title, or ID — it is already in this context. "
             "Do NOT ask the user for a userspace — it is injected automatically."
+        )
+
+    if context_type == "issue":
+        lines.append(
+            "You already have the full issue context above. "
+            "When asked to refine, summarise, or work with this issue, use the data provided directly. "
+            "Do NOT ask the user for an Issue ID or any identifier — it is already in this context."
         )
 
     lines.append(
