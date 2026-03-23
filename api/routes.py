@@ -269,11 +269,7 @@ def delete_feed(feed_id):
         abort(404, description=ERROR_FEED_NOT_FOUND)
 
     if delete_from_couchdb("feeds", feed_id, feed["_rev"]):
-        # Invalidate feed mappings cache
-        try:
-            invalidate_feed_mappings_cache()
-        except Exception as e:
-            logger.error(f"Failed to invalidate feed mappings cache: {e}")
+        invalidate_feed_mappings_cache()
         return jsonify({"status": "deleted"})
     else:
         abort(500, description="Failed to delete feed")
@@ -299,11 +295,7 @@ def update_feed(feed_id):
         feed["url"] = str(validated.new_url)
 
     if update_couchdb_doc("feeds", feed_id, feed):
-        # Invalidate feed mappings cache
-        try:
-            invalidate_feed_mappings_cache()
-        except Exception as e:
-            logger.error(f"Failed to invalidate feed mappings cache: {e}")
+        invalidate_feed_mappings_cache()
         return jsonify(feed)
     else:
         abort(500, description="Failed to update feed")

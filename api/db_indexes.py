@@ -12,7 +12,7 @@ Or directly:
 """
 import logging
 import requests
-from typing import Dict, List
+from typing import Dict
 from api.db_config import get_couchdb_uri
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def create_index(db_name: str, index_def: Dict) -> bool:
             
         return True
         
-    except Exception as e:
+    except requests.RequestException as e:
         logger.error(f"✗ Failed to create index {index_def['name']} in {db_name}: {e}")
         return False
 

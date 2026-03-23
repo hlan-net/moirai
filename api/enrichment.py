@@ -1,5 +1,6 @@
 import logging
 import json
+import redis.exceptions
 from api.db import query_couchdb, fetch_from_couchdb
 from api.db_constants import MONGO_ELEM_MATCH, MONGO_IN
 from api.extensions import get_redis_client
@@ -50,7 +51,7 @@ def _get_cached_feed_mappings():
         if cached:
             data = json.loads(cached)
             return data.get("titles", {}), data.get("favicons", {})
-    except Exception as e:
+    except (redis.exceptions.RedisError, json.JSONDecodeError) as e:
         logger.warning(f"Failed to get cached feed mappings: {e}")
     
     return None, None
@@ -69,7 +70,7 @@ def _cache_feed_mappings(feed_title_map, feed_favicon_map):
             ENRICHMENT_CACHE_TTL,
             json.dumps(data)
         )
-    except Exception as e:
+    except redis.exceptions.RedisError as e:
         logger.warning(f"Failed to cache feed mappings: {e}")
 
 
@@ -79,7 +80,7 @@ def invalidate_feed_mappings_cache():
         redis_client = get_redis_client()
         redis_client.delete("enrichment:feed_mappings")
         logger.info("Invalidated feed mappings cache")
-    except Exception as e:
+    except redis.exceptions.RedisError as e:
         logger.warning(f"Failed to invalidate feed mappings cache: {e}")
 
 

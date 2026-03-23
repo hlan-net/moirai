@@ -17,7 +17,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const geminiApiKey = ref<string>(localStorage.getItem('moirai_gemini_api_key') || '')
   
   // Endpoints
-  const ollamaEndpointUrl = ref<string>(localStorage.getItem('moirai_ollama_endpoint_url') || 'http://host.docker.internal:11434/v1')
+  // Ollama runs locally over plain HTTP by design — NOSONAR (typescript:S5332)
+  const ollamaEndpointUrl = ref<string>(localStorage.getItem('moirai_ollama_endpoint_url') || 'http://host.docker.internal:11434/v1') // NOSONAR
   
   // Theme
   const theme = ref<string>(localStorage.getItem('moirai_theme') || 'dark')
@@ -131,7 +132,7 @@ export const useSettingsStore = defineStore('settings', () => {
     geminiModel.value = 'gemini-1.5-pro'
     openaiApiKey.value = ''
     geminiApiKey.value = ''
-    ollamaEndpointUrl.value = 'http://host.docker.internal:11434/v1'
+    ollamaEndpointUrl.value = 'http://host.docker.internal:11434/v1' // NOSONAR
     theme.value = 'dark'
   }
 

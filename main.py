@@ -40,12 +40,14 @@ if not is_test_mode:
 csrf = CSRFProtect()
 csrf.init_app(app)
 
-# Exempt API routes from CSRF (they use JWT Bearer tokens)
-csrf.exempt(auth_blueprint)
-csrf.exempt(api_blueprint)
-csrf.exempt(chat_blueprint)
-csrf.exempt(mcp_blueprint)
-csrf.exempt(agent_blueprint)
+# Exempt API routes from CSRF — these endpoints authenticate via JWT Bearer tokens
+# in the Authorization header, which browsers do not attach automatically (unlike
+# cookies), so CSRF attacks cannot exploit them.  NOSONAR (python:S4502)
+csrf.exempt(auth_blueprint)  # noqa: S4502
+csrf.exempt(api_blueprint)  # noqa: S4502
+csrf.exempt(chat_blueprint)  # noqa: S4502
+csrf.exempt(mcp_blueprint)  # noqa: S4502
+csrf.exempt(agent_blueprint)  # noqa: S4502
 
 if (
     is_test_mode 
