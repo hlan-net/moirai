@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 # Cache TTL for enrichment data (5 minutes)
 ENRICHMENT_CACHE_TTL = 300
-ENRICHMENT_CACHE_KEY = ENRICHMENT_CACHE_KEY
+ENRICHMENT_CACHE_KEY = "enrichment:feed_mappings"
 
 
 def enrich_articles_with_issues(articles):
