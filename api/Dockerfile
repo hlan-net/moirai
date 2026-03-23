@@ -1,5 +1,5 @@
 # Stage 1: Build the conda environment
-FROM condaforge/miniforge3:26.1.0-0@sha256:df8d10c338351cc245f687c62921f40c8c1664249594b3b1cad37ae5f5ee7483 AS builder
+FROM condaforge/miniforge3:26.1.1-3@sha256:3afa647dbdc9f8d62c70bda1293fdff675c98f3c91e910738e806113c498d78a AS builder
 
 WORKDIR /build
 ENV PIP_ROOT_USER_ACTION=ignore
