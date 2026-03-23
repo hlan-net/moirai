@@ -388,6 +388,31 @@ class ConfigUpdateRequest(BaseModel):
         return v
 
 
+class IssueCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=300)
+    description: str = Field(..., min_length=1, max_length=2000)
+    article_links: list[str] = Field(..., min_length=1)
+    longevity: str = Field("transient")
+
+    @field_validator("name", "description")
+    @classmethod
+    def sanitize_text(cls, v: str) -> str:
+        return _sanitize_text(v)
+
+    @field_validator("longevity")
+    @classmethod
+    def validate_longevity(cls, v: str) -> str:
+        if v not in {"transient", "temporal", "epic"}:
+            raise ValueError("longevity must be one of: transient, temporal, epic")
+        return v
+
+    @field_validator("article_links")
+    @classmethod
+    def validate_links(cls, v: list[str]) -> list[str]:
+        _ensure_valid_url_list(v)
+        return v
+
+
 def validate_userspace_param(userspace: str) -> str:
     """Validate userspace query parameter"""
     if not userspace:

@@ -354,17 +354,74 @@ const openRaiseWizard = async () => {
 const submitRaiseWizard = async () => {
   const q = raiseWizardQuestions.value
   const a = raiseWizardAnswers.value
-  const prompt = [
-    'Please create a new Issue from this article using these clarifications:',
+  const articleId = chatContextStore.entityData?._id as string | undefined
+
+  raiseWizardOpen.value = false
+  loading.value = true
+
+  const draftPrompt = [
+    'Based on this article and the clarifications below, produce ONLY two lines:',
+    'NAME: <concise generic issue name, max 100 chars>',
+    'DESCRIPTION: <one-paragraph description of the issue, max 400 chars>',
+    '',
     `1) ${q[0] || 'Issue framing'}: ${a[0] || '(not provided)'}`,
     `2) ${q[1] || 'Time horizon'}: ${a[1] || '(not provided)'}`,
     `3) ${q[2] || 'Core drivers'}: ${a[2] || '(not provided)'}`,
-    'If this article can map to more than one issue, suggest the second issue after creating the primary one.',
+    '',
+    'Output only the NAME: and DESCRIPTION: lines. No extra text.',
   ].join('\n')
 
-  raiseWizardOpen.value = false
-  input.value = prompt
-  await sendMessage()
+  try {
+    const draftRes = await authFetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: draftPrompt,
+        history: [],
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
+        context: chatContextStore.contextPayload,
+      }),
+    })
+
+    if (!draftRes.ok) throw new Error('Failed to draft issue')
+
+    const draft = await draftRes.json()
+    const text: string = draft.response || ''
+    const nameMatch = text.match(/^NAME:\s*(.+)/m)
+    const descMatch = text.match(/^DESCRIPTION:\s*(.+)/ms)
+
+    const name = nameMatch?.[1]?.trim() || 'Issue from article'
+    const description = descMatch?.[1]?.split('\n')[0]?.trim() || text.trim()
+
+    if (!articleId) {
+      messages.value.push({ role: 'assistant', content: `Drafted issue but could not determine article ID. Name: **${name}**` })
+      return
+    }
+
+    const createRes = await authFetch('/api/issues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, article_links: [articleId] }),
+    })
+
+    if (createRes.ok) {
+      const result = await createRes.json()
+      messages.value.push({
+        role: 'assistant',
+        content: `Issue created: **${result.name}**\n\n${description}\n\n_ID: ${result.issue_id}_`,
+      })
+      await ensureSession(draftPrompt)
+      await updateSession()
+    } else {
+      const err = await createRes.text()
+      messages.value.push({ role: 'assistant', content: `Failed to create issue: ${err}` })
+    }
+  } catch (error) {
+    messages.value.push({ role: 'assistant', content: `Error: ${String(error)}` })
+  } finally {
+    loading.value = false
+  }
 }
 
 const applyQuickAction = (message: string, action?: string) => {

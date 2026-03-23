@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, abort, request, Response
+from flask import Blueprint, jsonify, abort, request, Response, g
 import os
 import json
 import version
@@ -16,10 +16,11 @@ from .db import (
     delete_from_couchdb,
     update_couchdb_doc,
     query_couchdb,
+    store_to_couchdb,
 )
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
-from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest
+from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest
 from .auth import get_auth_config
 
 import uuid  # Import uuid
@@ -645,6 +646,35 @@ def list_issues():
     issues = fetch_from_couchdb("issues")
     issues = _filter_issues_by_selector(issues, longevity, status)
     return jsonify(issues)
+
+
+@api_blueprint.route("/issues", methods=["POST"])
+@jwt_required
+@limiter.limit("30 per minute")
+def create_issue():
+    try:
+        validated = IssueCreateRequest(**request.json)
+    except ValidationError as e:
+        abort(400, description=str(e))
+
+    premises = [{"type": "message", "id": link} for link in validated.article_links]
+    issue_doc = {
+        "logos": validated.name,
+        "description": validated.description,
+        "premises": premises,
+        "longevity": validated.longevity,
+        "status": "active",
+        "born_at": datetime.now(timezone.utc).isoformat(),
+        "passed_at": None,
+        "type": "issue",
+        "userspace": g.user_id,
+    }
+
+    doc_id = store_to_couchdb("issues", issue_doc)
+    if not doc_id:
+        abort(500, description="Failed to create issue")
+
+    return jsonify({"issue_id": doc_id, "name": validated.name}), 201
 
 
 @api_blueprint.route("/issues/<issue_id>", methods=["GET"])
