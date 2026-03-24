@@ -10,6 +10,7 @@ import requests
 from api.db import query_couchdb, update_couchdb_doc_safe
 from api.db_config import get_couchdb_uri
 from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
+from api.userspace_ops import resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 
 logger = logging.getLogger(__name__)
@@ -258,10 +259,11 @@ class AgentOrchestrator(threading.Thread):
                     f"Dispatching on_new_article agent {agent_config.get('_id')} "
                     f"with {len(agent_articles)} articles."
                 )
+                llm_config = resolve_llm_config(userspace)
                 self.execute_agent_logic(
                     agent_config,
                     new_articles=agent_articles,
-                    llm_config=agent_config.get("llm_model_config"),
+                    llm_config=llm_config,
                 )
                 dispatch_count += 1
             except Exception as e:
@@ -385,9 +387,9 @@ class AgentOrchestrator(threading.Thread):
 
         if self.is_scheduled_agent_due(last_run_at_str, schedule_interval):
             logger.info(f"Triggering scheduled agent {agent_id}.")
-            self.execute_agent_logic(
-                agent_config, llm_config=agent_config.get("llm_model_config")
-            )
+            userspace = agent_config.get("userspace") or agent_config.get("namespace", "")
+            llm_config = resolve_llm_config(userspace)
+            self.execute_agent_logic(agent_config, llm_config=llm_config)
 
     def is_scheduled_agent_due(
         self, last_run_at_str: str | None, schedule_interval: str | None

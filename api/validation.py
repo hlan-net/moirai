@@ -413,6 +413,62 @@ class IssueCreateRequest(BaseModel):
         return v
 
 
+class LLMConfigRequest(BaseModel):
+    """LLM provider configuration stored on a userspace."""
+
+    provider: str = Field("ollama", description="ollama | openai | gemini")
+    model: str = Field("llama3.1", min_length=1, max_length=200)
+    openai_api_key: Optional[str] = Field(None, max_length=500)
+    gemini_api_key: Optional[str] = Field(None, max_length=500)
+    ollama_endpoint: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        allowed = {"ollama", "openai", "gemini"}
+        if v not in allowed:
+            raise ValueError(f"provider must be one of: {', '.join(sorted(allowed))}")
+        return v
+
+    @field_validator("model")
+    @classmethod
+    def sanitize_model(cls, v: str) -> str:
+        return _sanitize_text(v)
+
+    @field_validator("ollama_endpoint")
+    @classmethod
+    def validate_ollama_endpoint(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return _validate_http_or_https_url(v, "ollama_endpoint must be an HTTP/HTTPS URL")
+
+
+class UserspaceCreateRequest(BaseModel):
+    """Validation for creating a new userspace."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    llm_config: Optional[LLMConfigRequest] = None
+    preferences: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+    @field_validator("name")
+    @classmethod
+    def sanitize_name(cls, v: str) -> str:
+        return _sanitize_text(v)
+
+
+class UserspaceUpdateRequest(BaseModel):
+    """Partial update for a userspace — all fields optional."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    llm_config: Optional[LLMConfigRequest] = None
+    preferences: Optional[Dict[str, Any]] = None
+
+    @field_validator("name")
+    @classmethod
+    def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
+        return _sanitize_optional_text(v)
+
+
 def validate_userspace_param(userspace: str) -> str:
     """Validate userspace query parameter"""
     if not userspace:

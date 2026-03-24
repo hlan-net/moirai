@@ -189,6 +189,7 @@ def init_db():
         "chat_history",
         "users",
         "feed_content",
+        "userspaces",
     ]
     for db in allowed_dbs:
         ensure_db(db)
@@ -197,6 +198,7 @@ def init_db():
     create_index("articles", ["published"], "published-index")
     create_index("articles", ["feed_url"], "feed-url-index")
     create_index("users", ["email"], "users-email-index")
+    create_index("userspaces", ["owner_user_id"], "userspaces-owner-index")
 
     ensure_design_doc(
         "articles",
@@ -226,6 +228,38 @@ def init_db():
     )
 
     return
+
+
+def migrate_userspaces():
+    """Create userspace documents for all existing users that don't have one yet.
+
+    Safe to run multiple times — skips users that already have a userspace doc.
+    """
+    from api.userspace_ops import migrate_user_llm_settings_to_userspace
+
+    try:
+        response = _request(
+            "POST",
+            f"{get_couchdb_uri()}users/_find",
+            json={"selector": {}, "limit": 1000},
+            timeout=10,
+        )
+        if response.status_code != 200:
+            logger.error("migrate_userspaces: failed to list users: %s", response.text)
+            return
+
+        users = response.json().get("docs", [])
+        migrated = 0
+        for user in users:
+            if migrate_user_llm_settings_to_userspace(user):
+                migrated += 1
+
+        if migrated:
+            logger.info("Migrated %d user(s) to userspace documents.", migrated)
+        else:
+            logger.info("Userspace migration: all users already have userspace documents.")
+    except Exception as exc:
+        logger.error("migrate_userspaces: unexpected error: %s", exc)
 
 
 def ensure_default_user():
@@ -269,6 +303,7 @@ def run():
     logger.info("Initialising database...")
     init_db()
     ensure_default_user()
+    migrate_userspaces()
 
     logger.info("Starting cleanup task...")
     cleanup = CleanupTask()
