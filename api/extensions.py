@@ -5,6 +5,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import request
 from prometheus_flask_exporter import PrometheusMetrics
+from tasks.session_logger import SessionLogger
 
 
 def get_redis_client() -> redis.Redis:
@@ -79,3 +80,8 @@ limiter = Limiter(
 )
 
 metrics = PrometheusMetrics(app=None)
+
+
+def get_session_logger() -> SessionLogger:
+    """Return a SessionLogger backed by the configured Redis client (or a no-op one)."""
+    return SessionLogger(get_redis_client())

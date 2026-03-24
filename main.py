@@ -9,6 +9,7 @@ from api.chat_routes import chat_blueprint
 from api.auth import auth_blueprint, JWT_SECRET_KEY  # Import JWT_SECRET_KEY
 from api.agent_routes import agent_blueprint
 from api.userspace_routes import userspace_blueprint
+from api.session_routes import session_blueprint
 from api.telemetry import configure_telemetry  # Moved to top
 
 from tasks.scheduler import scheduler
@@ -72,6 +73,8 @@ app.register_blueprint(chat_blueprint, url_prefix="/api")
 app.register_blueprint(auth_blueprint, url_prefix="/api/auth")
 app.register_blueprint(agent_blueprint, url_prefix="/api")
 app.register_blueprint(userspace_blueprint, url_prefix="/api")
+app.register_blueprint(session_blueprint, url_prefix="/api")
+csrf.exempt(session_blueprint)
 
 
 @app.route("/", methods=["GET"])
