@@ -234,25 +234,46 @@ def migrate_userspaces():
     """Create userspace documents for all existing users that don't have one yet.
 
     Safe to run multiple times — skips users that already have a userspace doc.
+    Uses _all_docs with pagination to handle any number of users without a
+    hardcoded limit.
     """
     from api.userspace_ops import migrate_user_llm_settings_to_userspace
 
-    try:
-        response = _request(
-            "POST",
-            f"{get_couchdb_uri()}users/_find",
-            json={"selector": {}, "limit": 1000},
-            timeout=10,
-        )
-        if response.status_code != 200:
-            logger.error("migrate_userspaces: failed to list users: %s", response.text)
-            return
+    migrated = 0
+    batch_size = 200
+    start_key = None
 
-        users = response.json().get("docs", [])
-        migrated = 0
-        for user in users:
-            if migrate_user_llm_settings_to_userspace(user):
-                migrated += 1
+    try:
+        while True:
+            params: dict = {"include_docs": "true", "limit": batch_size}
+            if start_key:
+                params["startkey"] = f'"{start_key}"'
+                params["skip"] = 1  # skip the last doc seen in the previous batch
+
+            response = _request(
+                "GET",
+                f"{get_couchdb_uri()}users/_all_docs",
+                params=params,
+                timeout=10,
+            )
+            if response.status_code != 200:
+                logger.error("migrate_userspaces: failed to list users: %s", response.text)
+                return
+
+            rows = response.json().get("rows", [])
+            user_docs = [
+                r["doc"] for r in rows
+                if r.get("doc") and not r["id"].startswith("_design/")
+            ]
+
+            for user in user_docs:
+                if migrate_user_llm_settings_to_userspace(user):
+                    migrated += 1
+
+            if len(rows) < batch_size:
+                break  # last page
+
+            start_key = rows[-1]["id"]
 
         if migrated:
             logger.info("Migrated %d user(s) to userspace documents.", migrated)
