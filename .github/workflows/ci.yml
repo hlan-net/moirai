@@ -6,9 +6,9 @@ concurrency:
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, release/v0.7.0 ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, release/v0.7.0 ]
 
 jobs:
   test:
