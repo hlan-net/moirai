@@ -468,7 +468,9 @@ def _build_context_preamble(context):
             "You already have the full issue context above. "
             "The Context entity_id is this issue's ID — use it directly for any tool calls that require an issue ID. "
             "Do NOT ask the user for an Issue ID, issue name, or any other identifier — everything is already in this context. "
-            "This applies to ALL operations: refining, summarising, linking articles, updating, or any other action on this issue."
+            "This applies to ALL operations: refining, summarising, linking articles, updating, or any other action on this issue. "
+            "If asked to find related or new articles: call search_articles with the issue logos and key terms from the description as the query — do NOT ask the user what to search for. "
+            "Already-linked article IDs are listed above; exclude them from your suggestions."
         )
 
     lines.append(
