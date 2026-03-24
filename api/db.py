@@ -52,6 +52,7 @@ ALLOWED_DBS = {
     "chat_history",
     "users",
     "agent_configs",
+    "userspaces",
 }
 
 # Error messages

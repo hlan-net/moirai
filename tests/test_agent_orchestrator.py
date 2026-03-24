@@ -69,7 +69,7 @@ def test_check_and_run_agents_scheduled(mock_update_safe, mock_query, orchestrat
         # Verify query was called with SCHEDULED filter
         call_args = mock_query.call_args
         assert call_args[1]["selector"]["trigger_type"] == AgentTriggerType.SCHEDULED.value
-        mock_execute.assert_called_once_with(agent_config, llm_config=None)
+        mock_execute.assert_called_once_with(agent_config, llm_config={})
 
 def test_is_scheduled_agent_due(orchestrator):
     now = datetime.now(timezone.utc)
