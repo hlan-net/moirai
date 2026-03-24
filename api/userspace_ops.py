@@ -9,7 +9,7 @@ from individual user settings or agent configs.
 import logging
 from typing import Optional
 
-from api.db import fetch_from_couchdb, query_couchdb, store_to_couchdb, update_couchdb_doc_safe
+from api.db import fetch_from_couchdb, query_couchdb, store_to_couchdb
 
 logger = logging.getLogger(__name__)
 

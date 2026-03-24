@@ -2,7 +2,7 @@
 Unit tests for userspace document management and LLM config resolution.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
