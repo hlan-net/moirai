@@ -11,7 +11,6 @@ const logicModules = ALLOWED_LOGIC_MODULES
 
 const triggerTypes = ['on_new_article', 'scheduled']
 const statuses = ['active', 'paused']
-const targetDbs = ['articles', 'issues']
 
 const draftAgent = ref({
   name: '',

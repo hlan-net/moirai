@@ -31,7 +31,7 @@ When an agent runs, the issue is asking:
 
 The agent is how the Zeitgeist **perceives itself** in the flow of news and events.
 
-> **Etymology note:** *Zeitgeist* (German: "spirit of the age") derives from Latin *genius saeculi*, which traces back to the Greek *daimon* (δαίμων) — a guiding spirit that watches over an individual. Plato described the daimon as existing within a person from birth, providing awareness and guidance. In Moirai, each Issue has its own daimon (agent) through which it perceives the world. We use "Zeitgeist" in the UI to avoid confusion with the modern English word "demon".
+> **Etymology note:** *Zeitgeist* (German: "spirit of the age") derives from Latin *genius saeculi*, which traces back to the Greek *daimon* (δαίμων) — a guiding spirit that watches over an individual. Plato described the daimon as existing within a person from birth, providing awareness and guidance. The Roman *genius* was described by Horace as "the companion which controls the natal star; the god of human nature, in that he is mortal for each person." In Moirai, each Issue has its own daimon (agent) through which it perceives the world. We use "Zeitgeist" in the UI to avoid confusion with the modern English word "demon".
 
 ### The Three Fates Govern All Mortal Things
 
