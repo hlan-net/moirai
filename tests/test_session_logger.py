@@ -210,8 +210,6 @@ def test_session_context_marks_error_on_exception(sl, mock_redis):
         with sl.session(session_type=SESSION_TYPE_SCHEDULED, userspace="ws"):
             raise RuntimeError("boom")
 
-    last = stored.get("last")
-    if last:
-        doc = json.loads(last)
-        assert doc["status"] == STATUS_ERROR
-        assert "boom" in (doc.get("error") or "")
+    doc = json.loads(stored["last"])
+    assert doc["status"] == STATUS_ERROR
+    assert "boom" in (doc.get("error") or "")

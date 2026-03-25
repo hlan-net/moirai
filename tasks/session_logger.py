@@ -125,7 +125,7 @@ class SessionLogger:
                     end_dt = datetime.fromisoformat(now)
                     duration_ms = int((end_dt - start_dt).total_seconds() * 1000)
                 except ValueError:
-                    pass
+                    logger.debug("finish_session: could not parse started_at timestamp, duration_ms will be None")
             doc.update(
                 {
                     "finished_at": now,
