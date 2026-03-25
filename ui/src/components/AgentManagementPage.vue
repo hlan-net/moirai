@@ -97,6 +97,7 @@ const resetFeedback = () => {
 
 const loadUserspaces = async () => {
   loadingUserspaces.value = true
+  resetFeedback()
   try {
     const response = await authFetch('/api/userspaces')
     if (response.ok) {
@@ -105,8 +106,12 @@ const loadUserspaces = async () => {
       if (userspaces.value.length > 0 && !draftAgent.value.userspace) {
         draftAgent.value.userspace = userspaces.value[0]
       }
+    } else {
+      errorMessage.value = 'Failed to load userspaces. Please try again later.'
+      console.error('Failed to load userspaces:', response.status, response.statusText)
     }
   } catch (error) {
+    errorMessage.value = 'Unable to connect to server. Please check your connection.'
     console.error('Failed to load userspaces:', error)
   } finally {
     loadingUserspaces.value = false
