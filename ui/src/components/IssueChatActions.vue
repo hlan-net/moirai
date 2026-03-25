@@ -50,6 +50,7 @@ const shareToBluesky = async () => {
       shareUrl.value = data.url || null
     }
   } catch (err) {
+    console.error('Share to Bluesky failed:', err)
     shareState.value = 'error'
     shareError.value = 'Network error'
   }

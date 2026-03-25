@@ -7,7 +7,7 @@ Allows agents to share Moirai Issues to Bluesky.
 import logging
 
 from api.bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
-from api.db import fetch_from_couchdb, update_couchdb_doc_safe
+from api.db import fetch_from_couchdb, query_couchdb, update_couchdb_doc_safe
 from api.userspace_ops import get_userspace, resolve_llm_config
 from mcp_service.core import mcp
 
@@ -43,15 +43,14 @@ def publish_to_bluesky(issue_id: str, userspace: str) -> str:
     if not bluesky_handle or not bluesky_app_password:
         return "Error: Bluesky credentials not configured on this userspace."
 
-    # Fetch linked articles (premises)
+    # Fetch linked articles in a single bulk query
     premises = issue.get("premises") or []
-    articles = []
-    for p in premises[:10]:
-        pid = p.get("id") if isinstance(p, dict) else p
-        if pid:
-            art = fetch_from_couchdb("articles", pid)
-            if art:
-                articles.append(art)
+    article_ids = [
+        p.get("id") if isinstance(p, dict) else p
+        for p in premises[:10]
+        if (p.get("id") if isinstance(p, dict) else p)
+    ]
+    articles = query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
 
     llm_config = resolve_llm_config(userspace)
     post_text = generate_bluesky_post_text(issue, articles, llm_config)

@@ -92,5 +92,6 @@ def bluesky_uri_to_url(uri: str, handle: str) -> Optional[str]:
         parts = uri.split("/")
         rkey = parts[-1]
         return f"https://bsky.app/profile/{handle}/post/{rkey}"
-    except Exception:
+    except (AttributeError, IndexError) as exc:
+        logger.warning("Failed to parse Bluesky URI '%s': %s", uri, exc)
         return None

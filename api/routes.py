@@ -748,13 +748,12 @@ def share_issue(issue_id: str):
         return jsonify({"error": "Bluesky credentials not configured"}), 400
 
     premises = issue.get("premises") or []
-    articles = []
-    for p in premises[:10]:
-        pid = p.get("id") if isinstance(p, dict) else p
-        if pid:
-            art = fetch_from_couchdb("articles", pid)
-            if art:
-                articles.append(art)
+    article_ids = [
+        p.get("id") if isinstance(p, dict) else p
+        for p in premises[:10]
+        if (p.get("id") if isinstance(p, dict) else p)
+    ]
+    articles = query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
 
     llm_config = resolve_llm_config(userspace_id)
     post_text = generate_bluesky_post_text(issue, articles, llm_config)

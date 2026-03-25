@@ -476,18 +476,14 @@ class UserspaceUpdateRequest(BaseModel):
         return _sanitize_optional_text(v)
 
 
+class SocialPlatform(str, Enum):
+    BLUESKY = "bluesky"
+
+
 class ShareIssueRequest(BaseModel):
     """Validation for sharing an issue to a social platform."""
 
-    platform: str = Field(..., min_length=1, max_length=50)
-
-    @field_validator("platform")
-    @classmethod
-    def validate_platform(cls, v: str) -> str:
-        allowed = {"bluesky"}
-        if v not in allowed:
-            raise ValueError(f"Unsupported platform '{v}'. Allowed: {allowed}")
-        return v
+    platform: SocialPlatform
 
 
 def validate_userspace_param(userspace: str) -> str:
