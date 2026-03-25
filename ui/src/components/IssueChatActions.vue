@@ -42,12 +42,12 @@ const shareToBluesky = async () => {
       body: JSON.stringify({ platform: 'bluesky' }),
     })
     const data = await res.json()
-    if (!res.ok) {
-      shareState.value = 'error'
-      shareError.value = data.error || 'Share failed'
-    } else {
+    if (res.ok) {
       shareState.value = 'done'
       shareUrl.value = data.url || null
+    } else {
+      shareState.value = 'error'
+      shareError.value = data.error || 'Share failed'
     }
   } catch (err) {
     console.error('Share to Bluesky failed:', err)
