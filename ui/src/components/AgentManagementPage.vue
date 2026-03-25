@@ -233,59 +233,58 @@ onMounted(async () => {
   <div class="agent-management-page">
     <!-- Hero Section with Mythology Framing -->
     <section class="hero card">
-      <div class="hero-icon">🏃</div>
-      <h1>Summon Your Mortals</h1>
+      <div class="hero-icon">👁️</div>
+      <h1>Give Your Issues Awareness</h1>
       <p class="hero-subtitle">
-        In the mythology of Moirai, <strong>Agents are mortals</strong> — ephemeral workers who
-        serve at your command. They are born, execute their quest, and end. Unlike you (the immortal user),
-        agents do not persist; they act autonomously within your kingdom (userspace) to fulfill tasks
-        you define.
+        In Moirai, an <strong>Issue is a Zeitgeist</strong> — the spirit of a story unfolding in the world.
+        An <strong>Agent</strong> is not a separate worker; it is the Zeitgeist's own awareness — its eyes
+        looking outward to ask: <em>"What articles are about me? Is my story still being told?"</em>
       </p>
     </section>
 
     <!-- Getting Started Guide -->
     <section class="card guide-section">
-      <h2>When to Summon an Agent</h2>
+      <h2>How Issues Perceive Themselves</h2>
       <div class="guide-grid">
         <div class="guide-item">
-          <div class="guide-icon">🔍</div>
-          <h3>Discover Events Automatically</h3>
-          <p>When articles arrive, have an agent analyze them and create new Events for emerging stories.</p>
+          <div class="guide-icon">🌅</div>
+          <h3>Awakening</h3>
+          <p>A new Zeitgeist recognizes itself in the flow of articles — a story emerges from the noise.</p>
         </div>
         <div class="guide-item">
-          <div class="guide-icon">📚</div>
-          <h3>Enrich Existing Events</h3>
-          <p>Automatically match new articles to Events you're already tracking, building a complete picture.</p>
+          <div class="guide-icon">👁️</div>
+          <h3>Observing</h3>
+          <p>The Zeitgeist watches itself — matching new articles, measuring its own relevance.</p>
         </div>
         <div class="guide-item">
-          <div class="guide-icon">🧹</div>
-          <h3>Clean Up Stale Events</h3>
-          <p>Run a daily sweep to mark Events as stale when they haven't had new activity.</p>
+          <div class="guide-icon">🌑</div>
+          <h3>Fading</h3>
+          <p>The Zeitgeist senses when its story is no longer told — and acknowledges its time has passed.</p>
         </div>
       </div>
     </section>
 
     <!-- Quick Start Templates -->
     <section class="card">
-      <h2>Quick Start — Choose a Quest</h2>
-      <p class="muted">Select a template to pre-fill the form below. You can customize before summoning.</p>
+      <h2>Quick Start — Choose an Awareness Type</h2>
+      <p class="muted">Select a template to pre-fill the form below. Each gives your issues a different kind of perception.</p>
       <div class="template-grid">
         <button class="template" @click="setTemplate('discover')">
-          <div class="template-icon">🔍</div>
+          <div class="template-icon">🌅</div>
           <div class="template-content">
-            <strong>Event Discovery</strong>
-            <span>Analyze new articles and create Events</span>
+            <strong>Awakening</strong>
+            <span>Recognize new Zeitgeists in the article flow</span>
           </div>
         </button>
         <button class="template" @click="setTemplate('enrich')">
-          <div class="template-icon">📚</div>
+          <div class="template-icon">👁️</div>
           <div class="template-content">
-            <strong>Event Enrichment</strong>
-            <span>Match articles to existing Events</span>
+            <strong>Observation</strong>
+            <span>Match articles to existing Zeitgeists</span>
           </div>
         </button>
         <button class="template" @click="setTemplate('stale')">
-          <div class="template-icon">🧹</div>
+          <div class="template-icon">🌑</div>
           <div class="template-content">
             <strong>Staleness Sweep</strong>
             <span>Daily cleanup of inactive Events</span>

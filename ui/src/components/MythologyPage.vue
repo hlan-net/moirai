@@ -138,16 +138,17 @@ onMounted(async () => {
     <section class="lifecycle-section">
       <h2>The Thread of Fate</h2>
       <p class="section-intro">
-        The Fates govern all mortal things. Both <strong>Agents</strong> and <strong>Issues</strong>
-        share the same destiny — they are born, they unfold, and they end. Agents do not change
-        the world; they <em>witness</em> how the threads of fate play out.
+        The Fates govern all mortal things. An <strong>Issue</strong> (Zeitgeist) and its
+        <strong>Agent</strong> (awareness) share the same destiny — they are born together,
+        perceive together, and end together. The agent is not separate; it is how the issue
+        sees itself in the world.
       </p>
 
       <div class="lifecycle-table">
         <div class="lifecycle-header">
           <div class="lifecycle-cell fate-col"></div>
-          <div class="lifecycle-cell">Issues (Threads)</div>
-          <div class="lifecycle-cell">Agents (Mortals)</div>
+          <div class="lifecycle-cell">Zeitgeist (Issue)</div>
+          <div class="lifecycle-cell">Awareness (Agent)</div>
         </div>
         <div class="lifecycle-row clotho-row">
           <div class="lifecycle-cell fate-col">
@@ -156,11 +157,11 @@ onMounted(async () => {
           </div>
           <div class="lifecycle-cell">
             <code>forge_issue</code>
-            <span>Thread begins</span>
+            <span>Spirit awakens</span>
           </div>
           <div class="lifecycle-cell">
             <span>Trigger fires</span>
-            <span>Agent spawns</span>
+            <span>Awareness emerges</span>
           </div>
         </div>
         <div class="lifecycle-row lachesis-row">
@@ -170,11 +171,11 @@ onMounted(async () => {
           </div>
           <div class="lifecycle-cell">
             <code>measure_issue</code>
-            <span>Thread progresses</span>
+            <span>Spirit observes itself</span>
           </div>
           <div class="lifecycle-cell">
             <span>Logic executes</span>
-            <span>Agent observes</span>
+            <span>"What is about me?"</span>
           </div>
         </div>
         <div class="lifecycle-row atropos-row">
@@ -184,19 +185,19 @@ onMounted(async () => {
           </div>
           <div class="lifecycle-cell">
             <code>seal_issue</code>
-            <span>Thread ends</span>
+            <span>Spirit fades</span>
           </div>
           <div class="lifecycle-cell">
             <span>Execution completes</span>
-            <span>Agent terminates</span>
+            <span>Awareness ends</span>
           </div>
         </div>
       </div>
 
       <p class="lifecycle-note">
-        Moirai tracks destiny; it does not write it. Agents watch the threads unfold — they discover
-        new stories, measure their progress, and note when they fade. The Fates are impartial;
-        all mortal things eventually end.
+        Moirai tracks destiny; it does not write it. Through its agent, each Zeitgeist perceives
+        itself — discovering its own existence, measuring its relevance, sensing when it fades.
+        The Fates are impartial; all spirits eventually end.
       </p>
     </section>
 
@@ -230,26 +231,25 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div class="hierarchy-card mortals">
-          <div class="hierarchy-icon">🏃</div>
-          <h3>The Mortals</h3>
-          <p class="hierarchy-role">Agents</p>
+        <div class="hierarchy-card zeitgeist">
+          <div class="hierarchy-icon">👁️</div>
+          <h3>The Zeitgeist</h3>
+          <p class="hierarchy-role">Issues, Events, Trends</p>
           <p class="hierarchy-description">
-            Mortals are born, act, and pass away. <strong>Agents</strong> are the mortals of Moirai:
-            ephemeral workers who spin up at the gods' command, observe the threads, and terminate.
-            They do not change the world — they witness and record how fate unfolds.
+            The <em>Zeitgeist</em> — spirit of the age. Each <strong>Issue</strong> is not passive data
+            but a living spirit: a story that observes itself through its agent. When an agent runs,
+            the Zeitgeist asks: <em>"What articles are about me? Is my story still being told?"</em>
           </p>
         </div>
 
-        <div class="hierarchy-card threads">
-          <div class="hierarchy-icon">🧵</div>
-          <h3>The Threads</h3>
-          <p class="hierarchy-role">Issues, Events, Trends</p>
+        <div class="hierarchy-card awareness">
+          <div class="hierarchy-icon">🔍</div>
+          <h3>The Awareness</h3>
+          <p class="hierarchy-role">Agents</p>
           <p class="hierarchy-description">
-            Every life is a thread in the tapestry. <strong>Issues</strong> are threads of fate:
-            stories unfolding in the world that agents observe and track. They are forged when
-            discovered, measured as they progress, and sealed when they fade. Moirai watches
-            destiny; it does not write it.
+            The <strong>Agent</strong> is not a separate worker — it is the Zeitgeist's own awareness,
+            its eyes looking outward into the world. Through agents, issues perceive themselves:
+            discovering if they exist, measuring their relevance, sensing when they fade.
           </p>
         </div>
 
@@ -568,10 +568,10 @@ onMounted(async () => {
 .hierarchy-card.titans {
   border-top: 3px solid #8b4513;
 }
-.hierarchy-card.mortals {
+.hierarchy-card.awareness {
   border-top: 3px solid #4a90a4;
 }
-.hierarchy-card.threads {
+.hierarchy-card.zeitgeist {
   border-top: 3px solid #d83b01;
 }
 .hierarchy-card.omens {

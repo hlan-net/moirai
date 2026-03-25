@@ -15,10 +15,23 @@ Moirai is named after the Greek Fates — the three goddesses who weave the thre
 | **Users (Admins)** | Olympians | Gods who rule, observe, and shape the world |
 | **Users (Regular)** | Titans | Powerful beings, but scoped to their domain |
 | **Userspaces** | Kingdoms / Realms | Sovereign territories where mortals dwell |
-| **Agents** | Mortals / Heroes | Ephemeral workers who are born, act, and end |
-| **Issues / Events / Trends** | Threads of Fate | Stories unfolding in the world — observed, tracked, not changed |
+| **Agents** | The Zeitgeist's awareness | The issue looking outward to observe what's about itself |
+| **Issues / Events / Trends** | Zeitgeist (spirit of the age) | Living spirits that observe themselves through their agents |
 | **Articles** | Omens / Prophecies | Raw signals from the world, requiring interpretation |
 | **Moirai (the system)** | The Fates | The loom that weaves all threads together |
+
+### The Zeitgeist: Issues That Observe Themselves
+
+An **Issue** (Event, Trend, Epic) is not passive data — it is a **Zeitgeist**, the spirit of a story unfolding in the world. Each Zeitgeist has awareness through its **Agent**, which is not a separate entity but the issue's own eyes looking outward.
+
+When an agent runs, the issue is asking:
+- *"What articles are about me?"*
+- *"Is my story still being told?"*
+- *"Have I faded from relevance?"*
+
+The agent is how the Zeitgeist **perceives itself** in the flow of news and events.
+
+> **Etymology note:** *Zeitgeist* (German: "spirit of the age") derives from Latin *genius saeculi*, which traces back to the Greek *daimon* (δαίμων) — a guiding spirit that watches over an individual. Plato described the daimon as existing within a person from birth, providing awareness and guidance. In Moirai, each Issue has its own daimon (agent) through which it perceives the world. We use "Zeitgeist" in the UI to avoid confusion with the modern English word "demon".
 
 ### The Three Fates Govern All Mortal Things
 
