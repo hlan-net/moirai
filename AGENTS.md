@@ -20,27 +20,42 @@ Moirai is named after the Greek Fates — the three goddesses who weave the thre
 | **Articles** | Omens / Prophecies | Raw signals from the world, requiring interpretation |
 | **Moirai (the system)** | The Fates | The loom that weaves all threads together |
 
+### The Three Fates Govern All Mortal Things
+
+The Fates (Moirai) weave the destiny of both **Agents** and **Issues** — all mortal things share the same lifecycle:
+
+| Fate | Role | Issues (Quests) | Agents (Mortals) |
+|------|------|-----------------|------------------|
+| **Clotho** (Spinner) | Creates the thread | `forge_issue` — quest begins | Trigger fires — agent spawns |
+| **Lachesis** (Allotter) | Measures the thread | `measure_issue` — quest progresses | Agent executes — logic runs |
+| **Atropos** (Cutter) | Cuts the thread | `seal_issue` — quest ends | Execution completes — agent terminates |
+
+This shared lifecycle means agents and issues are **bound by the same fate** — the system (Moirai) governs when they are born, how long they live, and when they end.
+
 ### Guiding Principles
 
-1. **Users are immortal; agents are mortal.**
+1. **Users are immortal; agents and issues are mortal.**
    - Users persist across sessions. Their preferences, context, and identity endure.
    - Agents spin up, execute a mission, and terminate. They are ephemeral by design.
-   - Do not store critical user data solely in agent memory — mortals fade, gods remain.
+   - Issues are born, live, and are eventually sealed. They have a finite lifespan.
+   - Do not store critical user data solely in mortal memory — mortals fade, gods remain.
 
 2. **Userspaces are sovereign kingdoms.**
    - Each userspace is an isolated realm. Agents (mortals) belong to one kingdom and cannot cross borders.
    - All data, issues, and events exist within a userspace. There is no "global" mortal realm.
    - Enforce isolation rigorously — a mortal from one kingdom must never see another's affairs.
 
-3. **Agents serve the gods.**
+3. **Agents serve the gods by pursuing quests.**
    - Users summon agents to do their bidding. The relationship is asymmetric.
+   - Agents act upon issues — creating, enriching, or sealing them.
    - Agents should act autonomously but always in service of user intent.
    - When uncertain, agents should ask (or flag low confidence) rather than assume.
 
-4. **Issues are quests with lifecycles.**
-   - Issues are forged (created), measured (tracked), and sealed (completed/archived).
-   - Like mortal quests, they have a beginning, middle, and end.
-   - Some quests are heroic (major events); others are mundane (minor trends). Both matter.
+4. **Issues and agents share fate.**
+   - Both are governed by the three Fates: created (Clotho), measured (Lachesis), ended (Atropos).
+   - An agent's "death" is simply the completion of its execution — successful or not.
+   - An issue's "death" is being sealed — archived when no longer active.
+   - The Fates are impartial; all mortal things eventually end.
 
 5. **The Fates weave, but do not own.**
    - Moirai connects users, agents, and data — but the system should not hoard state.

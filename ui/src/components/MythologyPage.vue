@@ -135,6 +135,70 @@ onMounted(async () => {
       </p>
     </section>
 
+    <section class="lifecycle-section">
+      <h2>The Thread of Fate</h2>
+      <p class="section-intro">
+        The Fates govern all mortal things. Both <strong>Agents</strong> and <strong>Issues</strong>
+        share the same destiny — they are born, they act, and they end.
+      </p>
+
+      <div class="lifecycle-table">
+        <div class="lifecycle-header">
+          <div class="lifecycle-cell fate-col"></div>
+          <div class="lifecycle-cell">Issues (Quests)</div>
+          <div class="lifecycle-cell">Agents (Mortals)</div>
+        </div>
+        <div class="lifecycle-row clotho-row">
+          <div class="lifecycle-cell fate-col">
+            <span class="fate-name">Clotho</span>
+            <span class="fate-action">spins the thread</span>
+          </div>
+          <div class="lifecycle-cell">
+            <code>forge_issue</code>
+            <span>Quest begins</span>
+          </div>
+          <div class="lifecycle-cell">
+            <span>Trigger fires</span>
+            <span>Agent spawns</span>
+          </div>
+        </div>
+        <div class="lifecycle-row lachesis-row">
+          <div class="lifecycle-cell fate-col">
+            <span class="fate-name">Lachesis</span>
+            <span class="fate-action">measures the thread</span>
+          </div>
+          <div class="lifecycle-cell">
+            <code>measure_issue</code>
+            <span>Quest progresses</span>
+          </div>
+          <div class="lifecycle-cell">
+            <span>Logic executes</span>
+            <span>Agent acts</span>
+          </div>
+        </div>
+        <div class="lifecycle-row atropos-row">
+          <div class="lifecycle-cell fate-col">
+            <span class="fate-name">Atropos</span>
+            <span class="fate-action">cuts the thread</span>
+          </div>
+          <div class="lifecycle-cell">
+            <code>seal_issue</code>
+            <span>Quest ends</span>
+          </div>
+          <div class="lifecycle-cell">
+            <span>Execution completes</span>
+            <span>Agent terminates</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="lifecycle-note">
+        This shared lifecycle binds agents and issues together — the system (Moirai) governs when
+        they are born, how long they live, and when they end. The Fates are impartial; all mortal
+        things eventually end.
+      </p>
+    </section>
+
     <section class="hierarchy-section">
       <h2>The Divine Order</h2>
       <p class="section-intro">
@@ -376,6 +440,97 @@ onMounted(async () => {
   line-height: 1.7;
   opacity: 0.85;
   margin: 0 0 12px 0;
+}
+
+/* Lifecycle / Thread of Fate */
+.lifecycle-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 32px;
+  margin-bottom: 48px;
+}
+
+.lifecycle-section h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-color);
+}
+
+.lifecycle-table {
+  margin: 24px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lifecycle-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.lifecycle-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-top: 1px solid var(--border-color);
+}
+
+.lifecycle-cell {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.lifecycle-cell.fate-col {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fate-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.fate-action {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.lifecycle-cell code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  width: fit-content;
+}
+
+.lifecycle-cell span {
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.clotho-row .fate-col {
+  border-left: 3px solid #2e86c1;
+}
+
+.lachesis-row .fate-col {
+  border-left: 3px solid #d4ac0d;
+}
+
+.atropos-row .fate-col {
+  border-left: 3px solid #d83b01;
+}
+
+.lifecycle-note {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+  line-height: 1.6;
+  font-style: italic;
 }
 
 /* Divine Order / Hierarchy */
