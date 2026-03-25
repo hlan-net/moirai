@@ -2,6 +2,64 @@
 
 This document provides essential instructions for AI agents working on the Moirai project. Adhere strictly to these guidelines to maintain code quality and system integrity.
 
+---
+
+## 0. Project Ethos: The Mythology of Moirai
+
+Moirai is named after the Greek Fates — the three goddesses who weave the threads of destiny. This mythology provides a guiding philosophy for how we think about the system's architecture and the relationships between its components.
+
+### The Metaphor
+
+| Concept | Mythology | Moirai Equivalent |
+|---------|-----------|-------------------|
+| **Users (Admins)** | Olympians | Gods who rule, observe, and shape the world |
+| **Users (Regular)** | Titans | Powerful beings, but scoped to their domain |
+| **Userspaces** | Kingdoms / Realms | Sovereign territories where mortals dwell |
+| **Agents** | Mortals / Heroes | Ephemeral workers who are born, act, and end |
+| **Issues / Events / Trends** | Quests / Labors | Tasks that mortals pursue on behalf of the gods |
+| **Articles** | Omens / Prophecies | Raw signals from the world, requiring interpretation |
+| **Moirai (the system)** | The Fates | The loom that weaves all threads together |
+
+### Guiding Principles
+
+1. **Users are immortal; agents are mortal.**
+   - Users persist across sessions. Their preferences, context, and identity endure.
+   - Agents spin up, execute a mission, and terminate. They are ephemeral by design.
+   - Do not store critical user data solely in agent memory — mortals fade, gods remain.
+
+2. **Userspaces are sovereign kingdoms.**
+   - Each userspace is an isolated realm. Agents (mortals) belong to one kingdom and cannot cross borders.
+   - All data, issues, and events exist within a userspace. There is no "global" mortal realm.
+   - Enforce isolation rigorously — a mortal from one kingdom must never see another's affairs.
+
+3. **Agents serve the gods.**
+   - Users summon agents to do their bidding. The relationship is asymmetric.
+   - Agents should act autonomously but always in service of user intent.
+   - When uncertain, agents should ask (or flag low confidence) rather than assume.
+
+4. **Issues are quests with lifecycles.**
+   - Issues are forged (created), measured (tracked), and sealed (completed/archived).
+   - Like mortal quests, they have a beginning, middle, and end.
+   - Some quests are heroic (major events); others are mundane (minor trends). Both matter.
+
+5. **The Fates weave, but do not own.**
+   - Moirai connects users, agents, and data — but the system should not hoard state.
+   - Prefer explicit data flow over hidden caches. Prefer user-owned data over system-owned.
+   - The loom reveals the pattern; it does not create it.
+
+### How This Guides Development
+
+When designing features or making architecture decisions, ask:
+
+- **"Does this serve the gods (user value) or just the mortals (internal plumbing)?"**
+- **"Is this agent acting like a hero (autonomous, resilient) or a servant (brittle, dependent)?"**
+- **"Can a mortal from one kingdom see into another?"** (If yes, fix it.)
+- **"Will this data outlive the agent that created it?"** (If it should, store it properly.)
+
+This ethos is not about renaming code or enforcing mythology in APIs — it's a shared mental model for reasoning about the system's design and priorities.
+
+---
+
 ## 1. Build, Run, and Test Commands
 
 ### Backend (Python/Flask/MCP)

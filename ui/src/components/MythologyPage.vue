@@ -135,6 +135,82 @@ onMounted(async () => {
       </p>
     </section>
 
+    <section class="hierarchy-section">
+      <h2>The Divine Order</h2>
+      <p class="section-intro">
+        The Greek cosmos was ordered by nature: gods above, mortals below, each with their role.
+        Moirai follows this pattern.
+      </p>
+
+      <div class="hierarchy-grid">
+        <div class="hierarchy-card olympians">
+          <div class="hierarchy-icon">⚡</div>
+          <h3>The Olympians</h3>
+          <p class="hierarchy-role">Administrators</p>
+          <p class="hierarchy-description">
+            Like Zeus and the Olympians who rule from the heights, <strong>administrators</strong>
+            hold supreme power. They create userspaces, grant access, and shape the rules of the realm.
+            Their decisions ripple across all kingdoms.
+          </p>
+        </div>
+
+        <div class="hierarchy-card titans">
+          <div class="hierarchy-icon">🏛️</div>
+          <h3>The Titans</h3>
+          <p class="hierarchy-role">Users</p>
+          <p class="hierarchy-description">
+            The Titans were powerful, but their domain was bounded. <strong>Regular users</strong>
+            command great capability within their userspace — summoning agents, forging issues,
+            measuring the weave — but cannot cross into another's realm.
+          </p>
+        </div>
+
+        <div class="hierarchy-card mortals">
+          <div class="hierarchy-icon">🏃</div>
+          <h3>The Mortals</h3>
+          <p class="hierarchy-role">Agents</p>
+          <p class="hierarchy-description">
+            Mortals are born, act, and pass away. <strong>Agents</strong> are the mortals of Moirai:
+            ephemeral workers who spin up at the gods' command, execute their quest, and terminate.
+            They serve with autonomy but always in service of immortal intent.
+          </p>
+        </div>
+
+        <div class="hierarchy-card quests">
+          <div class="hierarchy-icon">🗡️</div>
+          <h3>The Quests</h3>
+          <p class="hierarchy-role">Issues, Events, Trends</p>
+          <p class="hierarchy-description">
+            Every hero needs a labor. <strong>Issues</strong> are the quests that mortals pursue:
+            forged by gods or discovered in the chaos, measured as they unfold, and sealed when
+            complete. Some are heroic epics; others are fleeting errands. Both matter to the weave.
+          </p>
+        </div>
+
+        <div class="hierarchy-card omens">
+          <div class="hierarchy-icon">🔮</div>
+          <h3>The Omens</h3>
+          <p class="hierarchy-role">Articles</p>
+          <p class="hierarchy-description">
+            Before action comes prophecy. <strong>Articles</strong> are the raw omens from the world:
+            signals that must be interpreted, patterns waiting to be named. They are the raw material
+            from which quests are born and meaning is made.
+          </p>
+        </div>
+
+        <div class="hierarchy-card kingdoms">
+          <div class="hierarchy-icon">🏰</div>
+          <h3>The Kingdoms</h3>
+          <p class="hierarchy-role">Userspaces</p>
+          <p class="hierarchy-description">
+            Each userspace is a <strong>sovereign kingdom</strong>. Mortals belong to one realm and
+            cannot cross borders. All affairs — issues, agents, articles — exist within a kingdom.
+            The walls are absolute; what happens in one realm is invisible to another.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <section class="public-issues-section">
       <h2>The Living Weave</h2>
       <p class="section-intro">
@@ -300,6 +376,78 @@ onMounted(async () => {
   line-height: 1.7;
   opacity: 0.85;
   margin: 0 0 12px 0;
+}
+
+/* Divine Order / Hierarchy */
+.hierarchy-section {
+  margin-bottom: 48px;
+}
+
+.hierarchy-section h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-color);
+}
+
+.hierarchy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.hierarchy-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hierarchy-card.olympians {
+  border-top: 3px solid #ffd700;
+}
+.hierarchy-card.titans {
+  border-top: 3px solid #8b4513;
+}
+.hierarchy-card.mortals {
+  border-top: 3px solid #4a90a4;
+}
+.hierarchy-card.quests {
+  border-top: 3px solid #d83b01;
+}
+.hierarchy-card.omens {
+  border-top: 3px solid #9b59b6;
+}
+.hierarchy-card.kingdoms {
+  border-top: 3px solid #27ae60;
+}
+
+.hierarchy-icon {
+  font-size: 1.8rem;
+}
+
+.hierarchy-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--text-color);
+}
+
+.hierarchy-role {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.hierarchy-description {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  opacity: 0.85;
+  margin: 0;
+  flex: 1;
 }
 
 /* Public issues */
