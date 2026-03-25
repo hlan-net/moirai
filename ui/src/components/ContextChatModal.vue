@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify'
 import { authFetch } from '../utils/authFetch'
 import { useChatContextStore } from '../stores/chatContext'
 import { useSettingsStore } from '../stores/settings'
+import { useDraggable } from '../composables/useDraggable'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -64,9 +65,16 @@ const raiseWizardLoading = ref(false)
 const raiseWizardQuestions = ref<string[]>([])
 const raiseWizardAnswers = ref<string[]>(['', '', ''])
 
-const modalContentRef = ref<HTMLElement | null>(null)
+const drawerRef = ref<HTMLElement | null>(null)
+// alias for focus-trap logic
+const modalContentRef = drawerRef
 const inputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
+
+const { dragStyle, handleProps: dragHandleProps, resetPosition } = useDraggable(
+  drawerRef,
+  computed(() => chatContextStore.isOpen),
+)
 
 let modalKeydownListenerAttached = false
 
@@ -553,13 +561,14 @@ const copyChat = async () => {
 <template>
   <div v-if="chatContextStore.isOpen" class="modal-overlay" @click="closeModal">
     <dialog
-      ref="modalContentRef"
+      ref="drawerRef"
       open
       class="context-chat-drawer"
       aria-labelledby="context-chat-title"
+      :style="dragStyle"
       @click.stop
     >
-      <header class="drawer-header">
+      <header class="drawer-header" v-bind="dragHandleProps">
         <div class="header-title-block">
           <span class="context-badge">{{ contextEmoji }} {{ contextLabel }}</span>
           <h3 id="context-chat-title" class="context-title" :title="contextTitle">{{ contextTitle }}</h3>
@@ -689,12 +698,14 @@ const copyChat = async () => {
   max-width: none;
   max-height: none;
   width: min(620px, 100%);
-  height: 100%;
+  height: min(85vh, 800px);
   background: var(--card-bg);
-  border-left: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  box-shadow: -12px 0 24px rgba(0, 0, 0, 0.35);
+  box-shadow: -4px 4px 24px rgba(0, 0, 0, 0.45);
+  will-change: transform;
 }
 
 .context-chat-drawer::backdrop {
@@ -712,6 +723,13 @@ const copyChat = async () => {
   padding: 14px;
   border-bottom: 1px solid var(--border-color);
   background: var(--card-bg);
+  border-radius: 8px 8px 0 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.drawer-header:active {
+  cursor: grabbing;
 }
 
 .header-title-block {
@@ -947,6 +965,15 @@ const copyChat = async () => {
 @media (max-width: 767px) {
   .context-chat-drawer {
     width: 100%;
+    height: 100%;
+    border-radius: 0;
+    margin: 0;
+    transform: none !important;
+  }
+
+  .drawer-header {
+    cursor: default;
+    border-radius: 0;
   }
 }
 
