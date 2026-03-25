@@ -376,7 +376,7 @@ onMounted(async () => {
   border-radius: 4px;
 }
 .status-badge.active {
-  background: #28a745;
+  background: #166534;
   color: white;
 }
 .status-badge.eternal {

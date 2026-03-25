@@ -18,6 +18,7 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 _OLLAMA_DEFAULT_ENDPOINT = "http://host.docker.internal:11434/v1"
+_WARN_MISSING_USERSPACE = "Agent '%s': missing userspace, skipping."
 
 
 def _call_llm(prompt: str, llm_config: dict) -> Optional[str]:
@@ -61,7 +62,7 @@ def _parse_json_response(text: Optional[str], context: str) -> Optional[dict]:
         stripped = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
     try:
         return json.loads(stripped)
-    except (json.JSONDecodeError, ValueError):
+    except ValueError:
         logger.warning("%s: could not parse LLM JSON response: %.200s", context, text)
         return None
 
@@ -83,7 +84,7 @@ def create_event_from_articles(
     llm_config = llm_config or {}
 
     if not userspace:
-        logger.warning("Agent '%s': missing userspace, skipping.", agent_name)
+        logger.warning(_WARN_MISSING_USERSPACE, agent_name)
         return
 
     if not new_articles:
@@ -163,7 +164,7 @@ def add_articles_to_event(
     llm_config = llm_config or {}
 
     if not userspace:
-        logger.warning("Agent '%s': missing userspace, skipping.", agent_name)
+        logger.warning(_WARN_MISSING_USERSPACE, agent_name)
         return
 
     if not event_id:
@@ -232,14 +233,20 @@ def add_articles_to_event(
         "Agent '%s' (%s): adding %d article(s) to event %s.",
         agent_name, userspace, len(relevant_ids), event_id,
     )
+    _call_update_event(agent_name, userspace, event_id, relevant_ids, mcp_client)
+
+
+def _call_update_event(
+    agent_name: str, userspace: str, event_id: str, article_links: list, mcp_client
+) -> None:
+    """Call the update_event MCP tool and log the outcome."""
     try:
         result = mcp_client.call_tool(
             "update_event",
             userspace=userspace,
             event_id=event_id,
-            article_links=relevant_ids,
+            article_links=article_links,
         )
-        # update_event returns a plain string
         if isinstance(result, str) and "error" not in result.lower():
             logger.info("Agent '%s' (%s): %s", agent_name, userspace, result)
         else:
@@ -248,10 +255,22 @@ def add_articles_to_event(
         logger.error("Agent '%s' (%s): update_event failed: %s", agent_name, userspace, exc)
 
 
+def _parse_iso_timestamp(ts_str: str) -> Optional[Any]:
+    """Parse an ISO-8601 timestamp string to a timezone-aware datetime, or return None on error."""
+    from datetime import datetime, timezone
+
+    try:
+        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        return None
+
+
 def check_event_staleness(
     agent_config: dict[str, Any],
     mcp_client,
-    llm_config: dict = None,
     **kwargs,
 ):
     """Check whether a linked event is stale and mark it accordingly.
@@ -268,7 +287,7 @@ def check_event_staleness(
     staleness_threshold_days = int(params.get("staleness_threshold_days", 30))
 
     if not userspace:
-        logger.warning("Agent '%s': missing userspace, skipping.", agent_name)
+        logger.warning(_WARN_MISSING_USERSPACE, agent_name)
         return
 
     if not event_id:
@@ -289,11 +308,8 @@ def check_event_staleness(
         logger.warning("Agent '%s' (%s): event %s has no activity timestamp.", agent_name, userspace, event_id)
         return
 
-    try:
-        last_activity = datetime.fromisoformat(last_activity_str.replace("Z", "+00:00"))
-        if last_activity.tzinfo is None:
-            last_activity = last_activity.replace(tzinfo=timezone.utc)
-    except ValueError:
+    last_activity = _parse_iso_timestamp(last_activity_str)
+    if last_activity is None:
         logger.error("Agent '%s' (%s): invalid date on event %s: %s", agent_name, userspace, event_id, last_activity_str)
         return
 

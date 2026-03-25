@@ -52,8 +52,10 @@ ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
 
 # Constants for error messages
 ERROR_FEED_NOT_FOUND = "Feed not found"
+ERROR_ISSUE_NOT_FOUND = "Issue not found"
 ERROR_LIMIT_INTEGER = "limit must be an integer"
 ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
+DESIGN_DOC_PREFIX = "_design/"
 
 # Mongo Constants are now imported from api.db_constants
 
@@ -693,7 +695,7 @@ def create_issue():
 def get_issue(issue_id):
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
-        abort(404, description="Issue not found")
+        abort(404, description=ERROR_ISSUE_NOT_FOUND)
     return jsonify(issue)
 
 
@@ -736,7 +738,7 @@ def patch_issue(issue_id):
     data = request.json or {}
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
-        abort(404, description="Issue not found")
+        abort(404, description=ERROR_ISSUE_NOT_FOUND)
 
     updates = {}
     if "public" in data:
@@ -770,15 +772,15 @@ def get_mythology():
             "premises_count": len(i.get("premises", [])),
         }
         for i in all_issues
-        if i.get("public") and not i["_id"].startswith("_design/")
+        if i.get("public") and not i["_id"].startswith(DESIGN_DOC_PREFIX)
     ]
 
     return jsonify(
         {
             "stats": {
-                "feeds": len([f for f in feeds if not f["_id"].startswith("_design/")]),
-                "articles": len([a for a in articles if not a["_id"].startswith("_design/")]),
-                "issues": len([i for i in all_issues if not i["_id"].startswith("_design/")]),
+                "feeds": len([f for f in feeds if not f["_id"].startswith(DESIGN_DOC_PREFIX)]),
+                "articles": len([a for a in articles if not a["_id"].startswith(DESIGN_DOC_PREFIX)]),
+                "issues": len([i for i in all_issues if not i["_id"].startswith(DESIGN_DOC_PREFIX)]),
             },
             "public_issues": public_issues,
         }
@@ -792,7 +794,7 @@ def share_issue(issue_id: str):
     """Share an issue to a social platform (currently Bluesky)."""
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
-        abort(404, description="Issue not found")
+        abort(404, description=ERROR_ISSUE_NOT_FOUND)
 
     userspace_id = issue.get("userspace")
     if not userspace_id:
