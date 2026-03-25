@@ -46,6 +46,20 @@ watchEffect(() => {
     llmSelectorOpen.value = false
   }
 })
+
+// When the provider changes, update the model to the corresponding default
+watch(sessionProvider, (newProvider) => {
+  switch (newProvider) {
+    case 'openai':
+      sessionModel.value = settingsStore.openaiModel
+      break
+    case 'gemini':
+      sessionModel.value = settingsStore.geminiModel
+      break
+    default:
+      sessionModel.value = settingsStore.ollamaModel
+  }
+})
 const raiseWizardLoading = ref(false)
 const raiseWizardQuestions = ref<string[]>([])
 const raiseWizardAnswers = ref<string[]>(['', '', ''])
