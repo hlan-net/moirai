@@ -50,7 +50,7 @@ csrf.exempt(api_blueprint)
 csrf.exempt(chat_blueprint)
 csrf.exempt(mcp_blueprint)
 csrf.exempt(agent_blueprint)
-csrf.exempt(session_blueprint)  # NOSONAR (python:S4502)
+csrf.exempt(session_blueprint)
 
 if (
     is_test_mode 
