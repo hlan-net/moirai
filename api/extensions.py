@@ -82,6 +82,12 @@ limiter = Limiter(
 metrics = PrometheusMetrics(app=None)
 
 
+_session_logger: SessionLogger | None = None
+
+
 def get_session_logger() -> SessionLogger:
-    """Return a SessionLogger backed by the configured Redis client (or a no-op one)."""
-    return SessionLogger(get_redis_client())
+    """Return a singleton SessionLogger backed by the configured Redis client (or a no-op one)."""
+    global _session_logger
+    if _session_logger is None:
+        _session_logger = SessionLogger(get_redis_client())
+    return _session_logger

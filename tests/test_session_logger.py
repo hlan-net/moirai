@@ -2,12 +2,10 @@
 
 import json
 import pytest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 from tasks.session_logger import (
     SessionLogger,
-    SESSION_TTL_SECONDS,
     SESSION_TYPE_SCHEDULED,
-    SESSION_TYPE_ON_NEW_ARTICLE,
     SESSION_TYPE_CHAT,
     STATUS_RUNNING,
     STATUS_SUCCESS,
@@ -151,7 +149,7 @@ def test_get_session_returns_none_without_redis(sl_no_redis):
 def test_list_sessions_by_userspace(sl, mock_redis):
     mock_redis.zrevrange.return_value = ["s1", "s2"]
     docs = [{"session_id": "s1"}, {"session_id": "s2"}]
-    mock_redis.get.side_effect = [json.dumps(d) for d in docs]
+    mock_redis.mget.return_value = [json.dumps(d) for d in docs]
 
     result = sl.list_sessions(userspace="ws1", limit=10, offset=0)
 
@@ -182,9 +180,6 @@ def test_session_context_success(sl, mock_redis):
 
     def fake_set(key, value, ex=None):
         existing_doc_holder["last"] = value
-
-    def fake_get(key):
-        return existing_doc_holder.get("last")
 
     pipe.set = fake_set
     mock_redis.get.side_effect = lambda k: existing_doc_holder.get("last")

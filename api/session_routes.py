@@ -6,6 +6,8 @@ from api.auth import jwt_required
 from api.extensions import get_session_logger
 from api.userspace_ops import get_userspace
 
+_ADMIN_ROLE = "admin"
+
 session_blueprint = Blueprint("sessions", __name__)
 
 
@@ -29,8 +31,11 @@ def list_sessions():
     offset    : default 0.
     """
     userspace = request.args.get("userspace")
-    if userspace and not _user_owns_userspace(userspace):
-        abort(403, description="Access denied")
+    if userspace:
+        if not _user_owns_userspace(userspace):
+            abort(403, description="Access denied")
+    elif g.user_role != _ADMIN_ROLE:
+        abort(400, description="'userspace' parameter is required")
 
     try:
         limit = min(int(request.args.get("limit", 50)), 200)

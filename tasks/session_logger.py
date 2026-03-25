@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 _INDEX_MAX_SIZE = 500  # keep sorted sets from growing unbounded
+_GLOBAL_INDEX_KEY = "session:index:all"
 
 SESSION_TYPE_SCHEDULED = "scheduled_agent"
 SESSION_TYPE_ON_NEW_ARTICLE = "on_new_article"
@@ -162,15 +163,13 @@ class SessionLogger:
         if not self._redis:
             return []
         try:
-            index_key = self._index_key(userspace) if userspace else "session:index:all"
+            index_key = self._index_key(userspace) if userspace else _GLOBAL_INDEX_KEY
             # ZREVRANGE returns members in descending score order (newest first)
             ids = self._redis.zrevrange(index_key, offset, offset + limit - 1)
-            sessions = []
-            for sid in ids:
-                raw = self._redis.get(self._key(sid))
-                if raw:
-                    sessions.append(json.loads(raw))
-            return sessions
+            if not ids:
+                return []
+            raws = self._redis.mget([self._key(sid) for sid in ids])
+            return [json.loads(raw) for raw in raws if raw]
         except Exception:
             logger.exception("SessionLogger.list_sessions failed")
             return []
@@ -251,8 +250,8 @@ class SessionLogger:
                 pipe.zadd(us_idx, {session_id: score})
                 pipe.zremrangebyrank(us_idx, 0, -((_INDEX_MAX_SIZE) + 1))
             # Global index
-            pipe.zadd("session:index:all", {session_id: score})
-            pipe.zremrangebyrank("session:index:all", 0, -(_INDEX_MAX_SIZE + 1))
+            pipe.zadd(_GLOBAL_INDEX_KEY, {session_id: score})
+            pipe.zremrangebyrank(_GLOBAL_INDEX_KEY, 0, -(_INDEX_MAX_SIZE + 1))
             pipe.execute()
         except Exception:
             logger.exception("SessionLogger._persist failed for %s", session_id)
