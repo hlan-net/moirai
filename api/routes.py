@@ -147,6 +147,14 @@ def get_component_versions() -> dict[str, str]:
         else:
             versions["couchdb"] = "unknown"
 
+    try:
+        redis_client = get_redis_client()
+        if redis_client:
+            info = redis_client.info("server")
+            versions["redis"] = info.get("redis_version", "unknown")
+    except Exception:
+        versions["redis"] = "unknown"
+
     return versions
 
 
