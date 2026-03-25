@@ -181,12 +181,7 @@ def update_couchdb_doc_safe(
         # Always fetch the latest revision before writing
         current = fetch_from_couchdb(db_name, doc_id)
         if not isinstance(current, dict):
-            logger.error(
-                "update_couchdb_doc_safe: doc %s/%s not found on attempt %d",
-                db_name,
-                doc_id,
-                attempt,
-            )
+            logger.error("update_couchdb_doc_safe: doc not found")
             return False
 
         # Merge updates into current doc, always using the freshly fetched _rev
@@ -202,9 +197,7 @@ def update_couchdb_doc_safe(
                 return True
             if response.status_code == 409:
                 logger.warning(
-                    "update_couchdb_doc_safe: 409 conflict on %s/%s (attempt %d/%d), retrying",
-                    db_name,
-                    doc_id,
+                    "update_couchdb_doc_safe: 409 conflict (attempt %d/%d), retrying",
                     attempt,
                     max_retries,
                 )
@@ -212,23 +205,15 @@ def update_couchdb_doc_safe(
                 time.sleep(0.05 * attempt)
                 continue
             logger.error(
-                "update_couchdb_doc_safe: unexpected status %d for %s/%s: %s",
+                "update_couchdb_doc_safe: unexpected status %d",
                 response.status_code,
-                db_name,
-                doc_id,
-                response.text,
             )
             return False
-        except requests.exceptions.RequestException as exc:
-            logger.error("update_couchdb_doc_safe: request error for %s/%s: %s", db_name, doc_id, exc)
+        except requests.exceptions.RequestException:
+            logger.error("update_couchdb_doc_safe: request error", exc_info=True)
             return False
 
-    logger.error(
-        "update_couchdb_doc_safe: exhausted %d retries for %s/%s",
-        max_retries,
-        db_name,
-        doc_id,
-    )
+    logger.error("update_couchdb_doc_safe: exhausted %d retries", max_retries)
     return False
 
 

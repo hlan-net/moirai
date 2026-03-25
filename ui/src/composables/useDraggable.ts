@@ -15,6 +15,10 @@ import { computed, ref, watch, type Ref } from 'vue'
  * The composable applies `transform: translate(x, y)` on top of that position
  * and clamps so the element stays within the viewport.
  */
+function clamp(val: number, min: number, max: number) {
+  return Math.min(Math.max(val, min), max)
+}
+
 export function useDraggable(
   targetRef: Ref<HTMLElement | null>,
   resetSignal?: Ref<unknown>,
@@ -31,10 +35,6 @@ export function useDraggable(
   let startPointerY = 0
   let startTranslateX = 0
   let startTranslateY = 0
-
-  function clamp(val: number, min: number, max: number) {
-    return Math.min(Math.max(val, min), max)
-  }
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return

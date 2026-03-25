@@ -230,6 +230,25 @@ def init_db():
     return
 
 
+def _fetch_user_batch(start_key: str | None, batch_size: int) -> list | None:
+    """Fetch one page of user docs from CouchDB. Returns rows list or None on error."""
+    params: dict = {"include_docs": "true", "limit": batch_size}
+    if start_key:
+        params["startkey"] = f'"{start_key}"'
+        params["skip"] = 1  # skip the last doc seen in the previous batch
+
+    response = _request(
+        "GET",
+        f"{get_couchdb_uri()}users/_all_docs",
+        params=params,
+        timeout=10,
+    )
+    if response.status_code != 200:
+        logger.error("migrate_userspaces: failed to list users: %s", response.text)
+        return None
+    return response.json().get("rows", [])
+
+
 def migrate_userspaces():
     """Create userspace documents for all existing users that don't have one yet.
 
@@ -245,22 +264,9 @@ def migrate_userspaces():
 
     try:
         while True:
-            params: dict = {"include_docs": "true", "limit": batch_size}
-            if start_key:
-                params["startkey"] = f'"{start_key}"'
-                params["skip"] = 1  # skip the last doc seen in the previous batch
-
-            response = _request(
-                "GET",
-                f"{get_couchdb_uri()}users/_all_docs",
-                params=params,
-                timeout=10,
-            )
-            if response.status_code != 200:
-                logger.error("migrate_userspaces: failed to list users: %s", response.text)
+            rows = _fetch_user_batch(start_key, batch_size)
+            if rows is None:
                 return
-
-            rows = response.json().get("rows", [])
             user_docs = [
                 r["doc"] for r in rows
                 if r.get("doc") and not r["id"].startswith("_design/")
