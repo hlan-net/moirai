@@ -12,6 +12,7 @@ from api.db_config import get_couchdb_uri
 from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
 from api.userspace_ops import resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
+from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,9 @@ class AgentOrchestrator(threading.Thread):
         self.is_leader = False
         self.lock_name = REDIS_LOCK_NAME
         self.lock_expiry = self.interval * 2 # Lock expiry is twice the check interval, to allow for renewal
+
+        # Session logger (shares the same Redis client)
+        self.session_logger = SessionLogger(redis_client)
 
         # Changes feed tracking for on_new_article agents
         self.last_seq = "0"
@@ -436,24 +440,46 @@ class AgentOrchestrator(threading.Thread):
             logger.error(f"Logic module {logic_module_path} is not in the allowed whitelist.")
             return
 
-        try:
-            module_name, func_name = logic_module_path.rsplit(".", 1)
-            module = importlib.import_module(module_name)
-            logic_function = getattr(module, func_name)
+        agent_id = agent_config.get("_id", "")
+        userspace = agent_config.get("userspace") or agent_config.get("namespace", "")
+        trigger_type = agent_config.get("trigger_type", "")
+        session_type = (
+            SESSION_TYPE_ON_NEW_ARTICLE
+            if trigger_type == "on_new_article"
+            else SESSION_TYPE_SCHEDULED
+        )
+        new_articles = kwargs.get("new_articles")
+        articles_count = len(new_articles) if isinstance(new_articles, list) else 0
+        llm_config = kwargs.get("llm_config") or {}
 
-            # Pass agent config and other relevant data
-            logic_function(
-                agent_config=agent_config, mcp_client=self.mcp_client, **kwargs
-            )
+        with self.session_logger.session(
+            session_type=session_type,
+            userspace=userspace,
+            agent_config_id=agent_id,
+            agent_name=agent_config.get("name") or logic_module_path,
+            trigger=trigger_type,
+            resolved_llm={k: v for k, v in llm_config.items() if k not in ("openai_api_key", "gemini_api_key")},
+            articles_count=articles_count,
+        ):
+            try:
+                module_name, func_name = logic_module_path.rsplit(".", 1)
+                module = importlib.import_module(module_name)
+                logic_function = getattr(module, func_name)
 
-            # Update last_run_at using conflict-safe write
-            update_couchdb_doc_safe(
-                self.agent_configs_db,
-                agent_config["_id"],
-                {"last_run_at": datetime.now(timezone.utc).isoformat()},
-            )
+                # Pass agent config and other relevant data
+                logic_function(
+                    agent_config=agent_config, mcp_client=self.mcp_client, **kwargs
+                )
 
-        except Exception as e:
-            logger.error(
-                f"Failed to execute logic for agent {agent_config.get('_id')} from {logic_module_path}: {e}"
-            )
+                # Update last_run_at using conflict-safe write
+                update_couchdb_doc_safe(
+                    self.agent_configs_db,
+                    agent_config["_id"],
+                    {"last_run_at": datetime.now(timezone.utc).isoformat()},
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Failed to execute logic for agent {agent_config.get('_id')} from {logic_module_path}: {e}"
+                )
+                raise
