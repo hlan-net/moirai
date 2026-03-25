@@ -49,3 +49,4 @@ dependencies:
     - langdetect==1.0.9
     - redis==7.2.0
     - gunicorn==25.1.0
+    - atproto==0.0.60

@@ -104,6 +104,10 @@ def update_userspace(userspace_id: str):
         updates["llm_config"] = payload.llm_config.model_dump()
     if payload.preferences is not None:
         updates["preferences"] = payload.preferences
+    if payload.bluesky_handle is not None:
+        updates["bluesky_handle"] = payload.bluesky_handle
+    if payload.bluesky_app_password is not None:
+        updates["bluesky_app_password"] = payload.bluesky_app_password
 
     success = update_couchdb_doc_safe(USERSPACES_DB, userspace_id, updates)
     if not success:
