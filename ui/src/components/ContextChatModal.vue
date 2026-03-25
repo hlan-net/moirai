@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { authFetch } from '../utils/authFetch'
@@ -30,6 +30,36 @@ const sessionId = ref<string | null>(null)
 const copyStatus = ref('')
 const pendingQuickAction = ref<QuickAction | null>(null)
 const raiseWizardOpen = ref(false)
+
+// Per-session LLM override — defaults to userspace/settings values, resets on close
+const sessionProvider = ref(settingsStore.llmEndpoint)
+const sessionModel = ref(settingsStore.getCurrentModel())
+const llmSelectorOpen = ref(false)
+
+const providers = ['ollama', 'openai', 'gemini'] as const
+
+// Keep defaults in sync with the store until the user explicitly changes them
+watchEffect(() => {
+  if (!chatContextStore.isOpen) {
+    sessionProvider.value = settingsStore.llmEndpoint
+    sessionModel.value = settingsStore.getCurrentModel()
+    llmSelectorOpen.value = false
+  }
+})
+
+// When the provider changes, update the model to the corresponding default
+watch(sessionProvider, (newProvider) => {
+  switch (newProvider) {
+    case 'openai':
+      sessionModel.value = settingsStore.openaiModel
+      break
+    case 'gemini':
+      sessionModel.value = settingsStore.geminiModel
+      break
+    default:
+      sessionModel.value = settingsStore.ollamaModel
+  }
+})
 const raiseWizardLoading = ref(false)
 const raiseWizardQuestions = ref<string[]>([])
 const raiseWizardAnswers = ref<string[]>(['', '', ''])
@@ -237,8 +267,8 @@ const ensureSession = async (userMsg: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: userMsg,
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -264,8 +294,8 @@ const updateSession = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: messages.value,
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -298,8 +328,8 @@ const sendMessage = async () => {
       body: JSON.stringify({
         message: userMsg,
         history,
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -338,8 +368,8 @@ const askWizardQuestions = async () => {
         message:
           'You are preparing issue creation from this article context. Ask exactly 3 concise clarifying questions that help define a reusable, generic issue. Return only a numbered list.',
         history: [],
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -410,8 +440,8 @@ const submitRaiseWizard = async () => {
       body: JSON.stringify({
         message: draftPrompt,
         history: [],
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -533,7 +563,25 @@ const copyChat = async () => {
         <div class="header-title-block">
           <span class="context-badge">{{ contextEmoji }} {{ contextLabel }}</span>
           <h3 id="context-chat-title" class="context-title" :title="contextTitle">{{ contextTitle }}</h3>
-          <p class="model-meta">{{ settingsStore.llmEndpoint }} / {{ settingsStore.getCurrentModel() }}</p>
+          <button
+            class="model-selector-btn"
+            :title="'Override model for this chat session'"
+            @click="llmSelectorOpen = !llmSelectorOpen"
+          >
+            {{ sessionProvider }} / {{ sessionModel }} ▾
+          </button>
+          <div v-if="llmSelectorOpen" class="llm-selector-panel">
+            <label class="llm-selector-label">
+              Provider
+              <select v-model="sessionProvider" class="llm-select">
+                <option v-for="p in providers" :key="p" :value="p">{{ p }}</option>
+              </select>
+            </label>
+            <label class="llm-selector-label">
+              Model
+              <input v-model="sessionModel" class="llm-model-input" type="text" placeholder="model name" />
+            </label>
+          </div>
         </div>
         <div class="header-actions">
           <button
@@ -688,9 +736,50 @@ const copyChat = async () => {
   white-space: nowrap;
 }
 
-.model-meta {
+.model-selector-btn {
   margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
   opacity: 0.6;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.model-selector-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.llm-selector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--color-surface, #2a2a2a);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.llm-selector-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.llm-select,
+.llm-model-input {
+  padding: 3px 6px;
+  background: var(--color-bg, #1a1a1a);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 4px;
+  color: inherit;
   font-size: 0.8rem;
 }
 
