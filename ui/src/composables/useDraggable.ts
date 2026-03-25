@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 
 /**
  * Makes an element draggable via pointer events on a handle element.
@@ -22,12 +22,9 @@ export function useDraggable(
   const translateX = ref(0)
   const translateY = ref(0)
 
-  const dragStyle = {
-    get transform() {
-      return `translate(${translateX.value}px, ${translateY.value}px)`
-    },
-    cursor: 'auto',
-  }
+  const dragStyle = computed(() => ({
+    transform: `translate(${translateX.value}px, ${translateY.value}px)`,
+  }))
 
   let dragging = false
   let startPointerX = 0
@@ -74,8 +71,10 @@ export function useDraggable(
     translateY.value = clamp(newY, minY, maxY)
   }
 
-  function onPointerUp() {
+  function onPointerUp(e: PointerEvent) {
+    if (!dragging) return
     dragging = false
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
   }
 
   function resetPosition() {
@@ -92,7 +91,7 @@ export function useDraggable(
     onPointerdown: onPointerDown,
     onPointermove: onPointerMove,
     onPointerup: onPointerUp,
-    style: { cursor: 'grab' },
+    onPointercancel: onPointerUp,
   }
 
   return { dragStyle, handleProps, resetPosition }

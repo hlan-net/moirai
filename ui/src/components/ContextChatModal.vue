@@ -71,7 +71,7 @@ const modalContentRef = drawerRef
 const inputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
 
-const { dragStyle, handleProps: dragHandleProps, resetPosition } = useDraggable(
+const { dragStyle, handleProps: dragHandleProps } = useDraggable(
   drawerRef,
   computed(() => chatContextStore.isOpen),
 )
