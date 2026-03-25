@@ -189,6 +189,7 @@ def init_db():
         "chat_history",
         "users",
         "feed_content",
+        "userspaces",
     ]
     for db in allowed_dbs:
         ensure_db(db)
@@ -197,6 +198,7 @@ def init_db():
     create_index("articles", ["published"], "published-index")
     create_index("articles", ["feed_url"], "feed-url-index")
     create_index("users", ["email"], "users-email-index")
+    create_index("userspaces", ["owner_user_id"], "userspaces-owner-index")
 
     ensure_design_doc(
         "articles",
@@ -226,6 +228,65 @@ def init_db():
     )
 
     return
+
+
+def _fetch_user_batch(start_key: str | None, batch_size: int) -> list | None:
+    """Fetch one page of user docs from CouchDB. Returns rows list or None on error."""
+    params: dict = {"include_docs": "true", "limit": batch_size}
+    if start_key:
+        params["startkey"] = f'"{start_key}"'
+        params["skip"] = 1  # skip the last doc seen in the previous batch
+
+    response = _request(
+        "GET",
+        f"{get_couchdb_uri()}users/_all_docs",
+        params=params,
+        timeout=10,
+    )
+    if response.status_code != 200:
+        logger.error("migrate_userspaces: failed to list users: %s", response.text)
+        return None
+    return response.json().get("rows", [])
+
+
+def migrate_userspaces():
+    """Create userspace documents for all existing users that don't have one yet.
+
+    Safe to run multiple times — skips users that already have a userspace doc.
+    Uses _all_docs with pagination to handle any number of users without a
+    hardcoded limit.
+    """
+    from api.userspace_ops import migrate_user_llm_settings_to_userspace
+
+    migrated = 0
+    batch_size = 200
+    start_key = None
+
+    try:
+        while True:
+            rows = _fetch_user_batch(start_key, batch_size)
+            if rows is None:
+                return
+            user_docs = [
+                r["doc"] for r in rows
+                if r.get("doc") and not r["id"].startswith("_design/")
+            ]
+
+            for user in user_docs:
+                if migrate_user_llm_settings_to_userspace(user):
+                    migrated += 1
+
+            if len(rows) < batch_size:
+                break  # last page
+
+            start_key = rows[-1]["id"]
+
+        if migrated:
+            logger.info("Migrated %d user(s) to userspace documents.", migrated)
+        else:
+            logger.info("Userspace migration: all users already have userspace documents.")
+    except Exception as exc:
+        logger.error("migrate_userspaces: unexpected error: %s", exc)
 
 
 def ensure_default_user():
@@ -269,6 +330,7 @@ def run():
     logger.info("Initialising database...")
     init_db()
     ensure_default_user()
+    migrate_userspaces()
 
     logger.info("Starting cleanup task...")
     cleanup = CleanupTask()

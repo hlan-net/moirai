@@ -15,12 +15,15 @@ from .db import (
     fetch_from_couchdb,
     delete_from_couchdb,
     update_couchdb_doc,
+    update_couchdb_doc_safe,
     query_couchdb,
     store_to_couchdb,
 )
+from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
+from .userspace_ops import get_userspace, resolve_llm_config
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
-from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest
+from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest, ShareIssueRequest
 from .auth import get_auth_config
 
 import uuid  # Import uuid
@@ -143,6 +146,14 @@ def get_component_versions() -> dict[str, str]:
             versions["couchdb"] = payload["version"]
         else:
             versions["couchdb"] = "unknown"
+
+    try:
+        redis_client = get_redis_client()
+        if redis_client:
+            info = redis_client.info("server")
+            versions["redis"] = info.get("redis_version", "unknown")
+    except Exception:
+        versions["redis"] = "unknown"
 
     return versions
 
@@ -715,6 +726,58 @@ def remove_issue_premise(issue_id):
             return jsonify(issue)
 
     abort(500, description="Failed to update issue")
+
+
+@api_blueprint.route("/issues/<issue_id>/share", methods=["POST"])
+@jwt_required
+@limiter.limit("10/minute")
+def share_issue(issue_id: str):
+    """Share an issue to a social platform (currently Bluesky)."""
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
+        abort(404, description="Issue not found")
+
+    userspace_id = issue.get("userspace")
+    if not userspace_id:
+        return jsonify({"error": "Issue has no userspace"}), 400
+
+    try:
+        ShareIssueRequest(**request.json)
+    except (ValidationError, TypeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    userspace_doc = get_userspace(userspace_id)
+    if not userspace_doc:
+        return jsonify({"error": "Userspace not found"}), 400
+
+    bluesky_handle = userspace_doc.get("bluesky_handle")
+    bluesky_app_password = userspace_doc.get("bluesky_app_password")
+    if not bluesky_handle or not bluesky_app_password:
+        return jsonify({"error": "Bluesky credentials not configured"}), 400
+
+    premises = issue.get("premises") or []
+    article_ids = [
+        p.get("id") if isinstance(p, dict) else p
+        for p in premises[:10]
+        if (p.get("id") if isinstance(p, dict) else p)
+    ]
+    articles = query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
+
+    llm_config = resolve_llm_config(userspace_id)
+    post_text = generate_bluesky_post_text(issue, articles, llm_config)
+
+    try:
+        post_uri = post_to_bluesky(bluesky_handle, bluesky_app_password, post_text)
+    except Exception:
+        logger.error("Bluesky post failed", exc_info=True)
+        return jsonify({"error": "Bluesky post failed"}), 502
+
+    social_posts = issue.get("social_posts") or {}
+    social_posts["bluesky"] = post_uri
+    update_couchdb_doc_safe("issues", issue_id, {"social_posts": social_posts})
+
+    post_url = bluesky_uri_to_url(post_uri, bluesky_handle) or post_uri
+    return jsonify({"status": "shared", "uri": post_uri, "url": post_url})
 
 
 def fetch_url(url):

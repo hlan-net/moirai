@@ -23,6 +23,7 @@ from .db import (
     query_couchdb,
 )
 from .auth import jwt_required
+from .userspace_ops import resolve_llm_config
 
 chat_blueprint = Blueprint("chat", __name__)
 
@@ -618,27 +619,19 @@ async def run_agent(
 @chat_blueprint.route("/models", methods=["GET"])
 @jwt_required
 def list_models():
-    llm_endpoint = request.args.get("llm_endpoint")
-
-    # Get API key from user settings if available
-    user = fetch_from_couchdb("users", g.user_id)
-    user_settings = user.get("settings", {}) if user else {}
+    userspace_llm = resolve_llm_config(g.user_id)
+    llm_endpoint = request.args.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
 
     api_key = None
     if llm_endpoint == "openai":
-        api_key = user_settings.get("moirai_openai_api_key")
+        api_key = userspace_llm.get("openai_api_key") or request.headers.get("x-openai-api-key")
     elif llm_endpoint == "gemini":
-        api_key = user_settings.get("moirai_gemini_api_key")
+        api_key = userspace_llm.get("gemini_api_key") or request.headers.get("x-gemini-api-key")
 
-    # Fallback to headers (or env vars in _get_api_key)
-    if not api_key:
-        api_key = request.headers.get("x-openai-api-key")
-    if not api_key:
-        api_key = request.headers.get("x-gemini-api-key")
-
-    ollama_base_url = user_settings.get(
-        "moirai_ollama_endpoint_url"
-    ) or request.headers.get("x-ollama-base-url")
+    ollama_base_url = (
+        userspace_llm.get("ollama_endpoint")
+        or request.headers.get("x-ollama-base-url")
+    )
 
     # Determine API Key based on provider if not passed
     final_api_key = _get_api_key(llm_endpoint, api_key)
@@ -661,24 +654,19 @@ def chat():
     user_message = data.get("message")
     history = data.get("history", [])
     context = data.get("context")
-    model = data.get("model")
-    llm_endpoint = data.get("llm_endpoint") or DEFAULT_LLM_PROVIDER
 
-    # Get user settings
-    user = fetch_from_couchdb("users", g.user_id)
-    user_settings = user.get("settings", {}) if user else {}
+    # Resolve LLM config from the userspace document (authoritative source).
+    # The request body may override provider and model for this chat session only.
+    userspace_llm = resolve_llm_config(g.user_id)
+
+    llm_endpoint = data.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
+    model = data.get("model") or userspace_llm.get("model")
 
     api_key = None
     if llm_endpoint == "openai":
-        api_key = user_settings.get("moirai_openai_api_key")
+        api_key = userspace_llm.get("openai_api_key") or request.headers.get("x-openai-api-key")
     elif llm_endpoint == "gemini":
-        api_key = user_settings.get("moirai_gemini_api_key")
-
-    # Fallback
-    if not api_key:
-        api_key = request.headers.get("x-openai-api-key")
-    if not api_key:
-        api_key = request.headers.get("x-gemini-api-key")
+        api_key = userspace_llm.get("gemini_api_key") or request.headers.get("x-gemini-api-key")
 
     api_key = _get_api_key(llm_endpoint, api_key)
 
@@ -688,16 +676,17 @@ def chat():
                 {
                     "response": (
                         f"Error: Missing API key for provider '{llm_endpoint}'. "
-                        "Add it in Settings or send it in request headers."
+                        "Add it in Settings → Userspace or send it in request headers."
                     )
                 }
             ),
             400,
         )
 
-    ollama_base_url = user_settings.get(
-        "moirai_ollama_endpoint_url"
-    ) or request.headers.get("x-ollama-base-url")
+    ollama_base_url = (
+        userspace_llm.get("ollama_endpoint")
+        or request.headers.get("x-ollama-base-url")
+    )
 
     auth_token = request.headers.get("Authorization")
 

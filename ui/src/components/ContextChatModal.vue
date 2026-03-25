@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { authFetch } from '../utils/authFetch'
 import { useChatContextStore } from '../stores/chatContext'
 import { useSettingsStore } from '../stores/settings'
+import { useDraggable } from '../composables/useDraggable'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -30,13 +31,50 @@ const sessionId = ref<string | null>(null)
 const copyStatus = ref('')
 const pendingQuickAction = ref<QuickAction | null>(null)
 const raiseWizardOpen = ref(false)
+
+// Per-session LLM override — defaults to userspace/settings values, resets on close
+const sessionProvider = ref(settingsStore.llmEndpoint)
+const sessionModel = ref(settingsStore.getCurrentModel())
+const llmSelectorOpen = ref(false)
+
+const providers = ['ollama', 'openai', 'gemini'] as const
+
+// Keep defaults in sync with the store until the user explicitly changes them
+watchEffect(() => {
+  if (!chatContextStore.isOpen) {
+    sessionProvider.value = settingsStore.llmEndpoint
+    sessionModel.value = settingsStore.getCurrentModel()
+    llmSelectorOpen.value = false
+  }
+})
+
+// When the provider changes, update the model to the corresponding default
+watch(sessionProvider, (newProvider) => {
+  switch (newProvider) {
+    case 'openai':
+      sessionModel.value = settingsStore.openaiModel
+      break
+    case 'gemini':
+      sessionModel.value = settingsStore.geminiModel
+      break
+    default:
+      sessionModel.value = settingsStore.ollamaModel
+  }
+})
 const raiseWizardLoading = ref(false)
 const raiseWizardQuestions = ref<string[]>([])
 const raiseWizardAnswers = ref<string[]>(['', '', ''])
 
-const modalContentRef = ref<HTMLElement | null>(null)
+const drawerRef = ref<HTMLElement | null>(null)
+// alias for focus-trap logic
+const modalContentRef = drawerRef
 const inputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
+
+const { dragStyle, handleProps: dragHandleProps } = useDraggable(
+  drawerRef,
+  computed(() => chatContextStore.isOpen),
+)
 
 let modalKeydownListenerAttached = false
 
@@ -88,6 +126,18 @@ const quickActions = computed<QuickAction[]>(() => {
         message: 'Please create a new Issue from this article',
         action: 'wizard',
       },
+      {
+        label: 'Find Related Issues',
+        message:
+          'Search existing issues and find which ones this article could be linked to. ' +
+          'Use keywords from the article title and summary to search. ' +
+          'List the best matches with a short reason for each.',
+      },
+      {
+        label: 'Summarize in 3 bullets',
+        message:
+          'Summarize the key points of this article in exactly 3 concise bullet points.',
+      },
     ]
   }
   if (chatContextStore.contextType === 'issue') {
@@ -102,6 +152,18 @@ const quickActions = computed<QuickAction[]>(() => {
           'Search for recent articles that relate to this issue but are not yet linked to it. ' +
           'Use the issue name and description as search terms. ' +
           'List the most relevant matches and suggest which ones should be linked.',
+      },
+      {
+        label: 'Write a brief',
+        message:
+          'Write a 2–3 paragraph press brief for this issue based on its description and linked articles. ' +
+          'The brief should be suitable for sharing with an editorial team.',
+      },
+      {
+        label: 'Seal this issue',
+        message:
+          'Help me close this issue. First provide a short closing summary of what happened and how it resolved, ' +
+          'then call the seal_issue tool to mark it as sealed.',
       },
     ]
   }
@@ -213,8 +275,8 @@ const ensureSession = async (userMsg: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: userMsg,
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -240,8 +302,8 @@ const updateSession = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: messages.value,
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -274,8 +336,8 @@ const sendMessage = async () => {
       body: JSON.stringify({
         message: userMsg,
         history,
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -314,8 +376,8 @@ const askWizardQuestions = async () => {
         message:
           'You are preparing issue creation from this article context. Ask exactly 3 concise clarifying questions that help define a reusable, generic issue. Return only a numbered list.',
         history: [],
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -386,8 +448,8 @@ const submitRaiseWizard = async () => {
       body: JSON.stringify({
         message: draftPrompt,
         history: [],
-        model: settingsStore.getCurrentModel(),
-        llm_endpoint: settingsStore.llmEndpoint,
+        model: sessionModel.value,
+        llm_endpoint: sessionProvider.value,
         context: chatContextStore.contextPayload,
       }),
     })
@@ -499,17 +561,36 @@ const copyChat = async () => {
 <template>
   <div v-if="chatContextStore.isOpen" class="modal-overlay" @click="closeModal">
     <dialog
-      ref="modalContentRef"
+      ref="drawerRef"
       open
       class="context-chat-drawer"
       aria-labelledby="context-chat-title"
+      :style="dragStyle"
       @click.stop
     >
-      <header class="drawer-header">
+      <header class="drawer-header" v-bind="dragHandleProps">
         <div class="header-title-block">
           <span class="context-badge">{{ contextEmoji }} {{ contextLabel }}</span>
           <h3 id="context-chat-title" class="context-title" :title="contextTitle">{{ contextTitle }}</h3>
-          <p class="model-meta">{{ settingsStore.llmEndpoint }} / {{ settingsStore.getCurrentModel() }}</p>
+          <button
+            class="model-selector-btn"
+            :title="'Override model for this chat session'"
+            @click="llmSelectorOpen = !llmSelectorOpen"
+          >
+            {{ sessionProvider }} / {{ sessionModel }} ▾
+          </button>
+          <div v-if="llmSelectorOpen" class="llm-selector-panel">
+            <label class="llm-selector-label">
+              Provider
+              <select v-model="sessionProvider" class="llm-select">
+                <option v-for="p in providers" :key="p" :value="p">{{ p }}</option>
+              </select>
+            </label>
+            <label class="llm-selector-label">
+              Model
+              <input v-model="sessionModel" class="llm-model-input" type="text" placeholder="model name" />
+            </label>
+          </div>
         </div>
         <div class="header-actions">
           <button
@@ -612,17 +693,18 @@ const copyChat = async () => {
 .context-chat-drawer {
   margin: 0 0 0 auto;
   padding: 0;
-  border: none;
   outline: none;
   max-width: none;
   max-height: none;
   width: min(620px, 100%);
-  height: 100%;
+  height: min(85vh, 800px);
   background: var(--card-bg);
-  border-left: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  box-shadow: -12px 0 24px rgba(0, 0, 0, 0.35);
+  box-shadow: -4px 4px 24px rgba(0, 0, 0, 0.45);
+  will-change: transform;
 }
 
 .context-chat-drawer::backdrop {
@@ -640,6 +722,13 @@ const copyChat = async () => {
   padding: 14px;
   border-bottom: 1px solid var(--border-color);
   background: var(--card-bg);
+  border-radius: 8px 8px 0 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.drawer-header:active {
+  cursor: grabbing;
 }
 
 .header-title-block {
@@ -664,9 +753,50 @@ const copyChat = async () => {
   white-space: nowrap;
 }
 
-.model-meta {
+.model-selector-btn {
   margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
   opacity: 0.6;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.model-selector-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.llm-selector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--color-surface, #2a2a2a);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.llm-selector-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.llm-select,
+.llm-model-input {
+  padding: 3px 6px;
+  background: var(--color-bg, #1a1a1a);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 4px;
+  color: inherit;
   font-size: 0.8rem;
 }
 
@@ -834,6 +964,15 @@ const copyChat = async () => {
 @media (max-width: 767px) {
   .context-chat-drawer {
     width: 100%;
+    height: 100%;
+    border-radius: 0;
+    margin: 0;
+    transform: none !important;
+  }
+
+  .drawer-header {
+    cursor: default;
+    border-radius: 0;
   }
 }
 

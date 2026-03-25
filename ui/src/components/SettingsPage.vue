@@ -77,12 +77,14 @@ const buildComponentVersions = (config?: {
   const apiVersion = config?.components?.api ?? config?.version ?? 'unknown'
   const mcpVersion = config?.components?.mcp ?? 'unknown'
   const couchdbVersion = config?.components?.couchdb ?? 'unknown'
+  const redisVersion = config?.components?.redis ?? 'unknown'
 
   return [
     { name: 'UI', version: uiVersion },
     { name: 'API', version: apiVersion },
     { name: 'MCP Server', version: mcpVersion },
     { name: 'CouchDB', version: couchdbVersion },
+    { name: 'Redis', version: redisVersion },
   ]
 }
 
