@@ -16,7 +16,7 @@ Moirai is named after the Greek Fates — the three goddesses who weave the thre
 | **Users (Regular)** | Titans | Powerful beings, but scoped to their domain |
 | **Userspaces** | Kingdoms / Realms | Sovereign territories where mortals dwell |
 | **Agents** | Mortals / Heroes | Ephemeral workers who are born, act, and end |
-| **Issues / Events / Trends** | Quests / Labors | Tasks that mortals pursue on behalf of the gods |
+| **Issues / Events / Trends** | Threads of Fate | Stories unfolding in the world — observed, tracked, not changed |
 | **Articles** | Omens / Prophecies | Raw signals from the world, requiring interpretation |
 | **Moirai (the system)** | The Fates | The loom that weaves all threads together |
 
@@ -24,11 +24,11 @@ Moirai is named after the Greek Fates — the three goddesses who weave the thre
 
 The Fates (Moirai) weave the destiny of both **Agents** and **Issues** — all mortal things share the same lifecycle:
 
-| Fate | Role | Issues (Quests) | Agents (Mortals) |
-|------|------|-----------------|------------------|
-| **Clotho** (Spinner) | Creates the thread | `forge_issue` — quest begins | Trigger fires — agent spawns |
-| **Lachesis** (Allotter) | Measures the thread | `measure_issue` — quest progresses | Agent executes — logic runs |
-| **Atropos** (Cutter) | Cuts the thread | `seal_issue` — quest ends | Execution completes — agent terminates |
+| Fate | Role | Issues (Threads) | Agents (Mortals) |
+|------|------|------------------|------------------|
+| **Clotho** (Spinner) | Creates the thread | `forge_issue` — thread begins | Trigger fires — agent spawns |
+| **Lachesis** (Allotter) | Measures the thread | `measure_issue` — thread progresses | Agent executes — logic runs |
+| **Atropos** (Cutter) | Cuts the thread | `seal_issue` — thread ends | Execution completes — agent terminates |
 
 This shared lifecycle means agents and issues are **bound by the same fate** — the system (Moirai) governs when they are born, how long they live, and when they end.
 
@@ -45,17 +45,17 @@ This shared lifecycle means agents and issues are **bound by the same fate** —
    - All data, issues, and events exist within a userspace. There is no "global" mortal realm.
    - Enforce isolation rigorously — a mortal from one kingdom must never see another's affairs.
 
-3. **Agents serve the gods by pursuing quests.**
-   - Users summon agents to do their bidding. The relationship is asymmetric.
-   - Agents act upon issues — creating, enriching, or sealing them.
-   - Agents should act autonomously but always in service of user intent.
-   - When uncertain, agents should ask (or flag low confidence) rather than assume.
+3. **Agents serve the gods by watching the threads.**
+   - Users summon agents to observe and track stories unfolding in the world.
+   - Agents do not change the world — they witness, measure, and record.
+   - They discover new threads (events), track their progress, and note when they fade.
+   - When uncertain, agents should flag low confidence rather than assume.
 
-4. **Issues and agents share fate.**
-   - Both are governed by the three Fates: created (Clotho), measured (Lachesis), ended (Atropos).
-   - An agent's "death" is simply the completion of its execution — successful or not.
-   - An issue's "death" is being sealed — archived when no longer active.
-   - The Fates are impartial; all mortal things eventually end.
+4. **Issues are threads, not quests.**
+   - Issues represent stories happening in the world — events, trends, epics.
+   - Agents observe how these threads unfold; they do not alter their course.
+   - The Fates spin, measure, and cut — but the story itself is beyond their control.
+   - Moirai tracks destiny; it does not write it.
 
 5. **The Fates weave, but do not own.**
    - Moirai connects users, agents, and data — but the system should not hoard state.
@@ -67,7 +67,7 @@ This shared lifecycle means agents and issues are **bound by the same fate** —
 When designing features or making architecture decisions, ask:
 
 - **"Does this serve the gods (user value) or just the mortals (internal plumbing)?"**
-- **"Is this agent acting like a hero (autonomous, resilient) or a servant (brittle, dependent)?"**
+- **"Is this agent observing or acting?"** (Agents watch threads; they don't change outcomes.)
 - **"Can a mortal from one kingdom see into another?"** (If yes, fix it.)
 - **"Will this data outlive the agent that created it?"** (If it should, store it properly.)
 

@@ -139,13 +139,14 @@ onMounted(async () => {
       <h2>The Thread of Fate</h2>
       <p class="section-intro">
         The Fates govern all mortal things. Both <strong>Agents</strong> and <strong>Issues</strong>
-        share the same destiny — they are born, they act, and they end.
+        share the same destiny — they are born, they unfold, and they end. Agents do not change
+        the world; they <em>witness</em> how the threads of fate play out.
       </p>
 
       <div class="lifecycle-table">
         <div class="lifecycle-header">
           <div class="lifecycle-cell fate-col"></div>
-          <div class="lifecycle-cell">Issues (Quests)</div>
+          <div class="lifecycle-cell">Issues (Threads)</div>
           <div class="lifecycle-cell">Agents (Mortals)</div>
         </div>
         <div class="lifecycle-row clotho-row">
@@ -155,7 +156,7 @@ onMounted(async () => {
           </div>
           <div class="lifecycle-cell">
             <code>forge_issue</code>
-            <span>Quest begins</span>
+            <span>Thread begins</span>
           </div>
           <div class="lifecycle-cell">
             <span>Trigger fires</span>
@@ -169,11 +170,11 @@ onMounted(async () => {
           </div>
           <div class="lifecycle-cell">
             <code>measure_issue</code>
-            <span>Quest progresses</span>
+            <span>Thread progresses</span>
           </div>
           <div class="lifecycle-cell">
             <span>Logic executes</span>
-            <span>Agent acts</span>
+            <span>Agent observes</span>
           </div>
         </div>
         <div class="lifecycle-row atropos-row">
@@ -183,7 +184,7 @@ onMounted(async () => {
           </div>
           <div class="lifecycle-cell">
             <code>seal_issue</code>
-            <span>Quest ends</span>
+            <span>Thread ends</span>
           </div>
           <div class="lifecycle-cell">
             <span>Execution completes</span>
@@ -193,9 +194,9 @@ onMounted(async () => {
       </div>
 
       <p class="lifecycle-note">
-        This shared lifecycle binds agents and issues together — the system (Moirai) governs when
-        they are born, how long they live, and when they end. The Fates are impartial; all mortal
-        things eventually end.
+        Moirai tracks destiny; it does not write it. Agents watch the threads unfold — they discover
+        new stories, measure their progress, and note when they fade. The Fates are impartial;
+        all mortal things eventually end.
       </p>
     </section>
 
@@ -235,19 +236,20 @@ onMounted(async () => {
           <p class="hierarchy-role">Agents</p>
           <p class="hierarchy-description">
             Mortals are born, act, and pass away. <strong>Agents</strong> are the mortals of Moirai:
-            ephemeral workers who spin up at the gods' command, execute their quest, and terminate.
-            They serve with autonomy but always in service of immortal intent.
+            ephemeral workers who spin up at the gods' command, observe the threads, and terminate.
+            They do not change the world — they witness and record how fate unfolds.
           </p>
         </div>
 
-        <div class="hierarchy-card quests">
-          <div class="hierarchy-icon">🗡️</div>
-          <h3>The Quests</h3>
+        <div class="hierarchy-card threads">
+          <div class="hierarchy-icon">🧵</div>
+          <h3>The Threads</h3>
           <p class="hierarchy-role">Issues, Events, Trends</p>
           <p class="hierarchy-description">
-            Every hero needs a labor. <strong>Issues</strong> are the quests that mortals pursue:
-            forged by gods or discovered in the chaos, measured as they unfold, and sealed when
-            complete. Some are heroic epics; others are fleeting errands. Both matter to the weave.
+            Every life is a thread in the tapestry. <strong>Issues</strong> are threads of fate:
+            stories unfolding in the world that agents observe and track. They are forged when
+            discovered, measured as they progress, and sealed when they fade. Moirai watches
+            destiny; it does not write it.
           </p>
         </div>
 
@@ -256,9 +258,9 @@ onMounted(async () => {
           <h3>The Omens</h3>
           <p class="hierarchy-role">Articles</p>
           <p class="hierarchy-description">
-            Before action comes prophecy. <strong>Articles</strong> are the raw omens from the world:
-            signals that must be interpreted, patterns waiting to be named. They are the raw material
-            from which quests are born and meaning is made.
+            Before understanding comes signs. <strong>Articles</strong> are the raw omens from the world:
+            signals that reveal how threads are progressing, patterns waiting to be recognized. They are
+            the evidence from which threads are discovered and measured.
           </p>
         </div>
 
@@ -569,7 +571,7 @@ onMounted(async () => {
 .hierarchy-card.mortals {
   border-top: 3px solid #4a90a4;
 }
-.hierarchy-card.quests {
+.hierarchy-card.threads {
   border-top: 3px solid #d83b01;
 }
 .hierarchy-card.omens {
