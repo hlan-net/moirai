@@ -27,6 +27,7 @@ onMounted(() => {
       <a href="https://github.com/hlan-net/moirai" target="_blank" class="brand">Moirai</a>
       <div class="links">
         <router-link to="/stream" class="nav-link">Stream</router-link>
+        <router-link to="/mythology" class="nav-link">Mythology</router-link>
         <template v-if="isAuthenticated">
           <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
           <router-link to="/lifespan" class="nav-link">Lifespan</router-link>

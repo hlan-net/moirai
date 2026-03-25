@@ -12,7 +12,8 @@ def _forge_issue_internal(
     description: str,
     premises: list[dict],
     userspace: str,
-    longevity: str = "transient"
+    longevity: str = "transient",
+    public: bool = False,
 ) -> str:
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -27,6 +28,7 @@ def _forge_issue_internal(
         "premises": premises,
         "longevity": longevity,
         "status": "active",
+        "public": public,
         "born_at": datetime.now(timezone.utc).isoformat(),
         "passed_at": None,
         "type": "issue"
@@ -173,11 +175,12 @@ def forge_issue(
     premises: list[dict],
     userspace: str,
     longevity: str = "transient",
+    public: bool = False,
 ) -> str:
     """
     (Clotho) Forge a new Issue (Resonance) from identified patterns in the sand.
     """
-    return _forge_issue_internal(logos, description, premises, userspace, longevity)
+    return _forge_issue_internal(logos, description, premises, userspace, longevity, public)
 
 
 @mcp.tool()

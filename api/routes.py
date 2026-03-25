@@ -675,6 +675,7 @@ def create_issue():
         "premises": premises,
         "longevity": validated.longevity,
         "status": "active",
+        "public": validated.public,
         "born_at": datetime.now(timezone.utc).isoformat(),
         "passed_at": None,
         "type": "issue",
@@ -726,6 +727,62 @@ def remove_issue_premise(issue_id):
             return jsonify(issue)
 
     abort(500, description="Failed to update issue")
+
+
+@api_blueprint.route("/issues/<issue_id>", methods=["PATCH"])
+@admin_required
+def patch_issue(issue_id):
+    """Partial update for an issue — currently supports toggling `public`."""
+    data = request.json or {}
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
+        abort(404, description="Issue not found")
+
+    updates = {}
+    if "public" in data:
+        updates["public"] = bool(data["public"])
+
+    if not updates:
+        return jsonify(issue)
+
+    if update_couchdb_doc_safe("issues", issue_id, updates):
+        updated = fetch_from_couchdb("issues", issue_id)
+        return jsonify(updated)
+    abort(500, description="Failed to update issue")
+
+
+@api_blueprint.route("/mythology", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_mythology():
+    """Public endpoint returning platform stats and public issues for the Mythology page."""
+    feeds = fetch_from_couchdb("feeds") or []
+    articles = fetch_from_couchdb("articles") or []
+    all_issues = fetch_from_couchdb("issues") or []
+
+    public_issues = [
+        {
+            "_id": i["_id"],
+            "logos": i.get("logos", ""),
+            "description": i.get("description", ""),
+            "longevity": i.get("longevity", "transient"),
+            "status": i.get("status", "active"),
+            "born_at": i.get("born_at"),
+            "premises_count": len(i.get("premises", [])),
+        }
+        for i in all_issues
+        if i.get("public") and not i["_id"].startswith("_design/")
+    ]
+
+    return jsonify(
+        {
+            "stats": {
+                "feeds": len([f for f in feeds if not f["_id"].startswith("_design/")]),
+                "articles": len([a for a in articles if not a["_id"].startswith("_design/")]),
+                "issues": len([i for i in all_issues if not i["_id"].startswith("_design/")]),
+            },
+            "public_issues": public_issues,
+        }
+    )
 
 
 @api_blueprint.route("/issues/<issue_id>/share", methods=["POST"])

@@ -7,9 +7,11 @@ import StreamPage from './components/StreamPage.vue'
 import LoginPage from './components/LoginPage.vue'
 import AgentManagementPage from './components/AgentManagementPage.vue'
 import LifespanView from './components/LifespanView.vue'
+import MythologyPage from './components/MythologyPage.vue'
 
 const routes = [
   { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
+  { path: '/mythology', component: MythologyPage, name: 'Mythology' },
   { path: '/stream', component: StreamPage, name: 'StreamExplicit' }, // Explicit /stream route for navigation
   { path: '/login', component: LoginPage, name: 'Login' },
   { path: '/dashboard', component: MainPage, name: 'Dashboard', meta: { requiresAuth: true } },
