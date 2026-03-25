@@ -760,8 +760,8 @@ def share_issue(issue_id: str):
 
     try:
         post_uri = post_to_bluesky(bluesky_handle, bluesky_app_password, post_text)
-    except Exception as exc:
-        logger.error("Bluesky post failed for issue %s", issue_id, exc_info=True)
+    except Exception:
+        logger.error("Bluesky post failed", exc_info=True)
         return jsonify({"error": "Bluesky post failed"}), 502
 
     social_posts = issue.get("social_posts") or {}
