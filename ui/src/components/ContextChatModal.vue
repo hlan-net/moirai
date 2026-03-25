@@ -88,6 +88,18 @@ const quickActions = computed<QuickAction[]>(() => {
         message: 'Please create a new Issue from this article',
         action: 'wizard',
       },
+      {
+        label: 'Find Related Issues',
+        message:
+          'Search existing issues and find which ones this article could be linked to. ' +
+          'Use keywords from the article title and summary to search. ' +
+          'List the best matches with a short reason for each.',
+      },
+      {
+        label: 'Summarize in 3 bullets',
+        message:
+          'Summarize the key points of this article in exactly 3 concise bullet points.',
+      },
     ]
   }
   if (chatContextStore.contextType === 'issue') {
@@ -102,6 +114,18 @@ const quickActions = computed<QuickAction[]>(() => {
           'Search for recent articles that relate to this issue but are not yet linked to it. ' +
           'Use the issue name and description as search terms. ' +
           'List the most relevant matches and suggest which ones should be linked.',
+      },
+      {
+        label: 'Write a brief',
+        message:
+          'Write a 2–3 paragraph press brief for this issue based on its description and linked articles. ' +
+          'The brief should be suitable for sharing with an editorial team.',
+      },
+      {
+        label: 'Seal this issue',
+        message:
+          'Help me close this issue. First provide a short closing summary of what happened and how it resolved, ' +
+          'then call the seal_issue tool to mark it as sealed.',
       },
     ]
   }
