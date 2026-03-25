@@ -462,11 +462,28 @@ class UserspaceUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     llm_config: Optional[LLMConfigRequest] = None
     preferences: Optional[Dict[str, Any]] = None
+    bluesky_handle: Optional[str] = Field(None, max_length=100)
+    bluesky_app_password: Optional[str] = Field(None, max_length=200)
 
     @field_validator("name")
     @classmethod
     def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
         return _sanitize_optional_text(v)
+
+    @field_validator("bluesky_handle")
+    @classmethod
+    def sanitize_bluesky_handle(cls, v: Optional[str]) -> Optional[str]:
+        return _sanitize_optional_text(v)
+
+
+class SocialPlatform(str, Enum):
+    BLUESKY = "bluesky"
+
+
+class ShareIssueRequest(BaseModel):
+    """Validation for sharing an issue to a social platform."""
+
+    platform: SocialPlatform
 
 
 def validate_userspace_param(userspace: str) -> str:
