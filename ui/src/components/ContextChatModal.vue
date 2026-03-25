@@ -693,7 +693,6 @@ const copyChat = async () => {
 .context-chat-drawer {
   margin: 0 0 0 auto;
   padding: 0;
-  border: none;
   outline: none;
   max-width: none;
   max-height: none;
