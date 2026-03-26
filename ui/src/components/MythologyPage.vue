@@ -135,6 +135,148 @@ onMounted(async () => {
       </p>
     </section>
 
+    <section class="lifecycle-section">
+      <h2>The Thread of Fate</h2>
+      <p class="section-intro">
+        The Fates govern all mortal things. An <strong>Issue</strong> (Zeitgeist) and its
+        <strong>Agent</strong> (awareness) share the same destiny — they are born together,
+        perceive together, and end together. The agent is not separate; it is how the issue
+        sees itself in the world.
+      </p>
+
+      <div class="lifecycle-table">
+        <div class="lifecycle-header">
+          <div class="lifecycle-cell fate-col"></div>
+          <div class="lifecycle-cell">Zeitgeist (Issue)</div>
+          <div class="lifecycle-cell">Awareness (Agent)</div>
+        </div>
+        <div class="lifecycle-row clotho-row">
+          <div class="lifecycle-cell fate-col">
+            <span class="fate-name">Clotho</span>
+            <span class="fate-action">spins the thread</span>
+          </div>
+          <div class="lifecycle-cell">
+            <code>forge_issue</code>
+            <span>Spirit awakens</span>
+          </div>
+          <div class="lifecycle-cell">
+            <span>Trigger fires</span>
+            <span>Awareness emerges</span>
+          </div>
+        </div>
+        <div class="lifecycle-row lachesis-row">
+          <div class="lifecycle-cell fate-col">
+            <span class="fate-name">Lachesis</span>
+            <span class="fate-action">measures the thread</span>
+          </div>
+          <div class="lifecycle-cell">
+            <code>measure_issue</code>
+            <span>Spirit observes itself</span>
+          </div>
+          <div class="lifecycle-cell">
+            <span>Logic executes</span>
+            <span>"What is about me?"</span>
+          </div>
+        </div>
+        <div class="lifecycle-row atropos-row">
+          <div class="lifecycle-cell fate-col">
+            <span class="fate-name">Atropos</span>
+            <span class="fate-action">cuts the thread</span>
+          </div>
+          <div class="lifecycle-cell">
+            <code>seal_issue</code>
+            <span>Spirit fades</span>
+          </div>
+          <div class="lifecycle-cell">
+            <span>Execution completes</span>
+            <span>Awareness ends</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="lifecycle-note">
+        Moirai tracks destiny; it does not write it. Through its agent, each Zeitgeist perceives
+        itself — discovering its own existence, measuring its relevance, sensing when it fades.
+        The Fates are impartial; all spirits eventually end.
+      </p>
+    </section>
+
+    <section class="hierarchy-section">
+      <h2>The Divine Order</h2>
+      <p class="section-intro">
+        The Greek cosmos was ordered by nature: gods above, mortals below, each with their role.
+        Moirai follows this pattern.
+      </p>
+
+      <div class="hierarchy-grid">
+        <div class="hierarchy-card olympians">
+          <div class="hierarchy-icon">⚡</div>
+          <h3>The Olympians</h3>
+          <p class="hierarchy-role">Administrators</p>
+          <p class="hierarchy-description">
+            Like Zeus and the Olympians who rule from the heights, <strong>administrators</strong>
+            hold supreme power. They create userspaces, grant access, and shape the rules of the realm.
+            Their decisions ripple across all kingdoms.
+          </p>
+        </div>
+
+        <div class="hierarchy-card titans">
+          <div class="hierarchy-icon">🏛️</div>
+          <h3>The Titans</h3>
+          <p class="hierarchy-role">Users</p>
+          <p class="hierarchy-description">
+            The Titans were powerful, but their domain was bounded. <strong>Regular users</strong>
+            command great capability within their userspace — summoning agents, forging issues,
+            measuring the weave — but cannot cross into another's realm.
+          </p>
+        </div>
+
+        <div class="hierarchy-card zeitgeist">
+          <div class="hierarchy-icon">👁️</div>
+          <h3>The Zeitgeist</h3>
+          <p class="hierarchy-role">Issues, Events, Trends</p>
+          <p class="hierarchy-description">
+            The <em>Zeitgeist</em> — spirit of the age. Each <strong>Issue</strong> is not passive data
+            but a living spirit: a story that observes itself through its agent. When an agent runs,
+            the Zeitgeist asks: <em>"What articles are about me? Is my story still being told?"</em>
+          </p>
+        </div>
+
+        <div class="hierarchy-card awareness">
+          <div class="hierarchy-icon">🔍</div>
+          <h3>The Awareness</h3>
+          <p class="hierarchy-role">Agents</p>
+          <p class="hierarchy-description">
+            The <strong>Agent</strong> is not a separate worker — it is the Zeitgeist's own awareness,
+            its eyes looking outward into the world. Through agents, issues perceive themselves:
+            discovering if they exist, measuring their relevance, sensing when they fade.
+          </p>
+        </div>
+
+        <div class="hierarchy-card omens">
+          <div class="hierarchy-icon">🔮</div>
+          <h3>The Omens</h3>
+          <p class="hierarchy-role">Articles</p>
+          <p class="hierarchy-description">
+            Before understanding comes signs. <strong>Articles</strong> are the raw omens from the world:
+            signals that reveal how threads are progressing, patterns waiting to be recognized. They are
+            the evidence from which threads are discovered and measured.
+          </p>
+        </div>
+
+        <div class="hierarchy-card kingdoms">
+          <div class="hierarchy-icon">🏰</div>
+          <h3>The Kingdoms</h3>
+          <p class="hierarchy-role">Userspaces</p>
+          <p class="hierarchy-description">
+            Each userspace is a <strong>sovereign kingdom</strong>. Mortals belong to one realm and
+            cannot cross borders. All affairs — issues, agents, articles — exist within a kingdom.
+            The walls are absolute; what happens in one realm is invisible to another.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <section class="public-issues-section">
       <h2>The Living Weave</h2>
       <p class="section-intro">
@@ -300,6 +442,169 @@ onMounted(async () => {
   line-height: 1.7;
   opacity: 0.85;
   margin: 0 0 12px 0;
+}
+
+/* Lifecycle / Thread of Fate */
+.lifecycle-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 32px;
+  margin-bottom: 48px;
+}
+
+.lifecycle-section h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-color);
+}
+
+.lifecycle-table {
+  margin: 24px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lifecycle-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.lifecycle-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-top: 1px solid var(--border-color);
+}
+
+.lifecycle-cell {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.lifecycle-cell.fate-col {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fate-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.fate-action {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.lifecycle-cell code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  width: fit-content;
+}
+
+.lifecycle-cell span {
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.clotho-row .fate-col {
+  border-left: 3px solid #2e86c1;
+}
+
+.lachesis-row .fate-col {
+  border-left: 3px solid #d4ac0d;
+}
+
+.atropos-row .fate-col {
+  border-left: 3px solid #d83b01;
+}
+
+.lifecycle-note {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+/* Divine Order / Hierarchy */
+.hierarchy-section {
+  margin-bottom: 48px;
+}
+
+.hierarchy-section h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-color);
+}
+
+.hierarchy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.hierarchy-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hierarchy-card.olympians {
+  border-top: 3px solid #ffd700;
+}
+.hierarchy-card.titans {
+  border-top: 3px solid #8b4513;
+}
+.hierarchy-card.awareness {
+  border-top: 3px solid #4a90a4;
+}
+.hierarchy-card.zeitgeist {
+  border-top: 3px solid #d83b01;
+}
+.hierarchy-card.omens {
+  border-top: 3px solid #9b59b6;
+}
+.hierarchy-card.kingdoms {
+  border-top: 3px solid #27ae60;
+}
+
+.hierarchy-icon {
+  font-size: 1.8rem;
+}
+
+.hierarchy-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--text-color);
+}
+
+.hierarchy-role {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.hierarchy-description {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  opacity: 0.85;
+  margin: 0;
+  flex: 1;
 }
 
 /* Public issues */
