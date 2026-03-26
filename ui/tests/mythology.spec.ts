@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Mythology Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/mythology')
+    await page.goto('/#/mythology')
   })
 
   test('has correct title and header', async ({ page }) => {
@@ -86,8 +86,8 @@ test.describe('Mythology Page', () => {
     // Go to home first
     await page.goto('/')
 
-    // Click the Mythology nav link
-    await page.click('a[href="/mythology"]')
+    // Click the Mythology nav link (router-link will handle the hash routing)
+    await page.click('text=Mythology')
 
     // Should be on Mythology page
     await expect(page.getByRole('heading', { name: 'The Three Fates' })).toBeVisible()
