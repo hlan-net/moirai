@@ -6,7 +6,6 @@ Validates the response contract defined in TODO_0.7.1.md #1.
 
 import json
 from mcp_service.responses import (
-    MCPResponse,
     MCPStatus,
     MCPErrorCode,
     NextAction,
