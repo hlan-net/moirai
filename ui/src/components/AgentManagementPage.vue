@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { authFetch } from '../utils/authFetch'
-import { ALLOWED_LOGIC_MODULES } from '../utils/agentConstants'
+import { ALLOWED_LOGIC_MODULES, LOGIC_MODULE_INFO, TRIGGER_TYPE_INFO } from '../utils/agentConstants'
 
 const authStore = useAuthStore()
 
@@ -11,7 +11,6 @@ const logicModules = ALLOWED_LOGIC_MODULES
 
 const triggerTypes = ['on_new_article', 'scheduled']
 const statuses = ['active', 'paused']
-const targetDbs = ['articles', 'issues']
 
 const draftAgent = ref({
   name: '',
@@ -40,10 +39,13 @@ type AgentDoc = {
 }
 
 const agents = ref<AgentDoc[]>([])
+const userspaces = ref<string[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const loadingUserspaces = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const showAdvanced = ref(false)
 
 const ownerHint = computed(() => {
   return authStore.user?._id || authStore.user?.id || ''
@@ -51,8 +53,17 @@ const ownerHint = computed(() => {
 
 const userspaceReady = computed(() => draftAgent.value.userspace.trim().length > 0)
 
+const selectedModuleInfo = computed(() => {
+  return LOGIC_MODULE_INFO[draftAgent.value.logic_module] || null
+})
+
+const selectedTriggerInfo = computed(() => {
+  return TRIGGER_TYPE_INFO[draftAgent.value.trigger_type] || null
+})
+
 const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
   if (template === 'stale') {
+    draftAgent.value.name = 'Daily Staleness Sweep'
     draftAgent.value.trigger_type = 'scheduled'
     draftAgent.value.schedule_interval = '1d'
     draftAgent.value.target_db = 'issues'
@@ -62,14 +73,16 @@ const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
   }
 
   if (template === 'discover') {
+    draftAgent.value.name = 'Event Discovery Agent'
     draftAgent.value.trigger_type = 'on_new_article'
     draftAgent.value.schedule_interval = ''
     draftAgent.value.target_db = 'articles'
     draftAgent.value.logic_module = 'tasks.agent_logic.create_event_from_articles'
-    draftAgent.value.parameters = '{\n  "topic": "energy transition"\n}'
+    draftAgent.value.parameters = '{\n  "topic": "your topic here"\n}'
     return
   }
 
+  draftAgent.value.name = 'Event Enrichment Agent'
   draftAgent.value.trigger_type = 'on_new_article'
   draftAgent.value.schedule_interval = ''
   draftAgent.value.target_db = 'articles'
@@ -80,6 +93,29 @@ const setTemplate = (template: 'stale' | 'discover' | 'enrich') => {
 const resetFeedback = () => {
   errorMessage.value = ''
   successMessage.value = ''
+}
+
+const loadUserspaces = async () => {
+  loadingUserspaces.value = true
+  resetFeedback()
+  try {
+    const response = await authFetch('/api/userspaces')
+    if (response.ok) {
+      userspaces.value = await response.json()
+      // Auto-select first userspace if available and none selected
+      if (userspaces.value.length > 0 && !draftAgent.value.userspace) {
+        draftAgent.value.userspace = userspaces.value[0]
+      }
+    } else {
+      errorMessage.value = 'Failed to load userspaces. Please try again later.'
+      console.error('Failed to load userspaces:', response.status, response.statusText)
+    }
+  } catch (error) {
+    errorMessage.value = 'Unable to connect to server. Please check your connection.'
+    console.error('Failed to load userspaces:', error)
+  } finally {
+    loadingUserspaces.value = false
+  }
 }
 
 const loadAgents = async () => {
@@ -142,7 +178,8 @@ const createAgent = async () => {
       throw new Error(msg || 'Failed to create agent')
     }
 
-    successMessage.value = 'Agent created'
+    successMessage.value = 'Agent summoned successfully!'
+    draftAgent.value.name = ''
     await loadAgents()
   } catch (error) {
     errorMessage.value = `Create failed: ${String(error)}`
@@ -163,132 +200,229 @@ const deleteAgent = async (agentId: string) => {
       throw new Error(msg || 'Failed to delete agent')
     }
 
-    successMessage.value = 'Agent deleted'
+    successMessage.value = 'Agent dismissed'
     await loadAgents()
   } catch (error) {
     errorMessage.value = `Delete failed: ${String(error)}`
   }
 }
 
-onMounted(() => {
+const getModuleDisplayName = (module: string) => {
+  return LOGIC_MODULE_INFO[module]?.name || module.split('.').pop() || module
+}
+
+const getStatusClass = (status: string) => {
+  if (status === 'active') return 'status-active'
+  if (status === 'paused') return 'status-paused'
+  if (status === 'error') return 'status-error'
+  return ''
+}
+
+// Auto-load agents when userspace changes
+watch(() => draftAgent.value.userspace, () => {
+  if (userspaceReady.value) {
+    loadAgents()
+  }
+})
+
+onMounted(async () => {
   if (ownerHint.value) {
     draftAgent.value.owner_user_id = ownerHint.value
   }
+  await loadUserspaces()
 })
 </script>
 
 <template>
   <div class="agent-management-page">
+    <!-- Hero Section with Mythology Framing -->
     <section class="hero card">
-      <h1>Agents</h1>
-      <p>
-        Agents are background automations scoped to a single <strong>userspace</strong>.
-        They run with the owning user&apos;s model credentials and never cross userspace boundaries.
+      <div class="hero-icon">👁️</div>
+      <h1>Give Your Issues Awareness</h1>
+      <p class="hero-subtitle">
+        In Moirai, an <strong>Issue is a Zeitgeist</strong> — the spirit of a story unfolding in the world.
+        An <strong>Agent</strong> is not a separate worker; it is the Zeitgeist's own awareness — its eyes
+        looking outward to ask: <em>"What articles are about me? Is my story still being told?"</em>
       </p>
-      <ul>
-        <li>Trigger types: <code>on_new_article</code>, <code>scheduled</code></li>
-        <li>Agent status: <code>active</code>, <code>paused</code>, <code>error</code></li>
-        <li>Allowed logic modules are pre-whitelisted for safety</li>
-      </ul>
     </section>
 
+    <!-- Getting Started Guide -->
+    <section class="card guide-section">
+      <h2>How Issues Perceive Themselves</h2>
+      <div class="guide-grid">
+        <div class="guide-item">
+          <div class="guide-icon">🌅</div>
+          <h3>Awakening</h3>
+          <p>A new Zeitgeist recognizes itself in the flow of articles — a story emerges from the noise.</p>
+        </div>
+        <div class="guide-item">
+          <div class="guide-icon">👁️</div>
+          <h3>Observing</h3>
+          <p>The Zeitgeist watches itself — matching new articles, measuring its own relevance.</p>
+        </div>
+        <div class="guide-item">
+          <div class="guide-icon">🌑</div>
+          <h3>Fading</h3>
+          <p>The Zeitgeist senses when its story is no longer told — and acknowledges its time has passed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start Templates -->
     <section class="card">
-      <h2>Suggested Templates</h2>
+      <h2>Quick Start — Choose an Awareness Type</h2>
+      <p class="muted">Select a template to pre-fill the form below. Each gives your issues a different kind of perception.</p>
       <div class="template-grid">
-        <button class="template" @click="setTemplate('stale')">
-          <strong>Daily Staleness Sweep</strong>
-          <span>scheduled · issues · check_event_staleness</span>
-        </button>
         <button class="template" @click="setTemplate('discover')">
-          <strong>Event Discovery</strong>
-          <span>on_new_article · articles · create_event_from_articles</span>
+          <div class="template-icon">🌅</div>
+          <div class="template-content">
+            <strong>Awakening</strong>
+            <span>Recognize new Zeitgeists in the article flow</span>
+          </div>
         </button>
         <button class="template" @click="setTemplate('enrich')">
-          <strong>Event Enrichment</strong>
-          <span>on_new_article · articles · add_articles_to_event</span>
+          <div class="template-icon">👁️</div>
+          <div class="template-content">
+            <strong>Observation</strong>
+            <span>Match articles to existing Zeitgeists</span>
+          </div>
+        </button>
+        <button class="template" @click="setTemplate('stale')">
+          <div class="template-icon">🌑</div>
+          <div class="template-content">
+            <strong>Staleness Sweep</strong>
+            <span>Daily cleanup of inactive Events</span>
+          </div>
         </button>
       </div>
     </section>
 
+    <!-- Create Agent Form -->
     <section class="card">
-      <h2>Create Agent</h2>
-      <p class="muted">Userspace-scoped config with owner-bound credentials.</p>
+      <h2>Configure Your Agent</h2>
 
-      <div class="form-grid">
+      <!-- Userspace Selection (Primary) -->
+      <div class="userspace-section">
         <label>
-          Name
-          <input v-model="draftAgent.name" type="text" placeholder="Quarterly policy monitor" />
-        </label>
-
-        <label>
-          Userspace (UUID)
-          <input v-model="draftAgent.userspace" type="text" placeholder="00000000-0000-0000-0000-000000000000" />
-        </label>
-
-        <label>
-          Owner User ID (UUID)
-          <input
-            v-model="draftAgent.owner_user_id"
-            type="text"
-            :placeholder="ownerHint || 'User UUID that owns API keys'"
-          />
-        </label>
-
-        <label>
-          Status
-          <select v-model="draftAgent.status">
-            <option v-for="status in statuses" :key="status" :value="status">{{ status }}</option>
+          <span class="label-text">Kingdom (Userspace)</span>
+          <span class="label-hint">The realm where this agent will serve</span>
+          <select v-model="draftAgent.userspace" :disabled="loadingUserspaces">
+            <option value="" disabled>{{ loadingUserspaces ? 'Loading...' : 'Select a userspace' }}</option>
+            <option v-for="us in userspaces" :key="us" :value="us">{{ us }}</option>
           </select>
-        </label>
-
-        <label>
-          Trigger
-          <select v-model="draftAgent.trigger_type">
-            <option v-for="trigger in triggerTypes" :key="trigger" :value="trigger">{{ trigger }}</option>
-          </select>
-        </label>
-
-        <label>
-          Schedule Interval
-          <input
-            v-model="draftAgent.schedule_interval"
-            type="text"
-            placeholder="1h, 6h, 1d"
-            :disabled="draftAgent.trigger_type !== 'scheduled'"
-          />
-        </label>
-
-        <label>
-          Target DB
-          <select v-model="draftAgent.target_db">
-            <option v-for="targetDb in targetDbs" :key="targetDb" :value="targetDb">{{ targetDb }}</option>
-          </select>
-        </label>
-
-        <label>
-          Logic Module
-          <select v-model="draftAgent.logic_module">
-            <option v-for="logic in logicModules" :key="logic" :value="logic">{{ logic }}</option>
-          </select>
-        </label>
-
-        <label>
-          Linked Entity ID (optional)
-          <input v-model="draftAgent.linked_entity_id" type="text" placeholder="Event/Issue UUID" />
         </label>
       </div>
 
-      <label class="full-width">
-        Parameters JSON
-        <textarea v-model="draftAgent.parameters" rows="8" />
-      </label>
+      <!-- Main Form -->
+      <div class="form-section" :class="{ disabled: !userspaceReady }">
+        <div class="form-grid">
+          <label>
+            <span class="label-text">Agent Name</span>
+            <span class="label-hint">A memorable name for this mortal</span>
+            <input v-model="draftAgent.name" type="text" placeholder="e.g., Climate News Watcher" :disabled="!userspaceReady" />
+          </label>
 
-      <div class="actions">
-        <button class="secondary" type="button" @click="loadAgents" :disabled="loading || !userspaceReady">
-          {{ loading ? 'Loading...' : 'Refresh List' }}
+          <label>
+            <span class="label-text">Quest Type (Logic Module)</span>
+            <span class="label-hint">What task will this agent perform?</span>
+            <select v-model="draftAgent.logic_module" :disabled="!userspaceReady">
+              <option v-for="logic in logicModules" :key="logic" :value="logic">
+                {{ getModuleDisplayName(logic) }}
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Module Info Box -->
+        <div v-if="selectedModuleInfo" class="info-box">
+          <strong>{{ selectedModuleInfo.name }}</strong>
+          <p>{{ selectedModuleInfo.description }}</p>
+          <p class="use-case">{{ selectedModuleInfo.useCase }}</p>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span class="label-text">Trigger</span>
+            <span class="label-hint">When should the agent act?</span>
+            <select v-model="draftAgent.trigger_type" :disabled="!userspaceReady">
+              <option v-for="trigger in triggerTypes" :key="trigger" :value="trigger">
+                {{ TRIGGER_TYPE_INFO[trigger]?.name || trigger }}
+              </option>
+            </select>
+          </label>
+
+          <label v-if="draftAgent.trigger_type === 'scheduled'">
+            <span class="label-text">Schedule Interval</span>
+            <span class="label-hint">How often? (e.g., 1h, 6h, 1d)</span>
+            <input
+              v-model="draftAgent.schedule_interval"
+              type="text"
+              placeholder="1d"
+              :disabled="!userspaceReady"
+            />
+          </label>
+
+          <label>
+            <span class="label-text">Status</span>
+            <span class="label-hint">Active agents run; paused agents wait</span>
+            <select v-model="draftAgent.status" :disabled="!userspaceReady">
+              <option v-for="status in statuses" :key="status" :value="status">{{ status }}</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Trigger Info -->
+        <div v-if="selectedTriggerInfo" class="info-box subtle">
+          <p>{{ selectedTriggerInfo.description }}</p>
+        </div>
+
+        <!-- Advanced Settings Toggle -->
+        <button type="button" class="toggle-advanced" @click="showAdvanced = !showAdvanced">
+          {{ showAdvanced ? '▼ Hide Advanced Settings' : '▶ Show Advanced Settings' }}
         </button>
-        <button type="button" @click="createAgent" :disabled="saving || !userspaceReady || !draftAgent.name.trim()">
-          {{ saving ? 'Creating...' : 'Create Agent' }}
+
+        <!-- Advanced Settings -->
+        <div v-if="showAdvanced" class="advanced-section">
+          <div class="form-grid">
+            <label>
+              <span class="label-text">Target Database</span>
+              <input v-model="draftAgent.target_db" type="text" :disabled="!userspaceReady" />
+            </label>
+
+            <label>
+              <span class="label-text">Linked Entity ID</span>
+              <span class="label-hint">Optional: Link to a specific Event/Issue</span>
+              <input v-model="draftAgent.linked_entity_id" type="text" placeholder="Event/Issue UUID" :disabled="!userspaceReady" />
+            </label>
+
+            <label>
+              <span class="label-text">Owner User ID</span>
+              <input
+                v-model="draftAgent.owner_user_id"
+                type="text"
+                :placeholder="ownerHint || 'Auto-filled from your account'"
+                :disabled="!userspaceReady"
+              />
+            </label>
+          </div>
+
+          <label class="full-width">
+            <span class="label-text">Parameters (JSON)</span>
+            <span class="label-hint">Custom configuration for the logic module</span>
+            <textarea v-model="draftAgent.parameters" rows="6" :disabled="!userspaceReady" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button
+          type="button"
+          class="primary"
+          @click="createAgent"
+          :disabled="saving || !userspaceReady || !draftAgent.name.trim()"
+        >
+          {{ saving ? 'Summoning...' : 'Summon Agent' }}
         </button>
       </div>
 
@@ -296,23 +430,45 @@ onMounted(() => {
       <p v-if="successMessage" class="success-text">{{ successMessage }}</p>
     </section>
 
+    <!-- Existing Agents -->
     <section class="card">
-      <h2>Existing Agents (This Userspace)</h2>
-      <div v-if="!userspaceReady" class="muted">Enter a userspace UUID to load agents.</div>
-      <div v-else-if="loading" class="muted">Loading agents...</div>
-      <div v-else-if="!agents.length" class="muted">No agents found in this userspace.</div>
+      <h2>Your Mortal Servants</h2>
+      <p class="muted">Agents currently serving in {{ draftAgent.userspace || 'your kingdom' }}.</p>
+
+      <div v-if="!userspaceReady" class="empty-state">
+        <p>Select a userspace above to see your agents.</p>
+      </div>
+      <div v-else-if="loading" class="empty-state">
+        <p>Consulting the roster...</p>
+      </div>
+      <div v-else-if="!agents.length" class="empty-state">
+        <p>No agents yet. Summon your first mortal above!</p>
+      </div>
       <div v-else class="agent-list">
         <article v-for="agent in agents" :key="agent._id" class="agent-item">
-          <div>
-            <strong>{{ agent.name }}</strong>
-            <div class="agent-meta">
-              <span>{{ agent.status }}</span>
-              <span>{{ agent.trigger_type }}</span>
-              <span>{{ agent.target_db }}</span>
+          <div class="agent-info">
+            <div class="agent-header">
+              <strong>{{ agent.name }}</strong>
+              <span class="status-badge" :class="getStatusClass(agent.status)">{{ agent.status }}</span>
             </div>
-            <code>{{ agent.logic_module }}</code>
+            <div class="agent-meta">
+              <span class="meta-item">
+                <span class="meta-label">Quest:</span>
+                {{ getModuleDisplayName(agent.logic_module) }}
+              </span>
+              <span class="meta-item">
+                <span class="meta-label">Trigger:</span>
+                {{ TRIGGER_TYPE_INFO[agent.trigger_type]?.name || agent.trigger_type }}
+              </span>
+              <span v-if="agent.schedule_interval" class="meta-item">
+                <span class="meta-label">Every:</span>
+                {{ agent.schedule_interval }}
+              </span>
+            </div>
           </div>
-          <button class="danger" type="button" @click="deleteAgent(agent._id)">Delete</button>
+          <button class="danger" type="button" @click="deleteAgent(agent._id)" title="Dismiss this agent">
+            Dismiss
+          </button>
         </article>
       </div>
     </section>
@@ -325,159 +481,393 @@ onMounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 20px;
-  max-width: 960px;
+  max-width: 900px;
   margin: 0 auto;
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
 .card {
   border: 1px solid var(--border-color);
   background: var(--card-bg);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 20px;
 }
 
+/* Hero Section */
 .hero {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 90%, transparent), var(--card-bg));
+  text-align: center;
+  padding: 32px 24px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 85%, #4a90a4), var(--card-bg));
+  border-top: 3px solid #4a90a4;
 }
 
-h1,
-h2 {
-  margin: 0 0 10px;
+.hero-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
 }
 
-p {
-  margin: 0 0 10px;
+.hero h1 {
+  margin: 0 0 12px;
+  font-size: 1.8rem;
 }
 
-.muted {
-  opacity: 0.75;
+.hero-subtitle {
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.7;
+  opacity: 0.9;
 }
 
-ul {
+/* Guide Section */
+.guide-section h2 {
+  margin: 0 0 16px;
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.guide-item {
+  padding: 16px;
+  background: var(--input-bg);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.guide-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.guide-item h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.guide-item p {
   margin: 0;
-  padding-left: 18px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+  line-height: 1.5;
 }
 
+/* Templates */
 .template-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .template {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   text-align: left;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--input-bg);
   color: var(--input-text);
-  padding: 10px;
+  padding: 14px;
   cursor: pointer;
-  display: grid;
-  gap: 5px;
+  transition: border-color 0.2s, transform 0.1s;
 }
 
 .template:hover {
   border-color: var(--primary-color);
+  transform: translateY(-1px);
 }
 
-.template span {
-  font-size: 0.85rem;
-  opacity: 0.75;
+.template-icon {
+  font-size: 1.8rem;
+}
+
+.template-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-content strong {
+  font-size: 0.95rem;
+}
+
+.template-content span {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+/* Form Sections */
+h2 {
+  margin: 0 0 12px;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+.muted {
+  opacity: 0.7;
+}
+
+.userspace-section {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-section {
+  transition: opacity 0.2s;
+}
+
+.form-section.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 label {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label-text {
   font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.label-hint {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  font-weight: normal;
 }
 
 input,
 select,
 textarea {
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px;
+  border-radius: 8px;
+  padding: 10px 12px;
   background: var(--input-bg);
   color: var(--input-text);
   font: inherit;
+  font-size: 0.9rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
 }
 
 textarea {
   resize: vertical;
+  font-family: monospace;
+  font-size: 0.85rem;
 }
 
 .full-width {
-  margin-top: 12px;
+  grid-column: 1 / -1;
 }
 
+/* Info Box */
+.info-box {
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.info-box.subtle {
+  background: var(--input-bg);
+  border-color: var(--border-color);
+}
+
+.info-box strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.info-box p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.info-box .use-case {
+  margin-top: 8px;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Advanced Toggle */
+.toggle-advanced {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 0.85rem;
+}
+
+.toggle-advanced:hover {
+  opacity: 1;
+}
+
+.advanced-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-color);
+}
+
+/* Actions */
 .actions {
-  margin-top: 12px;
+  margin-top: 20px;
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 button {
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+button.primary {
   background: var(--primary-color);
   color: var(--bg-color);
-  cursor: pointer;
+  border-color: var(--primary-color);
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.secondary {
-  background: transparent;
-  color: var(--text-color);
-}
-
-.danger {
+button.danger {
   background: transparent;
   color: #d9534f;
+  border-color: #d9534f;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+button.danger:hover {
+  background: #d9534f;
+  color: white;
 }
 
 .error-text {
-  margin-top: 10px;
+  margin-top: 12px;
   color: #d9534f;
+  font-size: 0.9rem;
 }
 
 .success-text {
-  margin-top: 10px;
+  margin-top: 12px;
   color: #2d8a5f;
+  font-size: 0.9rem;
 }
 
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  opacity: 0.6;
+}
+
+/* Agent List */
 .agent-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .agent-item {
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 14px 16px;
   display: flex;
   justify-content: space-between;
-  gap: 12px;
   align-items: center;
+  gap: 16px;
+  background: var(--input-bg);
+}
+
+.agent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.agent-header strong {
+  font-size: 1rem;
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.status-active {
+  background: #166534;
+  color: white;
+}
+
+.status-paused {
+  background: #6c757d;
+  color: white;
+}
+
+.status-error {
+  background: #d9534f;
+  color: white;
 }
 
 .agent-meta {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
   opacity: 0.8;
-  font-size: 0.9rem;
-  margin: 4px 0;
+}
+
+.meta-item {
+  display: flex;
+  gap: 4px;
+}
+
+.meta-label {
+  opacity: 0.6;
 }
 </style>

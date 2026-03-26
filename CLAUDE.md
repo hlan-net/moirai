@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Moirai is a GenAI-native press review platform built on the Model Context Protocol (MCP). AI agents use MCP tools to aggregate RSS feeds, synthesize articles into Events, and track Trends — all within isolated userspaces (UUID-scoped). A Vue.js dashboard lets humans review the agent's work.
+Moirai is a GenAI-native press review platform built on the Model Context Protocol (MCP). The platform is named after the three Fates of Greek mythology — Clotho (who spins the thread of life), Lachesis (who measures it), and Atropos (who cuts it) — each corresponding to a layer of the platform:
+
+- **Clotho** → feeds and ingestion (the source of the thread)
+- **Lachesis** → issues (the act of measurement and meaning-making)
+- **Atropos** → agent execution (the decisive action upon the thread)
+
+**Userspace** is the distaff — the tool that holds the raw material (LLM credentials, data isolation) from which the thread is drawn. Everything meaningful happens within a userspace.
+
+**Issues are the central unit of meaning.** An issue defines its own evaluation cadence: when it should be re-evaluated, what articles are relevant, and how long it remains active. Articles flow into issues; agents act on issues; userspaces provide the capability. Rather than routing every article to every agent, each issue owns its own logic and schedule — making the system issue-centric rather than article-centric.
+
+AI agents use MCP tools to aggregate RSS feeds, synthesize articles into Issues (Events/Trends), and maintain them — all within isolated userspaces (UUID-scoped). A Vue.js dashboard lets humans review the agent's work. A public Mythology page exposes the platform's living structure to unauthenticated visitors using public issues.
 
 ## Architecture
 
@@ -16,7 +26,7 @@ Three main services:
 
 **Data storage:** CouchDB (databases: `feeds`, `articles`, `issues`/events/trends). Redis for caching (TTL 3600s, invalidated on ingestion/deletion).
 
-**Data model:** Userspace (UUID) → Feeds → Articles → Events → Trends. All MCP tools and API queries must filter by userspace.
+**Data model:** Userspace (UUID) → Feeds → Articles → Issues (longevity: transient=Events, temporal=Trends, epic=Epics). All MCP tools and API queries must filter by userspace. Issues carry a `public` boolean: public issues appear on the Mythology page without authentication.
 
 ## Build & Run Commands
 
@@ -145,14 +155,25 @@ The `AgentOrchestrator` runs in the MCP server as a daemon thread:
 - **SCHEDULED agents:** Checked every 60s (poll interval). Respects `last_run_at` and `schedule_interval`.
 - **ON_NEW_ARTICLE agents:** Dispatched via `_changes` feed longpoll on `articles` database. Each agent receives only articles from its own `userspace`. Sequence tracking persists across restarts.
 - **Errors:** On exception, agent is marked with `status: ERROR` and logged; `last_run_at` is updated before dispatch so failed runs still count.
+- **LLM config:** Resolved by the orchestrator via `resolve_llm_config(userspace)` before dispatch. Logic modules receive `llm_config` as a kwarg and must NOT re-resolve it themselves.
+
+### Agentic Philosophy
+
+**Agent = triggered activity with context.** An agent is defined by what triggers it (schedule or new articles), what context it operates on (an issue, a userspace), and what LLM capability it has access to (from the userspace). The agent is a bridge between an issue's evaluation cadence and the userspace's LLM capability.
+
+**Issue-centric cadence.** Each issue should define its own evaluation rhythm rather than being passively updated whenever any article arrives. The issue knows what it is tracking; the agent attached to it decides when and how to re-evaluate. This keeps logic close to meaning rather than scattering it across article-triggered callbacks.
+
+**Userspace as capability layer.** The userspace provides two things: LLM credentials (provider, model, API keys) and data isolation (all data is scoped by userspace UUID). It is the distaff — it does not itself produce meaning, but it holds the raw material from which meaning is spun.
 
 ### Adding Agent Logic
 Agent orchestration supports two trigger types: `SCHEDULED` (runs on interval) and `ON_NEW_ARTICLE` (runs when articles arrive).
 
 1. **Create logic function** in `tasks/agent_logic.py`:
-   - Signature: `def my_logic(agent_config: dict, mcp_client, new_articles: list[dict] = None, llm_config: dict = None) -> None`
+   - Signature: `def my_logic(agent_config: dict, mcp_client, new_articles: list[dict] = None, llm_config: dict = None, **kwargs) -> None`
+   - All functions must accept `**kwargs` to absorb unused keyword arguments
    - Add function name to `ALLOWED_LOGIC_MODULES` in `api/validation.py` (allowlist for security)
    - Use `mcp_client.call_tool()` to invoke MCP tools (must pass `userspace` from agent_config)
+   - Call `_call_llm(prompt, llm_config)` for LLM calls — do not instantiate providers directly
 
 2. **Configure agent** via admin UI or API:
    - Set `trigger_type` to `SCHEDULED` (with `schedule_interval` like `"1h"`, `"2d"`) or `ON_NEW_ARTICLE`

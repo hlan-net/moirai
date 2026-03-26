@@ -393,6 +393,7 @@ class IssueCreateRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=2000)
     article_links: list[str] = Field(..., min_length=1)
     longevity: str = Field("transient")
+    public: bool = Field(False, description="Whether this issue is visible on the public Mythology page")
 
     @field_validator("name", "description")
     @classmethod

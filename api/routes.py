@@ -52,8 +52,10 @@ ITERATION_INTERVAL_ENV = int(os.environ.get("ITERATION_INTERVAL", 600))
 
 # Constants for error messages
 ERROR_FEED_NOT_FOUND = "Feed not found"
+ERROR_ISSUE_NOT_FOUND = "Issue not found"
 ERROR_LIMIT_INTEGER = "limit must be an integer"
 ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
+DESIGN_DOC_PREFIX = "_design/"
 
 # Mongo Constants are now imported from api.db_constants
 
@@ -675,6 +677,7 @@ def create_issue():
         "premises": premises,
         "longevity": validated.longevity,
         "status": "active",
+        "public": validated.public,
         "born_at": datetime.now(timezone.utc).isoformat(),
         "passed_at": None,
         "type": "issue",
@@ -692,7 +695,7 @@ def create_issue():
 def get_issue(issue_id):
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
-        abort(404, description="Issue not found")
+        abort(404, description=ERROR_ISSUE_NOT_FOUND)
     return jsonify(issue)
 
 
@@ -728,6 +731,62 @@ def remove_issue_premise(issue_id):
     abort(500, description="Failed to update issue")
 
 
+@api_blueprint.route("/issues/<issue_id>", methods=["PATCH"])
+@admin_required
+def patch_issue(issue_id):
+    """Partial update for an issue — currently supports toggling `public`."""
+    data = request.json or {}
+    issue = fetch_from_couchdb("issues", issue_id)
+    if not issue:
+        abort(404, description=ERROR_ISSUE_NOT_FOUND)
+
+    updates = {}
+    if "public" in data:
+        updates["public"] = bool(data["public"])
+
+    if not updates:
+        return jsonify(issue)
+
+    if update_couchdb_doc_safe("issues", issue_id, updates):
+        updated = fetch_from_couchdb("issues", issue_id)
+        return jsonify(updated)
+    abort(500, description="Failed to update issue")
+
+
+@api_blueprint.route("/mythology", methods=["GET"])
+@limiter.limit("60 per minute")
+def get_mythology():
+    """Public endpoint returning platform stats and public issues for the Mythology page."""
+    feeds = fetch_from_couchdb("feeds") or []
+    articles = fetch_from_couchdb("articles") or []
+    all_issues = fetch_from_couchdb("issues") or []
+
+    public_issues = [
+        {
+            "_id": i["_id"],
+            "logos": i.get("logos", ""),
+            "description": i.get("description", ""),
+            "longevity": i.get("longevity", "transient"),
+            "status": i.get("status", "active"),
+            "born_at": i.get("born_at"),
+            "premises_count": len(i.get("premises", [])),
+        }
+        for i in all_issues
+        if i.get("public") and not i["_id"].startswith(DESIGN_DOC_PREFIX)
+    ]
+
+    return jsonify(
+        {
+            "stats": {
+                "feeds": len([f for f in feeds if not f["_id"].startswith(DESIGN_DOC_PREFIX)]),
+                "articles": len([a for a in articles if not a["_id"].startswith(DESIGN_DOC_PREFIX)]),
+                "issues": len([i for i in all_issues if not i["_id"].startswith(DESIGN_DOC_PREFIX)]),
+            },
+            "public_issues": public_issues,
+        }
+    )
+
+
 @api_blueprint.route("/issues/<issue_id>/share", methods=["POST"])
 @jwt_required
 @limiter.limit("10/minute")
@@ -735,7 +794,7 @@ def share_issue(issue_id: str):
     """Share an issue to a social platform (currently Bluesky)."""
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
-        abort(404, description="Issue not found")
+        abort(404, description=ERROR_ISSUE_NOT_FOUND)
 
     userspace_id = issue.get("userspace")
     if not userspace_id:

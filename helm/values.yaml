@@ -75,6 +75,16 @@ mcpServer:
     targetPort: 8090
     metricsPort: 9000
     metricsTargetPort: 9000
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 6
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
 
 mcpInspector:
   enabled: false

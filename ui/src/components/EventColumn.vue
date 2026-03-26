@@ -18,6 +18,7 @@ interface Issue {
   premises: Premise[]
   longevity: 'transient' | 'temporal' | 'epic'
   status: 'active' | 'eternal'
+  public?: boolean
 }
 
 const issues = ref<Issue[]>([])
@@ -106,6 +107,25 @@ const deleteIssue = async (id: string) => {
       expandedIssues.value.delete(id)
       if (filterStore.selectedIssueId === id) {
         filterStore.setSelectedIssueId(null)
+      }
+    }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const togglePublic = async (issue: Issue) => {
+  try {
+    const res = await authFetch(`/api/issues/${issue._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ public: !issue.public }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      const index = issues.value.findIndex((i) => i._id === issue._id)
+      if (index !== -1) {
+        issues.value[index] = updated
       }
     }
   } catch (error) {
@@ -214,14 +234,23 @@ onUnmounted(() => {
       >
         <div class="card-header">
           <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
-          <button
-            v-if="isAdmin"
-            @click="deleteIssue(issue._id)"
-            class="delete-btn"
-            title="Delete Event"
-          >
-            ×
-          </button>
+          <div v-if="isAdmin" class="card-actions">
+            <button
+              @click.stop="togglePublic(issue)"
+              class="public-btn"
+              :class="{ 'is-public': issue.public }"
+              :title="issue.public ? 'Public — click to make private' : 'Private — click to make public'"
+            >
+              {{ issue.public ? '🌐' : '🔒' }}
+            </button>
+            <button
+              @click.stop="deleteIssue(issue._id)"
+              class="delete-btn"
+              title="Delete Event"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <p v-if="issue.description" class="summary">{{ issue.description }}</p>
 
@@ -352,6 +381,29 @@ h3 {
 .status-tag.eternal {
     background: #6c757d;
     color: white;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.public-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.5;
+  line-height: 1;
+}
+.public-btn:hover {
+  opacity: 1;
+}
+.public-btn.is-public {
+  opacity: 1;
 }
 
 .delete-btn {
