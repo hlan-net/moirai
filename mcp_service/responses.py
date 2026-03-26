@@ -268,20 +268,24 @@ def wrap_legacy_response(legacy_response: str, correlation_id: Optional[str] = N
     """
     lower = legacy_response.lower()
     
-    # Error detection patterns
+    # Error detection patterns - check specific errors before generic "error" keyword
+    
+    # Check for duplicate/already exists (may not contain "error" keyword)
+    if "already exists" in lower or "duplicate" in lower:
+        return error(
+            error_code=MCPErrorCode.DUPLICATE_RESOURCE,
+            message=legacy_response,
+            retryable=False,
+            next_action=NextAction.REPLAN,
+            correlation_id=correlation_id,
+        )
+    
+    # Check for explicit "error" keyword
     if "error" in lower:
         if "not found" in lower or "denied" in lower:
             return not_found_error("resource", "unknown", correlation_id)
         elif "invalid" in lower or "validation" in lower:
             return validation_error(legacy_response, correlation_id)
-        elif "already exists" in lower or "duplicate" in lower:
-            return error(
-                error_code=MCPErrorCode.DUPLICATE_RESOURCE,
-                message=legacy_response,
-                retryable=False,
-                next_action=NextAction.REPLAN,
-                correlation_id=correlation_id,
-            )
         else:
             return internal_error(legacy_response, correlation_id)
     

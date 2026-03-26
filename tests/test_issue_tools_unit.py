@@ -31,7 +31,14 @@ def test_forge_issue_unit(mock_db):
             longevity="transient",
         )
     
-    assert "Issue forged with ID: issue_123" in result
+    # Check new standardized response format
+    assert isinstance(result, dict)
+    assert result["status"] == "success"
+    assert result["data"]["issue_id"] == "issue_123"
+    assert result["data"]["logos"] == "Test Logos"
+    assert result["data"]["longevity"] == "transient"
+    assert result["data"]["premises_count"] == 1
+    
     mock_db['store'].assert_called_once()
     args, _ = mock_db['store'].call_args
     assert args[0] == "issues"
@@ -92,8 +99,14 @@ def test_list_issues_unit(mock_db):
     with patch('mcp_service.core.ADMIN_PASSWORD', 'test_password'):
         result = list_issues(userspace=userspace)
     
-    assert "ID: issue_1" in result
-    assert "Logos: Logos 1" in result
+    # Check new standardized response format
+    assert isinstance(result, dict)
+    assert result["status"] == "success"
+    assert result["data"]["count"] == 1
+    assert result["data"]["issues"][0]["id"] == "issue_1"
+    assert result["data"]["issues"][0]["logos"] == "Logos 1"
+    assert result["data"]["issues"][0]["longevity"] == "transient"
+    
     mock_db['request'].assert_called_once()
     _, kwargs = mock_db['request'].call_args
     assert {"userspace": userspace} in kwargs['json_data']['selector']['$or']
