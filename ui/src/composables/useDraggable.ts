@@ -30,6 +30,11 @@ export function useDraggable(
     transform: `translate(${translateX.value}px, ${translateY.value}px)`,
   }))
 
+  // Drag threshold: minimum pixels moved before starting drag
+  // This allows clicks to work properly with Wacom pens and other pointer devices
+  const DRAG_THRESHOLD = 5
+
+  let pointerDown = false
   let dragging = false
   let startPointerX = 0
   let startPointerY = 0
@@ -38,21 +43,36 @@ export function useDraggable(
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return
-    dragging = true
+    
+    // Record pointer down but don't start dragging yet
+    pointerDown = true
+    dragging = false
     startPointerX = e.clientX
     startPointerY = e.clientY
     startTranslateX = translateX.value
     startTranslateY = translateY.value
+    
+    // Capture pointer but DON'T preventDefault yet - allow click events
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    e.preventDefault()
   }
 
   function onPointerMove(e: PointerEvent) {
-    if (!dragging || !targetRef.value) return
+    if (!pointerDown || !targetRef.value) return
 
-    const rect = targetRef.value.getBoundingClientRect()
     const dx = e.clientX - startPointerX
     const dy = e.clientY - startPointerY
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    // Only start dragging if moved beyond threshold
+    if (!dragging && distance > DRAG_THRESHOLD) {
+      dragging = true
+      // Now prevent default to stop text selection during drag
+      e.preventDefault()
+    }
+
+    if (!dragging) return
+
+    const rect = targetRef.value.getBoundingClientRect()
 
     // Compute the element's un-translated position
     const baseLeft = rect.left - translateX.value
@@ -72,8 +92,11 @@ export function useDraggable(
   }
 
   function onPointerUp(e: PointerEvent) {
-    if (!dragging) return
+    if (!pointerDown) return
+    
+    pointerDown = false
     dragging = false
+    
     ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
   }
 
