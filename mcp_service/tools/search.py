@@ -6,6 +6,12 @@ from ..core import mcp, auth_required, validate_userspace
 from ..db import db_request
 from api.db_constants import MONGO_REGEX, MONGO_OR
 from .userspace import build_userspace_selector, extract_userspace
+from ..responses import (
+    success,
+    validation_error,
+    transient_error,
+    internal_error,
+)
 
 # Database names
 ISSUES_DB = "issues"
@@ -125,16 +131,28 @@ def search_articles(
     date_from: str = "",
     date_to: str = "",
     limit: int = 50,
-) -> str:
+) -> dict:
     """
     Search articles by keyword across the shared global article corpus.
-
-    Notes:
-    - `userspace` is accepted for backward compatibility with older callers,
-      but it is intentionally ignored for article retrieval.
+    
+    Searches title, description, and content fields. Multi-word queries
+    match documents containing ALL terms (in any field, in any order).
+    
+    Args:
+        query: Search keywords (space-separated for AND logic)
+        userspace: Accepted for compatibility but ignored (articles are global)
+        date_from: Optional ISO 8601 date to filter from
+        date_to: Optional ISO 8601 date to filter to
+        limit: Max results to return (capped at 200)
+        
+    Returns:
+        Standardized MCPResponse as dict with:
+        - status: success/error
+        - data: {articles: [{id, title, link, published, feed_title, description}], count: int, query: str}
+        - error_code: canonical code on error
     """
     if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
+        return validation_error("Query cannot be empty").to_dict()
 
     limit = min(limit, 200)
 
@@ -165,7 +183,7 @@ def search_articles(
         if date_filter:
             filters.append(date_filter)
     except ValueError:
-        return json.dumps({"error": "Invalid date format provided."})
+        return validation_error("Invalid date format - use ISO 8601 (YYYY-MM-DD)").to_dict()
 
     try:
         selector = {"$and": filters} if len(filters) > 1 else filters[0]
@@ -192,23 +210,34 @@ def search_articles(
 
         resp = db_request("POST", ARTICLES_DB, "/_find", json_data=query_payload)
 
+        if resp.status_code >= 500:
+            return transient_error(
+                message=f"Database error searching articles: HTTP {resp.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+        
         if resp.status_code != 200:
-            return json.dumps({"error": f"Search failed: {resp.text}"})
+            return internal_error(
+                message=f"Search failed: {resp.text}"
+            ).to_dict()
 
         results = _process_article_docs(resp.json().get("docs", []))
 
-        return json.dumps(
-            {
-                "total": len(results),
+        return success(
+            data={
+                "articles": results,
+                "count": len(results),
                 "query": query,
-                "userspace": None,
-                "results": results,
+                "date_from": date_from if date_from else None,
+                "date_to": date_to if date_to else None,
             },
-            indent=2,
-        )
+            message=f"Found {len(results)} article(s) matching '{query}'",
+        ).to_dict()
 
     except Exception as e:
-        return json.dumps({"error": f"Search execution error: {str(e)}"})
+        return internal_error(
+            message=f"Search execution error: {str(e)}"
+        ).to_dict()
 
 
 @mcp.tool()

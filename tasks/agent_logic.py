@@ -17,6 +17,66 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _handle_mcp_response(result: Any, context: str) -> tuple[bool, Any]:
+    """
+    Handle MCP tool response (standardized dict or legacy string).
+    
+    Returns:
+        (success: bool, data: Any)
+        - success: True if operation succeeded, False on error
+        - data: The data payload from response, or None on error
+        
+    Logs errors and warnings as appropriate.
+    """
+    # New standardized response format (dict)
+    if isinstance(result, dict):
+        status = result.get("status")
+        
+        if status == "success":
+            return True, result.get("data")
+        
+        elif status == "error":
+            error_code = result.get("error_code", "UNKNOWN")
+            message = result.get("message", "No error message")
+            retryable = result.get("retryable", False)
+            next_action = result.get("next_action", "unknown")
+            
+            if retryable:
+                retry_after_ms = result.get("retry_after_ms", 1000)
+                logger.warning(
+                    "%s: Retryable error (%s) - %s (retry in %dms, action: %s)",
+                    context, error_code, message, retry_after_ms, next_action
+                )
+            else:
+                logger.error(
+                    "%s: Non-retryable error (%s) - %s (action: %s)",
+                    context, error_code, message, next_action
+                )
+            
+            return False, None
+        
+        elif status == "partial":
+            logger.warning("%s: Partial success - %s", context, result.get("message"))
+            return True, result.get("data")  # Treat partial as success for now
+        
+        else:
+            logger.error("%s: Unknown response status: %s", context, status)
+            return False, None
+    
+    # Legacy string response format
+    elif isinstance(result, str):
+        if "error" in result.lower():
+            logger.error("%s: %s", context, result)
+            return False, None
+        else:
+            logger.info("%s: %s", context, result)
+            return True, result
+    
+    else:
+        logger.error("%s: Unexpected response type: %s", context, type(result))
+        return False, None
+
 _OLLAMA_DEFAULT_ENDPOINT = "http://host.docker.internal:11434/v1"
 _WARN_MISSING_USERSPACE = "Agent '%s': missing userspace, skipping."
 
@@ -136,11 +196,22 @@ def create_event_from_articles(
             description=description,
             article_links=article_ids,
         )
-        # add_event returns a plain string: "Issue forged with ID: <id> ..."
-        if isinstance(result, str) and "forged with ID" in result:
-            logger.info("Agent '%s' (%s): %s", agent_name, userspace, result)
+        
+        success, data = _handle_mcp_response(result, f"Agent '{agent_name}' ({userspace}): add_event")
+        
+        if success:
+            # New format includes issue_id in data
+            if isinstance(data, dict) and "issue_id" in data:
+                logger.info(
+                    "Agent '%s' (%s): Event created - ID: %s, Name: '%s'",
+                    agent_name, userspace, data["issue_id"], data.get("logos", name)
+                )
+            else:
+                # Legacy string response
+                logger.info("Agent '%s' (%s): Event created successfully", agent_name, userspace)
         else:
-            logger.error("Agent '%s' (%s): add_event returned: %s", agent_name, userspace, result)
+            logger.error("Agent '%s' (%s): Failed to create event", agent_name, userspace)
+            
     except Exception as exc:
         logger.error("Agent '%s' (%s): add_event failed: %s", agent_name, userspace, exc)
 
@@ -182,13 +253,19 @@ def add_articles_to_event(
 
     # Fetch current event state
     event_result = mcp_client.call_tool("get_event", event_id=event_id, userspace=userspace)
-    if not isinstance(event_result, dict) or event_result.get("status") != "success":
+    
+    success, event_doc = _handle_mcp_response(event_result, f"Agent '{agent_name}' ({userspace}): get_event")
+    
+    if not success or not event_doc:
         logger.error(
-            "Agent '%s' (%s): could not fetch event %s: %s",
-            agent_name, userspace, event_id, event_result,
+            "Agent '%s' (%s): could not fetch event %s",
+            agent_name, userspace, event_id,
         )
         return
-    event_doc = event_result["event"]
+    
+    # Handle both new standardized format (dict data) and legacy format (dict with "event" key)
+    if isinstance(event_doc, dict) and "event" in event_doc:
+        event_doc = event_doc["event"]  # Legacy format
 
     existing_ids = {
         (p.get("id") if isinstance(p, dict) else p)
@@ -247,10 +324,17 @@ def _call_update_event(
             event_id=event_id,
             article_links=article_links,
         )
-        if isinstance(result, str) and "error" not in result.lower():
-            logger.info("Agent '%s' (%s): %s", agent_name, userspace, result)
+        
+        success, data = _handle_mcp_response(result, f"Agent '{agent_name}' ({userspace}): update_event")
+        
+        if success:
+            logger.info(
+                "Agent '%s' (%s): Event %s updated with %d article(s)",
+                agent_name, userspace, event_id, len(article_links)
+            )
         else:
-            logger.error("Agent '%s' (%s): update_event returned: %s", agent_name, userspace, result)
+            logger.error("Agent '%s' (%s): Failed to update event %s", agent_name, userspace, event_id)
+            
     except Exception as exc:
         logger.error("Agent '%s' (%s): update_event failed: %s", agent_name, userspace, exc)
 
@@ -295,14 +379,19 @@ def check_event_staleness(
         return
 
     event_result = mcp_client.call_tool("get_event", event_id=event_id, userspace=userspace)
-    if not isinstance(event_result, dict) or event_result.get("status") != "success":
+    
+    success, event_doc = _handle_mcp_response(event_result, f"Agent '{agent_name}' ({userspace}): get_event")
+    
+    if not success or not event_doc:
         logger.error(
-            "Agent '%s' (%s): could not fetch event %s: %s",
-            agent_name, userspace, event_id, event_result,
+            "Agent '%s' (%s): could not fetch event %s",
+            agent_name, userspace, event_id,
         )
         return
-
-    event_doc = event_result["event"]
+    
+    # Handle both new standardized format (dict data) and legacy format (dict with "event" key)
+    if isinstance(event_doc, dict) and "event" in event_doc:
+        event_doc = event_doc["event"]  # Legacy format
     last_activity_str = event_doc.get("updated_at") or event_doc.get("created_at")
     if not last_activity_str:
         logger.warning("Agent '%s' (%s): event %s has no activity timestamp.", agent_name, userspace, event_id)
@@ -333,7 +422,13 @@ def check_event_staleness(
             entity_id=event_id,
             is_stale=should_be_stale,
         )
-        if not (isinstance(result, dict) and result.get("status") == "success"):
-            logger.error("Agent '%s' (%s): mark_entity_stale returned: %s", agent_name, userspace, result)
+        
+        success, data = _handle_mcp_response(result, f"Agent '{agent_name}' ({userspace}): mark_entity_stale")
+        
+        if success:
+            logger.info("Agent '%s' (%s): Event %s marked as %s", agent_name, userspace, event_id, action)
+        else:
+            logger.error("Agent '%s' (%s): Failed to mark event %s as %s", agent_name, userspace, event_id, action)
+            
     except Exception as exc:
         logger.error("Agent '%s' (%s): mark_entity_stale failed: %s", agent_name, userspace, exc)
