@@ -46,13 +46,13 @@ test.describe('Mythology Page', () => {
     await expect(page.getByRole('heading', { name: 'The Titans' })).toBeVisible()
     await expect(page.getByText('Users').first()).toBeVisible()
 
-    // The Mortals - Agents
-    await expect(page.getByRole('heading', { name: 'The Mortals' })).toBeVisible()
-    await expect(page.getByText('Agents').first()).toBeVisible()
-
-    // The Quests - Issues
-    await expect(page.getByRole('heading', { name: 'The Quests' })).toBeVisible()
+    // The Zeitgeist - Issues
+    await expect(page.getByRole('heading', { name: 'The Zeitgeist' })).toBeVisible()
     await expect(page.getByText('Issues, Events, Trends')).toBeVisible()
+
+    // The Awareness - Agents
+    await expect(page.getByRole('heading', { name: 'The Awareness' })).toBeVisible()
+    await expect(page.getByText('Agents').first()).toBeVisible()
 
     // The Omens - Articles
     await expect(page.getByRole('heading', { name: 'The Omens' })).toBeVisible()
@@ -76,10 +76,10 @@ test.describe('Mythology Page', () => {
   })
 
   test('displays footer with Plato quote', async ({ page }) => {
-    await expect(
-      page.getByText('The spindle of Necessity turns', { exact: false })
-    ).toBeVisible()
-    await expect(page.getByText('Plato, Republic X')).toBeVisible()
+    // Check footer specifically to avoid matching body content
+    const footer = page.locator('footer.myth-footer')
+    await expect(footer.getByText('The spindle of Necessity turns', { exact: false })).toBeVisible()
+    await expect(footer.getByText('Plato, Republic X')).toBeVisible()
   })
 
   test('navigation link to Mythology works', async ({ page }) => {
