@@ -401,8 +401,8 @@ def seal_issue(
                 born = datetime.fromisoformat(born_at.replace("Z", "+00:00"))
                 passed = datetime.fromisoformat(passed_at.replace("Z", "+00:00"))
                 lifespan_days = (passed - born).days
-            except:
-                pass
+            except (ValueError, AttributeError):
+                pass  # Invalid date format - lifespan_days remains None
         
         return success(
             data={
