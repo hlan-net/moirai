@@ -1,8 +1,6 @@
-import json
 from datetime import datetime, timezone
 from ..core import mcp, auth_required, validate_userspace
 from ..db import store_doc, db_request, get_doc, update_doc, delete_doc
-from .constants import ERROR_ISSUE_NOT_FOUND_OR_DENIED
 from .userspace import build_userspace_selector, extract_userspace, with_userspace
 from ..responses import (
     success,
@@ -24,13 +22,15 @@ def _forge_issue_internal(
     userspace: str,
     longevity: str = "transient",
     public: bool = False,
-) -> str:
+) -> dict:
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     if longevity not in ["transient", "temporal", "epic"]:
-        return "Error: Invalid longevity scale. Use transient, temporal, or epic."
+        return validation_error(
+            "Invalid longevity scale. Use transient, temporal, or epic."
+        ).to_dict()
 
     issue_doc = {
         "logos": logos,
@@ -41,15 +41,26 @@ def _forge_issue_internal(
         "public": public,
         "born_at": datetime.now(timezone.utc).isoformat(),
         "passed_at": None,
-        "type": "issue"
+        "type": "issue",
     }
     with_userspace(issue_doc, userspace)
 
     try:
         doc_id = store_doc("issues", issue_doc)
-        return f"Issue forged with ID: {doc_id} in userspace {userspace} (Scale: {longevity})"
+        return success(
+            data={
+                "issue_id": doc_id,
+                "logos": logos,
+                "longevity": longevity,
+                "premises_count": len(premises),
+                "userspace": userspace,
+            },
+            message=f"Issue forged with ID: {doc_id} in userspace {userspace} (Scale: {longevity})",
+        ).to_dict()
     except Exception as e:
-        return f"Error forging issue: {e}"
+        return internal_error(
+            message=f"Error forging issue: {str(e)}"
+        ).to_dict()
 
 
 def _measure_issue_internal(
@@ -57,70 +68,98 @@ def _measure_issue_internal(
     userspace: str,
     longevity: str = None,
     description: str = None,
-    add_premises: list[dict] = None
-) -> str:
+    add_premises: list[dict] = None,
+) -> dict:
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     existing = get_doc("issues", issue_id)
     if not existing or extract_userspace(existing) != userspace:
-        return ERROR_ISSUE_NOT_FOUND_OR_DENIED
+        return not_found_error("issue", issue_id).to_dict()
 
     updates = {}
+    updated_fields = []
     if longevity:
         if longevity not in ["transient", "temporal", "epic"]:
-            return "Error: Invalid longevity scale."
+            return validation_error("Invalid longevity scale.").to_dict()
         updates["longevity"] = longevity
-    
+        updated_fields.append("longevity")
+
     if description:
         updates["description"] = description
-        
+        updated_fields.append("description")
+
     if add_premises:
         current_premises = existing.get("premises", [])
-        # Simple deduplication based on ID
         existing_ids = {p.get("id") for p in current_premises}
+        new_count = 0
         for p in add_premises:
             if p.get("id") not in existing_ids:
                 current_premises.append(p)
+                new_count += 1
         updates["premises"] = current_premises
+        if new_count > 0:
+            updated_fields.append(f"premises (+{new_count})")
 
-    success, msg = update_doc("issues", issue_id, updates)
-    if success:
-        return f"Issue {issue_id} measured and modulated successfully."
+    if not updates:
+        return validation_error(
+            "No updates specified - provide longevity, description, or add_premises"
+        ).to_dict()
+
+    ok, msg = update_doc("issues", issue_id, updates)
+    if ok:
+        return success(
+            data={
+                "issue_id": issue_id,
+                "updated_fields": updated_fields,
+                "longevity": updates.get("longevity", existing.get("longevity")),
+                "premises_count": len(
+                    updates.get("premises", existing.get("premises", []))
+                ),
+            },
+            message=f"Issue {issue_id} measured and modulated successfully.",
+        ).to_dict()
     else:
-        return f"Error measuring issue: {msg}"
+        return internal_error(
+            message=f"Error measuring issue: {msg}"
+        ).to_dict()
 
 
-def _seal_issue_internal(issue_id: str, userspace: str) -> str:
+def _seal_issue_internal(issue_id: str, userspace: str) -> dict:
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     existing = get_doc("issues", issue_id)
     if not existing or extract_userspace(existing) != userspace:
-        return ERROR_ISSUE_NOT_FOUND_OR_DENIED
+        return not_found_error("issue", issue_id).to_dict()
 
     updates = {
         "status": "eternal",
-        "passed_at": datetime.now(timezone.utc).isoformat()
+        "passed_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    success, msg = update_doc("issues", issue_id, updates)
-    if success:
-        return f"Issue {issue_id} sealed into Eternity."
+    ok, msg = update_doc("issues", issue_id, updates)
+    if ok:
+        return success(
+            data={"issue_id": issue_id, "status": "eternal"},
+            message=f"Issue {issue_id} sealed into Eternity.",
+        ).to_dict()
     else:
-        return f"Error sealing issue: {msg}"
+        return internal_error(
+            message=f"Error sealing issue: {msg}"
+        ).to_dict()
 
 
 def _list_issues_internal(
     userspace: str,
-    longevity: str = None, 
-    status: str = None
-) -> str:
+    longevity: str = None,
+    status: str = None,
+) -> dict:
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     selector = {"type": "issue", **build_userspace_selector(userspace)}
     if longevity:
@@ -128,51 +167,80 @@ def _list_issues_internal(
     if status:
         selector["status"] = status
 
-    res = db_request("POST", "issues", path="/_find", json_data={"selector": selector})
-
-    if res.status_code != 200:
-        return f"Error fetching issues: {res.text}"
-
-    docs = res.json().get("docs", [])
-    output = []
-    for doc in docs:
-        output.append(
-            f"ID: {doc['_id']}\nLogos: {doc.get('logos', 'Unnamed')}\nScale: {doc.get('longevity')}\nStatus: {doc.get('status')}\nPremises: {len(doc.get('premises', []))}\n"
+    try:
+        res = db_request(
+            "POST", "issues", path="/_find", json_data={"selector": selector}
         )
 
-    return (
-        "\n---\n".join(output)
-        if output
-        else f"No matching issues found in userspace {userspace}."
-    )
+        if res.status_code >= 500:
+            return transient_error(
+                message=f"Database error fetching issues: HTTP {res.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+
+        if res.status_code != 200:
+            return internal_error(
+                message=f"Error fetching issues: {res.text}"
+            ).to_dict()
+
+        docs = res.json().get("docs", [])
+        issues = []
+        for doc in docs:
+            issues.append(
+                {
+                    "id": doc["_id"],
+                    "logos": doc.get("logos", "Unnamed"),
+                    "longevity": doc.get("longevity"),
+                    "status": doc.get("status"),
+                    "premises_count": len(doc.get("premises", [])),
+                }
+            )
+
+        return success(
+            data={"issues": issues, "count": len(issues), "userspace": userspace},
+            message=f"Found {len(issues)} issue(s) in userspace {userspace}",
+        ).to_dict()
+
+    except Exception as e:
+        return internal_error(
+            message=f"Unexpected error listing issues: {str(e)}"
+        ).to_dict()
 
 
-def _read_issue_internal(issue_id: str, userspace: str) -> str:
+def _read_issue_internal(issue_id: str, userspace: str) -> dict:
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     doc = get_doc("issues", issue_id)
     if not doc or extract_userspace(doc) != userspace:
-        return ERROR_ISSUE_NOT_FOUND_OR_DENIED
+        return not_found_error("issue", issue_id).to_dict()
 
-    return json.dumps(doc, indent=2)
+    return success(
+        data=doc,
+        message=f"Retrieved issue '{doc.get('logos', issue_id)}'",
+    ).to_dict()
 
 
-def _delete_issue_internal(issue_id: str, userspace: str) -> str:
+def _delete_issue_internal(issue_id: str, userspace: str) -> dict:
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     existing = get_doc("issues", issue_id)
     if not existing or extract_userspace(existing) != userspace:
-        return ERROR_ISSUE_NOT_FOUND_OR_DENIED
+        return not_found_error("issue", issue_id).to_dict()
 
-    success, msg = delete_doc("issues", issue_id)
-    if success:
-        return f"Issue {issue_id} deleted successfully."
+    ok, msg = delete_doc("issues", issue_id)
+    if ok:
+        return success(
+            data={"issue_id": issue_id, "userspace": userspace},
+            message=f"Issue {issue_id} deleted successfully.",
+        ).to_dict()
     else:
-        return f"Error deleting issue: {msg}"
+        return internal_error(
+            message=f"Error deleting issue: {msg}"
+        ).to_dict()
 
 
 # --- Issues (Resonances) Tools ---
@@ -548,7 +616,7 @@ def read_issue(issue_id: str, userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def delete_issue(issue_id: str, userspace: str) -> str:
+def delete_issue(issue_id: str, userspace: str) -> dict:
     """Irreversibly remove an issue record."""
     return _delete_issue_internal(issue_id, userspace)
 
@@ -562,7 +630,7 @@ def add_event(
     description: str,
     article_links: list[str],
     userspace: str,
-) -> str:
+) -> dict:
     """
     (Alias for forge_issue) Create a new Event.
     """
@@ -572,7 +640,7 @@ def add_event(
 
 @mcp.tool()
 @auth_required
-def list_events(userspace: str) -> str:
+def list_events(userspace: str) -> dict:
     """
     (Alias for list_issues) List transient issues.
     """
@@ -581,7 +649,7 @@ def list_events(userspace: str) -> str:
 
 @mcp.tool()
 @auth_required
-def read_event(event_id: str, userspace: str) -> str:
+def read_event(event_id: str, userspace: str) -> dict:
     """
     (Alias for read_issue) Get details of a specific event.
     """
@@ -594,14 +662,7 @@ def get_event(event_id: str, userspace: str) -> dict:
     """
     (Alias for read_issue) Returns the event document as a dictionary.
     """
-    res = _read_issue_internal(event_id, userspace)
-    try:
-        data = json.loads(res)
-        if "error" in data:
-            return {"status": "error", "message": data["error"]}
-        return {"status": "success", "event": data}
-    except Exception:
-        return {"status": "error", "message": res}
+    return _read_issue_internal(event_id, userspace)
 
 
 @mcp.tool()
@@ -612,20 +673,22 @@ def update_event(
     name: str = None,
     description: str = None,
     article_links: list[str] = None,
-) -> str:
+) -> dict:
     """
     (Alias for measure_issue) Update an existing event.
     """
     add_premises = None
     if article_links:
         add_premises = [{"type": "message", "id": link} for link in article_links]
-    
-    return _measure_issue_internal(event_id, userspace, description=description, add_premises=add_premises)
+
+    return _measure_issue_internal(
+        event_id, userspace, description=description, add_premises=add_premises
+    )
 
 
 @mcp.tool()
 @auth_required
-def delete_event(event_id: str, userspace: str) -> str:
+def delete_event(event_id: str, userspace: str) -> dict:
     """
     (Alias for delete_issue) Delete an event.
     """
@@ -639,7 +702,7 @@ def add_trend(
     description: str,
     event_ids: list[str],
     userspace: str,
-) -> str:
+) -> dict:
     """
     (Alias for forge_issue) Create a new Trend.
     """
@@ -649,7 +712,7 @@ def add_trend(
 
 @mcp.tool()
 @auth_required
-def list_trends(userspace: str) -> str:
+def list_trends(userspace: str) -> dict:
     """
     (Alias for list_issues) List temporal issues.
     """
@@ -658,7 +721,7 @@ def list_trends(userspace: str) -> str:
 
 @mcp.tool()
 @auth_required
-def read_trend(trend_id: str, userspace: str) -> str:
+def read_trend(trend_id: str, userspace: str) -> dict:
     """
     (Alias for read_issue) Get details of a specific trend.
     """
@@ -671,14 +734,7 @@ def get_trend(trend_id: str, userspace: str) -> dict:
     """
     (Alias for read_issue) Returns the trend document as a dictionary.
     """
-    res = _read_issue_internal(trend_id, userspace)
-    try:
-        data = json.loads(res)
-        if "error" in data:
-            return {"status": "error", "message": data["error"]}
-        return {"status": "success", "trend": data}
-    except Exception:
-        return {"status": "error", "message": res}
+    return _read_issue_internal(trend_id, userspace)
 
 
 @mcp.tool()
@@ -689,20 +745,22 @@ def update_trend(
     name: str = None,
     description: str = None,
     event_ids: list[str] = None,
-) -> str:
+) -> dict:
     """
     (Alias for measure_issue) Update an existing trend.
     """
     add_premises = None
     if event_ids:
         add_premises = [{"type": "issue", "id": eid} for eid in event_ids]
-    
-    return _measure_issue_internal(trend_id, userspace, description=description, add_premises=add_premises)
+
+    return _measure_issue_internal(
+        trend_id, userspace, description=description, add_premises=add_premises
+    )
 
 
 @mcp.tool()
 @auth_required
-def delete_trend(trend_id: str, userspace: str) -> str:
+def delete_trend(trend_id: str, userspace: str) -> dict:
     """
     (Alias for delete_issue) Delete a trend.
     """

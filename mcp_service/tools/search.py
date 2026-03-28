@@ -1,4 +1,3 @@
-import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -11,6 +10,7 @@ from ..responses import (
     validation_error,
     transient_error,
     internal_error,
+    not_found_error,
 )
 
 # Database names
@@ -61,14 +61,14 @@ def _build_date_filter(date_from, date_to):
 
 def _search_issues_internal(
     query: str, userspace: str, longevity: Optional[str] = None, limit: int = 50
-) -> str:
+) -> dict:
     """Internal implementation of issue search."""
     if not query.strip():
-        return json.dumps({"error": "Query cannot be empty"})
+        return validation_error("Query cannot be empty").to_dict()
 
     valid, err = validate_userspace(userspace)
     if not valid:
-        return json.dumps({"error": err})
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     limit = min(limit, 100)
     safe_query = re.escape(query)
@@ -95,8 +95,16 @@ def _search_issues_internal(
 
         resp = db_request("POST", ISSUES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload)
 
+        if resp.status_code >= 500:
+            return transient_error(
+                message=f"Database error searching issues: HTTP {resp.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+
         if resp.status_code != 200:
-            return json.dumps({"error": f"Search failed: {resp.text}"})
+            return internal_error(
+                message=f"Search failed: {resp.text}"
+            ).to_dict()
 
         docs = resp.json().get("docs", [])
 
@@ -113,12 +121,15 @@ def _search_issues_internal(
                 }
             )
 
-        return json.dumps(
-            {"total": len(results), "query": query, "results": results}, indent=2
-        )
+        return success(
+            data={"results": results, "count": len(results), "query": query},
+            message=f"Found {len(results)} issue(s) matching '{query}'",
+        ).to_dict()
 
     except Exception as e:
-        return json.dumps({"error": f"Search execution error: {str(e)}"})
+        return internal_error(
+            message=f"Search execution error: {str(e)}"
+        ).to_dict()
 
 
 # ===== SEARCH TOOLS =====
@@ -244,13 +255,16 @@ def search_articles(
 @auth_required
 def get_recent_articles(
     userspace: Optional[str] = None, hours: int = 24, limit: int = 50
-) -> str:
+) -> dict:
     """
     Get most recent articles from the shared global article corpus.
 
     Notes:
     - `userspace` is accepted for backward compatibility with older callers,
       but it is intentionally ignored for article retrieval.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     hours = min(hours, 168)
     limit = min(limit, 200)
@@ -280,32 +294,44 @@ def get_recent_articles(
 
         resp = db_request("POST", ARTICLES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload)
 
+        if resp.status_code >= 500:
+            return transient_error(
+                message=f"Database error fetching recent articles: HTTP {resp.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+
         if resp.status_code != 200:
-            return json.dumps({"error": f"Fetch failed: {resp.text}"})
+            return internal_error(
+                message=f"Fetch failed: {resp.text}"
+            ).to_dict()
 
         results = _process_article_docs(resp.json().get("docs", []))
 
-        return json.dumps(
-            {
-                "total": len(results),
+        return success(
+            data={
+                "articles": results,
+                "count": len(results),
                 "hours": hours,
-                "userspace": None,
-                "results": results,
             },
-            indent=2,
-        )
+            message=f"Found {len(results)} article(s) from the last {hours} hours",
+        ).to_dict()
 
     except Exception as e:
-        return json.dumps({"error": f"Fetch execution error: {str(e)}"})
+        return internal_error(
+            message=f"Fetch execution error: {str(e)}"
+        ).to_dict()
 
 
 @mcp.tool()
 @auth_required
 def search_issues(
     query: str, userspace: str, longevity: Optional[str] = None, limit: int = 50
-) -> str:
+) -> dict:
     """
     Search Issues (Resonances) by keyword within a userspace.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     return _search_issues_internal(query, userspace, longevity, limit)
 
@@ -314,9 +340,12 @@ def search_issues(
 @auth_required
 def search_events(
     query: str, userspace: str, limit: int = 50
-) -> str:
+) -> dict:
     """
     (Alias for search_issues) Search events (transient issues) by keyword.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     return _search_issues_internal(query, userspace, longevity="transient", limit=limit)
 
@@ -325,8 +354,11 @@ def search_events(
 @auth_required
 def search_trends(
     query: str, userspace: str, limit: int = 20
-) -> str:
+) -> dict:
     """
     (Alias for search_issues) Search trends (temporal issues) by keyword.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     return _search_issues_internal(query, userspace, longevity="temporal", limit=limit)

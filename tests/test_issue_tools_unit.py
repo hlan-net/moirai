@@ -57,10 +57,14 @@ def test_add_event_alias_unit(mock_db):
             userspace=userspace,
         )
     
-    assert "Issue forged with ID: event_123" in result
+    assert isinstance(result, dict)
+    assert result["status"] == "success"
+    assert result["data"]["issue_id"] == "event_123"
+    assert result["data"]["logos"] == "Test Event"
+    assert result["data"]["longevity"] == "transient"
     mock_db['store'].assert_called_once()
     args, _ = mock_db['store'].call_args
-    assert args[0] == "issues" # Verify it uses issues DB
+    assert args[0] == "issues"  # Verify it uses issues DB
     assert args[1]["logos"] == "Test Event"
     assert args[1]["longevity"] == "transient"
     assert args[1]["premises"] == [{"type": "message", "id": "http://link1.com"}]
@@ -77,10 +81,14 @@ def test_add_trend_alias_unit(mock_db):
             userspace=userspace,
         )
     
-    assert "Issue forged with ID: trend_123" in result
+    assert isinstance(result, dict)
+    assert result["status"] == "success"
+    assert result["data"]["issue_id"] == "trend_123"
+    assert result["data"]["logos"] == "Test Trend"
+    assert result["data"]["longevity"] == "temporal"
     mock_db['store'].assert_called_once()
     args, _ = mock_db['store'].call_args
-    assert args[0] == "issues" # Verify it uses issues DB
+    assert args[0] == "issues"  # Verify it uses issues DB
     assert args[1]["logos"] == "Test Trend"
     assert args[1]["longevity"] == "temporal"
     assert args[1]["premises"] == [{"type": "issue", "id": "event_1"}]

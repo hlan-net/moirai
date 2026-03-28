@@ -6,11 +6,17 @@ Provides tools to:
 - get annotation statistics for a userspace
 """
 
-import json
 from ..core import mcp, auth_required, validate_userspace
 from ..db import db_request
 from .userspace import build_userspace_selector
 from tasks.annotator import annotate_article, store_annotation
+from ..responses import (
+    success,
+    validation_error,
+    not_found_error,
+    transient_error,
+    internal_error,
+)
 
 # Database name
 ARTICLES_DB = "articles"
@@ -18,63 +24,84 @@ ARTICLES_DB = "articles"
 
 @mcp.tool()
 @auth_required
-def reannotate_article(
-    article_id: str,
-    userspace: str) -> str:
+def reannotate_article(article_id: str, userspace: str) -> dict:
     """
     Re-run AI annotation on a specific article, overwriting any existing annotation.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
-        return json.dumps({"error": err})
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     if not article_id.strip():
-        return json.dumps({"error": "article_id cannot be empty"})
+        return validation_error("article_id cannot be empty").to_dict()
 
-    # Fetch the article
-    resp = db_request("GET", ARTICLES_DB, path=f"/{article_id}")
-    if resp.status_code == 404:
-        return json.dumps({"error": f"Article {article_id} not found"})
-    if resp.status_code != 200:
-        return json.dumps({"error": f"Failed to fetch article: {resp.text}"})
+    try:
+        # Fetch the article
+        resp = db_request("GET", ARTICLES_DB, path=f"/{article_id}")
+        if resp.status_code == 404:
+            return not_found_error("article", article_id).to_dict()
+        if resp.status_code >= 500:
+            return transient_error(
+                message=f"Database error fetching article: HTTP {resp.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+        if resp.status_code != 200:
+            return internal_error(
+                message=f"Failed to fetch article: {resp.text}"
+            ).to_dict()
 
-    doc = resp.json()
+        doc = resp.json()
 
-    title = doc.get("title", "")
-    summary = doc.get("summary", "") or doc.get("description", "")
+        title = doc.get("title", "")
+        summary = doc.get("summary", "") or doc.get("description", "")
 
-    if not title:
-        return json.dumps({"error": "Article has no title — cannot annotate"})
+        if not title:
+            return validation_error(
+                "Article has no title — cannot annotate"
+            ).to_dict()
 
-    annotation = annotate_article(title, summary)
-    if annotation is None:
-        return json.dumps({"error": "Annotation failed — LLM returned invalid result"})
+        annotation = annotate_article(title, summary)
+        if annotation is None:
+            return internal_error(
+                message="Annotation failed — LLM returned invalid result"
+            ).to_dict()
 
-    success = store_annotation(article_id, annotation)
-    if not success:
-        return json.dumps({"error": "Failed to store annotation in CouchDB"})
+        stored = store_annotation(article_id, annotation)
+        if not stored:
+            return transient_error(
+                message="Failed to store annotation in CouchDB",
+                retry_after_ms=2000,
+            ).to_dict()
 
-    return json.dumps(
-        {
-            "status": "ok",
-            "article_id": article_id,
-            "annotation": annotation,
-        },
-        indent=2,
-    )
+        return success(
+            data={
+                "article_id": article_id,
+                "annotation": annotation,
+            },
+            message=f"Article {article_id} re-annotated successfully",
+        ).to_dict()
+
+    except Exception as e:
+        return internal_error(
+            message=f"Annotation error: {str(e)}"
+        ).to_dict()
 
 
 @mcp.tool()
 @auth_required
-def list_unannotated_articles(
-    userspace: str,
-    limit: int = 50) -> str:
+def list_unannotated_articles(userspace: str, limit: int = 50) -> dict:
     """
     List articles in a userspace that have not yet been annotated by AI.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
-        return json.dumps({"error": err})
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     limit = min(limit, 200)
 
@@ -99,8 +126,16 @@ def list_unannotated_articles(
 
         resp = db_request("POST", ARTICLES_DB, "/_find", json_data=query_payload)
 
+        if resp.status_code >= 500:
+            return transient_error(
+                message=f"Database error querying articles: HTTP {resp.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+
         if resp.status_code != 200:
-            return json.dumps({"error": f"Query failed: {resp.text}"})
+            return internal_error(
+                message=f"Query failed: {resp.text}"
+            ).to_dict()
 
         docs = resp.json().get("docs", [])
         results = [
@@ -113,26 +148,34 @@ def list_unannotated_articles(
             for d in docs
         ]
 
-        return json.dumps(
-            {"total": len(results), "userspace": userspace, "results": results},
-            indent=2,
-        )
+        return success(
+            data={
+                "articles": results,
+                "count": len(results),
+                "userspace": userspace,
+            },
+            message=f"Found {len(results)} unannotated article(s)",
+        ).to_dict()
 
-    except (RuntimeError, ValueError, KeyError) as e:
-        return json.dumps({"error": f"Query execution error: {str(e)}"})
+    except Exception as e:
+        return internal_error(
+            message=f"Query execution error: {str(e)}"
+        ).to_dict()
 
 
 @mcp.tool()
 @auth_required
-def get_annotation_stats(
-    userspace: str) -> str:
+def get_annotation_stats(userspace: str) -> dict:
     """
     Get annotation statistics for a userspace: total articles, annotated count,
     and breakdowns by priority and sentiment.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
-        return json.dumps({"error": err})
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     try:
         # Count annotated articles
@@ -151,8 +194,16 @@ def get_annotation_stats(
             "POST", ARTICLES_DB, "/_find", json_data=annotated_payload
         )
 
+        if annotated_resp.status_code >= 500:
+            return transient_error(
+                message=f"Database error querying stats: HTTP {annotated_resp.status_code}",
+                retry_after_ms=2000,
+            ).to_dict()
+
         if annotated_resp.status_code != 200:
-            return json.dumps({"error": f"Query failed: {annotated_resp.text}"})
+            return internal_error(
+                message=f"Query failed: {annotated_resp.text}"
+            ).to_dict()
 
         annotated_docs = annotated_resp.json().get("docs", [])
         annotated_count = len(annotated_docs)
@@ -179,20 +230,24 @@ def get_annotation_stats(
                 topic_counts[t] = topic_counts.get(t, 0) + 1
 
         # Sort topics by count descending
-        top_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[
-            :20
-        ]
+        top_topics = sorted(
+            topic_counts.items(), key=lambda x: x[1], reverse=True
+        )[:20]
 
-        return json.dumps(
-            {
+        return success(
+            data={
                 "userspace": userspace,
                 "annotated_count": annotated_count,
                 "priority": priority_counts,
                 "sentiment": sentiment_counts,
-                "top_topics": [{"topic": t, "count": c} for t, c in top_topics],
+                "top_topics": [
+                    {"topic": t, "count": c} for t, c in top_topics
+                ],
             },
-            indent=2,
-        )
+            message=f"Annotation stats: {annotated_count} annotated articles",
+        ).to_dict()
 
-    except (RuntimeError, ValueError, KeyError) as e:
-        return json.dumps({"error": f"Stats execution error: {str(e)}"})
+    except Exception as e:
+        return internal_error(
+            message=f"Stats execution error: {str(e)}"
+        ).to_dict()

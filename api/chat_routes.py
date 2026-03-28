@@ -1014,8 +1014,14 @@ async def _execute_tool_calls(session, tool_calls, messages, userspace_id, trace
             logger.debug(f"Tool result (truncated): {result_text[:200]}...")
 
             result_is_error = bool(getattr(result, "isError", False))
-            if not result_is_error and result_text.strip().lower().startswith("error"):
-                result_is_error = True
+            if not result_is_error:
+                try:
+                    parsed = json.loads(result_text)
+                    if isinstance(parsed, dict) and parsed.get("status") == "error":
+                        result_is_error = True
+                except (json.JSONDecodeError, ValueError):
+                    if result_text.strip().lower().startswith("error"):
+                        result_is_error = True
 
             if result_is_error:
                 _record_tool_trace(

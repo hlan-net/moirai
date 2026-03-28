@@ -14,6 +14,12 @@ from mcp_service.core import mcp
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 
 from .userspace import extract_userspace
+from ..responses import (
+    success,
+    validation_error,
+    not_found_error,
+    internal_error,
+)
 
 # Database name for agent configurations
 AGENT_CONFIGS_DB = "agent_configs"
@@ -35,20 +41,9 @@ def add_agent_config(
 ) -> dict:
     """
     Adds a new agent configuration to monitor and act on data.
-    Args:
-        userspace: The userspace GUID where this agent can operate.
-        name: A descriptive name for the agent config.
-        trigger_type: How the agent is triggered ('on_new_article', 'scheduled').
-        target_db: The database the agent primarily monitors ('articles', 'issues', 'feeds').
-        logic_module: Reference to a Python module/function for agent logic (e.g., 'tasks.agent_logic.create_event').
-        owner_user_id: The GUID of the user that owns model credentials for this agent.
-        user_id: Deprecated alias for owner_user_id.
-        schedule_interval: (Optional) If trigger_type is 'scheduled', the interval (e.g., '1h', '1d', 'every 30m').
-        llm_model_config: (Optional) LLM specific configurations (model_name, provider).
-        parameters: (Optional) User-defined parameters for the agent logic.
-        linked_entity_id: (Optional) ID of a specific issue (event or trend) this agent is managing.
+
     Returns:
-        A dictionary representing the created agent configuration.
+        Standardized MCPResponse as dict.
     """
     try:
         resolved_owner_user_id = owner_user_id or user_id
@@ -71,15 +66,20 @@ def add_agent_config(
 
         validated_data = AgentConfigCreateRequest(**agent_config_data).model_dump()
     except ValidationError as e:
-        return {"status": "error", "message": str(e)}
+        return validation_error(str(e)).to_dict()
 
     agent_id = str(uuid.uuid4())
     doc = {"_id": agent_id, **validated_data}
 
     if update_couchdb_doc(AGENT_CONFIGS_DB, agent_id, doc):
-        return {"status": "success", "agent_config": doc}
+        return success(
+            data={"agent_config": doc},
+            message=f"Agent configuration '{name}' created with ID: {agent_id}",
+        ).to_dict()
     else:
-        return {"status": "error", "message": "Failed to add agent configuration."}
+        return internal_error(
+            message="Failed to add agent configuration."
+        ).to_dict()
 
 
 @mcp.tool(
@@ -88,20 +88,18 @@ def add_agent_config(
 def get_agent_config(agent_id: str, userspace: str) -> dict:
     """
     Retrieves a specific agent configuration.
-    Args:
-        agent_id: The GUID of the agent configuration.
-        userspace: Userspace GUID for scope enforcement.
+
     Returns:
-        A dictionary representing the agent configuration or an error message.
+        Standardized MCPResponse as dict.
     """
     config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
     if isinstance(config, dict) and extract_userspace(config) == userspace:
-        return {"status": "success", "agent_config": config}
+        return success(
+            data={"agent_config": config},
+            message=f"Retrieved agent configuration {agent_id}",
+        ).to_dict()
 
-    return {
-        "status": "error",
-        "message": f"Agent configuration {agent_id} not found.",
-    }
+    return not_found_error("agent_config", agent_id).to_dict()
 
 
 @mcp.tool(
@@ -111,11 +109,9 @@ def get_agent_config(agent_id: str, userspace: str) -> dict:
 def list_agent_configs(userspace: str, owner_user_id: Optional[str] = None) -> dict:
     """
     Lists all agent configurations in a userspace.
-    Args:
-        userspace: Required userspace to filter agent configurations.
-        owner_user_id: (Optional) Filter by owner user ID.
+
     Returns:
-        A list of dictionaries, each representing an agent configuration.
+        Standardized MCPResponse as dict.
     """
     userspace_selector: dict[str, Any] = {
         "$or": [{"userspace": userspace}, {"namespace": userspace}]
@@ -125,7 +121,10 @@ def list_agent_configs(userspace: str, owner_user_id: Optional[str] = None) -> d
         selector = {"$and": [userspace_selector, {"owner_user_id": owner_user_id}]}
 
     configs = query_couchdb(AGENT_CONFIGS_DB, selector=selector)
-    return {"status": "success", "agent_configs": configs}
+    return success(
+        data={"agent_configs": configs, "count": len(configs)},
+        message=f"Found {len(configs)} agent configuration(s)",
+    ).to_dict()
 
 
 @mcp.tool(
@@ -147,16 +146,16 @@ def update_agent_config(
 ) -> dict:
     """
     Updates an existing agent configuration.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     existing_config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
     if (
         not isinstance(existing_config, dict)
         or extract_userspace(existing_config) != userspace
     ):
-        return {
-            "status": "error",
-            "message": f"Agent configuration {agent_id} not found.",
-        }
+        return not_found_error("agent_config", agent_id).to_dict()
 
     update_data: dict[str, Any] = {}
     excluded_keys = {"agent_id", "existing_config", "update_data", "userspace"}
@@ -169,35 +168,42 @@ def update_agent_config(
             exclude_unset=True
         )
     except ValidationError as e:
-        return {"status": "error", "message": str(e)}
+        return validation_error(str(e)).to_dict()
 
     existing_config.update(validated_data)
 
     if update_couchdb_doc(AGENT_CONFIGS_DB, agent_id, existing_config):
-        return {"status": "success", "agent_config": existing_config}
+        return success(
+            data={"agent_config": existing_config},
+            message=f"Agent configuration {agent_id} updated",
+        ).to_dict()
     else:
-        return {"status": "error", "message": "Failed to update agent configuration."}
+        return internal_error(
+            message="Failed to update agent configuration."
+        ).to_dict()
 
 
 @mcp.tool(name="delete_agent_config", description="Deletes an agent configuration.")
 def delete_agent_config(agent_id: str, userspace: str) -> dict:
     """
     Deletes a specific agent configuration.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     config = fetch_from_couchdb(AGENT_CONFIGS_DB, agent_id)
     if not isinstance(config, dict) or extract_userspace(config) != userspace:
-        return {
-            "status": "error",
-            "message": f"Agent configuration {agent_id} not found.",
-        }
+        return not_found_error("agent_config", agent_id).to_dict()
 
     if delete_from_couchdb(AGENT_CONFIGS_DB, agent_id, config["_rev"]):
-        return {
-            "status": "success",
-            "message": f"Agent configuration {agent_id} deleted.",
-        }
+        return success(
+            data={"agent_id": agent_id},
+            message=f"Agent configuration {agent_id} deleted.",
+        ).to_dict()
     else:
-        return {"status": "error", "message": "Failed to delete agent configuration."}
+        return internal_error(
+            message="Failed to delete agent configuration."
+        ).to_dict()
 
 
 @mcp.tool(
@@ -205,4 +211,17 @@ def delete_agent_config(agent_id: str, userspace: str) -> dict:
     description="Migrates legacy agent configs to userspace + owner_user_id fields.",
 )
 def migrate_agent_configs_userspace() -> dict:
-    return migrate_legacy_agent_configs()
+    """
+    Migrates legacy agent configs.
+
+    Returns:
+        Standardized MCPResponse as dict.
+    """
+    result = migrate_legacy_agent_configs()
+    return success(
+        data={
+            "migrated": result.get("migrated", 0),
+            "skipped": result.get("skipped", 0),
+        },
+        message=f"Migration complete: {result.get('migrated', 0)} migrated, {result.get('skipped', 0)} skipped",
+    ).to_dict()
