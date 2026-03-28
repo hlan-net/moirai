@@ -128,6 +128,15 @@ class AgentConfigBase(BaseModel):
     linked_entity_id: Optional[str] = Field(
         None, description="ID of a specific event or trend this agent is managing"
     )
+    max_retries: int = Field(
+        3, ge=0, le=10, description="Max automatic retries for transient tool failures"
+    )
+    require_approval: bool = Field(
+        False, description="Require human approval before executing destructive tool calls"
+    )
+    approval_timeout_seconds: int = Field(
+        300, ge=30, le=3600, description="Seconds to wait for approval before timing out"
+    )
 
     @field_validator("schedule_interval")
     @classmethod
