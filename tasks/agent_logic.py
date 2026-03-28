@@ -81,8 +81,20 @@ _OLLAMA_DEFAULT_ENDPOINT = "http://host.docker.internal:11434/v1"
 _WARN_MISSING_USERSPACE = "Agent '%s': missing userspace, skipping."
 
 
-def _call_llm(prompt: str, llm_config: dict) -> Optional[str]:
-    """Call the configured LLM with a prompt and return the text response."""
+def _call_llm(
+    prompt: str,
+    llm_config: dict,
+    mcp_client: object = None,
+) -> Optional[str]:
+    """Call the configured LLM with a prompt and return the text response.
+
+    If *mcp_client* is a :class:`TracingMCPClient` (or any object exposing
+    ``session_logger`` / ``session_id`` attributes), the call is recorded as
+    an ``llm_call`` step for observability.
+    """
+    import time as _time
+    import uuid as _uuid
+    from datetime import datetime as _dt, timezone as _tz
     from api.llm.factory import LLMProviderFactory
 
     provider_name = llm_config.get("provider", "ollama")
@@ -98,6 +110,11 @@ def _call_llm(prompt: str, llm_config: dict) -> Optional[str]:
     ollama_base_url = llm_config.get("ollama_endpoint") or _OLLAMA_DEFAULT_ENDPOINT
     llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
 
+    # Resolve tracing handles (no-op if mcp_client is not a TracingMCPClient)
+    _session_logger = getattr(mcp_client, "session_logger", None)
+    _session_id = getattr(mcp_client, "session_id", None)
+
+    start = _time.monotonic()
     try:
         response = llm_provider.create_chat_completion(
             messages=[{"role": "user", "content": prompt}],
@@ -105,8 +122,42 @@ def _call_llm(prompt: str, llm_config: dict) -> Optional[str]:
             tools=None,
             tool_choice=None,
         )
-        return response.choices[0].message.content.strip()
+        text = response.choices[0].message.content.strip()
+
+        if _session_logger and _session_id:
+            latency_ms = int((_time.monotonic() - start) * 1000)
+            _session_logger.add_step(_session_id, {
+                "step_id": str(_uuid.uuid4()),
+                "step_type": "llm_call",
+                "tool_name": f"{provider_name}/{model}",
+                "input_summary": prompt[:500],
+                "output_summary": (text or "")[:500],
+                "status": "success",
+                "latency_ms": latency_ms,
+                "correlation_id": str(_uuid.uuid4()),
+                "attempt": 1,
+                "risk_level": "normal",
+                "timestamp": _dt.now(_tz.utc).isoformat(),
+            })
+
+        return text
     except Exception as exc:
+        if _session_logger and _session_id:
+            latency_ms = int((_time.monotonic() - start) * 1000)
+            _session_logger.add_step(_session_id, {
+                "step_id": str(_uuid.uuid4()),
+                "step_type": "llm_call",
+                "tool_name": f"{provider_name}/{model}",
+                "input_summary": prompt[:500],
+                "output_summary": "",
+                "status": "error",
+                "error_message": str(exc),
+                "latency_ms": latency_ms,
+                "correlation_id": str(_uuid.uuid4()),
+                "attempt": 1,
+                "risk_level": "normal",
+                "timestamp": _dt.now(_tz.utc).isoformat(),
+            })
         logger.error("LLM call failed: %s", exc)
         return None
 
@@ -174,7 +225,7 @@ def create_event_from_articles(
         "Reply with ONLY the JSON object, no other text."
     )
 
-    raw = _call_llm(prompt, llm_config)
+    raw = _call_llm(prompt, llm_config, mcp_client=mcp_client)
     decision = _parse_json_response(raw, f"Agent '{agent_name}'")
     if not decision or not decision.get("should_create"):
         logger.info("Agent '%s' (%s): LLM decided no new event needed.", agent_name, userspace)
@@ -263,10 +314,6 @@ def add_articles_to_event(
         )
         return
     
-    # Handle both new standardized format (dict data) and legacy format (dict with "event" key)
-    if isinstance(event_doc, dict) and "event" in event_doc:
-        event_doc = event_doc["event"]  # Legacy format
-
     existing_ids = {
         (p.get("id") if isinstance(p, dict) else p)
         for p in event_doc.get("premises", [])
@@ -296,7 +343,7 @@ def add_articles_to_event(
         '{"relevant_ids": []}'
     )
 
-    raw = _call_llm(prompt, llm_config)
+    raw = _call_llm(prompt, llm_config, mcp_client=mcp_client)
     decision = _parse_json_response(raw, f"Agent '{agent_name}'")
     if not decision:
         return
@@ -389,9 +436,6 @@ def check_event_staleness(
         )
         return
     
-    # Handle both new standardized format (dict data) and legacy format (dict with "event" key)
-    if isinstance(event_doc, dict) and "event" in event_doc:
-        event_doc = event_doc["event"]  # Legacy format
     last_activity_str = event_doc.get("updated_at") or event_doc.get("created_at")
     if not last_activity_str:
         logger.warning("Agent '%s' (%s): event %s has no activity timestamp.", agent_name, userspace, event_id)

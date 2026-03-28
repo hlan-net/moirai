@@ -34,6 +34,7 @@ SESSION_TYPE_CHAT = "chat"
 STATUS_RUNNING = "running"
 STATUS_SUCCESS = "success"
 STATUS_ERROR = "error"
+STATUS_CANCELLED = "cancelled"
 
 
 class SessionLogger:
@@ -126,6 +127,11 @@ class SessionLogger:
                     duration_ms = int((end_dt - start_dt).total_seconds() * 1000)
                 except ValueError:
                     logger.debug("finish_session: could not parse started_at timestamp, duration_ms will be None")
+            # Count step-level traces if available
+            try:
+                step_count = int(self._redis.llen(f"session:steps:{session_id}") or 0)
+            except (Exception, TypeError, ValueError):
+                step_count = 0
             doc.update(
                 {
                     "finished_at": now,
@@ -134,6 +140,7 @@ class SessionLogger:
                     "error": error,
                     "llm_calls": llm_calls,
                     "tool_calls": tool_calls,
+                    "step_count": step_count,
                 }
             )
             if articles_processed is not None:
@@ -152,6 +159,29 @@ class SessionLogger:
         except Exception:
             logger.exception("SessionLogger.get_session failed for %s", session_id)
             return None
+
+    def add_step(self, session_id: str, step: dict) -> None:
+        """Append a step trace to the session's step list in Redis."""
+        if not self._redis or not session_id:
+            return
+        try:
+            key = f"session:steps:{session_id}"
+            self._redis.rpush(key, json.dumps(step))
+            self._redis.expire(key, SESSION_TTL_SECONDS)
+        except Exception:
+            logger.exception("SessionLogger.add_step failed for %s", session_id)
+
+    def get_steps(self, session_id: str) -> list[dict]:
+        """Return all step traces for a session."""
+        if not self._redis or not session_id:
+            return []
+        try:
+            key = f"session:steps:{session_id}"
+            raws = self._redis.lrange(key, 0, -1)
+            return [json.loads(raw) for raw in raws] if raws else []
+        except Exception:
+            logger.exception("SessionLogger.get_steps failed for %s", session_id)
+            return []
 
     def list_sessions(
         self,

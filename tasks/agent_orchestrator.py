@@ -13,6 +13,7 @@ from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
 from api.userspace_ops import resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
+from tasks.tracing_mcp_client import TracingMCPClient
 
 logger = logging.getLogger(__name__)
 
@@ -460,15 +461,23 @@ class AgentOrchestrator(threading.Thread):
             trigger=trigger_type,
             resolved_llm={k: v for k, v in llm_config.items() if k not in ("openai_api_key", "gemini_api_key")},
             articles_count=articles_count,
-        ):
+        ) as counters:
             try:
                 module_name, func_name = logic_module_path.rsplit(".", 1)
                 module = importlib.import_module(module_name)
                 logic_function = getattr(module, func_name)
 
+                # Wrap with tracing client for step-level observability
+                tracing_client = TracingMCPClient(
+                    mcp_client=self.mcp_client,
+                    session_logger=self.session_logger,
+                    session_id=counters["session_id"],
+                    max_retries=agent_config.get("max_retries", 3),
+                )
+
                 # Pass agent config and other relevant data
                 logic_function(
-                    agent_config=agent_config, mcp_client=self.mcp_client, **kwargs
+                    agent_config=agent_config, mcp_client=tracing_client, **kwargs
                 )
 
                 # Update last_run_at using conflict-safe write
