@@ -6,8 +6,7 @@ and LLM call tracing integration.
 
 import json
 import os
-import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 os.environ.setdefault("ADMIN_PASSWORD", "test-password")
 
@@ -243,7 +242,7 @@ class TestTracingMCPClient:
             "retry_after_ms": 10,
         }
 
-        result = client.call_tool("read_feed")
+        client.call_tool("read_feed")
 
         assert mock_inner_client.call_tool.call_count == 1
 

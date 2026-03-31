@@ -14,7 +14,6 @@ import os
 # Set required env vars before any MCP imports
 os.environ.setdefault("ADMIN_PASSWORD", "test-password")  # noqa: S105
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 # Required envelope fields for all responses
