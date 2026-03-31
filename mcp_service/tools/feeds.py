@@ -3,7 +3,6 @@ import requests
 from datetime import datetime, timezone
 from ..core import mcp, auth_required, validate_userspace
 from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
-from .constants import ERROR_FEED_NOT_FOUND_OR_DENIED
 from .userspace import build_userspace_selector, extract_userspace, with_userspace
 from ..responses import (
     success,
@@ -179,32 +178,58 @@ def list_feeds(userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def delete_feed(feed_id: str, userspace: str) -> str:
+def delete_feed(feed_id: str, userspace: str) -> dict:
     """
     Remove a feed from a userspace.
 
     Args:
         feed_id: The ID of the feed to delete.
         userspace: GUID of the userspace.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
-    existing = get_doc("feeds", feed_id)
-    if not existing or extract_userspace(existing) != userspace:
-        return ERROR_FEED_NOT_FOUND_OR_DENIED
+    try:
+        existing = get_doc("feeds", feed_id)
+        if not existing or extract_userspace(existing) != userspace:
+            return not_found_error("feed", feed_id).to_dict()
 
-    success, msg = delete_doc("feeds", feed_id)
-    if success:
-        return f"Feed {feed_id} deleted successfully from userspace {userspace}."
-    else:
-        return f"Error deleting feed: {msg}"
+        ok, msg = delete_doc("feeds", feed_id)
+        if ok:
+            return success(
+                data={"feed_id": feed_id, "userspace": userspace},
+                message=f"Feed {feed_id} deleted successfully from userspace {userspace}",
+            ).to_dict()
+        else:
+            return internal_error(
+                message=f"Error deleting feed: {msg}"
+            ).to_dict()
+
+    except requests.exceptions.Timeout:
+        return transient_error(
+            message="Database operation timed out while deleting feed",
+            retry_after_ms=2000,
+        ).to_dict()
+
+    except requests.exceptions.ConnectionError:
+        return transient_error(
+            message="Failed to connect to database while deleting feed",
+            retry_after_ms=5000,
+        ).to_dict()
+
+    except Exception as e:
+        return internal_error(
+            message=f"Unexpected error deleting feed: {str(e)}"
+        ).to_dict()
 
 
 @mcp.tool()
 @auth_required
-def read_feed(url: str, userspace: str, limit: int = 20) -> str:
+def read_feed(url: str, userspace: str, limit: int = 20) -> dict:
     """
     Fetch and process articles from a specific RSS feed URL.
     This triggers a live fetch and returns the latest articles.
@@ -213,10 +238,13 @@ def read_feed(url: str, userspace: str, limit: int = 20) -> str:
         url: The RSS feed URL to fetch
         userspace: GUID of the userspace.
         limit: Max number of articles to return (default: 20)
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
     try:
         from tasks.article_processor import ArticleProcessor
@@ -225,42 +253,66 @@ def read_feed(url: str, userspace: str, limit: int = 20) -> str:
         response = requests.get(url, headers=headers, timeout=30)
 
         if response.status_code != 200:
-            return f"Failed to fetch feed: HTTP {response.status_code}"
+            return transient_error(
+                message=f"Failed to fetch feed: HTTP {response.status_code}",
+                retry_after_ms=5000,
+            ).to_dict()
 
         processor = ArticleProcessor()
 
         feed_title, articles = processor.process_feed(url, response.text)
 
-        # Store articles in background
+        # Store articles
         count = 0
         for article in articles:
-            article["userspace"] = userspace  # Force userspace injection
+            article["userspace"] = userspace
             processor.store_article(article)
             count += 1
 
-        # Return the latest few
         results = articles[:limit]
 
-        output = [
-            f"Feed: {feed_title}",
-            f"Processed {len(articles)} articles, stored {count} in userspace {userspace}.",
-        ]
-        for a in results:
-            output.append(
-                f"- {a['title']} ({a['link']}) [{a.get('language', 'unknown')}]"
-            )
+        return success(
+            data={
+                "feed_title": feed_title,
+                "articles": [
+                    {
+                        "title": a["title"],
+                        "link": a["link"],
+                        "language": a.get("language", "unknown"),
+                    }
+                    for a in results
+                ],
+                "total_processed": len(articles),
+                "stored_count": count,
+                "returned_count": len(results),
+                "userspace": userspace,
+            },
+            message=f"Processed {len(articles)} articles from '{feed_title}', stored {count} in userspace {userspace}",
+        ).to_dict()
 
-        return "\n".join(output)
+    except requests.exceptions.Timeout:
+        return transient_error(
+            message="Feed fetch timed out",
+            retry_after_ms=5000,
+        ).to_dict()
+
+    except requests.exceptions.ConnectionError:
+        return transient_error(
+            message=f"Failed to connect to feed URL: {url}",
+            retry_after_ms=5000,
+        ).to_dict()
 
     except Exception as e:
-        return f"Error reading feed: {e}"
+        return internal_error(
+            message=f"Error reading feed: {str(e)}"
+        ).to_dict()
 
 
 @mcp.tool()
 @auth_required
 def update_feed_category(
     feed_id: str, new_category: str, userspace: str
-) -> str:
+) -> dict:
     """
     Update the category of an existing feed.
 
@@ -268,17 +320,47 @@ def update_feed_category(
         feed_id: The ID of the feed to update.
         new_category: New category name.
         userspace: GUID of the userspace.
+
+    Returns:
+        Standardized MCPResponse as dict.
     """
     valid, err = validate_userspace(userspace)
     if not valid:
-        return err
+        return validation_error(f"Invalid userspace: {err}").to_dict()
 
-    existing = get_doc("feeds", feed_id)
-    if not existing or extract_userspace(existing) != userspace:
-        return ERROR_FEED_NOT_FOUND_OR_DENIED
+    try:
+        existing = get_doc("feeds", feed_id)
+        if not existing or extract_userspace(existing) != userspace:
+            return not_found_error("feed", feed_id).to_dict()
 
-    success, msg = update_doc("feeds", feed_id, {"category": new_category})
-    if success:
-        return f"Feed {feed_id} category updated to {new_category}."
-    else:
-        return f"Error updating feed: {msg}"
+        ok, msg = update_doc("feeds", feed_id, {"category": new_category})
+        if ok:
+            return success(
+                data={
+                    "feed_id": feed_id,
+                    "category": new_category,
+                    "userspace": userspace,
+                },
+                message=f"Feed {feed_id} category updated to '{new_category}'",
+            ).to_dict()
+        else:
+            return internal_error(
+                message=f"Error updating feed: {msg}"
+            ).to_dict()
+
+    except requests.exceptions.Timeout:
+        return transient_error(
+            message="Database operation timed out while updating feed category",
+            retry_after_ms=2000,
+        ).to_dict()
+
+    except requests.exceptions.ConnectionError:
+        return transient_error(
+            message="Failed to connect to database while updating feed category",
+            retry_after_ms=5000,
+        ).to_dict()
+
+    except Exception as e:
+        return internal_error(
+            message=f"Unexpected error updating feed category: {str(e)}"
+        ).to_dict()
