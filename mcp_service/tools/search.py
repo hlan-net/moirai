@@ -10,7 +10,6 @@ from ..responses import (
     validation_error,
     transient_error,
     internal_error,
-    not_found_error,
 )
 
 # Database names

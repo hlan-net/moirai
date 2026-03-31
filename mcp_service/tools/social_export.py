@@ -17,7 +17,6 @@ from ..responses import (
     validation_error,
     not_found_error,
     transient_error,
-    internal_error,
 )
 
 logger = logging.getLogger(__name__)

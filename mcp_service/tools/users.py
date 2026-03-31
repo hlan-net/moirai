@@ -5,7 +5,6 @@ from ..db import db_request, update_doc, delete_doc, store_doc
 from ..responses import (
     success,
     validation_error,
-    not_found_error,
     transient_error,
     internal_error,
     error,
