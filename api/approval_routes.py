@@ -61,31 +61,35 @@ def list_pending_approvals():
     if not request_ids:
         return jsonify([])
 
-    pending = []
-    for rid in request_ids:
-        if isinstance(rid, bytes):
-            rid = rid.decode("utf-8")
-        pending_key = f"{_APPROVAL_PENDING_PREFIX}{rid}"
-        decision_key = f"{_APPROVAL_DECISION_PREFIX}{rid}"
-        try:
-            data = redis_client.hgetall(pending_key)
-            if not data:
-                continue
-            # Skip already-decided requests
-            if redis_client.exists(decision_key):
-                continue
-            # Decode bytes keys/values
-            entry = {
-                (k.decode("utf-8") if isinstance(k, bytes) else k): (
-                    v.decode("utf-8") if isinstance(v, bytes) else v
-                )
-                for k, v in data.items()
-            }
-            pending.append(entry)
-        except Exception:
-            logger.exception("Failed to read approval request %s", rid)
-
+    pending = [
+        entry
+        for rid in request_ids
+        if (entry := _read_pending_request(redis_client, rid)) is not None
+    ]
     return jsonify(pending)
+
+
+def _read_pending_request(redis_client, rid) -> dict | None:
+    """Read a single pending approval request from Redis, or return None."""
+    if isinstance(rid, bytes):
+        rid = rid.decode("utf-8")
+    pending_key = f"{_APPROVAL_PENDING_PREFIX}{rid}"
+    decision_key = f"{_APPROVAL_DECISION_PREFIX}{rid}"
+    try:
+        data = redis_client.hgetall(pending_key)
+        if not data:
+            return None
+        if redis_client.exists(decision_key):
+            return None
+        return {
+            (k.decode("utf-8") if isinstance(k, bytes) else k): (
+                v.decode("utf-8") if isinstance(v, bytes) else v
+            )
+            for k, v in data.items()
+        }
+    except Exception:
+        logger.exception("Failed to read approval request")
+        return None
 
 
 @approval_blueprint.route("/approvals/<request_id>/approve", methods=["POST"])
@@ -112,7 +116,7 @@ def _decide(request_id: str, decision: str):
     try:
         data = redis_client.hgetall(pending_key)
     except Exception:
-        logger.exception("Failed to read approval request %s", request_id)
+        logger.exception("Failed to read approval request")
         abort(500, description="Failed to read approval request")
 
     if not data:
@@ -128,11 +132,6 @@ def _decide(request_id: str, decision: str):
     decision_key = f"{_APPROVAL_DECISION_PREFIX}{request_id}"
     redis_client.set(decision_key, decision, ex=_APPROVAL_TTL)
 
-    logger.info(
-        "Approval decision '%s' for request %s by user %s",
-        decision,
-        request_id,
-        getattr(g, "user_id", "unknown"),
-    )
+    logger.info("Approval decision recorded")
 
     return jsonify({"request_id": request_id, "decision": decision})

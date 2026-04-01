@@ -11,6 +11,8 @@ from api.userspace_ops import get_userspace
 logger = logging.getLogger(__name__)
 
 _ADMIN_ROLE = "admin"
+_ACCESS_DENIED = "Access denied"
+_SESSION_NOT_FOUND = "Session not found"
 
 session_blueprint = Blueprint("sessions", __name__)
 
@@ -37,7 +39,7 @@ def list_sessions():
     userspace = request.args.get("userspace")
     if userspace:
         if not _user_owns_userspace(userspace):
-            abort(403, description="Access denied")
+            abort(403, description=_ACCESS_DENIED)
     elif g.user_role != _ADMIN_ROLE:
         abort(400, description="'userspace' parameter is required")
 
@@ -59,11 +61,11 @@ def get_session(session_id: str):
     sl = get_session_logger()
     session = sl.get_session(session_id)
     if not session:
-        abort(404, description="Session not found")
+        abort(404, description=_SESSION_NOT_FOUND)
 
     userspace = session.get("userspace")
     if userspace and not _user_owns_userspace(userspace):
-        abort(403, description="Access denied")
+        abort(403, description=_ACCESS_DENIED)
 
     return jsonify(session)
 
@@ -75,11 +77,11 @@ def get_session_steps(session_id: str):
     sl = get_session_logger()
     session = sl.get_session(session_id)
     if not session:
-        abort(404, description="Session not found")
+        abort(404, description=_SESSION_NOT_FOUND)
 
     userspace = session.get("userspace")
     if userspace and not _user_owns_userspace(userspace):
-        abort(403, description="Access denied")
+        abort(403, description=_ACCESS_DENIED)
 
     steps = sl.get_steps(session_id)
     return jsonify(steps)
@@ -92,11 +94,11 @@ def cancel_session(session_id: str):
     sl = get_session_logger()
     session = sl.get_session(session_id)
     if not session:
-        abort(404, description="Session not found")
+        abort(404, description=_SESSION_NOT_FOUND)
 
     userspace = session.get("userspace")
     if userspace and not _user_owns_userspace(userspace):
-        abort(403, description="Access denied")
+        abort(403, description=_ACCESS_DENIED)
 
     if session.get("status") != "running":
         abort(409, description="Session is not running")
@@ -108,5 +110,5 @@ def cancel_session(session_id: str):
     cancel_key = f"session:cancel:{session_id}"
     redis_client.set(cancel_key, "1", ex=600)
 
-    logger.info("Session %s cancel requested by user %s", session_id, getattr(g, "user_id", "unknown"))
+    logger.info("Session cancel requested")
     return jsonify({"session_id": session_id, "status": "cancel_requested"})

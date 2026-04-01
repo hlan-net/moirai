@@ -279,7 +279,7 @@ class TestSessionContextCancellation:
         return mock_redis, pipe, stored
 
     def test_cancelled_exception_sets_cancelled_status(self):
-        mock_redis, pipe, stored = self._setup_redis_for_session()
+        mock_redis, pipe, _ = self._setup_redis_for_session()
         sl = SessionLogger(mock_redis)
 
         with pytest.raises(AgentCancelledException):
@@ -296,7 +296,7 @@ class TestSessionContextCancellation:
         assert last_doc["status"] == STATUS_CANCELLED
 
     def test_regular_exception_sets_error_status(self):
-        mock_redis, pipe, stored = self._setup_redis_for_session()
+        mock_redis, pipe, _ = self._setup_redis_for_session()
         sl = SessionLogger(mock_redis)
 
         with pytest.raises(ValueError):

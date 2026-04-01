@@ -52,7 +52,7 @@ csrf.exempt(chat_blueprint)
 csrf.exempt(mcp_blueprint)
 csrf.exempt(agent_blueprint)
 csrf.exempt(session_blueprint)
-csrf.exempt(approval_blueprint)  # NOSONAR (python:S4502) — JWT Bearer auth, not cookies
+csrf.exempt(approval_blueprint)  # NOSONAR
 
 if (
     is_test_mode 
