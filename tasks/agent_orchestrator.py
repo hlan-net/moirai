@@ -13,7 +13,7 @@ from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
 from api.userspace_ops import resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
-from tasks.tracing_mcp_client import TracingMCPClient
+from tasks.tracing_mcp_client import TracingMCPClient, AgentCancelledException
 
 logger = logging.getLogger(__name__)
 
@@ -472,7 +472,12 @@ class AgentOrchestrator(threading.Thread):
                     mcp_client=self.mcp_client,
                     session_logger=self.session_logger,
                     session_id=counters["session_id"],
+                    redis_client=self.redis_client,
                     max_retries=agent_config.get("max_retries", 3),
+                    require_approval=agent_config.get("require_approval", False),
+                    approval_timeout=agent_config.get("approval_timeout_seconds", 300),
+                    userspace=userspace,
+                    agent_name=agent_config.get("name") or logic_module_path,
                 )
 
                 # Pass agent config and other relevant data
@@ -487,6 +492,13 @@ class AgentOrchestrator(threading.Thread):
                     {"last_run_at": datetime.now(timezone.utc).isoformat()},
                 )
 
+            except AgentCancelledException:
+                logger.info(
+                    "Agent %s cancelled by operator during session %s.",
+                    agent_config.get("_id"),
+                    counters["session_id"],
+                )
+                raise
             except Exception as e:
                 logger.error(
                     f"Failed to execute logic for agent {agent_config.get('_id')} from {logic_module_path}: {e}"

@@ -1,12 +1,18 @@
 """REST API for session logs (agent runs and chat turns)."""
 
+import logging
+
 from flask import Blueprint, abort, g, jsonify, request
 
 from api.auth import jwt_required
-from api.extensions import get_session_logger
+from api.extensions import get_redis_client, get_session_logger
 from api.userspace_ops import get_userspace
 
+logger = logging.getLogger(__name__)
+
 _ADMIN_ROLE = "admin"
+_ACCESS_DENIED = "Access denied"
+_SESSION_NOT_FOUND = "Session not found"
 
 session_blueprint = Blueprint("sessions", __name__)
 
@@ -33,7 +39,7 @@ def list_sessions():
     userspace = request.args.get("userspace")
     if userspace:
         if not _user_owns_userspace(userspace):
-            abort(403, description="Access denied")
+            abort(403, description=_ACCESS_DENIED)
     elif g.user_role != _ADMIN_ROLE:
         abort(400, description="'userspace' parameter is required")
 
@@ -43,8 +49,8 @@ def list_sessions():
     except ValueError:
         abort(400, description="limit and offset must be integers")
 
-    logger = get_session_logger()
-    sessions = logger.list_sessions(userspace=userspace, limit=limit, offset=offset)
+    sl = get_session_logger()
+    sessions = sl.list_sessions(userspace=userspace, limit=limit, offset=offset)
     return jsonify(sessions)
 
 
@@ -52,13 +58,57 @@ def list_sessions():
 @jwt_required
 def get_session(session_id: str):
     """Fetch a single session log by ID."""
-    logger = get_session_logger()
-    session = logger.get_session(session_id)
+    sl = get_session_logger()
+    session = sl.get_session(session_id)
     if not session:
-        abort(404, description="Session not found")
+        abort(404, description=_SESSION_NOT_FOUND)
 
     userspace = session.get("userspace")
     if userspace and not _user_owns_userspace(userspace):
-        abort(403, description="Access denied")
+        abort(403, description=_ACCESS_DENIED)
 
     return jsonify(session)
+
+
+@session_blueprint.route("/sessions/<session_id>/steps", methods=["GET"])
+@jwt_required
+def get_session_steps(session_id: str):
+    """Return step-level traces for a session."""
+    sl = get_session_logger()
+    session = sl.get_session(session_id)
+    if not session:
+        abort(404, description=_SESSION_NOT_FOUND)
+
+    userspace = session.get("userspace")
+    if userspace and not _user_owns_userspace(userspace):
+        abort(403, description=_ACCESS_DENIED)
+
+    steps = sl.get_steps(session_id)
+    return jsonify(steps)
+
+
+@session_blueprint.route("/sessions/<session_id>/cancel", methods=["POST"])
+@jwt_required
+def cancel_session(session_id: str):
+    """Request cancellation of a running agent session."""
+    sl = get_session_logger()
+    session = sl.get_session(session_id)
+    if not session:
+        abort(404, description=_SESSION_NOT_FOUND)
+
+    userspace = session.get("userspace")
+    if userspace and not _user_owns_userspace(userspace):
+        abort(403, description=_ACCESS_DENIED)
+
+    if session.get("status") != "running":
+        abort(409, description="Session is not running")
+
+    redis_client = get_redis_client()
+    if not redis_client:
+        abort(503, description="Redis unavailable")
+
+    cancel_key = f"session:cancel:{session_id}"
+    redis_client.set(cancel_key, "1", ex=600)
+
+    logger.info("Session cancel requested")
+    return jsonify({"session_id": session_id, "status": "cancel_requested"})

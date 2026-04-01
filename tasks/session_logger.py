@@ -249,7 +249,10 @@ class SessionLogger:
         try:
             yield counters
         except Exception as exc:
-            status = STATUS_ERROR
+            if type(exc).__name__ == "AgentCancelledException":
+                status = STATUS_CANCELLED
+            else:
+                status = STATUS_ERROR
             error_msg = str(exc)
             raise
         finally:
