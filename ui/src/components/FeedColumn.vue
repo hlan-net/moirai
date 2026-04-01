@@ -45,7 +45,6 @@ const isAdmin = computed(() => authStore.user?.role === 'admin')
 // Refs for modal accessibility
 const modalContentRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
 const previousActiveElement = ref<HTMLElement | null>(null)
 
 // Extract and validate URLs from text
