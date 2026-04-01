@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Tools whose execution has side-effects that are difficult or impossible to
 # reverse.  Used to tag steps with ``risk_level = "destructive"`` and to gate
 # execution behind the approval workflow when ``require_approval`` is enabled.
-DESTRUCTIVE_TOOLS: set[str] = frozenset(
+DESTRUCTIVE_TOOLS: frozenset[str] = frozenset(
     {
         "delete_issue",
         "delete_event",
@@ -214,6 +214,36 @@ class TracingMCPClient:
         return "timeout"
 
     # ------------------------------------------------------------------
+    # Approval rejection helpers
+    # ------------------------------------------------------------------
+
+    def _record_rejection(
+        self, tool_name: str, kwargs: dict, error_code: str, message: str,
+    ) -> dict:
+        """Record a denied/timeout step and return an error MCPResponse."""
+        step = {
+            "step_id": str(uuid.uuid4()),
+            "step_type": "tool_call",
+            "tool_name": tool_name,
+            "input_summary": _truncate(str(kwargs)),
+            "status": "denied",
+            "risk_level": "destructive",
+            "error_code": error_code,
+            "error_message": message,
+            "correlation_id": str(uuid.uuid4()),
+            "attempt": 0,
+            "latency_ms": 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self._session_logger.add_step(self._session_id, step)
+        return {
+            "status": "error",
+            "error_code": error_code,
+            "message": message,
+            "retryable": False,
+        }
+
+    # ------------------------------------------------------------------
     # Proxied call_tool with tracing + approval + retry
     # ------------------------------------------------------------------
 
@@ -225,56 +255,19 @@ class TracingMCPClient:
         risk_level = "destructive" if tool_name in DESTRUCTIVE_TOOLS else "normal"
 
         # Approval gate for destructive tools
-        if (
-            self._require_approval
-            and risk_level == "destructive"
-            and self._redis
-        ):
+        if self._require_approval and risk_level == "destructive" and self._redis:
             decision = self._request_approval(tool_name, kwargs)
             if decision == "denied":
-                step = {
-                    "step_id": str(uuid.uuid4()),
-                    "step_type": "tool_call",
-                    "tool_name": tool_name,
-                    "input_summary": _truncate(str(kwargs)),
-                    "status": "denied",
-                    "risk_level": "destructive",
-                    "error_code": "APPROVAL_DENIED",
-                    "error_message": "Destructive action denied by operator",
-                    "correlation_id": str(uuid.uuid4()),
-                    "attempt": 0,
-                    "latency_ms": 0,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-                self._session_logger.add_step(self._session_id, step)
-                return {
-                    "status": "error",
-                    "error_code": "APPROVAL_DENIED",
-                    "message": "Destructive action denied by operator",
-                    "retryable": False,
-                }
-            elif decision == "timeout":
-                step = {
-                    "step_id": str(uuid.uuid4()),
-                    "step_type": "tool_call",
-                    "tool_name": tool_name,
-                    "input_summary": _truncate(str(kwargs)),
-                    "status": "denied",
-                    "risk_level": "destructive",
-                    "error_code": "APPROVAL_TIMEOUT",
-                    "error_message": f"No approval received within {self._approval_timeout}s",
-                    "correlation_id": str(uuid.uuid4()),
-                    "attempt": 0,
-                    "latency_ms": 0,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-                self._session_logger.add_step(self._session_id, step)
-                return {
-                    "status": "error",
-                    "error_code": "APPROVAL_TIMEOUT",
-                    "message": f"No approval received within {self._approval_timeout}s",
-                    "retryable": False,
-                }
+                return self._record_rejection(
+                    tool_name, kwargs,
+                    "APPROVAL_DENIED", "Destructive action denied by operator",
+                )
+            if decision == "timeout":
+                return self._record_rejection(
+                    tool_name, kwargs,
+                    "APPROVAL_TIMEOUT",
+                    f"No approval received within {self._approval_timeout}s",
+                )
             # "approved" — fall through to execute
 
         last_result = None
