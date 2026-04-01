@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed, useTemplateRef } from 'vue'
 import { type Article } from '../utils/articleCache'
 import { authFetch } from '../utils/authFetch'
 import { useTheme } from '../composables/useTheme'
@@ -21,7 +21,7 @@ const expandedArticles = ref<Set<string>>(new Set())
 const isHighDensity = ref(true)
 const groupMode = ref<GroupMode>('feed')
 const newArticleCount = ref(0)
-const streamContainer = ref<HTMLElement | null>(null)
+const streamContainer = useTemplateRef<HTMLElement>('streamContainer')
 const { resolveTheme, setTheme } = useTheme()
 const authStore = useAuthStore()
 const isAuthenticated = computed(() => authStore.isAuthenticated)

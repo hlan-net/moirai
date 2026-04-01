@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch, nextTick } from 'vue'
+import { onMounted, ref, computed, watch, nextTick, useTemplateRef } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter' // Import the new filter store
@@ -45,7 +45,7 @@ const isAdmin = computed(() => authStore.user?.role === 'admin')
 // Refs for modal accessibility
 const modalContentRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const fileInputRef = useTemplateRef<HTMLInputElement>('fileInputRef')
 const previousActiveElement = ref<HTMLElement | null>(null)
 
 // Extract and validate URLs from text
