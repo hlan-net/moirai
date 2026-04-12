@@ -29,11 +29,13 @@ class GeminiProvider(LLMProvider):
 
     def create_chat_completion(self, messages, model, tools, tool_choice):
         # 1. Setup Config
-        system_instruction = None
-        # Extract system prompt if present
-        if messages and messages[0]["role"] == "system":
-            system_instruction = messages[0]["content"]
+        # Collect ALL leading system messages and combine into one system_instruction.
+        # The agent pipeline may insert multiple system messages (main prompt + context preamble).
+        system_parts = []
+        while messages and messages[0]["role"] == "system":
+            system_parts.append(messages[0]["content"])
             messages = messages[1:]
+        system_instruction = "\n\n".join(system_parts) if system_parts else None
 
         gemini_tools = self._convert_tools(tools)
         
