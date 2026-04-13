@@ -466,8 +466,10 @@ const downloadChat = async () => {
   const disposition = response.headers.get('Content-Disposition') ?? ''
   const match = disposition.match(/filename="?([^";]+)"?/)
   link.download = match?.[1] ?? 'chat.md'
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  document.body.removeChild(link)
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 100)
 }
 
 const copyChat = async () => {
@@ -479,7 +481,17 @@ const copyChat = async () => {
       return
     }
     const markdown = await response.text()
-    await navigator.clipboard.writeText(markdown)
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(markdown)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = markdown
+      textarea.style.cssText = 'position:fixed;opacity:0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
     copyStatus.value = 'Copied'
   } catch (error) {
     console.error('Failed to copy chat export:', error)
