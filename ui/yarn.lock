@@ -939,15 +939,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dompurify@npm:^3.3.3":
-  version: 3.3.3
-  resolution: "dompurify@npm:3.3.3"
+"dompurify@npm:^3.4.0":
+  version: 3.4.0
+  resolution: "dompurify@npm:3.4.0"
   dependencies:
-    "@types/trusted-types": "npm:^2.0.7"
+    "@types/trusted-types": ^2.0.7
   dependenciesMeta:
     "@types/trusted-types":
       optional: true
-  checksum: 097c14a21a3f6cb95beded9ecd255f7c3512c42767b048390c747b0fe35736f6a71e02320fc50a9ac2be645834b463e4760915d595d502a56452daf339d0ea9c
+  checksum: 8/8c4286d3d379c6133ff2951d73d946974ef079f5d651d66cf90c1a6e57d8d2d304e7bc18280d27c38835200bbe03877fd93fb22f9f1fb9e086d68ffcd2d5dd16
   languageName: node
   linkType: hard
 
@@ -2237,7 +2237,7 @@ __metadata:
     "@vitejs/plugin-vue": ^6.0.5
     "@vue/tsconfig": ^0.9.0
     axios: ^1.13.6
-    dompurify: ^3.3.3
+    dompurify: ^3.4.0
     entities: ^7.0.1
     husky: ^9.0.11
     lint-staged: ^16.4.0
