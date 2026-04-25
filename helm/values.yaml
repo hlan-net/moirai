@@ -47,6 +47,18 @@ ui:
     port: 80
     targetPort: 80
 
+# Enrichment worker (consumes the CouchDB changes feed). Single replica only.
+worker:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      ephemeral-storage: "1Gi"
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: "2Gi"
+
 nginx:
   replicaCount: 1
   image:

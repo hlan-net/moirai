@@ -1,20 +1,12 @@
 # Release/production environment overrides
 # Deploy with: helm install moirai . -f values-release.yaml -n moirai-release
 
-# Use semantic version tag (e.g., :0.6.1, :latest)
-# Update to match the current release version
-api:
-  image:
-    tag: "latest"  # Or pin to specific version like "0.6.1"
-
-ui:
-  image:
-    tag: "latest"  # Or pin to specific version like "0.6.1"
-
-# Production-specific settings
 environment: production
+
 api:
   replicaCount: 2  # Higher availability in production
+  image:
+    tag: "latest"  # Or pin to specific version like "0.6.1"
   readinessProbe:
     initialDelaySeconds: 30
     periodSeconds: 15
@@ -24,3 +16,18 @@ api:
 
 ui:
   replicaCount: 1
+  image:
+    tag: "latest"  # Or pin to specific version like "0.6.1"
+
+# Bump worker memory: at 512Mi the release worker OOMKills under feed-fetch
+# load (~63 feeds / 10 min) combined with OpenAI retry buffering.
+worker:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+      ephemeral-storage: "1Gi"
+    limits:
+      cpu: 500m
+      memory: 1Gi
+      ephemeral-storage: "2Gi"
