@@ -53,14 +53,7 @@ spec:
           imagePullPolicy: {{ if eq .Values.api.image.tag "latest" }}Always{{ else }}{{ default "IfNotPresent" .Values.api.image.pullPolicy }}{{ end }}
           command: ["python", "run_worker.py"]
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-              ephemeral-storage: "1Gi"
-            limits:
-              cpu: 500m
-              memory: 512Mi
-              ephemeral-storage: "2Gi"
+            {{- toYaml .Values.worker.resources | nindent 12 }}
           env:
           - name: ENVIRONMENT
             value: {{ .Values.environment | quote }}
