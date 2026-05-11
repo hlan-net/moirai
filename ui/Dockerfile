@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue.js application
-FROM node:25-alpine@sha256:ad82ecad30371c43f4057aaa4800a8ed88f9446553a2d21323710c7b937177fc AS build-stage
+FROM node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS build-stage
 
 WORKDIR /app
 
