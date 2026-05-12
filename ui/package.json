@@ -42,6 +42,9 @@
     "trailingComma": "es5"
   },
   "resolutions": {
-    "entities": "7.0.1"
+    "entities": "7.0.1",
+    "ip-address": "10.2.0",
+    "postcss": "8.5.14",
+    "dompurify": "3.4.2"
   }
 }
