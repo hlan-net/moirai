@@ -719,7 +719,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ansi-styles@npm:^6.2.1":
+"ansi-styles@npm:^6.2.1, ansi-styles@npm:^6.2.3":
   version: 6.2.3
   resolution: "ansi-styles@npm:6.2.3"
   checksum: 10c0/23b8a4ce14e18fb854693b95351e286b771d23d8844057ed2e7d083cd3e708376c3323707ec6a24365f7d7eda3ca00327fe04092e29e551499ec4c8b7bfac868
@@ -841,20 +841,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cli-truncate@npm:^5.0.0":
-  version: 5.1.1
-  resolution: "cli-truncate@npm:5.1.1"
+"cli-truncate@npm:^5.2.0":
+  version: 5.2.0
+  resolution: "cli-truncate@npm:5.2.0"
   dependencies:
-    slice-ansi: "npm:^7.1.0"
-    string-width: "npm:^8.0.0"
-  checksum: 10c0/3842920829a62f3e041ce39199050c42706c3c9c756a4efc8b86d464e102d1fa031d8b1b9b2e3bb36e1017c763558275472d031bdc884c1eff22a2f20e4f6b0a
-  languageName: node
-  linkType: hard
-
-"colorette@npm:^2.0.20":
-  version: 2.0.20
-  resolution: "colorette@npm:2.0.20"
-  checksum: 10c0/e94116ff33b0ff56f3b83b9ace895e5bf87c2a7a47b3401b8c3f3226e050d5ef76cf4072fb3325f9dc24d1698f9b730baf4e05eeaf861d74a1883073f4c98a40
+    slice-ansi: ^8.0.0
+    string-width: ^8.2.0
+  checksum: b789b6c2caff1560259aedeb6aaafcf41167d478df418d718a8c92edd6bc5a0ece272b8fb7e7911fbd31cef7b1ac8a30f2b21d90c3174b55a018fe3f2604a137
   languageName: node
   linkType: hard
 
@@ -864,13 +857,6 @@ __metadata:
   dependencies:
     delayed-stream: "npm:~1.0.0"
   checksum: 10c0/0dbb829577e1b1e839fa82b40c07ffaf7de8a09b935cadd355a73652ae70a88b4320db322f6634a4ad93424292fa80973ac6480986247f1734a1137debf271d5
-  languageName: node
-  linkType: hard
-
-"commander@npm:^14.0.3":
-  version: 14.0.3
-  resolution: "commander@npm:14.0.3"
-  checksum: 10c0/755652564bbf56ff2ff083313912b326450d3f8d8c85f4b71416539c9a05c3c67dbd206821ca72635bf6b160e2afdefcb458e86b317827d5cb333b69ce7f1a24
   languageName: node
   linkType: hard
 
@@ -1035,7 +1021,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eventemitter3@npm:^5.0.1":
+"eventemitter3@npm:^5.0.4":
   version: 5.0.4
   resolution: "eventemitter3@npm:5.0.4"
   checksum: 10c0/575b8cac8d709e1473da46f8f15ef311b57ff7609445a7c71af5cd42598583eee6f098fa7a593e30f27e94b8865642baa0689e8fa97c016f742abdb3b1bf6d9a
@@ -1296,7 +1282,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"is-fullwidth-code-point@npm:^5.0.0":
+"is-fullwidth-code-point@npm:^5.0.0, is-fullwidth-code-point@npm:^5.1.0":
   version: 5.1.0
   resolution: "is-fullwidth-code-point@npm:5.1.0"
   dependencies:
@@ -1457,33 +1443,34 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lint-staged@npm:^16.4.0":
-  version: 16.4.0
-  resolution: "lint-staged@npm:16.4.0"
+"lint-staged@npm:^17.0.4":
+  version: 17.0.4
+  resolution: "lint-staged@npm:17.0.4"
   dependencies:
-    commander: "npm:^14.0.3"
-    listr2: "npm:^9.0.5"
-    picomatch: "npm:^4.0.3"
-    string-argv: "npm:^0.3.2"
-    tinyexec: "npm:^1.0.4"
-    yaml: "npm:^2.8.2"
+    listr2: ^10.2.1
+    picomatch: ^4.0.4
+    string-argv: ^0.3.2
+    tinyexec: ^1.1.2
+    yaml: ^2.8.4
+  dependenciesMeta:
+    yaml:
+      optional: true
   bin:
     lint-staged: bin/lint-staged.js
-  checksum: 10c0/67625a49a2a01368c7df2da7e553567a79c4b261d9faf3436e00fc3a2f9c4bbe7295909012c47b3d9029e269fd7d7469901a5120573527a032f15797aa497c26
+  checksum: 9da94a3b926d71c633aa73dc7de3d98c4fa0c3f91ab86a10fb5282f30e75932ffb158cbf74f500f2aa6e24dbe0ca960f6d6b3a24accdb1df5e4ef154156f77d0
   languageName: node
   linkType: hard
 
-"listr2@npm:^9.0.5":
-  version: 9.0.5
-  resolution: "listr2@npm:9.0.5"
+"listr2@npm:^10.2.1":
+  version: 10.2.1
+  resolution: "listr2@npm:10.2.1"
   dependencies:
-    cli-truncate: "npm:^5.0.0"
-    colorette: "npm:^2.0.20"
-    eventemitter3: "npm:^5.0.1"
-    log-update: "npm:^6.1.0"
-    rfdc: "npm:^1.4.1"
-    wrap-ansi: "npm:^9.0.0"
-  checksum: 10c0/46448d1ba0addc9d71aeafd05bb8e86ded9641ccad930ac302c2bd2ad71580375604743e18586fcb8f11906edf98e8e17fca75ba0759947bf275d381f68e311d
+    cli-truncate: ^5.2.0
+    eventemitter3: ^5.0.4
+    log-update: ^6.1.0
+    rfdc: ^1.4.1
+    wrap-ansi: ^10.0.0
+  checksum: 0a95c80bfad8be56652c5f180d9b8105c2406222df9b794a7c02fdf798e263ec88ab7e275b528f79fdab1c4c5b9c3cb3fc2356803b0db7622a5741c8cab7abcf
   languageName: node
   linkType: hard
 
@@ -2080,6 +2067,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"slice-ansi@npm:^8.0.0":
+  version: 8.0.0
+  resolution: "slice-ansi@npm:8.0.0"
+  dependencies:
+    ansi-styles: ^6.2.3
+    is-fullwidth-code-point: ^5.1.0
+  checksum: a3a6947f2a87ebe8fe0de234184e2ff057ecb4532666acae60c6906d8d27253016d5890b6f2b1cb10b7763376b7626b60e54f489f657eb20cdfd8797ac04d2c1
+  languageName: node
+  linkType: hard
+
 "smart-buffer@npm:^4.2.0":
   version: 4.2.0
   resolution: "smart-buffer@npm:4.2.0"
@@ -2149,13 +2146,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"string-width@npm:^8.0.0":
-  version: 8.2.0
-  resolution: "string-width@npm:8.2.0"
+"string-width@npm:^8.2.0":
+  version: 8.2.1
+  resolution: "string-width@npm:8.2.1"
   dependencies:
-    get-east-asian-width: "npm:^1.5.0"
-    strip-ansi: "npm:^7.1.2"
-  checksum: 10c0/d8915428b43519b0f494da6590dbe4491857d8a12e40250e50fc01fbb616ffd8400a436bbe25712255ee129511fe0414c49d3b6b9627e2bc3a33dcec1d2eda02
+    get-east-asian-width: ^1.5.0
+    strip-ansi: ^7.1.2
+  checksum: f77829903c89e671942a8863cfc801f9ea330d3b7439f0ef9b0fcb2960866802bb90c598cf9aca86961e616e6d5182077e8b9c389f8ace42f7a3584a4f8f99d0
   languageName: node
   linkType: hard
 
@@ -2190,10 +2187,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tinyexec@npm:^1.0.4":
-  version: 1.0.4
-  resolution: "tinyexec@npm:1.0.4"
-  checksum: 10c0/d4a5bbcf6bdb23527a4b74c4aa566f41432167112fe76f420ec7e3a90a3ecfd3a7d944383e2719fc3987b69400f7b928daf08700d145fb527c2e80ec01e198bd
+"tinyexec@npm:^1.1.2":
+  version: 1.1.2
+  resolution: "tinyexec@npm:1.1.2"
+  checksum: be2cb2b60c415bf9ef2006f86b566774445ea59249b62edc293996299d0b235a14b3ec41bc11e942914287306e5d2c390a1f47cbf781cf3e96833312f0dca6bf
   languageName: node
   linkType: hard
 
@@ -2264,7 +2261,7 @@ __metadata:
     dompurify: ^3.4.2
     entities: ^7.0.1
     husky: ^9.0.11
-    lint-staged: ^16.4.0
+    lint-staged: ^17.0.4
     marked: ^18.0.3
     pinia: ^3.0.4
     prettier: ^3.8.3
@@ -2473,6 +2470,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"wrap-ansi@npm:^10.0.0":
+  version: 10.0.0
+  resolution: "wrap-ansi@npm:10.0.0"
+  dependencies:
+    ansi-styles: ^6.2.3
+    string-width: ^8.2.0
+    strip-ansi: ^7.1.2
+  checksum: 1ad55bbb6db345519834de53b93732a19abee0a3fc8315c7e037d7ae61420932335159f53f82259c2941dab91bda66b1b4886037216e1dfaae3f3b3fc6aa0a41
+  languageName: node
+  linkType: hard
+
 "wrap-ansi@npm:^9.0.0":
   version: 9.0.2
   resolution: "wrap-ansi@npm:9.0.2"
@@ -2504,5 +2512,14 @@ __metadata:
   bin:
     yaml: bin.mjs
   checksum: 10c0/ddff0e11c1b467728d7eb4633db61c5f5de3d8e9373cf84d08fb0cdee03e1f58f02b9f1c51a4a8a865751695addbd465a77f73f1079be91fe5493b29c305fd77
+  languageName: node
+  linkType: hard
+
+"yaml@npm:^2.8.4":
+  version: 2.9.0
+  resolution: "yaml@npm:2.9.0"
+  bin:
+    yaml: bin.mjs
+  checksum: f0f74b349c126bb9acf649be1e7efaec5869b1567bdc047e43b176bcdd7730a9bc7ab8fc9c6b1c358e611fab0fe0a0d8933393f1af383a7dc0b4755a1d5f31f9
   languageName: node
   linkType: hard
