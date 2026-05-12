@@ -34,6 +34,7 @@ onMounted(() => {
           <router-link to="/chat" class="nav-link">Chat</router-link>
           <router-link to="/settings" class="nav-link">Settings</router-link>
           <router-link to="/agents" class="nav-link">Agents</router-link>
+          <router-link to="/sessions" class="nav-link">Sessions</router-link>
           <a href="#" @click.prevent="handleLogout" class="nav-link logout-link">Logout</a>
         </template>
         <template v-else>
