@@ -24,21 +24,24 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
     -   **Features:** Cross-userspace review and item-level cleanup.
 -   **Data Storage:** Apache CouchDB. Databases: `feeds`, `articles`, `issues`.
 
-## Rewrite Progress
-- [x] **Remove Scheduler:** Autonomous background tasks have been disabled.
-- [x] **MCP Integration:** Stdio MCP server implemented and converted to HTTP/SSE.
-- [x] **Userspace Security:** Implemented GUID-based data segregation in MCP tools.
-- [x] **API Security:** Implemented HTTP Basic Auth for the Flask backend.
-- [x] **UI Overhaul:** Implemented 4-column layout with Event/Trend management.
-- [x] **Data Persistence:** Added `trends` database support and conflict handling.
-- [x] **Userspace Filtering:** Added userspace selector to the dashboard and API filtering.
-- [x] **Chat Integration:** Implemented GenAI Chat with MCP tools, model configuration, and UI persistence.
-- [x] **Polishing:** Finalize UI styling.
-- [x] **Database-Level Validation:** Implemented `validate_doc_update` functions for data integrity.
-- [x] **Housekeeping Improvements:** Standardized frontend tooling (Yarn) and backend dependency management (Miniforge/Conda), and implemented pre-commit hooks for consistent styling/formatting.
-- [x] **Article Filtering:** Implemented filtering articles by selected feeds, events, and trends.
+## Documentation Architecture
+Moirai follows a multi-tier documentation structure to balance high-level oversight with detailed technical specifications:
 
-## How to Build and Run
+### 1. Root Meta-Documents (CAPS)
+High-level project metadata and foundational guidance live in the root directory. These files use **ALL CAPS** naming for visibility and adherence to standard repository conventions.
+- `README.md`: Project overview and quick start.
+- `GEMINI.md`: Foundational mandates and documentation conventions.
+- `ROADMAP.md`: The master orchestration document. It outlines planned improvements and release versions, referencing detailed docs in `/docs`.
+- `AGENTS.md`: Overview of the agentic ecosystem and MCP integration.
+- `LICENSE`, `CHANGELOG.md`, `EXAMPLES.md`.
+
+### 2. Feature & Concept Documents (lowercase kebab-case)
+Detailed technical designs, functionalities, user stories, and architectural concepts live in the `docs/` directory. 
+- **Naming:** These files use **lowercase kebab-case** (e.g., `agentic-improvements.md`) for better readability in file listings.
+- **Content:** Each document should focus on a specific concept or feature from the project's goal-oriented perspective.
+- **Referencing:** The root-level `ROADMAP.md` should serve as the primary entry point, linking to these detailed documents as features are planned and implemented.
+
+## Development Lifecycle
 1.  **App & DB:** `docker compose up --build` (Port 8088).
 2.  **MCP Server:** Activate Miniforge env, then `mamba run -n moirai python mcp_server.py` (Port 8090).
 

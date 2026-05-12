@@ -18,37 +18,43 @@ main                          ← stable, always releasable
 - **`release/vX.Y.Z`** collects all features. CI also runs on pushes to this branch.
 - **`main`** is updated only by merging a completed release branch.
 
+## Version Management
+
+Moirai tracks versions in three critical locations. Every release must update all of them together:
+
+- `version.py`: Python-side versioning.
+- `ui/package.json`: Frontend versioning.
+- `helm/Chart.yaml`: Deployment versioning (both `version` and `appVersion`).
+
+The standard lifecycle is: **Bump Versions -> Commit -> Tag -> Push -> GitHub Release -> Deploy**.
+
 ---
 
 ## Creating a Release
 
 ### 1. Prepare the release branch
-
-Ensure the release branch is up to date with any hotfixes that landed on `main` after it was cut:
+Ensure the release branch is up to date with any hotfixes that landed on `main`:
 
 ```bash
 git checkout release/vX.Y.Z
-git rebase main          # absorb any hotfixes from main
+git rebase main
 git push --force-with-lease
 ```
 
-Verify all CI checks pass on the release branch before proceeding.
-
-### 2. Tag from the release branch
+### 2. Version Bump & Tag
+Bump the version strings in the files listed above, then commit and tag:
 
 ```bash
-git checkout release/vX.Y.Z
+git commit -am "release: X.Y.Z"
 git tag vX.Y.Z
+git push origin main
 git push origin vX.Y.Z
 ```
 
-The `docker-release.yml` workflow triggers on `v*.*.*` tags and:
-- Builds and pushes Docker images tagged `:X.Y.Z`, `:X.Y`, `:X`, and `:latest`
-- Injects `APP_VERSION=X.Y.Z` and `BUILD_NUMBER=<run_number>` into the images
+The `docker-release.yml` workflow triggers on `v*.*.*` tags to build and push images.
 
 ### 3. Fast-forward merge to main
-
-Because the release branch was rebased onto main in step 1, this merge is a fast-forward — no merge commit, clean linear history:
+Ensure a clean linear history by fast-forwarding `main`:
 
 ```bash
 git checkout main
@@ -56,24 +62,35 @@ git merge --ff-only release/vX.Y.Z
 git push origin main
 ```
 
-If `--ff-only` fails, go back to step 1 and rebase again.
-
-### 4. Deploy to production
+### 4. Deploy to Production
+Update the Helm release with the new image tags:
 
 ```bash
 helm upgrade moirai-release helm/ \
   --namespace moirai-release \
   --reuse-values \
   --set api.image.tag=X.Y.Z \
-  --set ui.image.tag=X.Y.Z \
-  --set nginx.ingress.host=moirai.hlan.net
+  --set ui.image.tag=X.Y.Z
 ```
 
-### 5. Update CHANGELOG.md and tag the release on GitHub
-
+### 5. Create GitHub Release
 ```bash
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "$(cat CHANGELOG_FRAGMENT.md)"
+gh release create vX.Y.Z --generate-notes
 ```
+
+---
+
+## Guardrails & Verification
+
+- **Tag Alignment:** The tag must point exactly to the version-bump commit.
+- **Order of Operations:** Never create a GitHub release before the git tag is pushed.
+- **Verification:** Use `git show vX.Y.Z` to verify the commit content.
+
+### Correcting Mistakes
+If a release is created on the wrong commit:
+1. Force-update the local tag: `git tag -f vX.Y.Z <correct-sha>`
+2. Force-push the tag: `git push origin -f vX.Y.Z`
+3. Edit the GitHub release if notes need updating: `gh release edit vX.Y.Z --notes "..."`
 
 ---
 

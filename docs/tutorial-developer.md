@@ -180,9 +180,9 @@ moirai/
 │   └── ... (30+ test files)
 │
 ├── docs/                         # Documentation
-│   ├── TUTORIAL_USER.md
-│   ├── TUTORIAL_ADMIN.md
-│   ├── TUTORIAL_DEVELOPER.md     # You are here
+│   ├── tutorial-user.md
+│   ├── tutorial-admin.md
+│   ├── tutorial-developer.md     # You are here
 │   └── STYLE_GUIDE.md
 │
 ├── CLAUDE.md                     # Instructions for Claude Code

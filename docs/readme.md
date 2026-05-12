@@ -4,7 +4,7 @@ Welcome to Moirai's documentation! Choose your role below to get started.
 
 ## 📚 Tutorials by Role
 
-### 🧑‍💼 [User Guide](./TUTORIAL_USER.md)
+### 🧑‍💼 [User Guide](./tutorial-user.md)
 **For journalists, analysts, and content reviewers using Moirai**
 
 Learn how to:
@@ -15,11 +15,11 @@ Learn how to:
 - Manage your workspace
 
 **Time to read:** 10-15 minutes
-**Get started:** [→ User Guide](./TUTORIAL_USER.md)
+**Get started:** [→ User Guide](./tutorial-user.md)
 
 ---
 
-### 🔧 [Admin Guide](./TUTORIAL_ADMIN.md)
+### 🔧 [Admin Guide](./tutorial-admin.md)
 **For IT admins and system operators deploying and maintaining Moirai**
 
 Learn how to:
@@ -31,11 +31,11 @@ Learn how to:
 - Backup and scale
 
 **Time to read:** 20-30 minutes
-**Get started:** [→ Admin Guide](./TUTORIAL_ADMIN.md)
+**Get started:** [→ Admin Guide](./tutorial-admin.md)
 
 ---
 
-### 👨‍💻 [Developer Guide](./TUTORIAL_DEVELOPER.md)
+### 👨‍💻 [Developer Guide](./tutorial-developer.md)
 **For software engineers building and extending Moirai**
 
 Learn how to:
@@ -47,7 +47,7 @@ Learn how to:
 - Write tests and contribute
 
 **Time to read:** 30-45 minutes
-**Get started:** [→ Developer Guide](./TUTORIAL_DEVELOPER.md)
+**Get started:** [→ Developer Guide](./tutorial-developer.md)
 
 ---
 
@@ -114,9 +114,9 @@ Moirai is a **GenAI-native press review platform** with three main layers:
 
 | Document | Purpose | Audience |
 |----------|---------|----------|
-| [TUTORIAL_USER.md](./TUTORIAL_USER.md) | How to use Moirai | End users, analysts |
-| [TUTORIAL_ADMIN.md](./TUTORIAL_ADMIN.md) | How to deploy & manage | IT admins, ops |
-| [TUTORIAL_DEVELOPER.md](./TUTORIAL_DEVELOPER.md) | How to extend Moirai | Engineers, contributors |
+| [tutorial-user.md](./tutorial-user.md) | How to use Moirai | End users, analysts |
+| [tutorial-admin.md](./tutorial-admin.md) | How to deploy & manage | IT admins, ops |
+| [tutorial-developer.md](./tutorial-developer.md) | How to extend Moirai | Engineers, contributors |
 | [../CLAUDE.md](../CLAUDE.md) | Architecture & conventions | Developers, maintainers |
 | [../README.md](../README.md) | Project overview | Everyone |
 
@@ -126,40 +126,40 @@ Moirai is a **GenAI-native press review platform** with three main layers:
 
 | Question | Answer |
 |----------|--------|
-| **How do I use Moirai?** | See [User Guide](./TUTORIAL_USER.md) |
-| **How do I deploy Moirai?** | See [Admin Guide](./TUTORIAL_ADMIN.md) Part 1 |
-| **How do I add a feature?** | See [Developer Guide](./TUTORIAL_DEVELOPER.md) |
+| **How do I use Moirai?** | See [User Guide](./tutorial-user.md) |
+| **How do I deploy Moirai?** | See [Admin Guide](./tutorial-admin.md) Part 1 |
+| **How do I add a feature?** | See [Developer Guide](./tutorial-developer.md) |
 | **What's the API reference?** | See [../README.md](../README.md#api) (coming soon) |
 | **Where's the architecture doc?** | See [../CLAUDE.md](../CLAUDE.md) |
 | **Found a bug?** | Open a GitHub Issue with logs |
-| **Want to contribute?** | See [Developer Guide](./TUTORIAL_DEVELOPER.md) Part 9 |
+| **Want to contribute?** | See [Developer Guide](./tutorial-developer.md) Part 9 |
 
 ---
 
 ## 🔄 Learning Path
 
 ### For Users
-1. [User Guide](./TUTORIAL_USER.md) (15 min)
+1. [User Guide](./tutorial-user.md) (15 min)
 2. Create your first issue (5 min)
 3. Ask the chat a question (5 min)
 4. Explore the Lifespan view (5 min)
 5. **Done!** You're ready to use Moirai
 
 ### For Admins
-1. [Admin Guide](./TUTORIAL_ADMIN.md) Part 1 (Deployment) (15 min)
+1. [Admin Guide](./tutorial-admin.md) Part 1 (Deployment) (15 min)
 2. Deploy Moirai (10 min)
-3. [Admin Guide](./TUTORIAL_ADMIN.md) Part 2 (Users & Feeds) (10 min)
+3. [Admin Guide](./tutorial-admin.md) Part 2 (Users & Feeds) (10 min)
 4. Create feeds and users (10 min)
-5. [Admin Guide](./TUTORIAL_ADMIN.md) Part 3 (Agents) (10 min)
+5. [Admin Guide](./tutorial-admin.md) Part 3 (Agents) (10 min)
 6. Configure agents (10 min)
 7. **Done!** Your Moirai is ready for users
 
 ### For Developers
-1. [Developer Guide](./TUTORIAL_DEVELOPER.md) Part 1 (Setup) (15 min)
+1. [Developer Guide](./tutorial-developer.md) Part 1 (Setup) (15 min)
 2. Set up dev environment (15 min)
-3. [Developer Guide](./TUTORIAL_DEVELOPER.md) Part 2 (Architecture) (10 min)
+3. [Developer Guide](./tutorial-developer.md) Part 2 (Architecture) (10 min)
 4. Read [../CLAUDE.md](../CLAUDE.md) (10 min)
-5. [Developer Guide](./TUTORIAL_DEVELOPER.md) Part 4 (Common Tasks) (20 min)
+5. [Developer Guide](./tutorial-developer.md) Part 4 (Common Tasks) (20 min)
 6. Write and test a feature (30 min)
 7. Submit a PR (5 min)
 8. **Done!** You're a Moirai contributor
@@ -246,7 +246,7 @@ All tutorials follow these conventions:
 
 ## 📅 Version Info
 
-- **Latest Version:** v0.6.0
+- **Latest Version:** v0.8.1
 - **Python:** 3.10+
 - **Node.js:** 18+
 - **CouchDB:** 3.2+
@@ -265,7 +265,7 @@ Found a typo in the docs? Want to improve a tutorial?
 3. Submit a pull request
 4. We'll review and merge!
 
-See [Developer Guide Part 9](./TUTORIAL_DEVELOPER.md#part-9-contributing-guidelines) for details.
+See [Developer Guide Part 9](./tutorial-developer.md#part-9-contributing-guidelines) for details.
 
 ---
 

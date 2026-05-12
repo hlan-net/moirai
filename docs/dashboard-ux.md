@@ -1,21 +1,23 @@
-# Dashboard UX Improvement Plan
+# Dashboard UX: Status & Performance Improvements
 
-**Date:** March 20, 2026  
-**Status:** Implementation Ready  
-**Priority:** High - Addresses critical user experience issues
+**Status:** Implementation Ready | **Priority:** High
 
-## Executive Summary
+This document outlines the root causes of the "erratic" dashboard behavior and provides a comprehensive, phased implementation plan.
 
-The Moirai dashboard exhibits "erratic" status updates across its four columns (Feeds, Articles, Events, Trends). This document outlines the root causes and provides a comprehensive, phased implementation plan to resolve these issues.
+---
 
-## Table of Contents
+## 🎯 Quick Implementation Reference
 
-1. [Problem Analysis](#problem-analysis)
-2. [Root Causes](#root-causes)
-3. [Implementation Tiers](#implementation-tiers)
-4. [Technical Specifications](#technical-specifications)
-5. [Testing Strategy](#testing-strategy)
-6. [Rollback Plan](#rollback-plan)
+### 1. Critical Fixes (Immediate)
+- **Fix 1: Sync Polling Intervals.** Articles, Events, and Trends must refresh at the same rate.
+  - Create `ui/src/config/polling.ts`: `export const SYNC_REFRESH_INTERVAL = 30000`
+- **Fix 2: Article Polling Bug.** Remove the condition in `ArticleColumn.vue` that stops refresh when filters are active.
+- **Fix 3: Last Updated Indicator.** Add `lastUpdated` and `isRefreshing` to `filterStore` and display in `MainPage.vue`.
+
+### 2. Performance Fixes (Backend)
+- **Index 1: CouchDB Indexes.** Create indexes for `articles` (published, userspace, feed_url) and `issues` (longevity, userspace).
+- **Index 2: Article Enrichment.** Replace O(n*m) loop in `enrichment.py` with cached Redis lookups.
+- **Index 3: Cache Versioning.** Add `cache_version` to API responses to allow frontend to invalidate IndexedDB on backend restart.
 
 ---
 
