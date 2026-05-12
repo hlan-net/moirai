@@ -8,6 +8,7 @@ import LoginPage from './components/LoginPage.vue'
 import AgentManagementPage from './components/AgentManagementPage.vue'
 import LifespanView from './components/LifespanView.vue'
 import MythologyPage from './components/MythologyPage.vue'
+import SessionsPage from './components/SessionsPage.vue'
 
 const routes = [
   { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
@@ -24,6 +25,7 @@ const routes = [
     name: 'AgentManagement',
     meta: { requiresAuth: true },
   },
+  { path: '/sessions', component: SessionsPage, name: 'Sessions', meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
