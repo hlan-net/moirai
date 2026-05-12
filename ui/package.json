@@ -2,6 +2,7 @@
   "name": "ui",
   "private": true,
   "version": "0.8.1",
+  "packageManager": "yarn@4.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -42,6 +43,9 @@
     "trailingComma": "es5"
   },
   "resolutions": {
-    "entities": "7.0.1"
+    "entities": "7.0.1",
+    "ip-address": "10.2.0",
+    "postcss": "8.5.14",
+    "dompurify": "3.4.2"
   }
 }
