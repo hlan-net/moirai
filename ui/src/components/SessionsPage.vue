@@ -199,10 +199,10 @@ onMounted(async () => {
 .error-message {
   padding: 10px 14px;
   margin: 12px 0;
-  background-color: rgba(220, 53, 69, 0.15);
-  border: 1px solid rgba(220, 53, 69, 0.4);
+  background-color: #d9534f;
+  border: 1px solid #b94440;
   border-radius: 4px;
-  color: #f5c2c7;
+  color: white;
 }
 
 .empty-state {
@@ -262,22 +262,22 @@ onMounted(async () => {
 }
 
 .status-pill.status-running {
-  background-color: rgba(74, 144, 226, 0.2);
-  color: #6bb0ff;
+  background-color: #1e5fa8;
+  color: white;
 }
 
 .status-pill.status-success {
-  background-color: rgba(40, 167, 69, 0.2);
-  color: #6fd28a;
+  background-color: #166534;
+  color: white;
 }
 
 .status-pill.status-error {
-  background-color: rgba(220, 53, 69, 0.2);
-  color: #f5c2c7;
+  background-color: #d9534f;
+  color: white;
 }
 
 .status-pill.status-cancelled {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: var(--text-muted, #888);
+  background-color: #6c757d;
+  color: white;
 }
 </style>
