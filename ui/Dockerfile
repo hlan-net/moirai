@@ -1,13 +1,13 @@
 # Stage 1: Build the Vue.js application
-FROM node:26-alpine@sha256:e71ac5e964b9201072425d59d2e876359efa25dc96bb1768cb73295728d6e4ea AS build-stage
+FROM node:22-slim AS build-stage
 
 WORKDIR /app
 
 # Copy package.json and yarn.lock to leverage Docker cache
 COPY package.json yarn.lock ./
 
-# Enable corepack so yarn is available (not bundled in node:26+)
-RUN npm install -g corepack && corepack enable && yarn install
+# Enable corepack so yarn is available (bundled in node:22 but disabled by default)
+RUN corepack enable && yarn install
 
 # Copy the rest of the UI source code
 COPY . .
