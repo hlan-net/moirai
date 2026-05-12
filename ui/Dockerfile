@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package.json and yarn.lock to leverage Docker cache
 COPY package.json yarn.lock ./
 
-# Install dependencies (resolutions in package.json will handle entities)
-RUN yarn install
+# Enable corepack so yarn is available (not bundled in node:26+)
+RUN corepack enable && yarn install
 
 # Copy the rest of the UI source code
 COPY . .
