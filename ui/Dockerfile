@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 
 # Enable corepack so yarn is available (not bundled in node:26+)
-RUN corepack enable && yarn install
+RUN npm install -g corepack && corepack enable && yarn install
 
 # Copy the rest of the UI source code
 COPY . .
