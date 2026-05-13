@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionsStore, type SessionDoc, type SessionStep } from '../stores/sessions'
 import { formatDate, formatDuration } from '../utils/formatters'
@@ -17,6 +17,7 @@ const cancelling = ref(false)
 const cancelError = ref('')
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
+let isMounted = true
 
 const SESSION_TYPE_LABELS: Record<SessionDoc['session_type'], string> = {
   scheduled_agent: 'Scheduled',
@@ -41,33 +42,52 @@ const STEP_STATUS_LABELS: Record<SessionStep['status'], string> = {
 
 const isRunning = computed(() => session.value?.status === 'running')
 
-const load = async () => {
+const stopPoll = () => {
+  if (pollTimer !== null) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+const load = async (id: string) => {
   loading.value = true
   error.value = ''
-  const [sessionData, stepsData] = await Promise.all([
-    sessionsStore.fetchSession(sessionId.value),
-    sessionsStore.fetchSteps(sessionId.value),
-  ])
-  if (!sessionData) {
-    error.value = 'Session not found.'
-  } else {
-    session.value = sessionData
-    steps.value = stepsData
+  try {
+    const [sessionData, stepsData] = await Promise.all([
+      sessionsStore.fetchSession(id),
+      sessionsStore.fetchSteps(id),
+    ])
+    if (!isMounted || sessionId.value !== id) return
+    if (sessionData) {
+      session.value = sessionData
+      steps.value = stepsData
+    } else {
+      error.value = 'Session not found.'
+    }
+  } catch {
+    if (isMounted && sessionId.value === id) {
+      error.value = 'Failed to load session.'
+    }
+  } finally {
+    if (isMounted && sessionId.value === id) {
+      loading.value = false
+    }
   }
-  loading.value = false
 }
 
 const poll = async () => {
-  if (!isRunning.value) return
+  if (!isRunning.value || !isMounted) return
+  const id = sessionId.value
   const [sessionData, stepsData] = await Promise.all([
-    sessionsStore.fetchSession(sessionId.value),
-    sessionsStore.fetchSteps(sessionId.value),
+    sessionsStore.fetchSession(id),
+    sessionsStore.fetchSteps(id),
   ])
+  if (!isMounted || sessionId.value !== id) return
   if (sessionData) {
     session.value = sessionData
     steps.value = stepsData
   }
-  if (isRunning.value) {
+  if (isRunning.value && isMounted) {
     pollTimer = setTimeout(poll, 3000)
   }
 }
@@ -76,23 +96,31 @@ const cancel = async () => {
   cancelling.value = true
   cancelError.value = ''
   const ok = await sessionsStore.cancelSession(sessionId.value)
-  if (!ok) {
-    cancelError.value = 'Cancel request failed. Try again.'
+  if (ok) {
+    await load(sessionId.value)
   } else {
-    await load()
+    cancelError.value = 'Cancel request failed. Try again.'
   }
   cancelling.value = false
 }
 
-onMounted(async () => {
-  await load()
-  if (isRunning.value) {
-    pollTimer = setTimeout(poll, 3000)
-  }
-})
+watch(
+  sessionId,
+  async (id) => {
+    stopPoll()
+    session.value = null
+    steps.value = []
+    await load(id)
+    if (isRunning.value) {
+      pollTimer = setTimeout(poll, 3000)
+    }
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
-  if (pollTimer !== null) clearTimeout(pollTimer)
+  isMounted = false
+  stopPoll()
 })
 </script>
 
@@ -299,7 +327,7 @@ onUnmounted(() => {
 }
 
 .status-pill.status-error {
-  background-color: #d9534f;
+  background-color: #c0392b;
   color: white;
 }
 
@@ -310,7 +338,7 @@ onUnmounted(() => {
 
 .cancel-btn {
   padding: 6px 14px;
-  background-color: #d9534f;
+  background-color: #c0392b;
   color: white;
   border: none;
   border-radius: 4px;
@@ -326,8 +354,8 @@ onUnmounted(() => {
 
 .cancel-error {
   padding: 8px 12px;
-  background-color: #d9534f;
-  border: 1px solid #b94440;
+  background-color: #c0392b;
+  border: 1px solid #922b21;
   border-radius: 4px;
   color: white;
   font-size: 0.85rem;
@@ -408,7 +436,7 @@ onUnmounted(() => {
 }
 
 .dot-error {
-  background-color: #d9534f;
+  background-color: #c0392b;
 }
 
 .dot-retried {
@@ -539,8 +567,8 @@ onUnmounted(() => {
 
 .error-message {
   padding: 10px 14px;
-  background-color: #d9534f;
-  border: 1px solid #b94440;
+  background-color: #c0392b;
+  border: 1px solid #922b21;
   border-radius: 4px;
   color: white;
 }

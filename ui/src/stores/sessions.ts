@@ -102,27 +102,17 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   const fetchSession = async (sessionId: string): Promise<SessionDoc | null> => {
-    try {
-      const response = await authFetch(`/api/sessions/${sessionId}`)
-      if (!response.ok) {
-        throw new Error(`Failed to load session (${response.status})`)
-      }
-      return await response.json()
-    } catch {
-      return null
-    }
+    const response = await authFetch(`/api/sessions/${sessionId}`)
+    if (response.status === 404) return null
+    if (!response.ok) throw new Error(`Failed to load session (${response.status})`)
+    return await response.json()
   }
 
   const fetchSteps = async (sessionId: string): Promise<SessionStep[]> => {
-    try {
-      const response = await authFetch(`/api/sessions/${sessionId}/steps`)
-      if (!response.ok) {
-        throw new Error(`Failed to load steps (${response.status})`)
-      }
-      return await response.json()
-    } catch {
-      return []
-    }
+    const response = await authFetch(`/api/sessions/${sessionId}/steps`)
+    if (response.status === 404) return []
+    if (!response.ok) throw new Error(`Failed to load steps (${response.status})`)
+    return await response.json()
   }
 
   const cancelSession = async (sessionId: string): Promise<boolean> => {
