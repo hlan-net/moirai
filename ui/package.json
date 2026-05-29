@@ -19,18 +19,18 @@
     "vue-router": "^5.0.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.60.0",
     "@types/dompurify": "^3.2.0",
-    "@types/node": "^25.6.2",
-    "@vitejs/plugin-vue": "^6.0.6",
+    "@types/node": "^25.8.0",
+    "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
     "entities": "^7.0.1",
     "husky": "^9.0.11",
-    "lint-staged": "^17.0.4",
+    "lint-staged": "^17.0.5",
     "prettier": "^3.8.3",
     "typescript": "~6.0.3",
-    "vite": "^8.0.12",
-    "vue-tsc": "^3.2.8"
+    "vite": "^8.0.13",
+    "vue-tsc": "^3.2.9"
   },
   "lint-staged": {
     "*.{js,ts,vue,json,css,md}": "prettier --write"
