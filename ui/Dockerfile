@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package.json and yarn.lock to leverage Docker cache
 COPY package.json yarn.lock ./
 
-# Enable corepack so yarn is available (bundled in node:22 but disabled by default)
-RUN corepack enable && yarn install
+# Node 26 slim doesn't ship corepack by default; install it to activate the pinned Yarn version
+RUN npm install -g corepack@latest && corepack enable && corepack prepare yarn@4.1.0 --activate && yarn install
 
 # Copy the rest of the UI source code
 COPY . .
@@ -21,6 +21,9 @@ ENV BUILD_NUMBER=${BUILD_NUMBER}
 # Create build-info.json for runtime version display
 RUN mkdir -p /app/public && \
     printf '{"appVersion":"%s","buildNumber":"%s"}\n' "${APP_VERSION}" "${BUILD_NUMBER}" > /app/public/build-info.json
+
+# Re-run install after source copy so Yarn's install state matches the final workspace
+RUN yarn install --immutable
 
 # Build the application
 RUN yarn build
