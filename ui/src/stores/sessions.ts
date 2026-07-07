@@ -21,6 +21,22 @@ export interface SessionDoc {
   step_count?: number
 }
 
+export interface SessionStep {
+  step_id: string
+  step_type: 'tool_call' | 'llm_call'
+  tool_name?: string
+  input_summary?: string
+  output_summary?: string
+  status: 'success' | 'error' | 'retried' | 'pending_approval' | 'denied'
+  latency_ms?: number
+  correlation_id?: string
+  attempt?: number
+  risk_level?: 'normal' | 'destructive'
+  timestamp?: string
+  error_message?: string
+  error_code?: string
+}
+
 const USERSPACE_STORAGE_KEY = 'moirai_sessions_userspace'
 
 export const useSessionsStore = defineStore('sessions', () => {
@@ -85,6 +101,29 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
+  const fetchSession = async (sessionId: string): Promise<SessionDoc | null> => {
+    const response = await authFetch(`/api/sessions/${sessionId}`)
+    if (response.status === 404) return null
+    if (!response.ok) throw new Error(`Failed to load session (${response.status})`)
+    return await response.json()
+  }
+
+  const fetchSteps = async (sessionId: string): Promise<SessionStep[]> => {
+    const response = await authFetch(`/api/sessions/${sessionId}/steps`)
+    if (response.status === 404) return []
+    if (!response.ok) throw new Error(`Failed to load steps (${response.status})`)
+    return await response.json()
+  }
+
+  const cancelSession = async (sessionId: string): Promise<boolean> => {
+    try {
+      const response = await authFetch(`/api/sessions/${sessionId}/cancel`, { method: 'POST' })
+      return response.ok
+    } catch {
+      return false
+    }
+  }
+
   return {
     userspaces,
     currentUserspace,
@@ -95,5 +134,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     setCurrentUserspace,
     loadUserspaces,
     loadSessions,
+    fetchSession,
+    fetchSteps,
+    cancelSession,
   }
 })

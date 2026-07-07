@@ -9,6 +9,7 @@ import AgentManagementPage from './components/AgentManagementPage.vue'
 import LifespanView from './components/LifespanView.vue'
 import MythologyPage from './components/MythologyPage.vue'
 import SessionsPage from './components/SessionsPage.vue'
+import SessionDetailPage from './components/SessionDetailPage.vue'
 
 const routes = [
   { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
@@ -26,6 +27,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   { path: '/sessions', component: SessionsPage, name: 'Sessions', meta: { requiresAuth: true } },
+  {
+    path: '/sessions/:id',
+    component: SessionDetailPage,
+    name: 'SessionDetail',
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
