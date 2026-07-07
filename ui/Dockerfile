@@ -26,7 +26,7 @@ RUN mkdir -p /app/public && \
 RUN yarn build
 
 # Stage 2: Serve the application with Nginx
-FROM nginx:stable-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883
+FROM nginx:stable-alpine@sha256:6525b050aa05151ca19ec7090851bc8c12006cffdae5187f3d28023402f44cfa
 
 # Build arguments for version info
 ARG APP_VERSION=dev
