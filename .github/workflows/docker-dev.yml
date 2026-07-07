@@ -26,13 +26,13 @@ jobs:
       DISABLE_CSRF: true
       TEST_TARGET: docker
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: Cache Docker layers
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /tmp/.buildx-cache
           key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'environment-prod.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
@@ -179,7 +179,7 @@ jobs:
             file: ui/Dockerfile
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Docker Metadata
         uses: docker/metadata-action@v6
