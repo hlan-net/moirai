@@ -554,6 +554,17 @@ async def run_agent(
 
     messages.append({"role": "user", "content": user_message})
 
+    # When operating in an issue context, prefer that issue's own userspace UUID for
+    # tool call injection. An agent may have created the issue under a userspace that
+    # differs from g.user_id (e.g. when the user has multiple userspaces or an agent
+    # config was registered before the userspace switcher existed).
+    effective_userspace_id = userspace_id
+    if isinstance(context, dict) and context.get("type") == "issue":
+        entity_data = context.get("entity_data") or {}
+        issue_userspace = (entity_data.get("userspace") or entity_data.get("namespace") or "").strip()
+        if issue_userspace:
+            effective_userspace_id = issue_userspace
+
     # Determine API Key based on provider if not passed in headers
     final_api_key = _get_api_key(llm_endpoint, api_key)
 
@@ -585,7 +596,7 @@ async def run_agent(
 
                 if _should_prefetch_recent_articles(user_message):
                     prefetch_statuses = await _prefetch_recent_articles_context(
-                        session, messages, userspace_id, user_message
+                        session, messages, effective_userspace_id, user_message
                     )
                     for name, status, error in prefetch_statuses:
                         _record_tool_trace(trace, name, status, error)
@@ -596,7 +607,7 @@ async def run_agent(
                     target_model,
                     openai_tools,
                     session,
-                    userspace_id,
+                    effective_userspace_id,
                     trace,
                 )
                 return {
@@ -1001,8 +1012,10 @@ async def _execute_tool_calls(session, tool_calls, messages, userspace_id, trace
         func_name = tool_call.function.name
         func_args = json.loads(tool_call.function.arguments)
 
-        # Inject userspace_id if not already present
-        if userspace_id and "userspace" not in func_args:
+        # Always inject the effective userspace, overriding any LLM-provided value.
+        # The LLM may copy userspace from search-result articles rather than using
+        # the context issue's userspace, which causes ISSUE_NOT_FOUND errors.
+        if userspace_id:
             func_args["userspace"] = userspace_id
 
         args_for_trace = json.dumps(func_args, ensure_ascii=True, sort_keys=True)
