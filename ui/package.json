@@ -15,8 +15,8 @@
     "dompurify": "^3.4.2",
     "marked": "^18.0.3",
     "pinia": "^3.0.4",
-    "vue": "^3.5.33",
-    "vue-router": "^5.0.6"
+    "vue": "^3.5.39",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",
