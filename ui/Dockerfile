@@ -3,8 +3,10 @@ FROM node:22-slim AS build-stage
 
 WORKDIR /app
 
-# Copy package.json and yarn.lock to leverage Docker cache
-COPY package.json yarn.lock ./
+# Copy package.json, yarn.lock and .yarnrc.yml to leverage Docker cache
+# (.yarnrc.yml sets nodeLinker: node-modules — must be present before install
+# or Yarn 4 defaults to PnP and yarn build fails to find the node_modules state file)
+COPY package.json yarn.lock .yarnrc.yml ./
 
 # Enable corepack so yarn is available (bundled in node:22 but disabled by default)
 RUN corepack enable && yarn install
