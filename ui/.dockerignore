@@ -1,0 +1,10 @@
+# Local yarn/build state must never enter the image — a host-generated
+# .yarn/install-state.gz overwrites the container's own install state
+# after `COPY . .`, breaking Yarn's node_modules/.bin PATH resolution.
+.yarn
+node_modules
+dist
+
+# Editor/VCS cruft
+.git
+.vscode
