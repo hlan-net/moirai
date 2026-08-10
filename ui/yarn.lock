@@ -1615,12 +1615,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"marked@npm:^18.0.5":
-  version: 18.0.5
-  resolution: "marked@npm:18.0.5"
+"marked@npm:^18.0.9":
+  version: 18.0.9
+  resolution: "marked@npm:18.0.9"
   bin:
     marked: bin/marked.js
-  checksum: 10/61f1c64304a7e2615ac096bd7b6e5da453561a57393a57f85f8ddef07a64eaeadf4d57c4c6e47d9179d116d36326c159d15993490686fc17434a39bdab9ddb8a
+  checksum: 10/99d337c50acd57034734f8460f25b28e9658b15627f950092707cb443b840f0bd29fe343bf211b948e643303c34abdb5b5a12cf5245a846635750697524bb747
   languageName: node
   linkType: hard
 
@@ -2332,7 +2332,7 @@ __metadata:
     entities: "npm:^7.0.1"
     husky: "npm:^9.0.11"
     lint-staged: "npm:^17.0.8"
-    marked: "npm:^18.0.5"
+    marked: "npm:^18.0.9"
     pinia: "npm:^3.0.4"
     prettier: "npm:^3.8.4"
     typescript: "npm:~6.0.3"
