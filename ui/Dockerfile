@@ -8,8 +8,10 @@ WORKDIR /app
 # or Yarn 4 defaults to PnP and yarn build fails to find the node_modules state file)
 COPY package.json yarn.lock .yarnrc.yml ./
 
-# Node 26 slim doesn't ship corepack by default; install it to activate the pinned Yarn version
-RUN npm install -g corepack@latest && corepack enable && corepack prepare yarn@4.1.0 --activate && yarn install
+# Node 26 slim doesn't ship corepack by default; install it (pinned, no lifecycle
+# scripts) to activate the pinned Yarn version
+ENV YARN_ENABLE_SCRIPTS=false
+RUN npm install -g --ignore-scripts corepack@0.35.0 && corepack enable && corepack prepare yarn@4.1.0 --activate && yarn install
 
 # Copy the rest of the UI source code
 COPY . .
