@@ -1,0 +1,18 @@
+services:
+  api:
+    image: moirai-app:ci
+    environment:
+      - ADMIN_USERNAME=testuser
+      - ADMIN_PASSWORD=testpassword
+
+  mcp-server:
+    image: moirai-app:ci
+    environment:
+      - ADMIN_USERNAME=testuser
+      - ADMIN_PASSWORD=testpassword
+
+  ui:
+    image: moirai-ui:ci
+
+  worker:
+    image: moirai-app:ci
