@@ -5,53 +5,25 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main, release/** ]
   schedule:
     # Weekly, offset from Dependabot's Monday run.
     - cron: '0 4 * * 1'
   workflow_dispatch:
 
+# Static analysis (CodeQL) is intentionally NOT defined here: the repo already
+# runs it via GitHub's own default code-scanning setup (workflow "CodeQL",
+# dynamic/github-code-scanning/codeql) on every push and pull request -- adding
+# a second copy would just duplicate Actions minutes and Security-tab entries.
+
 jobs:
-  codeql:
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ python, javascript-typescript ]
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: /language:${{ matrix.language }}
-
   pentest:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v7
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
+      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
     - name: Cache Docker layers
       uses: actions/cache@v6
@@ -62,7 +34,7 @@ jobs:
           buildx-${{ runner.os }}-
 
     - name: Set up Miniforge
-      uses: conda-incubator/setup-miniconda@v4
+      uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4
       with:
         miniforge-variant: Miniforge3
         miniforge-version: latest
@@ -89,6 +61,8 @@ jobs:
 
     - name: Install dependencies (Yarn)
       working-directory: ./ui
+      env:
+        YARN_ENABLE_SCRIPTS: false
       run: yarn install
 
     - name: Build UI
