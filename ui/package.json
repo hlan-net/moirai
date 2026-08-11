@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "axios": "^1.18.1",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.13",
     "marked": "^18.0.9",
     "pinia": "^3.0.4",
     "vue": "^3.5.39",
@@ -44,8 +44,8 @@
   },
   "resolutions": {
     "entities": "7.0.1",
-    "ip-address": "10.2.0",
-    "postcss": "8.5.14",
-    "dompurify": "3.4.11"
+    "ip-address": "10.5.0",
+    "postcss": "8.5.26",
+    "dompurify": "3.4.13"
   }
 }
