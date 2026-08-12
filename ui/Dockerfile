@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue.js application
-FROM node:22-slim AS build-stage
+FROM node:26-slim AS build-stage
 
 WORKDIR /app
 
@@ -8,11 +8,19 @@ WORKDIR /app
 # or Yarn 4 defaults to PnP and yarn build fails to find the node_modules state file)
 COPY package.json yarn.lock .yarnrc.yml ./
 
-# Enable corepack so yarn is available (bundled in node:22 but disabled by default)
-RUN corepack enable && yarn install
+# Node 26 slim doesn't ship corepack by default; install it (pinned, no lifecycle
+# scripts) to activate the pinned Yarn version
+ENV YARN_ENABLE_SCRIPTS=false
+RUN npm install -g --ignore-scripts corepack@0.35.0 \
+    && corepack enable \
+    && corepack prepare yarn@4.1.0 --activate \
+    && yarn install --immutable
 
 # Copy the rest of the UI source code
 COPY . .
+
+# Re-run install after source copy so Yarn's install state matches the final workspace
+RUN yarn install --immutable
 
 # Build arguments placed after dependency install so they don't bust the cache
 ARG APP_VERSION=dev
