@@ -171,7 +171,7 @@ class AnnotationWorker(threading.Thread):
 
         logger.info(f"Annotating article: {title[:80]}")
 
-        annotation = annotate_article(title, summary)
+        annotation = annotate_article(title, summary, language=doc.get("language"))
         if annotation is None:
             logger.warning(f"Annotation failed for article {article_id}")
             return

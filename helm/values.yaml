@@ -167,6 +167,15 @@ ollama:
 llm:
   provider: "ollama"
   model: "llama3.2:3b"
+  # -- Optional dedicated article-annotation backend (Ollama API), e.g.
+  # hailo-ollama on a low-power NPU. Articles whose language is listed in
+  # `languages` try it first; other languages and any failure (invalid JSON,
+  # error, missing model) fall back to provider/model above. Leave endpoint
+  # empty to annotate everything with the default model.
+  annotation:
+    endpoint: ""
+    model: ""
+    languages: "en"
 
 # -- Service account configuration
 serviceAccount:
