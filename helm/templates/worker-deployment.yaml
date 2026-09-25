@@ -59,6 +59,20 @@ spec:
             value: {{ .Values.environment | quote }}
           - name: OLLAMA_BASE_URL
             value: {{ .Values.ollama.endpoint | quote }}
+          - name: DEFAULT_LLM_PROVIDER
+            value: {{ .Values.llm.provider | quote }}
+          - name: MODEL_NAME
+            value: {{ .Values.llm.model | quote }}
+          {{- with .Values.llm.annotation }}
+          {{- if .endpoint }}
+          - name: ANNOTATION_OLLAMA_BASE_URL
+            value: {{ .endpoint | quote }}
+          - name: ANNOTATION_MODEL_NAME
+            value: {{ .model | quote }}
+          - name: ANNOTATION_LANGUAGES
+            value: {{ .languages | quote }}
+          {{- end }}
+          {{- end }}
           - name: COUCHDB_USER
             valueFrom:
               secretKeyRef:
