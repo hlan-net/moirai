@@ -161,6 +161,13 @@ gemini:
 ollama:
   endpoint: "https://ollama.example.com"
 
+# -- Default LLM used by background workers (article annotation) and as the
+# chat fallback when a userspace has no llm_config. The model must be
+# installed on the provider (for Ollama: `ollama list`).
+llm:
+  provider: "ollama"
+  model: "llama3.2:3b"
+
 # -- Service account configuration
 serviceAccount:
   # -- Specifies whether a service account should be created

@@ -16,6 +16,7 @@ import time
 from typing import Any, Optional
 
 import requests
+from openai import NotFoundError
 
 from api.db_config import get_couchdb_uri
 from api.llm.factory import LLMProviderFactory
@@ -32,6 +33,13 @@ Respond ONLY with the JSON object, no other text."""
 
 ANNOTATION_USER_TEMPLATE = """Title: {title}
 Summary: {summary}"""
+
+DEFAULT_ANNOTATION_MODEL = "llama3.1"
+
+# When the provider reports the model as missing (HTTP 404), pause annotation
+# instead of sending one doomed request per incoming article.
+MODEL_NOT_FOUND_BACKOFF_SECONDS = 600
+_paused_until: float = 0.0
 
 
 def _get_llm_provider() -> Any:
@@ -53,7 +61,64 @@ def _get_llm_provider() -> Any:
     return factory.get_provider(llm_endpoint, api_key, ollama_base_url)
 
 
-def annotate_article(title: str, summary: str, model: Optional[str] = None) -> Optional[dict]:
+def _resolve_model(model: Optional[str] = None) -> str:
+    return model or os.environ.get("MODEL_NAME", DEFAULT_ANNOTATION_MODEL)
+
+
+def _pause_annotation(reason: str) -> None:
+    global _paused_until
+    _paused_until = time.monotonic() + MODEL_NOT_FOUND_BACKOFF_SECONDS
+    logger.error(
+        f"{reason} — pausing annotation for {MODEL_NOT_FOUND_BACKOFF_SECONDS}s. "
+        "Set MODEL_NAME / DEFAULT_LLM_PROVIDER to an installed model."
+    )
+
+
+def annotation_paused_for() -> float:
+    """Seconds remaining before annotation resumes (0 when active)."""
+    return max(0.0, _paused_until - time.monotonic())
+
+
+def _model_names_match(wanted: str, available: str) -> bool:
+    # Ollama treats "name" and "name:latest" as the same model.
+    def norm(name: str) -> str:
+        return name if ":" in name else f"{name}:latest"
+
+    return norm(wanted) == norm(available)
+
+
+def check_annotation_model(model: Optional[str] = None) -> bool:
+    """Verify the configured annotation model is available on the provider.
+
+    Returns False (and pauses annotation) only when the provider's model list
+    was fetched and the model is not in it. An unreachable provider is logged
+    but not treated as a missing model.
+    """
+    model_name = _resolve_model(model)
+    provider_name = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
+    try:
+        available = _get_llm_provider().list_models()
+    except Exception as e:
+        logger.warning(
+            f"Could not list models from {provider_name} to verify "
+            f"annotation model '{model_name}': {e}"
+        )
+        return True
+
+    if any(_model_names_match(model_name, m) for m in available):
+        logger.info(f"Annotation model '{model_name}' available on {provider_name}")
+        return True
+
+    _pause_annotation(
+        f"Annotation model '{model_name}' not found on {provider_name} "
+        f"(available: {', '.join(sorted(available)) or 'none'})"
+    )
+    return False
+
+
+def annotate_article(
+    title: str, summary: str, model: Optional[str] = None
+) -> Optional[dict]:
     """Classify an article using the configured LLM provider.
 
     Args:
@@ -68,7 +133,10 @@ def annotate_article(title: str, summary: str, model: Optional[str] = None) -> O
     if not title:
         return None
 
-    model_name = model or os.environ.get("MODEL_NAME", "llama3.1")
+    if annotation_paused_for() > 0:
+        return None
+
+    model_name = _resolve_model(model)
 
     # Truncate very long summaries to save tokens
     truncated_summary = (summary or "")[:1000]
@@ -107,6 +175,12 @@ def annotate_article(title: str, summary: str, model: Optional[str] = None) -> O
 
     except json.JSONDecodeError as e:
         logger.warning(f"Annotation JSON parse error for '{title[:60]}': {e}")
+        return None
+    except NotFoundError as e:
+        provider_name = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
+        _pause_annotation(
+            f"Annotation model '{model_name}' not found on {provider_name}: {e}"
+        )
         return None
     except Exception as e:
         logger.error(f"Annotation LLM error for '{title[:60]}': {e}")

@@ -10,7 +10,12 @@ import time
 import requests
 import logging
 from api.db_config import get_couchdb_uri
-from .annotator import annotate_article, store_annotation
+from .annotator import (
+    annotate_article,
+    annotation_paused_for,
+    check_annotation_model,
+    store_annotation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +43,7 @@ class AnnotationWorker(threading.Thread):
     def run(self) -> None:
         logger.info("AnnotationWorker started.")
         self.last_seq = self._get_last_seq()
+        check_annotation_model()
 
         while self.running:
             self._process_changes()
@@ -96,6 +102,13 @@ class AnnotationWorker(threading.Thread):
 
     def _process_changes(self) -> None:
         """Long-poll the CouchDB changes feed and annotate new articles."""
+        paused_for = annotation_paused_for()
+        if paused_for > 0:
+            # Leave last_seq untouched so pending articles are annotated once
+            # the model becomes available.
+            time.sleep(min(paused_for, 30))
+            return
+
         changes_url = f"{self.couchdb_url}{self.db_name}/_changes"
         params = {
             "feed": "longpoll",
@@ -128,6 +141,11 @@ class AnnotationWorker(threading.Thread):
 
                 self._maybe_annotate(doc)
 
+                if annotation_paused_for() > 0:
+                    # Model went missing mid-batch: don't advance last_seq so
+                    # the rest of the batch is retried after the pause.
+                    return
+
             if data.get("last_seq"):
                 self.last_seq = data["last_seq"]
                 self._save_last_seq(self.last_seq)
@@ -136,9 +154,7 @@ class AnnotationWorker(threading.Thread):
             # DB doesn't exist yet — wait and retry
             time.sleep(10)
         else:
-            logger.error(
-                f"AnnotationWorker: Unexpected status {response.status_code}"
-            )
+            logger.error(f"AnnotationWorker: Unexpected status {response.status_code}")
             time.sleep(10)
 
     def _maybe_annotate(self, doc: dict) -> None:
