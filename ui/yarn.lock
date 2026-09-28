@@ -841,10 +841,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"entities@npm:7.0.1":
-  version: 7.0.1
-  resolution: "entities@npm:7.0.1"
-  checksum: 10/3c0c58d869c45148463e96d21dee2d1b801bd3fe4cf47aa470cd26dfe81d59e9e0a9be92ae083fa02fa441283c883a471486e94538dcfb8544428aa80a55271b
+"entities@npm:8.1.0":
+  version: 8.1.0
+  resolution: "entities@npm:8.1.0"
+  checksum: 10/bd2fadbcabcf2cbd5de6b8155289acec9394d004fc095b9c7b3fdb4135468d8823a6de12275b07085e5dc077a142ede24e71098ffeb064000312d2a6960330a2
   languageName: node
   linkType: hard
 
@@ -1961,7 +1961,7 @@ __metadata:
     "@vue/tsconfig": "npm:^0.9.1"
     axios: "npm:^1.20.0"
     dompurify: "npm:^3.4.16"
-    entities: "npm:^7.0.1"
+    entities: "npm:^8.1.0"
     husky: "npm:^9.0.11"
     lint-staged: "npm:^17.5.1"
     marked: "npm:^18.0.14"
