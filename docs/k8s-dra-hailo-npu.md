@@ -1,8 +1,9 @@
 # Dynamic Resource Allocation (DRA) for the Hailo NPU
 
 **Status:** Deferred (low priority) — decided 2026-09-28
-**Capability gate:** `192.168.1.12` joined to the cluster as a node, **and** a DRA driver (or at
-minimum a device plugin) for Hailo devices available.
+**Capability gate:** `192.168.1.12` joined to the cluster as a node, **and** a Hailo DRA driver
+available. The `DeviceClass`/`ResourceClaim` sketch below requires a DRA driver; a device plugin
+alone cannot satisfy it (see [Device-plugin alternative](#device-plugin-alternative)).
 
 ## What it is
 
@@ -12,8 +13,9 @@ DRA is the Kubernetes mechanism for modelling hardware devices as first-class re
 - **`ResourceClaim` / `ResourceClaimTemplate`** — a pod's request for a device. The scheduler
   places the pod on a node that has a matching free device.
 
-DRA is GA in the Kubernetes line the cluster runs (k3s v1.36.4). It replaces the older
-device-plugin model (`resources.limits: vendor.com/device: 1`) with richer selection and sharing.
+DRA is GA in the Kubernetes line the cluster runs (k3s v1.36.4). It is an alternative to the
+device-plugin model (`resources.limits: vendor.com/device: 1`), which remains supported, and adds
+richer selection and sharing.
 
 ## Why it matters for Moirai
 
@@ -24,7 +26,8 @@ that **requests the NPU**, so Kubernetes schedules, restarts and monitors it.
 ## Why it is deferred
 
 - `192.168.1.12` is not a cluster node.
-- No Hailo DRA driver is known to exist. A device plugin may be needed instead, or written.
+- No Hailo DRA driver is known to exist. A device plugin may be needed instead, or written (see
+  [Device-plugin alternative](#device-plugin-alternative)).
 - The external setup works. See [External Ollama as a Service](k8s-external-ollama-service.md)
   for the low-cost improvement available now.
 
@@ -58,9 +61,25 @@ spec:
 The device class name is a placeholder. Use whatever the eventual driver publishes, and check API
 versions against the installed cluster.
 
+## Device-plugin alternative
+
+If only a device plugin is available, skip the `DeviceClass`/`ResourceClaim` objects. The plugin
+advertises an extended resource on the node, and the hailo-ollama Deployment requests it directly:
+
+```yaml
+containers:
+  - name: hailo-ollama
+    resources:
+      limits:
+        hailo.ai/npu: 1   # placeholder: the resource name the plugin advertises
+```
+
+This is simpler, but gives no device attributes to select on and no sharing between pods.
+
 ## When to revisit
 
-- Hailo (or the community) ships a DRA driver or device plugin, and
+- Hailo (or the community) ships a DRA driver (for the sketch above) or a device plugin (for the
+  alternative), and
 - `192.168.1.12` (or another NPU host) is joined to the cluster.
 
 ## Related

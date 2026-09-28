@@ -14,10 +14,13 @@ Moirai's Ollama backends run outside the cluster on host `192.168.1.12`:
 | `11434` | Ollama 0.31.1 | General-purpose models (chat, default annotation fallback) |
 | `8000` | Ollama-compatible, reports `0.5.1` | Presumably hailo-ollama on the Hailo NPU (not verified) |
 
-The Helm chart points at them with raw URLs (`ollama.endpoint`, `llm.annotation.endpoint`), which
-are injected as `OLLAMA_BASE_URL` / `ANNOTATION_OLLAMA_BASE_URL` into the api, worker, scheduler
-and MCP server deployments. Moving Ollama to another host means editing values and redeploying
-every component.
+The Helm chart points at them with raw URLs:
+
+- `ollama.endpoint` → `OLLAMA_BASE_URL`, injected into the api, worker, scheduler and MCP server.
+- `llm.annotation.endpoint` → `ANNOTATION_OLLAMA_BASE_URL`, injected into the **worker only**.
+
+Moving the general Ollama to another host means editing values and restarting all four
+components. Moving the annotation backend only requires restarting the worker.
 
 ## Proposal
 
@@ -54,11 +57,13 @@ A second pair (`ollama-hailo`, port `8000`) covers the annotation backend. Helm 
 
 ```yaml
 ollama:
-  endpoint: "http://ollama:11434"
+  endpoint: "http://ollama:11434/v1"
 llm:
   annotation:
-    endpoint: "http://ollama-hailo:8000"
+    endpoint: "http://ollama-hailo:8000/v1"
 ```
+
+Keep the `/v1` suffix: both values are used as OpenAI-compatible base URLs (see `.env.example`).
 
 ### Helm integration sketch
 

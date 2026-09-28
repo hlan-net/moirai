@@ -1,9 +1,9 @@
 # Gateway API Inference Extension (InferencePool)
 
 **Status:** Deferred (low priority) — decided 2026-09-28
-**Capability gate:** Inference Extension CRDs (`InferencePool`, `InferenceObjective`) and a
-compatible gateway implementation installed in the cluster, **and** model servers running as pods
-in-cluster.
+**Capability gate:** the Inference Extension `InferencePool` CRD, a gateway implementation that
+supports it, and an endpoint picker (EPP) deployment installed in the cluster, **and** model servers
+running as pods in-cluster.
 
 ## What it is
 
@@ -12,8 +12,7 @@ of Gateway API:
 
 - **`InferencePool`** — a group of model-server pods, selected by labels, that an `HTTPRoute` can
   target instead of a plain Service.
-- **`InferenceObjective`** — per-workload intent (e.g. criticality) used by the endpoint picker.
-- An **endpoint picker** chooses the backend pod per request using model-server signals such as
+- An **endpoint picker** (EPP) chooses the backend pod per request using model-server signals such as
   queue depth, KV-cache usage and loaded LoRA adapters, instead of round-robin.
 
 ## Why it is deferred
@@ -46,7 +45,9 @@ spec:
   targetPorts:
     - number: 11434
   endpointPickerRef:
-    name: moirai-llm-epp
+    name: moirai-llm-epp   # placeholder: the EPP Service, deployed separately
+    port:
+      number: 9002         # required when kind is Service (the default)
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -63,6 +64,10 @@ spec:
 ```
 
 Field names follow the upstream v1 API. Check them against the installed CRD version before use.
+
+Per-workload objectives (`InferenceObjective`, e.g. criticality) are no longer part of this
+project upstream; they live in llm-d-router. Moirai does not need them, so they are not part of the
+gate.
 
 ## Related
 

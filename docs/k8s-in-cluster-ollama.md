@@ -30,7 +30,9 @@ them. Running the model server inside the cluster would make it a managed worklo
 
 - **Models on persisted volumes, never baked into images.** Mount a PVC for `OLLAMA_MODELS`, the
   same rule as for embedding models.
-- Moirai keeps talking plain Ollama/OpenAI-compatible HTTP. Only `ollama.endpoint` changes.
+- Moirai keeps talking plain Ollama/OpenAI-compatible HTTP. Only the endpoint values change:
+  `ollama.endpoint`, and `llm.annotation.endpoint` too when a dedicated annotation backend is
+  configured. Otherwise annotation keeps targeting the old external host.
 - Once there are several replicas, consider the
   [Gateway API Inference Extension](k8s-gateway-inference-extension.md) for routing.
 
