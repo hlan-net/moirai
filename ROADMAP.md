@@ -78,6 +78,17 @@ See [`docs/metrics-and-alerting.md`](docs/metrics-and-alerting.md) for full conc
 
 - **[Agentic Infrastructure](docs/agentic-improvements.md):** Plan-Execute-Reflect loops, persistent agent memory.
 
+### Kubernetes-native Inference (capability-gated)
+**Focus:** Represent the LLM backends (Ollama, hailo-ollama on `192.168.1.12`) as Kubernetes resources instead of raw URLs in Helm values.
+**Priority:** Low. Decided 2026-09-28: revisit each item when the cluster in use gains the listed capability. As of that date (k3s v1.36.4) it has Gateway API base CRDs only.
+
+| Item | Capability gate |
+|------|-----------------|
+| **[External Ollama as a Service](docs/k8s-external-ollama-service.md)**: selectorless Service + EndpointSlice | None; possible today |
+| **[Gateway API Inference Extension](docs/k8s-gateway-inference-extension.md)**: `InferencePool` routing | Inference Extension CRDs + in-cluster model-server pods |
+| **[In-cluster Ollama](docs/k8s-in-cluster-ollama.md)**: KServe / KubeAI / ollama-operator | Operator installed + node capacity for models |
+| **[DRA for the Hailo NPU](docs/k8s-dra-hailo-npu.md)**: NPU as a schedulable resource | NPU host joined as node + Hailo DRA driver/device plugin |
+
 ---
 
 ## 🛡️ Strategic Pillars (cross-cutting)
