@@ -284,6 +284,35 @@ const handleFaviconError = (event: Event) => {
   img.style.display = 'none'
 }
 
+// Dot-details popover (compact view). Teleported to <body> with fixed positioning so
+// the scrolling .stream-container can't clip it.
+const DOT_POPOVER_GAP = 6
+const hoveredArticle = ref<Article | null>(null)
+const popoverPos = ref({ top: 0, right: 0, placeAbove: false })
+
+const hasDots = (article: Article) =>
+  article.annotations?.priority === 'high' ||
+  article.annotations?.priority === 'medium' ||
+  article.annotations?.sentiment === 'positive' ||
+  article.annotations?.sentiment === 'negative' ||
+  !!article.events?.length ||
+  !!article.trends?.length
+
+const showDotDetails = (article: Article, event: Event) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const placeAbove = rect.bottom > window.innerHeight * 0.6
+  popoverPos.value = {
+    top: placeAbove ? rect.top - DOT_POPOVER_GAP : rect.bottom + DOT_POPOVER_GAP,
+    right: Math.max(8, window.innerWidth - rect.right),
+    placeAbove,
+  }
+  hoveredArticle.value = article
+}
+
+const hideDotDetails = () => {
+  hoveredArticle.value = null
+}
+
 const toggleTheme = () => {
   const nextTheme = resolvedTheme.value === 'dark' ? 'light' : 'dark'
   setTheme(nextTheme, { persist: false })
@@ -349,7 +378,7 @@ const toggleTheme = () => {
 
     <div v-if="loading" class="loading">Loading stream...</div>
     
-    <div v-else-if="articles.length" ref="streamContainer" class="stream-container" :class="{ 'high-density': isHighDensity }">
+    <div v-else-if="articles.length" ref="streamContainer" class="stream-container" :class="{ 'high-density': isHighDensity }" @scroll.passive="hideDotDetails">
       <div v-for="(group, index) in groupedArticles" :key="group.title + '-' + index" class="feed-group">
         <h3 class="group-title">
           <template v-if="groupMode === 'feed'">
@@ -375,13 +404,22 @@ const toggleTheme = () => {
               <h4 class="item-title compact-title">
                 <a :href="article.link" target="_blank">{{ article.title }}</a>
               </h4>
-              <div class="compact-tags">
-                <span v-if="article.annotations?.priority === 'high'" class="dot-tag priority-high-dot" title="High Priority"></span>
-                <span v-if="article.annotations?.priority === 'medium'" class="dot-tag priority-medium-dot" title="Medium Priority"></span>
-                <span v-if="article.annotations?.sentiment === 'positive'" class="dot-tag sentiment-positive-dot" title="Positive Sentiment"></span>
-                <span v-if="article.annotations?.sentiment === 'negative'" class="dot-tag sentiment-negative-dot" title="Negative Sentiment"></span>
-                <span v-if="article.events?.length" class="dot-tag event-dot" title="Has Events"></span>
-                <span v-if="article.trends?.length" class="dot-tag trend-dot" title="Has Trends"></span>
+              <div
+                v-if="hasDots(article)"
+                class="compact-tags"
+                tabindex="0"
+                aria-describedby="dot-details-popover"
+                @mouseenter="showDotDetails(article, $event)"
+                @mouseleave="hideDotDetails"
+                @focus="showDotDetails(article, $event)"
+                @blur="hideDotDetails"
+              >
+                <span v-if="article.annotations?.priority === 'high'" class="dot-tag priority-high-dot"></span>
+                <span v-if="article.annotations?.priority === 'medium'" class="dot-tag priority-medium-dot"></span>
+                <span v-if="article.annotations?.sentiment === 'positive'" class="dot-tag sentiment-positive-dot"></span>
+                <span v-if="article.annotations?.sentiment === 'negative'" class="dot-tag sentiment-negative-dot"></span>
+                <span v-if="article.events?.length" class="dot-tag event-dot"></span>
+                <span v-if="article.trends?.length" class="dot-tag trend-dot"></span>
               </div>
             </div>
           </template>
@@ -438,6 +476,55 @@ const toggleTheme = () => {
     </div>
     
     <div v-else class="empty-state">No articles found in the stream.</div>
+
+    <Teleport to="body">
+      <div
+        v-if="hoveredArticle"
+        id="dot-details-popover"
+        role="tooltip"
+        class="dot-popover"
+        :class="{ 'place-above': popoverPos.placeAbove }"
+        :style="{ top: `${popoverPos.top}px`, right: `${popoverPos.right}px` }"
+      >
+        <div v-if="hoveredArticle.annotations?.priority === 'high'" class="dot-popover-row">
+          <span class="dot-tag priority-high-dot"></span>
+          <span>High priority</span>
+        </div>
+        <div v-else-if="hoveredArticle.annotations?.priority === 'medium'" class="dot-popover-row">
+          <span class="dot-tag priority-medium-dot"></span>
+          <span>Medium priority</span>
+        </div>
+        <div v-if="hoveredArticle.annotations?.sentiment === 'positive'" class="dot-popover-row">
+          <span class="dot-tag sentiment-positive-dot"></span>
+          <span>Positive sentiment</span>
+        </div>
+        <div v-else-if="hoveredArticle.annotations?.sentiment === 'negative'" class="dot-popover-row">
+          <span class="dot-tag sentiment-negative-dot"></span>
+          <span>Negative sentiment</span>
+        </div>
+        <div v-if="hoveredArticle.events?.length" class="dot-popover-row">
+          <span class="dot-tag event-dot"></span>
+          <span class="dot-popover-label">Events</span>
+          <span class="dot-popover-tags">
+            <span v-for="event in hoveredArticle.events" :key="event" class="tag tag-event">{{ event }}</span>
+          </span>
+        </div>
+        <div v-if="hoveredArticle.trends?.length" class="dot-popover-row">
+          <span class="dot-tag trend-dot"></span>
+          <span class="dot-popover-label">Trends</span>
+          <span class="dot-popover-tags">
+            <span v-for="trend in hoveredArticle.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+          </span>
+        </div>
+        <div v-if="hoveredArticle.annotations?.topics?.length" class="dot-popover-row">
+          <span class="dot-tag dot-placeholder"></span>
+          <span class="dot-popover-label">Topics</span>
+          <span class="dot-popover-tags">
+            <span v-for="topic in hoveredArticle.annotations.topics" :key="topic" class="tag tag-topic">{{ topic }}</span>
+          </span>
+        </div>
+      </div>
+    </Teleport>
     
   </div>
 </template>
@@ -707,6 +794,66 @@ const toggleTheme = () => {
 .priority-medium-dot { background-color: #ef6c00; }
 .sentiment-positive-dot { background-color: #2e7d32; }
 .sentiment-negative-dot { background-color: #d32f2f; }
+
+.compact-tags:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Dot-details popover (teleported to body, fixed position) */
+.dot-popover {
+    position: fixed;
+    z-index: 2000;
+    max-width: 320px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    font-size: 0.85rem;
+    text-align: left;
+    pointer-events: none;
+}
+
+.dot-popover.place-above {
+    transform: translateY(-100%);
+}
+
+.dot-popover-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.dot-popover-row .dot-tag {
+    flex-shrink: 0;
+}
+
+.dot-placeholder {
+    visibility: hidden;
+}
+
+.dot-popover-label {
+    font-weight: 600;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.dot-popover-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.dot-popover-tags .tag {
+    padding: 1px 8px;
+    font-size: 0.75rem;
+}
 
 .item-meta {
     font-size: 0.8rem;
