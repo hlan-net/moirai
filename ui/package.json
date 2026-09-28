@@ -24,7 +24,6 @@
     "@types/node": "^26.6.2",
     "@vitejs/plugin-vue": "^6.0.9",
     "@vue/tsconfig": "^0.9.1",
-    "entities": "^7.0.1",
     "husky": "^9.0.11",
     "lint-staged": "^17.5.1",
     "prettier": "^3.9.9",
@@ -43,7 +42,6 @@
     "trailingComma": "es5"
   },
   "resolutions": {
-    "entities": "7.0.1",
     "ip-address": "10.5.0",
     "postcss": "8.5.26",
     "dompurify": "3.4.16"
