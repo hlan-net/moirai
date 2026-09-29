@@ -18,6 +18,11 @@ on:
 jobs:
   pentest:
     runs-on: ubuntu-latest
+    # Job-level so every docker compose call (up, logs, down) can interpolate
+    # the compose file's required variables, not just the start step.
+    env:
+      COUCHDB_PASSWORD: password
+      REDIS_PASSWORD: password
 
     steps:
     - uses: actions/checkout@v7
@@ -88,8 +93,6 @@ jobs:
     # these tests exist to prove those protections hold under their real defaults.
     - name: Start stack with real CSRF/rate-limit enforcement
       env:
-        COUCHDB_PASSWORD: password
-        REDIS_PASSWORD: password
         ADMIN_USERNAME: testuser
         ADMIN_PASSWORD: testpassword
         JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
@@ -115,8 +118,8 @@ jobs:
 
     - name: Dump container logs on failure
       if: failure()
-      run: docker compose logs
+      run: docker compose -f docker-compose.yml -f docker-compose.security-ci.yml logs
 
     - name: Tear down stack
       if: always()
-      run: docker compose down
+      run: docker compose -f docker-compose.yml -f docker-compose.security-ci.yml down
