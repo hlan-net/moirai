@@ -169,8 +169,9 @@ class TestFactory:
         assert isinstance(provider, AisaProvider)
 
     def test_factory_raises_clear_error_when_aisa_unconfigured(self):
+        factory = LLMProviderFactory()
         with pytest.raises(ValueError, match="AISA is not configured"):
-            LLMProviderFactory().get_provider("aisa", "", "")
+            factory.get_provider("aisa", "", "")
 
     def test_direct_providers_ignore_aisa_env(self, monkeypatch):
         """AISA env must not redirect direct OpenAI or Ollama traffic."""
@@ -288,4 +289,5 @@ class TestChatRoutes:
         msg = _format_agent_error_message(
             "ollama", "http://ollama:11434/v1", ["Connection refused"]
         )
-        assert "Ollama" in msg and "http://ollama:11434/v1" in msg
+        assert "Ollama" in msg
+        assert "http://ollama:11434/v1" in msg

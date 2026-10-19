@@ -677,7 +677,14 @@ onMounted(() => {
       </div>
 
       <div class="sub-section">
-        <h3 @click="toggleSection('aisa')">
+        <h3
+          @click="toggleSection('aisa')"
+          @keydown.enter.prevent="toggleSection('aisa')"
+          @keydown.space.prevent="toggleSection('aisa')"
+          tabindex="0"
+          role="button"
+          :aria-expanded="!collapsedSections.has('aisa')"
+        >
           AISA (in-cluster inference proxy)
           <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
         </h3>

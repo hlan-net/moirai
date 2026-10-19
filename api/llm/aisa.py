@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 AISA_TIMEOUT_SECONDS = 600.0
 AISA_PROVIDER_NAME = "aisa"
+_UNSET = "(unset)"
 
 
 def _read_secret_file(path: str) -> str:
@@ -162,8 +163,8 @@ def log_llm_startup_config(log: logging.Logger) -> None:
         "LLM config: default_provider=%s model=%s ollama_base_url=%s "
         "openai_key=%s gemini_key=%s",
         default_provider,
-        model_name or "(unset)",
-        ollama or "(unset)",
+        model_name or _UNSET,
+        ollama or _UNSET,
         "set" if os.environ.get("OPENAI_API_KEY") else "unset",
         "set" if os.environ.get("GEMINI_API_KEY") else "unset",
     )
@@ -171,7 +172,7 @@ def log_llm_startup_config(log: logging.Logger) -> None:
         log.info(
             "LLM config: aisa base_url=%s default_model=%s key=%s",
             status["base_url"],
-            status["default_model"] or "(unset)",
+            status["default_model"] or _UNSET,
             "set" if status["configured"] else "MISSING",
         )
     else:
