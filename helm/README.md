@@ -40,6 +40,26 @@ See `values.yaml` for all available options:
 - **Resources:** CPU/memory requests and limits per service
 - **Probes:** Readiness and liveness probe settings
 
+### AISA (in-cluster inference proxy)
+
+Optional and additive: direct OpenAI/Gemini/Ollama settings keep working. Declare Moirai
+as an AISA consumer (target secret `moirai-aisa-key` in this namespace), then:
+
+```yaml
+aisa:
+  enabled: true
+  secretName: moirai-aisa-key
+  reloader: true          # optional, needs Stakater Reloader in the cluster
+llm:
+  provider: aisa          # optional process-wide default (DEFAULT_LLM_PROVIDER)
+  model: "qwen3:8b"       # MODEL_NAME; must exist behind the proxy
+```
+
+The Secret keys `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` are mapped to
+`AISA_BASE_URL` / `AISA_API_KEY` / `AISA_MODEL` with `optional: true`. Restart the
+deployments after AISA first creates the Secret (env is read at container start).
+See `docs/llm-configuration.md` for details.
+
 ## Storage
 
 CouchDB uses persistent volumes for data. Configure:

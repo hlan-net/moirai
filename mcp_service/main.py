@@ -7,6 +7,7 @@ from api.telemetry import configure_telemetry
 from api.auth_utils import verify_auth_header
 from tasks.agent_orchestrator import AgentOrchestrator
 from .tools import feeds, issues, search, staleness, users, agent_configs, annotations  # noqa: F401
+from api.llm.aisa import log_llm_startup_config
 from version import get_version_string
 import logging
 import os  # Added for env vars
@@ -47,6 +48,7 @@ class AuthMiddleware:
 
 # Print version info
 logger.info(f"{get_version_string()} starting...")
+log_llm_startup_config(logger)
 
 # Get the ASGI app
 app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()

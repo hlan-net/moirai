@@ -37,7 +37,7 @@ const sessionProvider = ref(settingsStore.llmEndpoint)
 const sessionModel = ref(settingsStore.getCurrentModel())
 const llmSelectorOpen = ref(false)
 
-const providers = ['ollama', 'openai', 'gemini'] as const
+const providers = ['ollama', 'openai', 'gemini', 'aisa'] as const
 
 // Keep defaults in sync with the store until the user explicitly changes them
 watchEffect(() => {
@@ -56,6 +56,9 @@ watch(sessionProvider, (newProvider) => {
       break
     case 'gemini':
       sessionModel.value = settingsStore.geminiModel
+      break
+    case 'aisa':
+      sessionModel.value = settingsStore.aisaModel
       break
     default:
       sessionModel.value = settingsStore.ollamaModel

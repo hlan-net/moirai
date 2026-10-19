@@ -84,3 +84,4 @@ spec:
                     optional: true
               - name: PYTHONUNBUFFERED
                 value: "1"
+              {{- include "moirai.aisaEnv" . | nindent 14 }}

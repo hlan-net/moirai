@@ -165,6 +165,7 @@ ollama:
 # chat fallback when a userspace has no llm_config. The model must be
 # installed on the provider (for Ollama: `ollama list`).
 llm:
+  # -- ollama | openai | gemini | aisa (aisa requires aisa.enabled below)
   provider: "ollama"
   model: "llama3.2:3b"
   # -- Optional dedicated article-annotation backend (Ollama API), e.g.
@@ -176,6 +177,23 @@ llm:
     endpoint: ""
     model: ""
     languages: "en"
+
+# -- AISA: in-cluster OpenAI-compatible inference proxy (additive, direct
+# providers keep working). AISA reconciles a Secret into this namespace with
+# the keys OPENAI_BASE_URL, OPENAI_API_KEY and optionally OPENAI_MODEL; the chart
+# maps them to AISA_BASE_URL / AISA_API_KEY / AISA_MODEL so the direct
+# OPENAI_API_KEY above is never overwritten. The Secret is referenced with
+# optional: true, so pods start before AISA has reconciled it, but they must be
+# restarted once the Secret exists (env is read only at container start).
+aisa:
+  enabled: false
+  # -- Name of the Secret declared for this consumer in AISA
+  # (Consumers -> Target Secret, or Consul KV aisa/consumers/<name>.secret)
+  secretName: "moirai-aisa-key"
+  # -- Override the default model instead of reading OPENAI_MODEL from the Secret
+  defaultModel: ""
+  # -- Add Stakater Reloader annotations so pods restart on key rotation
+  reloader: false
 
 # -- Service account configuration
 serviceAccount:

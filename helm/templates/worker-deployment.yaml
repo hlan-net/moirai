@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "moirai.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
+  {{- with (include "moirai.aisaReloaderAnnotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   # Only one enrichment worker may run at a time to avoid duplicate processing
   # of the CouchDB changes feed.
@@ -113,3 +117,4 @@ spec:
                 optional: true
           - name: PYTHONUNBUFFERED
             value: "1"
+          {{- include "moirai.aisaEnv" . | nindent 10 }}

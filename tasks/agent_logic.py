@@ -108,7 +108,6 @@ def _call_llm(
         api_key = ""
 
     ollama_base_url = llm_config.get("ollama_endpoint") or _OLLAMA_DEFAULT_ENDPOINT
-    llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
 
     # Resolve tracing handles (no-op if mcp_client is not a TracingMCPClient)
     _session_logger = getattr(mcp_client, "session_logger", None)
@@ -116,6 +115,9 @@ def _call_llm(
 
     start = _time.monotonic()
     try:
+        # Inside the try: the AISA provider raises ValueError when the
+        # in-cluster credentials are missing, which must be logged, not crash.
+        llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
         response = llm_provider.create_chat_completion(
             messages=[{"role": "user", "content": prompt}],
             model=model,

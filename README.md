@@ -130,7 +130,7 @@ Before committing and pushing changes, run relevant local tests for the area you
 ## Documentation
 
 * [Architecture](docs/ARCHITECTURE.md)
-* [LLM Configuration](docs/LLM_CONFIGURATION.md) - How to configure Ollama, OpenAI, and Gemini.
+* [LLM Configuration](docs/llm-configuration.md) - How to configure Ollama, OpenAI, Gemini, and the in-cluster AISA proxy.
 * [External REST API](docs/EXTERNAL_API.md) - Documentation for `/mcp` endpoints on the REST API.
 * [Release Process](docs/RELEASE.md) - Release and RC checklist.
 * [Example Usage](EXAMPLES.md)

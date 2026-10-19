@@ -426,7 +426,7 @@ class IssueCreateRequest(BaseModel):
 class LLMConfigRequest(BaseModel):
     """LLM provider configuration stored on a userspace."""
 
-    provider: str = Field("ollama", description="ollama | openai | gemini")
+    provider: str = Field("ollama", description="ollama | openai | gemini | aisa")
     model: str = Field("llama3.1", min_length=1, max_length=200)
     openai_api_key: Optional[str] = Field(None, max_length=500)
     gemini_api_key: Optional[str] = Field(None, max_length=500)
@@ -435,7 +435,7 @@ class LLMConfigRequest(BaseModel):
     @field_validator("provider")
     @classmethod
     def validate_provider(cls, v: str) -> str:
-        allowed = {"ollama", "openai", "gemini"}
+        allowed = {"ollama", "openai", "gemini", "aisa"}
         if v not in allowed:
             raise ValueError(f"provider must be one of: {', '.join(sorted(allowed))}")
         return v

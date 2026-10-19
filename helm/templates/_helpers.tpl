@@ -82,3 +82,45 @@ Nginx name
 {{- define "moirai.nginx.name" -}}
 {{- printf "%s-%s" (include "moirai.name" .) "nginx" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+AISA env vars mapped from the AISA-managed consumer Secret.
+Uses secretKeyRef (not envFrom) so the Secret's OPENAI_API_KEY cannot collide
+with the direct OPENAI_API_KEY env var; optional so pods start pre-reconcile.
+*/}}
+{{- define "moirai.aisaEnv" -}}
+{{- if .Values.aisa.enabled }}
+- name: AISA_BASE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.aisa.secretName | quote }}
+      key: OPENAI_BASE_URL
+      optional: true
+- name: AISA_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.aisa.secretName | quote }}
+      key: OPENAI_API_KEY
+      optional: true
+{{- if .Values.aisa.defaultModel }}
+- name: AISA_MODEL
+  value: {{ .Values.aisa.defaultModel | quote }}
+{{- else }}
+- name: AISA_MODEL
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.aisa.secretName | quote }}
+      key: OPENAI_MODEL
+      optional: true
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Deployment annotations for Stakater Reloader (restart on AISA key rotation).
+*/}}
+{{- define "moirai.aisaReloaderAnnotations" -}}
+{{- if and .Values.aisa.enabled .Values.aisa.reloader }}
+secret.reloader.stakater.com/reload: {{ .Values.aisa.secretName | quote }}
+{{- end }}
+{{- end -}}

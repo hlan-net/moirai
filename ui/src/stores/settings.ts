@@ -11,6 +11,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const ollamaModel = ref<string>(localStorage.getItem('moirai_model') || 'llama3.2:3b')
   const openaiModel = ref<string>(localStorage.getItem('moirai_openai_model') || 'gpt-4-turbo')
   const geminiModel = ref<string>(localStorage.getItem('moirai_gemini_model') || 'gemini-1.5-pro')
+  // AISA (in-cluster proxy): model only — credentials live in the server environment
+  const aisaModel = ref<string>(localStorage.getItem('moirai_aisa_model') || '')
   
   // API Keys
   const openaiApiKey = ref<string>(localStorage.getItem('moirai_openai_api_key') || '')
@@ -30,6 +32,8 @@ export const useSettingsStore = defineStore('settings', () => {
         return openaiModel.value
       case 'gemini':
         return geminiModel.value
+      case 'aisa':
+        return aisaModel.value
       default:
         return ollamaModel.value
     }
@@ -42,6 +46,8 @@ export const useSettingsStore = defineStore('settings', () => {
         return 'moirai_openai_model'
       case 'gemini':
         return 'moirai_gemini_model'
+      case 'aisa':
+        return 'moirai_aisa_model'
       default:
         return 'moirai_model'
     }
@@ -55,6 +61,9 @@ export const useSettingsStore = defineStore('settings', () => {
         break
       case 'gemini':
         geminiModel.value = model
+        break
+      case 'aisa':
+        aisaModel.value = model
         break
       default:
         ollamaModel.value = model
@@ -76,6 +85,11 @@ export const useSettingsStore = defineStore('settings', () => {
   
   watch(geminiModel, (value) => {
     localStorage.setItem('moirai_gemini_model', value)
+  })
+
+  watch(aisaModel, (value) => {
+    if (value) localStorage.setItem('moirai_aisa_model', value)
+    else localStorage.removeItem('moirai_aisa_model')
   })
   
   watch(openaiApiKey, (value) => {
@@ -102,6 +116,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (settings.moirai_model) ollamaModel.value = settings.moirai_model
     if (settings.moirai_openai_model) openaiModel.value = settings.moirai_openai_model
     if (settings.moirai_gemini_model) geminiModel.value = settings.moirai_gemini_model
+    if (settings.moirai_aisa_model) aisaModel.value = settings.moirai_aisa_model
     if (settings.moirai_openai_api_key) openaiApiKey.value = settings.moirai_openai_api_key
     if (settings.moirai_gemini_api_key) geminiApiKey.value = settings.moirai_gemini_api_key
     if (settings.moirai_ollama_endpoint_url) ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
@@ -115,6 +130,7 @@ export const useSettingsStore = defineStore('settings', () => {
       moirai_model: ollamaModel.value,
       moirai_openai_model: openaiModel.value,
       moirai_gemini_model: geminiModel.value,
+      moirai_aisa_model: aisaModel.value,
       moirai_openai_api_key: openaiApiKey.value,
       moirai_gemini_api_key: geminiApiKey.value,
       moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
@@ -130,6 +146,7 @@ export const useSettingsStore = defineStore('settings', () => {
     ollamaModel.value = 'llama3.2:3b'
     openaiModel.value = 'gpt-4-turbo'
     geminiModel.value = 'gemini-1.5-pro'
+    aisaModel.value = ''
     openaiApiKey.value = ''
     geminiApiKey.value = ''
     ollamaEndpointUrl.value = 'http://host.docker.internal:11434/v1' // NOSONAR
@@ -142,6 +159,7 @@ export const useSettingsStore = defineStore('settings', () => {
     ollamaModel,
     openaiModel,
     geminiModel,
+    aisaModel,
     openaiApiKey,
     geminiApiKey,
     ollamaEndpointUrl,

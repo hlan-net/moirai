@@ -21,6 +21,7 @@ from .db import (
 )
 from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
 from .userspace_ops import get_userspace, resolve_llm_config
+from .llm.aisa import aisa_status
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
 from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest, ShareIssueRequest
@@ -864,6 +865,8 @@ def get_config():
             "components": get_component_versions(),
             "default_llm_provider": os.environ.get("DEFAULT_LLM_PROVIDER", "ollama"),
             "default_model_name": os.environ.get("MODEL_NAME", "llama3.1"),
+            # In-cluster AISA proxy status (never includes the key)
+            "aisa": aisa_status(),
             # Include public auth config
             **get_auth_config(),
         }

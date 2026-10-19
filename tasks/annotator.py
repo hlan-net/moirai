@@ -20,6 +20,7 @@ import requests
 from openai import NotFoundError
 
 from api.db_config import get_couchdb_uri
+from api.llm.aisa import aisa_default_model
 from api.llm.factory import LLMProviderFactory
 
 logger = logging.getLogger(__name__)
@@ -59,14 +60,23 @@ class AnnotationBackend:
     model: str
 
 
+def _default_model_name(provider: str) -> str:
+    """MODEL_NAME wins; for the aisa provider fall back to the Secret's default model."""
+    model = os.environ.get("MODEL_NAME", "")
+    if not model and provider == "aisa":
+        model = aisa_default_model()
+    return model or DEFAULT_ANNOTATION_MODEL
+
+
 def _default_backend(model: Optional[str] = None) -> AnnotationBackend:
     # OLLAMA_BASE_URL is set via docker-compose.yml; no hardcoded default
     # to avoid SonarCloud S5332 (http:// in source).
+    provider = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
     return AnnotationBackend(
         name="default",
-        provider=os.environ.get("DEFAULT_LLM_PROVIDER", "ollama"),
+        provider=provider,
         base_url=os.environ.get("OLLAMA_BASE_URL", ""),
-        model=model or os.environ.get("MODEL_NAME", DEFAULT_ANNOTATION_MODEL),
+        model=model or _default_model_name(provider),
     )
 
 
