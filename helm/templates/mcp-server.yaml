@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "moirai.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp-server
+  {{- with (include "moirai.aisaReloaderAnnotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -94,6 +98,7 @@ spec:
               value: {{ .Values.llm.model | quote }}
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
+            {{- include "moirai.aisaEnv" . | nindent 12 }}
             - name: COUCHDB_USER
               valueFrom:
                 secretKeyRef:

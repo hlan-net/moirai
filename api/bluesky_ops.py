@@ -38,8 +38,6 @@ def generate_bluesky_post_text(
 
     ollama_base_url = llm_config.get("ollama_endpoint") or _OLLAMA_DEFAULT_ENDPOINT
 
-    llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
-
     article_lines = []
     for art in articles[:5]:
         title = (art.get("title") or art.get("url") or "").strip()
@@ -58,6 +56,7 @@ def generate_bluesky_post_text(
     )
 
     try:
+        llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
         response = llm_provider.create_chat_completion(
             messages=[{"role": "user", "content": prompt}],
             model=model,

@@ -19,6 +19,7 @@ import sys
 from tasks import init
 from tasks.scheduler import _process_feeds
 from api.db_config import get_couchdb_uri
+from api.llm.aisa import log_llm_startup_config
 from version import get_version_string
 
 logging.basicConfig(
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     logger.info(f"{get_version_string()} starting...")
+    log_llm_startup_config(logger)
     logger.info("Initialising database...")
     init.run()
     logger.info("Database initialised. Running scheduler cycle...")

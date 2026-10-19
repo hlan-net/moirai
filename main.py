@@ -16,6 +16,7 @@ from api.telemetry import configure_telemetry  # Moved to top
 from tasks.scheduler import scheduler
 from tasks import init
 from tasks.enrichment_worker import worker  # Moved to top
+from api.llm.aisa import log_llm_startup_config
 from version import get_version_string
 
 app = Flask(__name__, static_folder="ui/dist")
@@ -114,6 +115,7 @@ def start_services():
     sys.stdout.reconfigure(line_buffering=True)
 
     app.logger.info(f"{get_version_string()} starting...")
+    log_llm_startup_config(app.logger)
     init.run()
     app.logger.info("Moirai initialised.")
 

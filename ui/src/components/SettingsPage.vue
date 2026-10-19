@@ -24,8 +24,11 @@ const schedulerLogsLoading = ref(false)
 const schedulerLogsError = ref('')
 const availableOpenAiModels = ref([])
 const availableGeminiModels = ref([])
+const availableAisaModels = ref<string[]>([])
+// AISA availability comes from the server environment (AISA-managed Secret)
+const aisaStatus = ref<{ available: boolean; base_url: string; default_model: string } | null>(null)
 const verboseChatExport = ref(false)
-const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'authentication']))
+const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'aisa', 'authentication']))
 const activeTab = ref('user')
 
 // Create computed properties for settings store values
@@ -52,6 +55,10 @@ const geminiApiKey = computed({
 const geminiModelName = computed({
   get: () => settingsStore.geminiModel,
   set: (value: string) => { settingsStore.geminiModel = value }
+})
+const aisaModelName = computed({
+  get: () => settingsStore.aisaModel,
+  set: (value: string) => { settingsStore.aisaModel = value }
 })
 const modelName = computed({
   get: () => settingsStore.ollamaModel,
@@ -143,6 +150,8 @@ watch(llmEndpoint, (newEndpoint) => {
     fetchOllamaModels()
   } else if (newEndpoint === 'gemini' && availableGeminiModels.value.length === 0 && geminiApiKey.value) {
     fetchGeminiModels()
+  } else if (newEndpoint === 'aisa' && availableAisaModels.value.length === 0) {
+    fetchAisaModels()
   }
 })
 
@@ -307,6 +316,41 @@ const fetchGeminiModels = async () => {
   }
 }
 
+const fetchAisaStatus = async () => {
+  try {
+    const res = await authFetch('/api/llm/providers')
+    if (res.ok) {
+      const providers = (await res.json()) as Array<{ id: string; available: boolean; base_url?: string; default_model?: string }>
+      const aisa = providers.find((p) => p.id === 'aisa')
+      if (aisa) {
+        aisaStatus.value = {
+          available: aisa.available,
+          base_url: aisa.base_url || '',
+          default_model: aisa.default_model || ''
+        }
+        if (!aisaModelName.value && aisa.default_model) aisaModelName.value = aisa.default_model
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching LLM provider status:', e)
+  }
+}
+
+const fetchAisaModels = async () => {
+  loadingModels.value = true
+  try {
+    // No API key header: the server holds the AISA consumer key
+    const res = await authFetch('/api/models?llm_endpoint=aisa')
+    if (res.ok) {
+      availableAisaModels.value = await res.json()
+    }
+  } catch (e) {
+    console.error('Error fetching AISA models:', e)
+  } finally {
+    loadingModels.value = false
+  }
+}
+
 const fetchUserProfile = async () => {
     try {
         const res = await authFetch('/api/auth/me')
@@ -321,6 +365,7 @@ const fetchUserProfile = async () => {
             if (settingsStore.llmEndpoint === 'ollama') fetchOllamaModels()
             else if (settingsStore.llmEndpoint === 'openai' && settingsStore.openaiApiKey) fetchOpenAiModels()
             else if (settingsStore.llmEndpoint === 'gemini' && settingsStore.geminiApiKey) fetchGeminiModels()
+            else if (settingsStore.llmEndpoint === 'aisa') fetchAisaModels()
         }
     } catch (e) {
         console.error("Error fetching user profile", e)
@@ -458,6 +503,7 @@ onMounted(() => {
   fetchUserProfile()
   // Still fetch system config for version and system-wide settings
   fetchConfig()
+  fetchAisaStatus()
 })
 </script>
 
@@ -548,6 +594,10 @@ onMounted(() => {
             <input type="radio" value="gemini" v-model="llmEndpoint">
             Gemini
           </label>
+          <label>
+            <input type="radio" value="aisa" v-model="llmEndpoint" :disabled="aisaStatus !== null && !aisaStatus.available">
+            AISA (in-cluster)
+          </label>
         </div>
       </div>
       <div class="sub-section">
@@ -622,6 +672,46 @@ onMounted(() => {
             </select>
             <small v-if="loadingModels">Loading available models...</small>
             <small v-if="!geminiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-section">
+        <h3
+          @click="toggleSection('aisa')"
+          @keydown.enter.prevent="toggleSection('aisa')"
+          @keydown.space.prevent="toggleSection('aisa')"
+          tabindex="0"
+          role="button"
+          :aria-expanded="!collapsedSections.has('aisa')"
+        >
+          AISA (in-cluster inference proxy)
+          <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+        </h3>
+        <div v-if="!collapsedSections.has('aisa')">
+          <div class="form-group">
+            <small v-if="aisaStatus === null">Checking AISA availability...</small>
+            <small v-else-if="aisaStatus.available">
+              Connected via <code>{{ aisaStatus.base_url }}</code>. Credentials are managed by the cluster; no API key is needed here.
+            </small>
+            <small v-else>
+              AISA is not configured on this deployment. Direct providers above keep working. Operators enable it with
+              <code>aisa.enabled=true</code> in the Helm chart (or <code>AISA_BASE_URL</code>/<code>AISA_API_KEY</code>).
+            </small>
+          </div>
+          <div class="form-group">
+            <label for="aisa-model">AISA Model Name:</label>
+            <button @click="fetchAisaModels" :disabled="!aisaStatus?.available || loadingModels">
+              {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+            </button>
+            <select v-if="availableAisaModels.length" id="aisa-model" v-model="aisaModelName">
+              <option v-for="model in availableAisaModels" :key="model" :value="model">
+                {{ model }}
+              </option>
+            </select>
+            <input v-else id="aisa-model" v-model="aisaModelName" :placeholder="aisaStatus?.default_model || 'e.g. qwen3:8b'" />
+            <small v-if="availableAisaModels.length">Only models with a healthy backend are listed.</small>
+            <small v-else-if="aisaStatus?.default_model">Consumer default model: {{ aisaStatus.default_model }}</small>
           </div>
         </div>
       </div>

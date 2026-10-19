@@ -44,6 +44,8 @@ const modelFetchError = ref('')
 const availableModels = ref<string[]>([])
 const availableOpenAiModels = ref<string[]>([])
 const availableGeminiModels = ref<string[]>([])
+const availableAisaModels = ref<string[]>([])
+const aisaAvailable = ref<boolean | null>(null)
 const copyStatus = ref('')
 
 const settingsStore = useSettingsStore()
@@ -83,6 +85,8 @@ const modelOptions = computed(() => {
       return availableOpenAiModels.value
     case 'gemini':
       return availableGeminiModels.value
+    case 'aisa':
+      return availableAisaModels.value
     default:
       return availableModels.value
   }
@@ -211,6 +215,22 @@ const _loadGeminiModels = async () => {
   }
 }
 
+const _loadAisaModels = async () => {
+  if (availableAisaModels.value.length > 0) return
+  loadingModels.value = true
+  try {
+    // Credentials are server-side (AISA-managed Secret); no key header needed
+    availableAisaModels.value = await _fetchModels('aisa', null)
+    aisaAvailable.value = true
+  } catch (error) {
+    console.error('Error fetching AISA models:', error)
+    aisaAvailable.value = false
+    modelFetchError.value = 'AISA is not configured on this deployment or the proxy is unreachable.'
+  } finally {
+    loadingModels.value = false
+  }
+}
+
 const _loadOllamaModels = async () => {
   if (availableModels.value.length > 0) return
   loadingModels.value = true
@@ -235,6 +255,8 @@ const loadModelsForEndpoint = async (endpoint: string) => {
     await _loadOpenAiModels()
   } else if (endpoint === 'gemini') {
     await _loadGeminiModels()
+  } else if (endpoint === 'aisa') {
+    await _loadAisaModels()
   } else {
     await _loadOllamaModels()
   }
@@ -249,6 +271,7 @@ const toggleModelSelect = () => {
 
 const getProviderStatusClass = () => {
   if (settingsStore.llmEndpoint === 'ollama') return 'status-ok'
+  if (settingsStore.llmEndpoint === 'aisa') return aisaAvailable.value === false ? 'status-warning' : 'status-ok'
 
   const apiKey = settingsStore.llmEndpoint === 'openai'
     ? settingsStore.openaiApiKey
@@ -259,6 +282,7 @@ const getProviderStatusClass = () => {
 
 const getProviderStatusText = () => {
   if (settingsStore.llmEndpoint === 'ollama') return '✓ Ready'
+  if (settingsStore.llmEndpoint === 'aisa') return aisaAvailable.value === false ? '⚠ Not Configured' : '✓ Cluster Managed'
 
   const apiKey = settingsStore.llmEndpoint === 'openai'
     ? settingsStore.openaiApiKey
@@ -273,6 +297,8 @@ const getModelPlaceholder = () => {
       return 'e.g., gpt-4-turbo'
     case 'gemini':
       return 'e.g., gemini-1.5-pro'
+    case 'aisa':
+      return 'e.g., qwen3:8b'
     default:
       return 'e.g., llama3.1:latest'
   }
@@ -550,6 +576,7 @@ const getProviderColor = (provider?: string) => {
     case 'openai': return '#0d8a68'  // Darker green for better contrast
     case 'ollama': return '#4651d9'  // Darker blue for better contrast
     case 'gemini': return '#1a66c9'  // Darker blue for better contrast
+    case 'aisa': return '#8a4b0d'    // Dark amber for the in-cluster proxy
     default: return '#444'
   }
 }
@@ -747,6 +774,7 @@ const renameSession = async (session: ChatSession) => {
             <option value="ollama">Ollama (Local)</option>
             <option value="openai">OpenAI (API Key Required)</option>
             <option value="gemini">Gemini (API Key Required)</option>
+            <option value="aisa">AISA (In-cluster Proxy)</option>
           </select>
         </div>
         

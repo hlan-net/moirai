@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "moirai.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
+  {{- with (include "moirai.aisaReloaderAnnotations" .) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.api.replicaCount }}
   selector:
@@ -139,6 +143,7 @@ spec:
             value: "http://{{ include "moirai.fullname" . }}-mcp-server:{{ .Values.mcpServer.service.port }}/sse"
           - name: ARTICLE_EXPIRATION_DAYS
             value: {{ .Values.api.articleExpirationDays | quote }}
+          {{- include "moirai.aisaEnv" . | nindent 10 }}
           {{- if .Values.redis.enabled }}
           - name: REDIS_HOST
             value: "{{ include "moirai.fullname" . }}-redis"

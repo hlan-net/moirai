@@ -20,6 +20,7 @@ import sys
 from tasks import init
 from tasks.enrichment_worker import worker
 from tasks.annotation_worker import annotation_worker
+from api.llm.aisa import log_llm_startup_config
 from version import get_version_string
 
 logging.basicConfig(
@@ -44,6 +45,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, _handle_signal)
 
     logger.info(f"{get_version_string()} starting...")
+    log_llm_startup_config(logger)
     logger.info("Initialising database...")
     init.run()
     logger.info("Database initialised. Starting workers...")

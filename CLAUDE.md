@@ -189,7 +189,9 @@ Agent orchestration supports two trigger types: `SCHEDULED` (runs on interval) a
 
 Required: `COUCHDB_URI`, `COUCHDB_USER`, `COUCHDB_PASSWORD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JWT_SECRET_KEY`, `REDIS_PASSWORD`.
 
-Notable optional: `ALLOW_PUBLIC_READ`, `ARTICLE_EXPIRATION_DAYS` (default 30), `MODEL_NAME`, `DEFAULT_LLM_PROVIDER` (ollama/openai/gemini), `METRICS_PORT` (default 9000), `DISABLE_CSRF`, `DISABLE_RATE_LIMIT`.
+Notable optional: `ALLOW_PUBLIC_READ`, `ARTICLE_EXPIRATION_DAYS` (default 30), `MODEL_NAME`, `DEFAULT_LLM_PROVIDER` (ollama/openai/gemini/aisa), `METRICS_PORT` (default 9000), `DISABLE_CSRF`, `DISABLE_RATE_LIMIT`.
+
+AISA (in-cluster OpenAI-compatible proxy, additive to the direct providers): `AISA_BASE_URL`, `AISA_API_KEY` or `AISA_API_KEY_FILE`, `AISA_MODEL`. The standard Secret contract names `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` are also accepted. Resolution lives in `api/llm/aisa.py`; the Helm chart maps the AISA Secret with `aisa.enabled=true`. See `docs/llm-configuration.md`.
 
 ### Version and Build Metadata
 

@@ -24,6 +24,7 @@ from .db import (
 )
 from .auth import jwt_required
 from .userspace_ops import resolve_llm_config
+from .llm.aisa import aisa_default_model, aisa_status, is_aisa_configured
 
 chat_blueprint = Blueprint("chat", __name__)
 
@@ -40,6 +41,10 @@ CHAT_HISTORY_LIMIT = 6
 MAX_AGENT_TURNS = int(os.environ.get("MAX_AGENT_TURNS", "8"))
 LLM_TIMEOUT_SECONDS = 600.0
 CHAT_SESSION_NOT_FOUND = "Chat session not found"
+AISA_NOT_CONFIGURED_MSG = (
+    "AISA is not configured on this deployment "
+    "(AISA_BASE_URL/OPENAI_BASE_URL and AISA_API_KEY/OPENAI_API_KEY are required)."
+)
 ERROR_ACCESS_DENIED = "Access denied"
 CHAT_EXPORT_VERBOSE_SETTING = "chat_export_verbose"
 
@@ -190,16 +195,32 @@ def _format_agent_error_message(
     messages: list[str],
 ) -> str:
     """Build user-facing error text with provider-specific guidance."""
+    connection_markers = [
+        "APIConnectionError",
+        "ConnectError",
+        "Connection error",
+        "Name or service not known",
+        "Temporary failure in name resolution",
+        "Connection refused",
+        "timed out",
+    ]
+    if llm_endpoint == "aisa":
+        if any("aisa_quota_exceeded" in msg or "429" in msg for msg in messages):
+            return (
+                "Agent Error: AISA token quota exceeded for this consumer. "
+                "Retry later or ask the cluster admin to raise the quota profile."
+            )
+        if any("503" in msg for msg in messages):
+            return (
+                "Agent Error: AISA has no healthy backend for the requested model. "
+                "Pick another model from the AISA model list."
+            )
+        if any(any(marker in msg for marker in connection_markers) for msg in messages):
+            return (
+                "Agent Error: Could not reach the AISA proxy "
+                f"`{aisa_status().get('base_url') or '(unconfigured)'}`. Check the AISA Secret binding on the API pod."
+            )
     if llm_endpoint == "ollama":
-        connection_markers = [
-            "APIConnectionError",
-            "ConnectError",
-            "Connection error",
-            "Name or service not known",
-            "Temporary failure in name resolution",
-            "Connection refused",
-            "timed out",
-        ]
         if any(any(marker in msg for marker in connection_markers) for msg in messages):
             endpoint = ollama_base_url or OLLAMA_BASE_URL
             return (
@@ -627,6 +648,31 @@ async def run_agent(
         }
 
 
+@chat_blueprint.route("/llm/providers", methods=["GET"])
+@jwt_required
+def list_llm_providers():
+    """Availability of each LLM provider for the UI (never exposes secrets).
+
+    Direct providers are always selectable (the key may live on the
+    userspace); AISA is only available when the environment carries the
+    AISA-managed Secret.
+    """
+    status = aisa_status()
+    return jsonify(
+        [
+            {"id": "ollama", "available": True},
+            {"id": "openai", "available": True, "env_key": bool(OPENAI_API_KEY)},
+            {"id": "gemini", "available": True, "env_key": bool(GEMINI_API_KEY)},
+            {
+                "id": "aisa",
+                "available": status["configured"],
+                "base_url": status["base_url"],
+                "default_model": status["default_model"],
+            },
+        ]
+    )
+
+
 @chat_blueprint.route("/models", methods=["GET"])
 @jwt_required
 def list_models():
@@ -643,6 +689,9 @@ def list_models():
         userspace_llm.get("ollama_endpoint")
         or request.headers.get("x-ollama-base-url")
     )
+
+    if llm_endpoint == "aisa" and not is_aisa_configured():
+        return jsonify({"error": AISA_NOT_CONFIGURED_MSG}), 503
 
     # Determine API Key based on provider if not passed
     final_api_key = _get_api_key(llm_endpoint, api_key)
@@ -672,6 +721,11 @@ def chat():
 
     llm_endpoint = data.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
     model = data.get("model") or userspace_llm.get("model")
+
+    if llm_endpoint == "aisa":
+        if not is_aisa_configured():
+            return jsonify({"response": f"Error: {AISA_NOT_CONFIGURED_MSG}"}), 400
+        model = model or aisa_default_model() or None
 
     api_key = None
     if llm_endpoint == "openai":
