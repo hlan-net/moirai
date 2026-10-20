@@ -134,9 +134,12 @@ inside the worker pod:
 
 ```bash
 python scripts/reannotate_outdated.py --dry-run            # list only
-python scripts/reannotate_outdated.py --limit 500          # all userspaces
+python scripts/reannotate_outdated.py --days 3 --limit 500 # last 3 days
 python scripts/reannotate_outdated.py --userspace <uuid>   # one userspace
 ```
+
+`--days` defaults to 7: articles expire after `ARTICLE_EXPIRATION_DAYS`, so
+regenerating older ones is wasted model time (each call costs seconds on CPU).
 
 The script uses the same backends and language routing as the worker, so a
 paused or missing model affects it the same way.

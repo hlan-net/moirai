@@ -22,6 +22,14 @@ def test_selector_scopes_to_userspace():
     assert outdated_selector("abc")["userspace"] == "abc"
 
 
+def test_selector_days_adds_published_cutoff():
+    selector = outdated_selector(None, days=7)
+    cutoff = selector["published"]["$gte"]
+    assert len(cutoff) == len("2026-01-01T00:00:00")
+    assert cutoff < "9999"
+    assert "published" not in outdated_selector(None)
+
+
 @patch("scripts.reannotate_outdated.requests.post")
 def test_iter_outdated_pages_with_bookmark_until_empty(mock_post):
     pages = [

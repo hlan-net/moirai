@@ -9,12 +9,17 @@ re-annotates them through the same backends the worker uses.
 Run inside the worker pod (same env, same network):
 
     python scripts/reannotate_outdated.py --dry-run
-    python scripts/reannotate_outdated.py --userspace <uuid> --limit 200
+    python scripts/reannotate_outdated.py --days 3 --limit 500
+    python scripts/reannotate_outdated.py --userspace <uuid>
+
+Articles expire after ARTICLE_EXPIRATION_DAYS anyway, so ``--days`` keeps
+the run proportional to what readers will still see.
 """
 
 import argparse
 import logging
 import sys
+from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
 import requests
@@ -27,8 +32,12 @@ logger = logging.getLogger("reannotate")
 PAGE_SIZE = 100
 
 
-def outdated_selector(userspace: str | None) -> dict:
-    """Mango selector for annotated articles behind ANNOTATION_VERSION."""
+def outdated_selector(userspace: str | None, days: int | None = None) -> dict:
+    """Mango selector for annotated articles behind ANNOTATION_VERSION.
+
+    *days* limits the match to articles published in the last N days; the
+    ``published`` field is ISO 8601, so a string comparison is enough.
+    """
     selector: dict = {
         "annotations": {"$exists": True},
         "$or": [
@@ -38,17 +47,22 @@ def outdated_selector(userspace: str | None) -> dict:
     }
     if userspace:
         selector["userspace"] = userspace
+    if days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        selector["published"] = {"$gte": cutoff.strftime("%Y-%m-%dT%H:%M:%S")}
     return selector
 
 
-def iter_outdated(userspace: str | None, limit: int) -> Iterator[dict]:
+def iter_outdated(
+    userspace: str | None, limit: int, days: int | None = None
+) -> Iterator[dict]:
     """Yield up to *limit* outdated article docs, paging with bookmarks."""
     url = f"{get_couchdb_uri()}articles/_find"
     bookmark = None
     yielded = 0
     while yielded < limit:
         body = {
-            "selector": outdated_selector(userspace),
+            "selector": outdated_selector(userspace, days),
             "fields": ["_id", "title", "summary", "description", "language"],
             "limit": min(PAGE_SIZE, limit - yielded),
         }
@@ -88,13 +102,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--userspace", help="restrict to one userspace UUID")
     parser.add_argument("--limit", type=int, default=100, help="max articles")
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="only articles published in the last N days (0 = no limit)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="only list")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     done = failed = 0
-    for doc in iter_outdated(args.userspace, args.limit):
+    days = args.days if args.days > 0 else None
+    for doc in iter_outdated(args.userspace, args.limit, days):
         if reannotate(doc, args.dry_run):
             done += 1
         else:
