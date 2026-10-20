@@ -121,6 +121,26 @@ services. Leave them empty to run without AISA.
 - The proxy passes the upstream `usage` object through unchanged, so token accounting on
   responses is unaffected.
 
+## Article Annotation
+
+The annotation worker classifies every new article (title + summary) into 1–3
+topics from a closed vocabulary (`TOPIC_VOCABULARY` in `tasks/annotator.py`),
+a priority and a sentiment. Labels the model invents are mapped through
+`TOPIC_ALIASES` or dropped, so only vocabulary labels reach the UI.
+
+Each stored annotation carries `annotation_version`. When the prompt or the
+vocabulary changes, bump `ANNOTATION_VERSION` and regenerate the old ones from
+inside the worker pod:
+
+```bash
+python scripts/reannotate_outdated.py --dry-run            # list only
+python scripts/reannotate_outdated.py --limit 500          # all userspaces
+python scripts/reannotate_outdated.py --userspace <uuid>   # one userspace
+```
+
+The script uses the same backends and language routing as the worker, so a
+paused or missing model affects it the same way.
+
 ## Switching Providers
 
 To switch between providers:

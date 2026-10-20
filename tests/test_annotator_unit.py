@@ -9,7 +9,17 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from tasks.annotator import _validate_annotation, annotate_article, store_annotation
+from tasks.annotator import (
+    ANNOTATION_VERSION,
+    ANNOTATION_SYSTEM_PROMPT,
+    TOPIC_ALIASES,
+    TOPIC_VOCABULARY,
+    _extract_json,
+    _normalise_topics,
+    _validate_annotation,
+    annotate_article,
+    store_annotation,
+)
 
 
 # ===== _validate_annotation =====
@@ -39,12 +49,12 @@ class TestValidateAnnotation:
 
     def test_topics_truncated_to_three(self):
         raw = {
-            "topics": ["a", "b", "c", "d", "e"],
+            "topics": ["politics", "world", "business", "finance", "health"],
             "priority": "medium",
             "sentiment": "negative",
         }
         result = _validate_annotation(raw)
-        assert len(result["topics"]) == 3
+        assert result["topics"] == ["politics", "world", "business"]
 
     def test_empty_topics_returns_none(self):
         raw = {"topics": [], "priority": "high", "sentiment": "positive"}
@@ -74,11 +84,69 @@ class TestValidateAnnotation:
             "sentiment": "neutral",
         }
         result = _validate_annotation(raw)
-        assert result["topics"] == ["tech"]
+        assert result["topics"] == ["technology"]
 
-    def test_topics_all_empty_returns_none(self):
+    def test_topics_all_empty_falls_back_to_general(self):
+        """No usable label, but priority/sentiment are still worth storing."""
         raw = {"topics": ["", ""], "priority": "low", "sentiment": "neutral"}
-        assert _validate_annotation(raw) is None
+        assert _validate_annotation(raw)["topics"] == ["general"]
+
+
+# ===== _extract_json =====
+
+
+class TestExtractJson:
+    def test_plain_object_unchanged(self):
+        assert _extract_json('{"a": 1}') == '{"a": 1}'
+
+    def test_code_fence_stripped(self):
+        assert _extract_json('```json\n{"a": 1}\n```') == '{"a": 1}'
+
+    def test_trailing_commentary_dropped(self):
+        raw = '{"a": 1}\n\nI hope this helps!'
+        assert _extract_json(raw) == '{"a": 1}'
+
+    def test_sentencepiece_space_marker_replaced(self):
+        raw = '{\n\u2581\u2581"a": 1\n}'
+        assert json.loads(_extract_json(raw)) == {"a": 1}
+
+    def test_no_object_returns_stripped_text(self):
+        assert _extract_json("  no json here  ") == "no json here"
+
+
+# ===== closed topic vocabulary =====
+
+
+class TestTopicVocabulary:
+    def test_vocabulary_labels_pass_through(self):
+        assert _normalise_topics(["politics", "sports"]) == ["politics", "sports"]
+
+    def test_alias_is_mapped(self):
+        assert _normalise_topics(["tech", "economy"]) == ["technology", "business"]
+
+    def test_unknown_label_is_dropped(self):
+        assert _normalise_topics(["jews/holocaust", "culture"]) == ["culture"]
+
+    def test_all_unknown_falls_back_to_general(self):
+        assert _normalise_topics(["kuolleet", "juutalaisuus"]) == ["general"]
+
+    def test_general_dropped_when_other_topics_present(self):
+        assert _normalise_topics(["news", "obituary"]) == ["obituary"]
+
+    def test_duplicates_after_aliasing_are_collapsed(self):
+        assert _normalise_topics(["death", "obituary", "deaths"]) == ["obituary"]
+
+    def test_max_three_after_dropping(self):
+        raw = ["x", "politics", "y", "world", "business", "finance"]
+        assert _normalise_topics(raw) == ["politics", "world", "business"]
+
+    def test_every_alias_targets_the_vocabulary(self):
+        assert set(TOPIC_ALIASES.values()) <= set(TOPIC_VOCABULARY)
+
+    def test_prompt_lists_exactly_the_vocabulary(self):
+        """The prompt and the validator must not drift apart."""
+        for label in TOPIC_VOCABULARY:
+            assert f'"{label}"' in ANNOTATION_SYSTEM_PROMPT
 
 
 # ===== annotate_article =====
@@ -103,7 +171,7 @@ class TestAnnotateArticle:
 
         result = annotate_article("Election results shock markets", "A long summary...")
         assert result is not None
-        assert result["topics"] == ["politics", "economy"]
+        assert result["topics"] == ["politics", "business"]  # economy → alias
         assert result["priority"] == "high"
         assert result["sentiment"] == "negative"
 
@@ -121,7 +189,7 @@ class TestAnnotateArticle:
 
         result = annotate_article("New chip released", "Details here")
         assert result is not None
-        assert result["topics"] == ["tech"]
+        assert result["topics"] == ["technology"]
 
     @patch("tasks.annotator._get_llm_provider")
     def test_empty_title_returns_none(self, mock_get_provider):
@@ -194,10 +262,6 @@ class TestIdentityTermRegression:
         assert user_content == f"Title: {SELLA_TITLE}\nSummary: {SELLA_SUMMARY}"
         assert "holocaust" not in user_content.lower()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="topics are free-form: _validate_annotation has no vocabulary check",
-    )
     @patch.dict("tasks.annotator._paused_until", {}, clear=True)
     @patch("tasks.annotator._get_llm_provider")
     def test_invented_topic_is_not_stored(self, mock_get_provider):
@@ -259,6 +323,7 @@ class TestStoreAnnotation:
         doc = put_call.kwargs.get("json") or put_call[1].get("json")
         assert doc["annotations"] == annotation
         assert "annotated_at" in doc
+        assert doc["annotation_version"] == ANNOTATION_VERSION
 
     @patch("tasks.annotator.requests")
     def test_article_not_found(self, mock_requests):

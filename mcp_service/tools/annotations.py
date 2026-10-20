@@ -63,7 +63,7 @@ def reannotate_article(article_id: str, userspace: str) -> dict:
                 "Article has no title — cannot annotate"
             ).to_dict()
 
-        annotation = annotate_article(title, summary)
+        annotation = annotate_article(title, summary, language=doc.get("language"))
         if annotation is None:
             return internal_error(
                 message="Annotation failed — LLM returned invalid result"
