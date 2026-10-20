@@ -7,6 +7,8 @@ os.environ.setdefault("ADMIN_PASSWORD", "test_password")
 import json
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 from tasks.annotator import _validate_annotation, annotate_article, store_annotation
 
 
@@ -150,6 +152,81 @@ class TestAnnotateArticle:
 
         result = annotate_article("Some title", "Some summary")
         assert result is None
+
+
+# ===== Regression: topics derived from an identity term =====
+
+# Recorded from production on 2026-09-29 (llama3.2:3b, default backend). A
+# two-line death notice was tagged politics/security/holocaust on the strength
+# of the word "juutalaiselle" alone; nothing in the input supports those topics.
+# See issue #249 for the model comparison and the proposed fix.
+SELLA_TITLE = "Kuolleet | Näyttelijä Seela Sella haudattiin"
+SELLA_SUMMARY = "Sella haudattiin Helsingin juutalaiselle hautausmaalle."
+SELLA_LANGUAGE = "fi"
+SELLA_RECORDED_OUTPUT = {
+    "topics": ["politics", "security", "jews/holocaust"],
+    "priority": "medium",
+    "sentiment": "negative",
+}
+UNSUPPORTED_TOPIC_FRAGMENTS = ("politic", "security", "holocaust", "jew")
+
+LIVE_LLM_CONFIGURED = any(
+    os.environ.get(k) for k in ("OLLAMA_BASE_URL", "OPENAI_API_KEY", "GEMINI_API_KEY")
+)
+
+
+class TestIdentityTermRegression:
+    @patch.dict("tasks.annotator._paused_until", {}, clear=True)
+    @patch("tasks.annotator._get_llm_provider")
+    def test_model_input_does_not_mention_recorded_topics(self, mock_get_provider):
+        """The model saw only title + summary, neither of which names the topics."""
+        mock_provider = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = json.dumps(SELLA_RECORDED_OUTPUT)
+        mock_provider.create_chat_completion.return_value = mock_response
+        mock_get_provider.return_value = mock_provider
+
+        annotate_article(SELLA_TITLE, SELLA_SUMMARY, language=SELLA_LANGUAGE)
+
+        messages = mock_provider.create_chat_completion.call_args.kwargs["messages"]
+        user_content = messages[-1]["content"]
+        assert user_content == f"Title: {SELLA_TITLE}\nSummary: {SELLA_SUMMARY}"
+        assert "holocaust" not in user_content.lower()
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="topics are free-form: _validate_annotation has no vocabulary check",
+    )
+    @patch.dict("tasks.annotator._paused_until", {}, clear=True)
+    @patch("tasks.annotator._get_llm_provider")
+    def test_invented_topic_is_not_stored(self, mock_get_provider):
+        """A label the model made up must not survive validation."""
+        mock_provider = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = json.dumps(SELLA_RECORDED_OUTPUT)
+        mock_provider.create_chat_completion.return_value = mock_response
+        mock_get_provider.return_value = mock_provider
+
+        result = annotate_article(SELLA_TITLE, SELLA_SUMMARY, language=SELLA_LANGUAGE)
+
+        topics = result["topics"] if result else []
+        assert "jews/holocaust" not in topics
+
+    @pytest.mark.integration
+    @pytest.mark.skipif(not LIVE_LLM_CONFIGURED, reason="needs a live annotation LLM")
+    def test_live_model_does_not_tag_by_identity_term(self):
+        """The configured model must classify the notice by what it is about."""
+        result = annotate_article(SELLA_TITLE, SELLA_SUMMARY, language=SELLA_LANGUAGE)
+
+        assert result is not None
+        unsupported = [
+            topic
+            for topic in result["topics"]
+            if any(fragment in topic for fragment in UNSUPPORTED_TOPIC_FRAGMENTS)
+        ]
+        assert unsupported == []
 
 
 # ===== store_annotation =====
