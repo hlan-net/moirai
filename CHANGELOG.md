@@ -18,6 +18,15 @@ Notable design decisions and significant changes to the Moirai project, in rever
 - UI: AISA option in Settings and the chat provider selectors; models are listed without a user key.
 - See `docs/llm-configuration.md`.
 
+### Annotation: closed topic vocabulary (#249, #268)
+Production tagged a Finnish death notice `politics` / `security` from a single identity term. Topics are now restricted to a fixed `TOPIC_VOCABULARY` (with aliases such as `tech` → `technology`), and the prompt states that topics describe what the article is about, not the group membership of people mentioned. Unknown labels are dropped, falling back to `general`.
+
+- Every annotation stores `annotation_version` (now `2`).
+- `scripts/reannotate_outdated.py` regenerates annotations behind the current version (`--dry-run`, `--limit`, `--userspace`). Run it in the worker pod after deploying; the worker never revisits already-annotated articles.
+
+### Docs
+- Roadmap entry and design for Stream sections (`docs/stream-sections.md`, #266).
+
 ---
 
 ## [v0.5.2] — 2026-02-24
