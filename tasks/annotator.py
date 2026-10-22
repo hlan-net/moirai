@@ -1,7 +1,7 @@
 """AI annotation module for articles.
 
 Uses the configured LLM provider to classify articles with:
-- topics: list of topic labels (e.g., "technology", "politics", "science")
+- topics: 1-3 labels from the closed ``TOPIC_VOCABULARY``
 - priority: "low" | "medium" | "high"
 - sentiment: "positive" | "neutral" | "negative"
 
@@ -25,16 +25,92 @@ from api.llm.factory import LLMProviderFactory
 
 logger = logging.getLogger(__name__)
 
+# Closed topic vocabulary. Anything the model returns outside this list is
+# mapped through TOPIC_ALIASES or dropped, so invented labels never reach the
+# UI (issue #249). Keep in sync with the prompt below.
+TOPIC_VOCABULARY: tuple[str, ...] = (
+    "politics",
+    "world",
+    "local",
+    "business",
+    "finance",
+    "technology",
+    "science",
+    "climate",
+    "health",
+    "security",
+    "crime",
+    "sports",
+    "culture",
+    "entertainment",
+    "obituary",
+    "lifestyle",
+    "general",
+)
+
+# Labels small models commonly produce → vocabulary entry.
+TOPIC_ALIASES: dict[str, str] = {
+    "tech": "technology",
+    "economy": "business",
+    "economics": "business",
+    "markets": "finance",
+    "environment": "climate",
+    "energy": "climate",
+    "medicine": "health",
+    "military": "security",
+    "defense": "security",
+    "defence": "security",
+    "war": "security",
+    "terrorism": "security",
+    "sport": "sports",
+    "arts": "culture",
+    "art": "culture",
+    "theatre": "culture",
+    "theater": "culture",
+    "music": "culture",
+    "film": "culture",
+    "cinema": "culture",
+    "literature": "culture",
+    "books": "culture",
+    "celebrity": "entertainment",
+    "celebrities": "entertainment",
+    "celebrity news": "entertainment",
+    "television": "entertainment",
+    "tv": "entertainment",
+    "death": "obituary",
+    "deaths": "obituary",
+    "celebrity death": "obituary",
+    "funeral": "obituary",
+    "mortality": "obituary",
+    "people": "obituary",
+    "international": "world",
+    "world news": "world",
+    "local news": "local",
+    "education": "general",
+    "news": "general",
+    "society": "general",
+}
+
 ANNOTATION_SYSTEM_PROMPT = """You are a news article classifier. Given an article's title and summary, respond with a JSON object containing exactly these fields:
 
-- "topics": an array of 1-3 short topic labels (lowercase, e.g. "technology", "politics", "climate", "finance", "health", "science", "sports", "entertainment", "security", "business")
-- "priority": one of "low", "medium", or "high" based on newsworthiness and impact
-- "sentiment": one of "positive", "neutral", or "negative" based on the overall tone
+- "topics": an array of 1-3 labels chosen ONLY from this list: "politics", "world", "local", "business", "finance", "technology", "science", "climate", "health", "security", "crime", "sports", "culture", "entertainment", "obituary", "lifestyle", "general"
+- "priority": "high" for major breaking news with broad impact, "medium" for notable news of national or sector-wide interest, "low" for routine or niche items
+- "sentiment": "positive", "neutral", or "negative" — the tone of the writing, not the seriousness of the subject. Plain factual reporting is "neutral" even when the subject is sad or serious.
+
+Rules:
+- Topics describe what the article is ABOUT. Do not derive topics from the nationality, religion, ethnicity or other group membership of people mentioned in it.
+- A death notice, funeral or obituary is "obituary" plus the person's field (e.g. "culture" for an actor, "sports" for an athlete).
+- The article may be in any language; the labels are always the English ones above.
 
 Respond ONLY with the JSON object, no other text."""
 
 ANNOTATION_USER_TEMPLATE = """Title: {title}
 Summary: {summary}"""
+
+# Bump when the prompt or vocabulary changes in a way that makes stored
+# annotations stale. Stored on the article as ``annotation_version`` so
+# outdated ones can be found and regenerated (scripts/reannotate_outdated.py).
+ANNOTATION_VERSION = 2
 
 DEFAULT_ANNOTATION_MODEL = "llama3.1"
 
@@ -268,15 +344,8 @@ def _annotate_with(
             tool_choice=None,
         )
 
-        content = response.choices[0].message.content.strip()
-        # Strip markdown code fences if the model wraps the JSON
-        if content.startswith("```"):
-            content = content.split("\n", 1)[-1]
-            if content.endswith("```"):
-                content = content[: -len("```")]
-            content = content.strip()
-
-        result = json.loads(content)
+        content = response.choices[0].message.content
+        result = json.loads(_extract_json(content))
 
         # Validate and normalise
         annotation = _validate_annotation(result)
@@ -302,6 +371,22 @@ def _annotate_with(
         return None
 
 
+def _extract_json(content: str) -> str:
+    """Isolate the JSON object in a model reply.
+
+    Small models wrap the object in code fences, add commentary after it,
+    or (gemma3n) indent with the SentencePiece space marker U+2581, which
+    is not JSON whitespace. Returns the text from the first ``{`` to the
+    last ``}``; the caller's ``json.loads`` still decides validity.
+    """
+    content = content.replace("▁", " ")
+    start = content.find("{")
+    end = content.rfind("}")
+    if start == -1 or end < start:
+        return content.strip()
+    return content[start : end + 1]
+
+
 def _validate_annotation(raw: dict) -> Optional[dict]:
     """Validate and normalise an annotation dict from the LLM."""
     topics = raw.get("topics")
@@ -315,8 +400,7 @@ def _validate_annotation(raw: dict) -> Optional[dict]:
     if sentiment not in ("positive", "neutral", "negative"):
         return None
 
-    # Normalise topics: lowercase strings, max 3
-    clean_topics = [str(t).lower().strip() for t in topics[:3] if t]
+    clean_topics = _normalise_topics(topics)
     if not clean_topics:
         return None
 
@@ -325,6 +409,31 @@ def _validate_annotation(raw: dict) -> Optional[dict]:
         "priority": priority,
         "sentiment": sentiment,
     }
+
+
+def _normalise_topics(topics: list) -> list[str]:
+    """Map raw model labels onto the closed vocabulary, max 3, order kept.
+
+    Labels outside the vocabulary (after alias mapping) are dropped. If none
+    survive, ``["general"]`` is returned so a valid priority/sentiment is
+    still stored rather than leaving the article un-annotated.
+    """
+    result: list[str] = []
+    for raw_topic in topics:
+        if not raw_topic:
+            continue
+        label = str(raw_topic).lower().strip()
+        label = TOPIC_ALIASES.get(label, label)
+        if label in TOPIC_VOCABULARY and label not in result:
+            result.append(label)
+        if len(result) == 3:
+            break
+    if not result:
+        return ["general"]
+    # "general" only carries information when it is the sole topic.
+    if len(result) > 1 and "general" in result:
+        result.remove("general")
+    return result
 
 
 def store_annotation(article_id: str, annotation: dict) -> bool:
@@ -354,6 +463,7 @@ def store_annotation(article_id: str, annotation: dict) -> bool:
         doc = res.json()
         doc["annotations"] = annotation
         doc["annotated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        doc["annotation_version"] = ANNOTATION_VERSION
 
         put_res = requests.put(doc_url, json=doc, timeout=10)
         if put_res.status_code in (200, 201):
