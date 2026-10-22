@@ -98,6 +98,8 @@ These are not version-pinned; they accumulate as the platform grows.
 ### Reader Experience
 The Stream page is the product's primary surface. It is **explicitly not** a database to be queried (no in-stream search/filter, no keyboard navigation) and **explicitly not** an inbox (no read/unread, no save/archive). Improvements should sharpen the flow itself: feed health, deduplication, image rendering, mobile layout, density.
 
+- **[Stream Sections](docs/stream-sections.md):** Four newspaper-style tabs — Top stories (default), Sports, Culture, Business. A fixed editorial split of the flow, assigned at ingestion from feed category and link path (annotation topic as fallback), not a reader-composed filter. Tracked in #266; depends on the closed topic vocabulary (#249) only for the fallback.
+
 ### Input Diversity & Precision
 - **[Pointer Interaction Support](docs/pointer-interaction-wacom-touch.md):** Continued work on Wacom, touch, and mouse parity across the interactive dashboard.
 
