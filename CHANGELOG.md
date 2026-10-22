@@ -8,6 +8,18 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [v0.9.0] — 2026-10-22
+
+### AISA in-cluster inference proxy as an LLM provider
+`aisa` joins ollama, openai and gemini as a fourth, additive LLM provider. AISA is an in-cluster OpenAI-compatible proxy that reconciles a Secret with the `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` contract into the app namespace. Direct providers and their keys are untouched and never routed through AISA.
+
+- Resolution lives in `api/llm/aisa.py` (`AISA_*` env vars, with the standard `OPENAI_*` Secret names accepted as fallbacks).
+- Helm: `aisa.enabled`, `aisa.secretName`, `aisa.defaultModel` and an optional Reloader annotation for key rotation. Disabled renders unchanged.
+- UI: AISA option in Settings and the chat provider selectors; models are listed without a user key.
+- See `docs/llm-configuration.md`.
+
+---
+
 ## [v0.5.2] — 2026-02-24
 
 ### Service Decoupling (Scheduler and Worker split from API)
