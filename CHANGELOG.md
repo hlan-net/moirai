@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Re-annotation at backlog scale (#273)
+`scripts/reannotate_outdated.py` was shaped for hundreds of articles; production had 25 008 behind version 2 at ~18 s each, with no count, progress or ETA. The script now reports the outdated count up front and the remaining count at the end (from a new `annotation/by_version` reduce view, seconds instead of an 11-minute listing), logs `done/total, rate, ETA` every `--progress-every` articles, and accepts `--concurrency N` (default 1, unchanged behaviour). `--dry-run` now only counts; add `--list` for ids. The docs state what was always true: finished articles are stamped and never revisited, so the job can be stopped and resumed at will.
+
 ### Fixes
 - API image sets `PYTHONPATH=/app`, so scripts under `scripts/` import `api` and `tasks` however they are started. Documented commands use the module form, e.g. `python -m scripts.reannotate_outdated` (the path form failed with `ModuleNotFoundError: No module named 'api'` in 0.9.0).
 

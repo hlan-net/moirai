@@ -133,13 +133,39 @@ vocabulary changes, bump `ANNOTATION_VERSION` and regenerate the old ones from
 inside the worker pod:
 
 ```bash
-python -m scripts.reannotate_outdated --dry-run            # list only
-python -m scripts.reannotate_outdated --days 3 --limit 500 # last 3 days
-python -m scripts.reannotate_outdated --userspace <uuid>   # one userspace
+python -m scripts.reannotate_outdated --dry-run                   # count only, seconds
+python -m scripts.reannotate_outdated --dry-run --list --limit 50 # also list ids
+python -m scripts.reannotate_outdated --days 3 --limit 500        # last 3 days
+python -m scripts.reannotate_outdated --userspace <uuid>          # one userspace
+python -m scripts.reannotate_outdated --limit 5000 --concurrency 2
 ```
 
 `--days` defaults to 7: articles expire after `ARTICLE_EXPIRATION_DAYS`, so
 regenerating older ones is wasted model time (each call costs seconds on CPU).
+
+**The job is interruptible and resumable.** Each finished article is stamped
+with the current version as soon as it is stored and is never listed again.
+Stopping the run (Ctrl-C, `kubectl delete pod`, a timeout) loses at most the
+articles in flight, and re-running the same command continues with exactly
+what is left. Work through a large backlog in batches with `--limit`.
+
+What the operator sees:
+
+- At start, the number of outdated articles in scope. It comes from the
+  `annotation/by_version` reduce view (created by `init_db` at startup), so it
+  takes seconds; the first query after a deploy builds the index once.
+  `--dry-run` stops after this count.
+- Every `--progress-every` articles (default 25): `done/total (pct), failed,
+  elapsed, s/article, ETA`.
+- At the end, the same line plus how many articles are still outdated, so no
+  separate dry run is needed to decide whether to run another batch.
+
+`--concurrency N` (default 1) keeps up to N articles in flight. The call is
+bound by the annotation backend, so the gain depends on how many requests the
+backend serves in parallel: Ollama queues requests beyond `OLLAMA_NUM_PARALLEL`,
+and an NPU backend may run only one inference at a time. Raise it in small steps
+and watch `s/article`; the worker keeps annotating new articles on the same
+backends meanwhile.
 
 The script uses the same backends and language routing as the worker, so a
 paused or missing model affects it the same way.
