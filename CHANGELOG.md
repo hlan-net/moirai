@@ -6,6 +6,10 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+---
+
+## [v0.9.1] — 2026-10-23
+
 ### AISA key read from a mounted Secret (#272)
 The chart wired the AISA key as the env var `AISA_API_KEY`, which Kubernetes never refreshes: a week after an AISA rotation (the grace period), every call would fail 401 until the pods restarted. The only remedy was `aisa.reloader`, which needs Stakater Reloader in the cluster. With `aisa.enabled`, the chart now mounts the Secret into api, worker, mcp-server and scheduler pods and sets `AISA_API_KEY_FILE` (`aisa.keyFile: true` by default, mount path `aisa.keyMountPath`); `api/llm/aisa.py` already re-reads the file on every request. `aisa.keyFile: false` keeps the env form. The README names the Reloader dependency.
 
