@@ -63,8 +63,8 @@ Resolution order for inference credentials, per provider selection:
 1. **Direct provider selected** (`openai`, `gemini`, explicit `ollama` endpoint): the
    userspace's own key / endpoint, falling back to `OPENAI_API_KEY` / `GEMINI_API_KEY` /
    `OLLAMA_BASE_URL` from the environment. AISA variables are ignored.
-2. **`aisa` selected**: `AISA_BASE_URL` + `AISA_API_KEY` from the environment (the
-   AISA Secret). The userspace document never stores AISA credentials.
+2. **`aisa` selected**: `AISA_BASE_URL` + `AISA_API_KEY_FILE` / `AISA_API_KEY` from the
+   environment (the AISA Secret). The userspace document never stores AISA credentials.
 3. **Nothing configured**: the local Ollama default (`http://host.docker.internal:11434/v1`).
 
 Unknown keys in the Secret are ignored. Set `DEFAULT_LLM_PROVIDER=aisa` to make AISA the
@@ -85,15 +85,23 @@ Every service logs the resolved provider, base URL and model at startup
    aisa:
      enabled: true
      secretName: moirai-aisa-key
-     reloader: true        # optional: Stakater Reloader restarts pods on key rotation
    llm:
      provider: aisa        # optional: make AISA the process-wide default provider
    ```
 
-   The chart binds the Secret with `optional: true`, so pods start even before AISA has
-   reconciled it. Environment variables are read only at container start: if the Secret
-   appears later, or when AISA rotates the key (default every 30 days, 7-day grace),
-   restart the deployments or enable `aisa.reloader`.
+   The chart mounts the Secret at `aisa.keyMountPath` (default `/var/run/secrets/aisa`)
+   and points `AISA_API_KEY_FILE` at its `OPENAI_API_KEY` file (`aisa.keyFile: true`,
+   the default). The file is re-read for every request, and kubelet refreshes a mounted
+   Secret in place (within about a minute), so a key rotation (AISA default: every 30
+   days, 7-day grace) needs **no pod restart and no Reloader**.
+
+   `AISA_BASE_URL` and `AISA_MODEL` are still environment variables, read at container
+   start. Both the mount and the env refs are `optional: true`, so pods start before
+   AISA has reconciled the Secret; restart once after it first appears (the base URL is
+   env). `aisa.reloader: true` adds a Stakater Reloader annotation for those rare
+   changes, and only works if Reloader is installed in the cluster.
+   `aisa.keyFile: false` restores the old `AISA_API_KEY` env var, which goes stale on
+   rotation unless the pods are restarted.
 3. Moirai pods run with `automountServiceAccountToken: false`, so model discovery uses the
    proxy's HTTP `GET /v1/models` (Level 1) rather than the `Model` CRD.
 
@@ -133,13 +141,39 @@ vocabulary changes, bump `ANNOTATION_VERSION` and regenerate the old ones from
 inside the worker pod:
 
 ```bash
-python scripts/reannotate_outdated.py --dry-run            # list only
-python scripts/reannotate_outdated.py --days 3 --limit 500 # last 3 days
-python scripts/reannotate_outdated.py --userspace <uuid>   # one userspace
+python -m scripts.reannotate_outdated --dry-run                   # count only, seconds
+python -m scripts.reannotate_outdated --dry-run --list --limit 50 # also list ids
+python -m scripts.reannotate_outdated --days 3 --limit 500        # last 3 days
+python -m scripts.reannotate_outdated --userspace <uuid>          # one userspace
+python -m scripts.reannotate_outdated --limit 5000 --concurrency 2
 ```
 
 `--days` defaults to 7: articles expire after `ARTICLE_EXPIRATION_DAYS`, so
 regenerating older ones is wasted model time (each call costs seconds on CPU).
+
+**The job is interruptible and resumable.** Each finished article is stamped
+with the current version as soon as it is stored and is never listed again.
+Stopping the run (Ctrl-C, `kubectl delete pod`, a timeout) loses at most the
+articles in flight, and re-running the same command continues with exactly
+what is left. Work through a large backlog in batches with `--limit`.
+
+What the operator sees:
+
+- At start, the number of outdated articles in scope. It comes from the
+  `annotation/by_version` reduce view (created by `init_db` at startup), so it
+  takes seconds; the first query after a deploy builds the index once.
+  `--dry-run` stops after this count.
+- Every `--progress-every` articles (default 25): `done/total (pct), failed,
+  elapsed, s/article, ETA`.
+- At the end, the same line plus how many articles are still outdated, so no
+  separate dry run is needed to decide whether to run another batch.
+
+`--concurrency N` (default 1) keeps up to N articles in flight. The call is
+bound by the annotation backend, so the gain depends on how many requests the
+backend serves in parallel: Ollama queues requests beyond `OLLAMA_NUM_PARALLEL`,
+and an NPU backend may run only one inference at a time. Raise it in small steps
+and watch `s/article`; the worker keeps annotating new articles on the same
+backends meanwhile.
 
 The script uses the same backends and language routing as the worker, so a
 paused or missing model affects it the same way.

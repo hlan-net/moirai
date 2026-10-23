@@ -87,6 +87,9 @@ Nginx name
 AISA env vars mapped from the AISA-managed consumer Secret.
 Uses secretKeyRef (not envFrom) so the Secret's OPENAI_API_KEY cannot collide
 with the direct OPENAI_API_KEY env var; optional so pods start pre-reconcile.
+With aisa.keyFile (default) the key is read from the mounted Secret instead
+(AISA_API_KEY_FILE): kubelet refreshes the file in place, so a key rotation
+needs no restart and no Reloader. Pair with moirai.aisaVolumeMounts/Volumes.
 */}}
 {{- define "moirai.aisaEnv" -}}
 {{- if .Values.aisa.enabled }}
@@ -96,12 +99,17 @@ with the direct OPENAI_API_KEY env var; optional so pods start pre-reconcile.
       name: {{ .Values.aisa.secretName | quote }}
       key: OPENAI_BASE_URL
       optional: true
+{{- if .Values.aisa.keyFile }}
+- name: AISA_API_KEY_FILE
+  value: {{ printf "%s/OPENAI_API_KEY" .Values.aisa.keyMountPath | quote }}
+{{- else }}
 - name: AISA_API_KEY
   valueFrom:
     secretKeyRef:
       name: {{ .Values.aisa.secretName | quote }}
       key: OPENAI_API_KEY
       optional: true
+{{- end }}
 {{- if .Values.aisa.defaultModel }}
 - name: AISA_MODEL
   value: {{ .Values.aisa.defaultModel | quote }}
@@ -117,7 +125,32 @@ with the direct OPENAI_API_KEY env var; optional so pods start pre-reconcile.
 {{- end -}}
 
 {{/*
-Deployment annotations for Stakater Reloader (restart on AISA key rotation).
+Mount of the AISA consumer Secret for AISA_API_KEY_FILE. The whole Secret is
+mounted (no subPath, which kubelet never refreshes); optional so pods start
+before AISA has reconciled it, and kubelet fills it in once it exists.
+*/}}
+{{- define "moirai.aisaVolumeMounts" -}}
+{{- if and .Values.aisa.enabled .Values.aisa.keyFile -}}
+- name: aisa-key
+  mountPath: {{ .Values.aisa.keyMountPath | quote }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "moirai.aisaVolumes" -}}
+{{- if and .Values.aisa.enabled .Values.aisa.keyFile -}}
+- name: aisa-key
+  secret:
+    secretName: {{ .Values.aisa.secretName | quote }}
+    optional: true
+{{- end }}
+{{- end -}}
+
+{{/*
+Deployment annotations for Stakater Reloader (restart when the AISA Secret
+changes). Requires Reloader in the cluster; without it this does nothing.
+With aisa.keyFile the key rotates without it; Reloader then only matters for
+OPENAI_BASE_URL / OPENAI_MODEL changes, which are read as env at start.
 */}}
 {{- define "moirai.aisaReloaderAnnotations" -}}
 {{- if and .Values.aisa.enabled .Values.aisa.reloader }}

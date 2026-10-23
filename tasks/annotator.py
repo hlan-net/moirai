@@ -112,6 +112,29 @@ Summary: {summary}"""
 # outdated ones can be found and regenerated (scripts/reannotate_outdated.py).
 ANNOTATION_VERSION = 2
 
+# Map/reduce view that counts annotated articles by version, so "how many are
+# still outdated" is a reduce query instead of a full Mango scan. Each article
+# is emitted once under "*" (all userspaces) and once under its userspace:
+# key = [scope, annotation_version or null, published]. Created by init_db().
+ANNOTATION_DESIGN_DOC = "annotation"
+ANNOTATION_VERSION_VIEW = "by_version"
+ANNOTATION_ALL_SCOPE = "*"
+ANNOTATION_VIEWS = {
+    ANNOTATION_VERSION_VIEW: {
+        "map": (
+            "function(doc) {"
+            " if (!doc.annotations) return;"
+            " var v = doc.annotation_version === undefined"
+            " ? null : doc.annotation_version;"
+            " var p = doc.published === undefined ? null : doc.published;"
+            " emit(['*', v, p], null);"
+            " if (doc.userspace) emit([doc.userspace, v, p], null);"
+            " }"
+        ),
+        "reduce": "_count",
+    }
+}
+
 DEFAULT_ANNOTATION_MODEL = "llama3.1"
 
 # When a backend reports its model as missing (HTTP 404), pause that backend

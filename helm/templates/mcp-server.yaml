@@ -143,6 +143,14 @@ spec:
                   name: {{ include "moirai.fullname" . }}-redis-secret
                   key: password
             {{- end }}
+          {{- with (include "moirai.aisaVolumeMounts" .) }}
+          volumeMounts:
+            {{- . | nindent 12 }}
+          {{- end }}
+      {{- with (include "moirai.aisaVolumes" .) }}
+      volumes:
+        {{- . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

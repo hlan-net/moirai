@@ -49,15 +49,24 @@ as an AISA consumer (target secret `moirai-aisa-key` in this namespace), then:
 aisa:
   enabled: true
   secretName: moirai-aisa-key
-  reloader: true          # optional, needs Stakater Reloader in the cluster
 llm:
   provider: aisa          # optional process-wide default (DEFAULT_LLM_PROVIDER)
   model: "qwen3:8b"       # MODEL_NAME; must exist behind the proxy
 ```
 
-The Secret keys `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` are mapped to
-`AISA_BASE_URL` / `AISA_API_KEY` / `AISA_MODEL` with `optional: true`. Restart the
-deployments after AISA first creates the Secret (env is read at container start).
+The Secret is mounted at `aisa.keyMountPath` (default `/var/run/secrets/aisa`) and the
+key is read from the file via `AISA_API_KEY_FILE` (`aisa.keyFile: true`, the default).
+kubelet refreshes the file in place, so AISA key rotations need no restart and no
+Reloader. `OPENAI_BASE_URL` / `OPENAI_MODEL` are mapped to the env vars `AISA_BASE_URL` /
+`AISA_MODEL`; everything is `optional: true`, so restart the deployments once after
+AISA first creates the Secret (env is read at container start).
+
+- `aisa.reloader: true` adds a `secret.reloader.stakater.com/reload` annotation. It
+  **requires [Stakater Reloader](https://github.com/stakater/Reloader) in the cluster**;
+  the chart neither installs nor checks for it, and without it the annotation does
+  nothing. With `keyFile` it is only needed for base URL / model changes.
+- `aisa.keyFile: false` falls back to the `AISA_API_KEY` env var, which keeps the old key
+  until the pods restart: use it only together with Reloader.
 See `docs/llm-configuration.md` for details.
 
 ## Storage

@@ -105,6 +105,20 @@ class TestResolveAisaConfig:
         monkeypatch.setenv("AISA_API_KEY_FILE", str(key_file))
         assert resolve_aisa_config()["api_key"] == "rotated-key"
 
+    def test_rotated_key_file_is_picked_up_without_reimport(
+        self, tmp_path, monkeypatch
+    ):
+        # kubelet swaps the mounted Secret in place; the next provider must
+        # use the new key with no restart (#272).
+        key_file = tmp_path / "OPENAI_API_KEY"
+        key_file.write_text("old-key")
+        monkeypatch.setenv("AISA_BASE_URL", "http://aisa/v1")
+        monkeypatch.setenv("AISA_API_KEY_FILE", str(key_file))
+        assert AisaProvider.from_env().client.api_key == "old-key"
+
+        key_file.write_text("new-key\n")
+        assert AisaProvider.from_env().client.api_key == "new-key"
+
     def test_missing_key_file_falls_back_to_env(self, tmp_path, monkeypatch):
         monkeypatch.setenv("AISA_BASE_URL", "http://aisa/v1")
         monkeypatch.setenv("AISA_API_KEY", "env-key")
