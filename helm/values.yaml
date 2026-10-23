@@ -181,10 +181,9 @@ llm:
 # -- AISA: in-cluster OpenAI-compatible inference proxy (additive, direct
 # providers keep working). AISA reconciles a Secret into this namespace with
 # the keys OPENAI_BASE_URL, OPENAI_API_KEY and optionally OPENAI_MODEL; the chart
-# maps them to AISA_BASE_URL / AISA_API_KEY / AISA_MODEL so the direct
-# OPENAI_API_KEY above is never overwritten. The Secret is referenced with
-# optional: true, so pods start before AISA has reconciled it, but they must be
-# restarted once the Secret exists (env is read only at container start).
+# maps them to AISA_* names so the direct OPENAI_API_KEY above is never
+# overwritten. The Secret is referenced with optional: true, so pods start
+# before AISA has reconciled it.
 aisa:
   enabled: false
   # -- Name of the Secret declared for this consumer in AISA
@@ -192,7 +191,16 @@ aisa:
   secretName: "moirai-aisa-key"
   # -- Override the default model instead of reading OPENAI_MODEL from the Secret
   defaultModel: ""
-  # -- Add Stakater Reloader annotations so pods restart on key rotation
+  # -- Read the API key from the mounted Secret (AISA_API_KEY_FILE) instead of
+  # an env var. kubelet refreshes the file in place, so AISA key rotations need
+  # no pod restart and no Reloader. false = legacy AISA_API_KEY env var.
+  keyFile: true
+  # -- Where the Secret is mounted when keyFile is true
+  keyMountPath: "/var/run/secrets/aisa"
+  # -- Add Stakater Reloader annotations so pods restart when the Secret
+  # changes. Requires Stakater Reloader in the cluster (the chart neither
+  # installs nor checks for it). With keyFile the key does not need it; base
+  # URL and model are still env vars read at container start.
   reloader: false
 
 # -- Service account configuration

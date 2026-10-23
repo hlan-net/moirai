@@ -158,7 +158,13 @@ spec:
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
+            {{- with (include "moirai.aisaVolumeMounts" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: feeds-volume
           configMap:
             name: {{ include "moirai.fullname" . }}-feed-lists
+        {{- with (include "moirai.aisaVolumes" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}

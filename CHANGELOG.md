@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### AISA key read from a mounted Secret (#272)
+The chart wired the AISA key as the env var `AISA_API_KEY`, which Kubernetes never refreshes: a week after an AISA rotation (the grace period), every call would fail 401 until the pods restarted. The only remedy was `aisa.reloader`, which needs Stakater Reloader in the cluster. With `aisa.enabled`, the chart now mounts the Secret into api, worker, mcp-server and scheduler pods and sets `AISA_API_KEY_FILE` (`aisa.keyFile: true` by default, mount path `aisa.keyMountPath`); `api/llm/aisa.py` already re-reads the file on every request. `aisa.keyFile: false` keeps the env form. The README names the Reloader dependency.
+
 ### Re-annotation at backlog scale (#273)
 `scripts/reannotate_outdated.py` was shaped for hundreds of articles; production had 25 008 behind version 2 at ~18 s each, with no count, progress or ETA. The script now reports the outdated count up front and the remaining count at the end (from a new `annotation/by_version` reduce view, seconds instead of an 11-minute listing), logs `done/total, rate, ETA` every `--progress-every` articles, and accepts `--concurrency N` (default 1, unchanged behaviour). `--dry-run` now only counts; add `--list` for ids. The docs state what was always true: finished articles are stamped and never revisited, so the job can be stopped and resumed at will.
 

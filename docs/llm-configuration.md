@@ -63,8 +63,8 @@ Resolution order for inference credentials, per provider selection:
 1. **Direct provider selected** (`openai`, `gemini`, explicit `ollama` endpoint): the
    userspace's own key / endpoint, falling back to `OPENAI_API_KEY` / `GEMINI_API_KEY` /
    `OLLAMA_BASE_URL` from the environment. AISA variables are ignored.
-2. **`aisa` selected**: `AISA_BASE_URL` + `AISA_API_KEY` from the environment (the
-   AISA Secret). The userspace document never stores AISA credentials.
+2. **`aisa` selected**: `AISA_BASE_URL` + `AISA_API_KEY_FILE` / `AISA_API_KEY` from the
+   environment (the AISA Secret). The userspace document never stores AISA credentials.
 3. **Nothing configured**: the local Ollama default (`http://host.docker.internal:11434/v1`).
 
 Unknown keys in the Secret are ignored. Set `DEFAULT_LLM_PROVIDER=aisa` to make AISA the
@@ -85,15 +85,23 @@ Every service logs the resolved provider, base URL and model at startup
    aisa:
      enabled: true
      secretName: moirai-aisa-key
-     reloader: true        # optional: Stakater Reloader restarts pods on key rotation
    llm:
      provider: aisa        # optional: make AISA the process-wide default provider
    ```
 
-   The chart binds the Secret with `optional: true`, so pods start even before AISA has
-   reconciled it. Environment variables are read only at container start: if the Secret
-   appears later, or when AISA rotates the key (default every 30 days, 7-day grace),
-   restart the deployments or enable `aisa.reloader`.
+   The chart mounts the Secret at `aisa.keyMountPath` (default `/var/run/secrets/aisa`)
+   and points `AISA_API_KEY_FILE` at its `OPENAI_API_KEY` file (`aisa.keyFile: true`,
+   the default). The file is re-read for every request, and kubelet refreshes a mounted
+   Secret in place (within about a minute), so a key rotation (AISA default: every 30
+   days, 7-day grace) needs **no pod restart and no Reloader**.
+
+   `AISA_BASE_URL` and `AISA_MODEL` are still environment variables, read at container
+   start. Both the mount and the env refs are `optional: true`, so pods start before
+   AISA has reconciled the Secret; restart once after it first appears (the base URL is
+   env). `aisa.reloader: true` adds a Stakater Reloader annotation for those rare
+   changes, and only works if Reloader is installed in the cluster.
+   `aisa.keyFile: false` restores the old `AISA_API_KEY` env var, which goes stale on
+   rotation unless the pods are restarted.
 3. Moirai pods run with `automountServiceAccountToken: false`, so model discovery uses the
    proxy's HTTP `GET /v1/models` (Level 1) rather than the `Model` CRD.
 
