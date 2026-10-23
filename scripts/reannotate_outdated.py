@@ -239,6 +239,15 @@ class Progress:
         return text
 
 
+def _reannotate_isolated(doc: dict, dry_run: bool) -> bool:
+    """reannotate() that reports an unexpected exception as a failure."""
+    try:
+        return reannotate(doc, dry_run)
+    except Exception:  # noqa: BLE001 - one article must not stop the run
+        logger.exception("re-annotation of %s raised", doc.get("_id"))
+        return False
+
+
 def run(
     docs: Iterable[dict],
     progress: Progress,
@@ -254,7 +263,7 @@ def run(
     if concurrency <= 1:
         try:
             for doc in docs:
-                progress.record(reannotate(doc, dry_run))
+                progress.record(_reannotate_isolated(doc, dry_run))
         except KeyboardInterrupt:
             return False
         return True
@@ -263,12 +272,7 @@ def run(
 
     def collect(futures: set[Future]) -> None:
         for fut in futures:
-            try:
-                ok = fut.result()
-            except Exception:  # noqa: BLE001 - one article must not stop the run
-                logger.exception("re-annotation raised")
-                ok = False
-            progress.record(ok)
+            progress.record(fut.result())
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         try:
@@ -276,7 +280,7 @@ def run(
                 if len(in_flight) >= concurrency:
                     finished, in_flight = wait(in_flight, return_when=FIRST_COMPLETED)
                     collect(finished)
-                in_flight.add(pool.submit(reannotate, doc, dry_run))
+                in_flight.add(pool.submit(_reannotate_isolated, doc, dry_run))
             collect(set(wait(in_flight).done))
         except KeyboardInterrupt:
             logger.warning(

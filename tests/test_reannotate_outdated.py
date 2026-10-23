@@ -153,7 +153,9 @@ def test_progress_logs_at_interval_with_eta(caplog):
         progress.record(False)
     assert len(caplog.records) == 1
     msg = caplog.records[0].getMessage()
-    assert "2/10 (20.0%)" in msg and "1 failed" in msg and "ETA" in msg
+    assert "2/10 (20.0%)" in msg
+    assert "1 failed" in msg
+    assert "ETA" in msg
 
 
 @pytest.mark.parametrize("concurrency", [1, 3])
@@ -176,10 +178,11 @@ def test_run_exception_in_one_worker_does_not_stop_others(mock_reannotate):
         return True
 
     mock_reannotate.side_effect = flaky
-    progress = Progress(total=3, every=0)
-    docs = [{"_id": "a"}, {"_id": "boom"}, {"_id": "c"}]
-    assert run(docs, progress, concurrency=2) is True
-    assert (progress.done, progress.failed) == (2, 1)
+    for concurrency in (1, 2):
+        progress = Progress(total=3, every=0)
+        docs = [{"_id": "a"}, {"_id": "boom"}, {"_id": "c"}]
+        assert run(docs, progress, concurrency=concurrency) is True
+        assert (progress.done, progress.failed) == (2, 1)
 
 
 @patch("scripts.reannotate_outdated.reannotate")
