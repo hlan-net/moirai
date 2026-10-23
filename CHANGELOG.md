@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Fixes
+- API image sets `PYTHONPATH=/app`, so scripts under `scripts/` import `api` and `tasks` however they are started. Documented commands use the module form, e.g. `python -m scripts.reannotate_outdated` (the path form failed with `ModuleNotFoundError: No module named 'api'` in 0.9.0).
+
 ---
 
 ## [v0.9.0] — 2026-10-22

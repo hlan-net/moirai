@@ -62,6 +62,9 @@ COPY --from=builder /opt/conda/envs/moirai /opt/conda/envs/moirai
 ENV PATH="/opt/conda/envs/moirai/bin:$PATH"
 
 WORKDIR /app
+# Make the app root importable for `python -m scripts.<name>` and any script
+# run by path (sys.path[0] would otherwise be its own directory, not /app).
+ENV PYTHONPATH=/app
 
 # Copy application code (this layer changes on every code commit)
 COPY . .

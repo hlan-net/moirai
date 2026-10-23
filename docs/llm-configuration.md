@@ -133,9 +133,9 @@ vocabulary changes, bump `ANNOTATION_VERSION` and regenerate the old ones from
 inside the worker pod:
 
 ```bash
-python scripts/reannotate_outdated.py --dry-run            # list only
-python scripts/reannotate_outdated.py --days 3 --limit 500 # last 3 days
-python scripts/reannotate_outdated.py --userspace <uuid>   # one userspace
+python -m scripts.reannotate_outdated --dry-run            # list only
+python -m scripts.reannotate_outdated --days 3 --limit 500 # last 3 days
+python -m scripts.reannotate_outdated --userspace <uuid>   # one userspace
 ```
 
 `--days` defaults to 7: articles expire after `ARTICLE_EXPIRATION_DAYS`, so

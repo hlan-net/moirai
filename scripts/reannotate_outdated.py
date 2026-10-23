@@ -8,9 +8,9 @@ re-annotates them through the same backends the worker uses.
 
 Run inside the worker pod (same env, same network):
 
-    python scripts/reannotate_outdated.py --dry-run
-    python scripts/reannotate_outdated.py --days 3 --limit 500
-    python scripts/reannotate_outdated.py --userspace <uuid>
+    python -m scripts.reannotate_outdated --dry-run
+    python -m scripts.reannotate_outdated --days 3 --limit 500
+    python -m scripts.reannotate_outdated --userspace <uuid>
 
 Articles expire after ARTICLE_EXPIRATION_DAYS anyway, so ``--days`` keeps
 the run proportional to what readers will still see.
