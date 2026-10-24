@@ -157,3 +157,40 @@ OPENAI_BASE_URL / OPENAI_MODEL changes, which are read as env at start.
 secret.reloader.stakater.com/reload: {{ .Values.aisa.secretName | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Model catalog (llm.catalog + llm.purposes) rendered as JSON into a ConfigMap
+and read through LLM_CATALOG_FILE. Rendered only when llm.catalog has entries;
+without it the services keep the legacy env configuration. The ConfigMap is
+mounted as a directory (no subPath), so kubelet refreshes it in place and the
+services pick up changes without a restart.
+*/}}
+{{- define "moirai.llmCatalogEnabled" -}}
+{{- if .Values.llm.catalog }}true{{ end }}
+{{- end -}}
+
+{{- define "moirai.llmEnv" -}}
+{{- include "moirai.aisaEnv" . }}
+{{- if include "moirai.llmCatalogEnabled" . }}
+- name: LLM_CATALOG_FILE
+  value: {{ printf "%s/catalog.json" .Values.llm.catalogMountPath | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "moirai.llmVolumeMounts" -}}
+{{- include "moirai.aisaVolumeMounts" . }}
+{{- if include "moirai.llmCatalogEnabled" . }}
+- name: llm-catalog
+  mountPath: {{ .Values.llm.catalogMountPath | quote }}
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "moirai.llmVolumes" -}}
+{{- include "moirai.aisaVolumes" . }}
+{{- if include "moirai.llmCatalogEnabled" . }}
+- name: llm-catalog
+  configMap:
+    name: {{ include "moirai.fullname" . }}-llm-catalog
+{{- end }}
+{{- end -}}

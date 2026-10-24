@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Model catalog for annotation
+Which model served which job was spread over env vars with purpose-specific names (`ANNOTATION_OLLAMA_BASE_URL`, `MODEL_NAME`, ...), and the dedicated annotation tier could only be Ollama. `api/llm/catalog.py` adds a deployment-wide catalog: named entries (provider, endpoint, model, capabilities, languages) and purposes mapping to ordered fallback lists, set in Helm as `llm.catalog` / `llm.purposes` and read from `LLM_CATALOG_FILE`. The annotator now resolves its backends through the `annotation` purpose, so any provider, including AISA, can be a tier. Without a catalog the legacy env vars are synthesised into the same entries, and the rendered chart is unchanged. Chat and agents move onto purposes in a follow-up; Moirai is single-tenant, so there is no per-userspace model layer.
+
 ---
 
 ## [v0.9.1] — 2026-10-23
