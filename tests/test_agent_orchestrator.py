@@ -296,3 +296,27 @@ def test_check_and_run_agents_only_schedules(mock_update_safe, mock_query, orche
         assert call_args[1]["selector"]["trigger_type"] == AgentTriggerType.SCHEDULED.value
 
         mock_run.assert_called_once_with(agent_config)
+
+
+@patch('tasks.agent_orchestrator.get_default_userspace')
+@patch('tasks.agent_orchestrator.query_couchdb')
+def test_unscoped_articles_dispatch_to_default_userspace(mock_query, mock_default, orchestrator):
+    """Articles without a userspace are routed to the deployment's default userspace."""
+    default_userspace = "00000000-0000-0000-0000-000000000001"
+    mock_default.return_value = default_userspace
+    agent = {
+        "_id": "agent-default",
+        "userspace": default_userspace,
+        "status": AgentStatus.ACTIVE.value,
+        "trigger_type": AgentTriggerType.ON_NEW_ARTICLE.value,
+        "llm_model_config": None,
+    }
+    mock_query.return_value = [agent]
+    new_docs = [{"_id": "art1"}, {"_id": "art2"}, {"_id": "art3", "userspace": default_userspace}]
+
+    with patch.object(orchestrator, 'execute_agent_logic') as mock_execute:
+        orchestrator._dispatch_on_new_article_agents(new_docs)
+
+    assert mock_execute.call_count == 1
+    assert len(mock_execute.call_args[1]["new_articles"]) == 3
+    mock_default.assert_called_once()

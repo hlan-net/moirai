@@ -10,7 +10,7 @@ import requests
 from api.db import query_couchdb, update_couchdb_doc_safe
 from api.db_config import get_couchdb_uri
 from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
-from api.userspace_ops import resolve_llm_config
+from api.userspace_ops import get_default_userspace, resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
 from tasks.tracing_mcp_client import TracingMCPClient, AgentCancelledException
@@ -225,9 +225,15 @@ class AgentOrchestrator(threading.Thread):
     def _dispatch_on_new_article_agents(self, new_docs: list[dict]) -> None:
         """Dispatch on_new_article agents with articles from their own userspace."""
         # Pre-group documents by userspace for efficient dispatch (O(docs + agents) instead of O(docs * agents))
+        # Articles stored without a userspace (legacy ingestion, or a failed default
+        # lookup at write time) belong to the deployment's default userspace.
         docs_by_userspace: dict[str, list[dict]] = {}
+        default_userspace: str | None = None
         for doc in new_docs:
             userspace = doc.get("userspace")
+            if not userspace:
+                default_userspace = default_userspace or get_default_userspace()
+                userspace = default_userspace
             if userspace:
                 if userspace not in docs_by_userspace:
                     docs_by_userspace[userspace] = []
