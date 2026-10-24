@@ -135,3 +135,72 @@ class TestUserspaceCreateRequest:
         from api.validation import UserspaceCreateRequest
         req = UserspaceCreateRequest(name="<script>alert(1)</script>My Space")
         assert "<script>" not in req.name
+
+
+# ---------------------------------------------------------------------------
+# Default userspace resolution
+# ---------------------------------------------------------------------------
+
+DEFAULT_UUID = "11111111-1111-4111-8111-111111111111"
+
+
+@pytest.fixture
+def clear_default_cache(monkeypatch):
+    import api.userspace_ops as ops
+
+    monkeypatch.setattr(ops, "_default_userspace_cache", None)
+    monkeypatch.delenv("DEFAULT_USERSPACE", raising=False)
+    return ops
+
+
+class TestGetDefaultUserspace:
+    def test_env_var_wins(self, clear_default_cache, monkeypatch):
+        monkeypatch.setenv("DEFAULT_USERSPACE", DEFAULT_UUID)
+        with patch("api.userspace_ops.fetch_from_couchdb") as mock_fetch:
+            assert clear_default_cache.get_default_userspace() == DEFAULT_UUID
+        mock_fetch.assert_not_called()
+
+    def test_invalid_env_var_returns_none(self, clear_default_cache, monkeypatch):
+        monkeypatch.setenv("DEFAULT_USERSPACE", "not-a-uuid")
+        assert clear_default_cache.get_default_userspace() is None
+
+    def test_single_userspace_doc_is_used_and_cached(self, clear_default_cache):
+        docs = [{"_id": "_design/x"}, {"_id": DEFAULT_UUID, "type": "userspace"}]
+        with patch("api.userspace_ops.fetch_from_couchdb", return_value=docs) as mock_fetch:
+            assert clear_default_cache.get_default_userspace() == DEFAULT_UUID
+            assert clear_default_cache.get_default_userspace() == DEFAULT_UUID
+        mock_fetch.assert_called_once()
+
+    def test_ambiguous_returns_none(self, clear_default_cache):
+        docs = [{"_id": DEFAULT_UUID}, {"_id": "22222222-2222-4222-8222-222222222222"}]
+        with patch("api.userspace_ops.fetch_from_couchdb", return_value=docs):
+            assert clear_default_cache.get_default_userspace() is None
+
+
+class TestStoreArticleStampsUserspace:
+    def _store(self, article):
+        from tasks.article_processor import ArticleProcessor
+
+        with patch("tasks.article_processor.requests") as mock_requests:
+            mock_requests.head.return_value.status_code = 404
+            mock_requests.post.return_value.status_code = 201
+            ArticleProcessor().store_article(article)
+        return mock_requests.post.call_args.kwargs["json"]
+
+    def test_missing_userspace_gets_default(self):
+        article = {"title": "t", "link": "l", "feed_url": "f"}
+        with patch(
+            "tasks.article_processor.get_default_userspace", return_value=DEFAULT_UUID
+        ), patch("tasks.article_processor.get_redis_client", return_value=None):
+            stored = self._store(article)
+        assert stored["userspace"] == DEFAULT_UUID
+
+    def test_existing_userspace_is_kept(self):
+        other = "33333333-3333-4333-8333-333333333333"
+        article = {"title": "t", "link": "l", "feed_url": "f", "userspace": other}
+        with patch(
+            "tasks.article_processor.get_default_userspace", return_value=DEFAULT_UUID
+        ) as mock_default, patch("tasks.article_processor.get_redis_client", return_value=None):
+            stored = self._store(article)
+        assert stored["userspace"] == other
+        mock_default.assert_not_called()
