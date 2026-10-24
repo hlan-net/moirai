@@ -9,6 +9,7 @@ from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 from api.db_config import get_couchdb_uri
 from api.extensions import get_redis_client
+from api.userspace_ops import get_default_userspace
 
 # Ensure consistent results for language detection
 DetectorFactory.seed = 0
@@ -97,6 +98,10 @@ class ArticleProcessor:
             json.dumps(hash_payload, sort_keys=True).encode("utf-8")
         ).hexdigest()
         article["_id"] = article_hash
+        if not article.get("userspace"):
+            default_userspace = get_default_userspace()
+            if default_userspace:
+                article["userspace"] = default_userspace
 
         try:
             response = requests.head(f"{self.couchdb_url}/{article_hash}", timeout=10)

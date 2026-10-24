@@ -178,6 +178,10 @@ llm:
     model: ""
     languages: "en"
 
+# -- UUID of the deployment's single implicit userspace (DEFAULT_USERSPACE).
+# Leave empty to use the only document in the userspaces database.
+defaultUserspace: ""
+
 # -- AISA: in-cluster OpenAI-compatible inference proxy (additive, direct
 # providers keep working). AISA reconciles a Secret into this namespace with
 # the keys OPENAI_BASE_URL, OPENAI_API_KEY and optionally OPENAI_MODEL; the chart
