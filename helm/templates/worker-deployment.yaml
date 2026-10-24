@@ -117,12 +117,12 @@ spec:
                 optional: true
           - name: PYTHONUNBUFFERED
             value: "1"
-          {{- include "moirai.aisaEnv" . | nindent 10 }}
-          {{- with (include "moirai.aisaVolumeMounts" .) }}
+          {{- include "moirai.llmEnv" . | nindent 10 }}
+          {{- with (include "moirai.llmVolumeMounts" .) }}
           volumeMounts:
             {{- . | nindent 12 }}
           {{- end }}
-      {{- with (include "moirai.aisaVolumes" .) }}
+      {{- with (include "moirai.llmVolumes" .) }}
       volumes:
         {{- . | nindent 8 }}
       {{- end }}
