@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Model catalog editable in the admin UI
+Changing which model serves a purpose needed a Helm values change and an upgrade. Admins now edit the catalog on Settings → System Settings → Model Catalog: models (provider, model, endpoint, API key variable, languages, capabilities) and an ordered model list per purpose. The catalog is stored in `config/llm_catalog` and replaces the Helm one while it exists; "Reset to Helm values" deletes it. Every service re-reads it within 30 seconds and keeps the last known catalog if CouchDB is unreachable. `PUT /api/llm/catalog` validates the whole catalog (`LlmCatalogUpdateRequest`): known providers and capabilities, an endpoint for Ollama, purposes only naming entries with the capability they need, and API key variables restricted to `*_API_KEY` names so an edit cannot hand another secret to a provider.
+
 ### Single implicit userspace, step 3: UI and REST API
 The Agents and Sessions pages no longer ask for a userspace; the REST API fills in the deployment default. `/api/agents`, `/api/sessions` (non-admin callers) and `/api/approvals/pending` default a missing `userspace` to it, and `POST /api/agents` stores it when the payload has none. Access checks go through `can_access_userspace()`: any authenticated user may use the default userspace, other (legacy) userspaces stay limited to their owner and admins. Chat resolves its LLM config and MCP tool scope from the default userspace instead of the caller's user id, so a user who signs in through GitHub, Google or Entra works on the same data as the admin account.
 

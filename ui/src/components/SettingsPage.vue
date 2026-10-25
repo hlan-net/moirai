@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useTheme, type Theme } from '../composables/useTheme'
 import { authFetch } from '../utils/authFetch'
+import ModelCatalogEditor from './ModelCatalogEditor.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
@@ -758,6 +759,8 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <ModelCatalogEditor />
 
     <div class="settings-section">
       <h2 @click="toggleSection('authentication')">

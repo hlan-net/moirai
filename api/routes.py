@@ -22,10 +22,12 @@ from .db import (
 from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
 from .userspace_ops import get_userspace, resolve_llm_config
 from .llm.aisa import aisa_status
+from .llm import catalog as llm_catalog
 from .llm.catalog import PURPOSE_SOCIAL_EXPORT
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
 from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest, ShareIssueRequest
+from .validation import LlmCatalogUpdateRequest
 from .auth import get_auth_config
 
 import uuid  # Import uuid
@@ -923,6 +925,91 @@ def update_config():
         return jsonify({"status": "updated", "config": new_doc})
     else:
         abort(500, description="Failed to update config")
+
+
+def _llm_catalog_payload() -> dict:
+    """Active model catalog plus what the editor needs (never any API key)."""
+    doc = llm_catalog.load_catalog_doc(force=True)
+    file_data = llm_catalog.read_catalog_file()
+    active = doc if doc is not None else (file_data or {})
+    parsed = llm_catalog.load_catalog()
+    return {
+        "source": llm_catalog.catalog_source(),
+        "catalog": active.get("catalog") or {},
+        "purposes": active.get("purposes") or {},
+        "updated_at": (doc or {}).get("updated_at"),
+        "updated_by": (doc or {}).get("updated_by"),
+        "file": file_data,
+        # Entries the running services ignore (e.g. aisa without a model).
+        "skipped": [
+            name
+            for name in active.get("catalog") or {}
+            if not parsed or name not in parsed.entries
+        ],
+        "purpose_info": [
+            {
+                "id": purpose,
+                "needs": needs,
+                "description": llm_catalog.PURPOSE_DESCRIPTIONS.get(purpose, ""),
+            }
+            for purpose, needs in llm_catalog.PURPOSE_CAPABILITIES.items()
+        ],
+        "providers": sorted(llm_catalog.KNOWN_PROVIDERS),
+        "capabilities": sorted(llm_catalog.KNOWN_CAPABILITIES),
+    }
+
+
+@api_blueprint.route("/llm/catalog", methods=["GET"])
+@admin_required
+def get_llm_catalog():
+    return jsonify(_llm_catalog_payload())
+
+
+@api_blueprint.route("/llm/catalog", methods=["PUT"])
+@admin_required
+@limiter.limit("20 per minute")
+def update_llm_catalog():
+    try:
+        validated = LlmCatalogUpdateRequest(**(request.get_json(silent=True) or {}))
+    except ValidationError as e:
+        errors = [
+            ".".join(str(part) for part in err["loc"]) + ": " if err["loc"] else ""
+            for err in e.errors()
+        ]
+        errors = [
+            prefix + err["msg"].removeprefix("Value error, ")
+            for prefix, err in zip(errors, e.errors())
+        ]
+        return jsonify({"error": "Invalid model catalog", "details": errors}), 400
+    except TypeError:
+        return jsonify({"error": "Invalid model catalog"}), 400
+
+    doc = validated.to_document()
+    doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    doc["updated_by"] = getattr(g, "user_email", None) or getattr(g, "user_id", None)
+    existing = fetch_from_couchdb(llm_catalog.CATALOG_DB, llm_catalog.CATALOG_DOC_ID)
+    if existing:
+        doc["_rev"] = existing["_rev"]
+    if not update_couchdb_doc(llm_catalog.CATALOG_DB, llm_catalog.CATALOG_DOC_ID, doc):
+        abort(500, description="Failed to store model catalog")
+    llm_catalog.invalidate_catalog_cache()
+    logger.info(
+        "Model catalog updated by %s: %d entries", doc["updated_by"], len(doc["catalog"])
+    )
+    return jsonify(_llm_catalog_payload())
+
+
+@api_blueprint.route("/llm/catalog", methods=["DELETE"])
+@admin_required
+def reset_llm_catalog():
+    """Drop the admin-edited catalog so the Helm values (file) apply again."""
+    existing = fetch_from_couchdb(llm_catalog.CATALOG_DB, llm_catalog.CATALOG_DOC_ID)
+    if existing and not delete_from_couchdb(
+        llm_catalog.CATALOG_DB, llm_catalog.CATALOG_DOC_ID, existing["_rev"]
+    ):
+        abort(500, description="Failed to reset model catalog")
+    llm_catalog.invalidate_catalog_cache()
+    return jsonify(_llm_catalog_payload())
 
 
 @api_blueprint.route("/scheduler/logs", methods=["GET"])

@@ -540,3 +540,148 @@ def sanitize_html_content(html: str, max_length: int = 10000) -> str:
     )
 
     return cleaned
+
+
+# --- Model catalog (admin UI) ---
+
+CATALOG_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+CATALOG_LANGUAGE_PATTERN = re.compile(r"^[a-z]{2,3}$")
+# Only variables that look like API keys may be named, so an admin edit
+# cannot point a provider at an unrelated secret (JWT key, DB password).
+CATALOG_API_KEY_ENV_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*_API_KEY$")
+CATALOG_MAX_ENTRIES = 50
+
+
+class LlmCatalogEntry(BaseModel):
+    """One model catalog entry as edited in the admin UI."""
+
+    model_config = {"extra": "forbid"}
+
+    provider: str
+    endpoint: Optional[str] = Field(None, max_length=500)
+    model: Optional[str] = Field(None, max_length=200)
+    capabilities: list[str] = Field(default_factory=list, max_length=10)
+    languages: list[str] = Field(default_factory=list, max_length=50)
+    apiKeyEnv: Optional[str] = Field(None, max_length=100)
+
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, v: str) -> str:
+        from api.llm.catalog import KNOWN_PROVIDERS
+
+        v = v.strip().lower()
+        if v not in KNOWN_PROVIDERS:
+            raise ValueError(f"provider must be one of {sorted(KNOWN_PROVIDERS)}")
+        return v
+
+    @field_validator("endpoint", "model", "apiKeyEnv")
+    @classmethod
+    def clean_text(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = bleach.clean(v, tags=[], strip=True).strip()
+        return v or None
+
+    @field_validator("endpoint")
+    @classmethod
+    def validate_endpoint(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("endpoint must be an http(s) URL")
+        return v
+
+    @field_validator("capabilities")
+    @classmethod
+    def validate_capabilities(cls, v: list[str]) -> list[str]:
+        from api.llm.catalog import KNOWN_CAPABILITIES
+
+        cleaned = sorted({c.strip().lower() for c in v if c.strip()})
+        unknown = [c for c in cleaned if c not in KNOWN_CAPABILITIES]
+        if unknown:
+            raise ValueError(
+                f"unknown capabilities {unknown}; use {sorted(KNOWN_CAPABILITIES)}"
+            )
+        return cleaned
+
+    @field_validator("languages")
+    @classmethod
+    def validate_languages(cls, v: list[str]) -> list[str]:
+        cleaned = sorted({lang.strip().lower() for lang in v if lang.strip()})
+        bad = [lang for lang in cleaned if not CATALOG_LANGUAGE_PATTERN.match(lang)]
+        if bad:
+            raise ValueError(f"languages must be ISO 639-1 codes, got {bad}")
+        return cleaned
+
+    @field_validator("apiKeyEnv")
+    @classmethod
+    def validate_api_key_env(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not CATALOG_API_KEY_ENV_PATTERN.match(v):
+            raise ValueError("apiKeyEnv must name an env var ending in _API_KEY")
+        return v
+
+    @model_validator(mode="after")
+    def check_required(self) -> "LlmCatalogEntry":
+        if self.provider != "aisa" and not self.model:
+            raise ValueError("model is required (optional only for aisa)")
+        if self.provider == "ollama" and not self.endpoint:
+            raise ValueError("endpoint is required for ollama")
+        return self
+
+
+class LlmCatalogUpdateRequest(BaseModel):
+    """The whole model catalog as saved from the admin UI."""
+
+    model_config = {"extra": "forbid"}
+
+    catalog: Dict[str, LlmCatalogEntry] = Field(default_factory=dict)
+    purposes: Dict[str, list[str]] = Field(default_factory=dict)
+
+    @field_validator("catalog")
+    @classmethod
+    def validate_names(
+        cls, v: Dict[str, LlmCatalogEntry]
+    ) -> Dict[str, LlmCatalogEntry]:
+        if len(v) > CATALOG_MAX_ENTRIES:
+            raise ValueError(f"at most {CATALOG_MAX_ENTRIES} entries")
+        bad = [name for name in v if not CATALOG_NAME_PATTERN.match(name)]
+        if bad:
+            raise ValueError(
+                f"invalid entry names {bad}: letters, digits, '.', '_', '-' (max 64)"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def check_purposes(self) -> "LlmCatalogUpdateRequest":
+        from api.llm.catalog import DEFAULT_CAPABILITIES, PURPOSE_CAPABILITIES
+
+        for purpose, names in self.purposes.items():
+            if purpose not in PURPOSE_CAPABILITIES:
+                raise ValueError(
+                    f"unknown purpose '{purpose}'; use {sorted(PURPOSE_CAPABILITIES)}"
+                )
+            if len(set(names)) != len(names):
+                raise ValueError(f"purpose '{purpose}' lists an entry twice")
+            needed = PURPOSE_CAPABILITIES[purpose]
+            for name in names:
+                entry = self.catalog.get(name)
+                if entry is None:
+                    raise ValueError(f"purpose '{purpose}' names unknown entry '{name}'")
+                capabilities = set(entry.capabilities) or DEFAULT_CAPABILITIES
+                if needed not in capabilities:
+                    raise ValueError(
+                        f"purpose '{purpose}' needs '{needed}', which '{name}' lacks"
+                    )
+        return self
+
+    def to_document(self) -> dict:
+        """The stored form: empty fields left out, purposes without entries dropped."""
+        return {
+            "catalog": {
+                name: entry.model_dump(exclude_none=True, exclude_defaults=True)
+                | {"provider": entry.provider}
+                for name, entry in self.catalog.items()
+            },
+            "purposes": {p: names for p, names in self.purposes.items() if names},
+        }

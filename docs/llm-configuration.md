@@ -187,6 +187,11 @@ control and quotas belong to AISA. Each **entry** is a provider, endpoint and
 model with its capabilities; each **purpose** is an ordered fallback list of
 entries.
 
+There are two places to define it. Admins edit it on **Settings → System
+Settings → Model Catalog**; the Helm values (`llm.catalog` / `llm.purposes`)
+are the default the deployment starts with. A catalog saved in the UI replaces
+the Helm one completely, and **Reset to Helm values** discards it again.
+
 ```yaml
 llm:
   catalog:
@@ -245,7 +250,30 @@ Without a catalog, or for a purpose it does not list, the legacy settings stay
 in effect: for `annotation`, `llm.annotation` (`ANNOTATION_*`) then
 `llm.provider` / `llm.model`; for the other purposes, the Settings page
 configuration stored in the userspace document.
-The startup log line `LLM catalog: ...` shows which applies.
+The startup log line `LLM catalog (<source>): ...` shows which applies.
+
+### Editing in the admin UI
+
+The editor lists the models (name, provider, model, endpoint for Ollama, the
+API key *variable* for OpenAI and Gemini, languages, capabilities) and, per
+purpose, the ordered list of models with buttons to reorder, add and remove.
+Saving validates the whole catalog first and rejects it with the reasons when,
+for example, an Ollama entry has no endpoint, a purpose names a model that
+lacks the capability it needs (`json` for annotation and event synthesis,
+`chat` for chat and social export), or an API key variable does not end in
+`_API_KEY`. Keys themselves cannot be entered: they stay in the environment.
+
+The saved catalog lives in the CouchDB document `config/llm_catalog` (with
+`updated_at` / `updated_by`). Every service re-reads it at most every 30
+seconds, so a change reaches the annotation worker, agents and chat within
+half a minute without a restart. If CouchDB is briefly unreachable the
+services keep the last catalog they read instead of switching models. An entry
+the services cannot use (an AISA entry without a model while the AISA Secret
+has no default model) is listed as ignored in the editor.
+
+The API behind the editor is admin-only: `GET /api/llm/catalog` (the active
+catalog, its source and the Helm file), `PUT /api/llm/catalog` (save) and
+`DELETE /api/llm/catalog` (back to the Helm values).
 
 ## Switching Providers
 

@@ -37,16 +37,32 @@ API keys never live in the catalog: ``openai`` / ``gemini`` entries read
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from typing import Optional
+
+import requests
+
+from api.db_config import get_couchdb_uri
 
 from .aisa import aisa_default_model
 
 logger = logging.getLogger(__name__)
 
 CATALOG_FILE_ENV = "LLM_CATALOG_FILE"
+# Catalog edited in the admin UI; when present it replaces the file.
+CATALOG_DB = "config"
+CATALOG_DOC_ID = "llm_catalog"
+# Every pod reads the document; this bounds how long an edit takes to reach
+# them and how often a busy worker queries CouchDB.
+DB_CACHE_SECONDS = 30
+
+SOURCE_DATABASE = "database"
+SOURCE_FILE = "file"
+SOURCE_NONE = "none"
 DEFAULT_MODEL = "llama3.1"
 KNOWN_PROVIDERS = frozenset({"ollama", "openai", "gemini", "aisa"})
+KNOWN_CAPABILITIES = frozenset({"chat", "json", "tools", "embedding"})
 
 PURPOSE_ANNOTATION = "annotation"
 PURPOSE_CHAT = "chat"
@@ -62,6 +78,14 @@ PURPOSE_CAPABILITIES: dict[str, str] = {
     PURPOSE_SOCIAL_EXPORT: "chat",
 }
 DEFAULT_CAPABILITIES = frozenset({"chat", "json"})
+
+# Shown next to each purpose in the admin UI.
+PURPOSE_DESCRIPTIONS: dict[str, str] = {
+    PURPOSE_ANNOTATION: "Article topics, priority and sentiment (worker, re-annotation)",
+    PURPOSE_EVENT_SYNTHESIS: "Agents that create and update events from articles",
+    PURPOSE_CHAT: "Chat page and its model list",
+    PURPOSE_SOCIAL_EXPORT: "Bluesky post text",
+}
 
 _DEFAULT_API_KEY_ENV = {"openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
 
@@ -174,12 +198,64 @@ def parse_catalog(data: dict) -> Catalog:
     return Catalog(entries=entries, purposes=purposes)
 
 
-def load_catalog() -> Optional[Catalog]:
-    """Return the catalog from ``LLM_CATALOG_FILE``, or ``None`` when unset.
+def _fetch_catalog_doc() -> Optional[dict]:
+    """GET the admin-edited catalog document; ``None`` when it does not exist.
 
-    The file is re-read when its mtime changes, so an updated ConfigMap is
-    picked up without a restart.
+    Raises ``requests.RequestException`` when CouchDB cannot be reached, so
+    the caller can keep the last known catalog instead of switching models.
     """
+    response = requests.get(
+        f"{get_couchdb_uri()}{CATALOG_DB}/{CATALOG_DOC_ID}", timeout=5
+    )
+    if response.status_code == 404:
+        return None
+    if response.status_code != 200:
+        raise requests.RequestException(f"HTTP {response.status_code}")
+    doc = response.json()
+    return doc if isinstance(doc, dict) else None
+
+
+_db_cache: dict[str, object] = {}
+
+
+def load_catalog_doc(force: bool = False) -> Optional[dict]:
+    """The admin-edited catalog document, cached for ``DB_CACHE_SECONDS``.
+
+    On a CouchDB error the previous value is kept (and retried after the
+    cache period), so a database hiccup never silently swaps models.
+    """
+    now = time.monotonic()
+    if not force and "doc" in _db_cache and now < _db_cache["expires"]:
+        return _db_cache["doc"]
+    try:
+        doc = _fetch_catalog_doc()
+    except (requests.RequestException, ValueError) as e:
+        logger.warning(f"LLM catalog: cannot read {CATALOG_DB}/{CATALOG_DOC_ID}: {e}")
+        doc = _db_cache.get("doc")
+    _db_cache.update(doc=doc, expires=now + DB_CACHE_SECONDS)
+    return doc
+
+
+def invalidate_catalog_cache() -> None:
+    """Forget the cached document (this process only; other pods expire it)."""
+    _db_cache.clear()
+
+
+def read_catalog_file() -> Optional[dict]:
+    """The raw JSON of ``LLM_CATALOG_FILE`` (the Helm values), or ``None``."""
+    path = os.environ.get(CATALOG_FILE_ENV, "")
+    if not path:
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        logger.warning(f"LLM catalog: cannot read {path}: {e}")
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _load_file_catalog() -> Optional[Catalog]:
     path = os.environ.get(CATALOG_FILE_ENV, "")
     if not path:
         return None
@@ -199,6 +275,45 @@ def load_catalog() -> Optional[Catalog]:
         return None
     _cache[path] = (mtime, catalog)
     return catalog
+
+
+def _load_db_catalog(doc: dict) -> Optional[Catalog]:
+    key = f"db:{doc.get('_rev', '')}"
+    cached = _cache.get(key)
+    if cached:
+        return cached[1]
+    try:
+        catalog = parse_catalog(doc)
+    except ValueError as e:
+        logger.error(f"LLM catalog: invalid {CATALOG_DB}/{CATALOG_DOC_ID}: {e}")
+        return None
+    for stale in [k for k in _cache if k.startswith("db:")]:
+        del _cache[stale]
+    _cache[key] = (0.0, catalog)
+    return catalog
+
+
+def catalog_source() -> str:
+    """Where the active catalog comes from: database, file or none."""
+    if load_catalog_doc() is not None:
+        return SOURCE_DATABASE
+    if os.environ.get(CATALOG_FILE_ENV, ""):
+        return SOURCE_FILE
+    return SOURCE_NONE
+
+
+def load_catalog() -> Optional[Catalog]:
+    """Return the active catalog, or ``None`` when there is none.
+
+    The catalog edited in the admin UI (``config/llm_catalog``) wins; without
+    it, ``LLM_CATALOG_FILE`` (the Helm values) applies. The file is re-read
+    when its mtime changes, so an updated ConfigMap is picked up without a
+    restart.
+    """
+    doc = load_catalog_doc()
+    if doc is not None:
+        return _load_db_catalog(doc)
+    return _load_file_catalog()
 
 
 def default_model_name(provider: str) -> str:
@@ -298,9 +413,11 @@ def describe_catalog() -> str:
     catalog = load_catalog()
     if not catalog:
         return "LLM catalog: none (legacy environment configuration)"
+    source = catalog_source()
     purposes = ", ".join(
         f"{p}=[{', '.join(names)}]" for p, names in sorted(catalog.purposes.items())
     )
     return (
-        f"LLM catalog: {len(catalog.entries)} entries; purposes: {purposes or 'none'}"
+        f"LLM catalog ({source}): {len(catalog.entries)} entries; "
+        f"purposes: {purposes or 'none'}"
     )
