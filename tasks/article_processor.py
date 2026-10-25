@@ -98,15 +98,16 @@ class ArticleProcessor:
             json.dumps(hash_payload, sort_keys=True).encode("utf-8")
         ).hexdigest()
         article["_id"] = article_hash
-        if not article.get("userspace"):
-            default_userspace = get_default_userspace()
-            if default_userspace:
-                article["userspace"] = default_userspace
 
         try:
             response = requests.head(f"{self.couchdb_url}/{article_hash}", timeout=10)
             if response.status_code == 200:
                 return
+
+            if not article.get("userspace"):
+                default_userspace = get_default_userspace()
+                if default_userspace:
+                    article["userspace"] = default_userspace
 
             response = requests.post(self.couchdb_url, json=article, timeout=10)
             if response.status_code not in (200, 201):

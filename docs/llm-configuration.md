@@ -175,8 +175,62 @@ and an NPU backend may run only one inference at a time. Raise it in small steps
 and watch `s/article`; the worker keeps annotating new articles on the same
 backends meanwhile.
 
-The script uses the same backends and language routing as the worker, so a
+The script uses the same backends (the catalog's `annotation` purpose, see
+[Model Catalog](#model-catalog)) and language routing as the worker, so a
 paused or missing model affects it the same way.
+
+## Model Catalog
+
+The model catalog names the LLM endpoints a deployment has and says which job
+uses which of them. It is deployment-wide: Moirai is single-tenant, and cost
+control and quotas belong to AISA. Each **entry** is a provider, endpoint and
+model with its capabilities; each **purpose** is an ordered fallback list of
+entries. Today the catalog drives `annotation`; chat and agents still use the
+Settings page configuration.
+
+```yaml
+llm:
+  catalog:
+    npu-qwen:                       # Hailo NPU, small model, English only
+      provider: ollama
+      endpoint: "http://ergo:8000/v1"
+      model: "qwen3:1.7b"
+      languages: [en]
+    cpu-llama:
+      provider: ollama
+      endpoint: "http://ergo:11434/v1"
+      model: "llama3.2:3b"
+    aisa:
+      provider: aisa                # model defaults to the AISA Secret's model
+      capabilities: [chat, json, tools]
+  purposes:
+    annotation: [npu-qwen, cpu-llama]
+```
+
+| Entry key | Meaning |
+|---|---|
+| `provider` | `ollama`, `openai`, `gemini` or `aisa` |
+| `endpoint` | Base URL (Ollama); ignored for the other providers |
+| `model` | Model name; optional for `aisa` |
+| `capabilities` | Default `[chat, json]`; annotation needs `json` |
+| `languages` | ISO 639-1 codes the model handles; empty means any |
+| `apiKeyEnv` | Env var holding the key (default `OPENAI_API_KEY` / `GEMINI_API_KEY`) |
+
+API keys never go into the catalog. For an article, Moirai walks the purpose's
+list, skips entries without the needed capability or restricted to other
+languages, and falls through to the next entry when one fails or is paused
+after a missing-model 404.
+
+The chart renders the catalog into the `<release>-llm-catalog` ConfigMap,
+mounts it at `llm.catalogMountPath` in the api, worker, mcp-server and
+scheduler pods and sets `LLM_CATALOG_FILE`. The file is re-read when it
+changes, so editing the values and running `helm upgrade` needs no restart
+(kubelet refreshes the mount within about a minute). Outside Kubernetes, point
+`LLM_CATALOG_FILE` at a JSON file with the same `catalog` and `purposes` keys.
+
+Without a catalog, or for a purpose it does not list, the legacy settings stay
+in effect: `llm.annotation` (`ANNOTATION_*`) then `llm.provider` / `llm.model`.
+The startup log line `LLM catalog: ...` shows which applies.
 
 ## Switching Providers
 

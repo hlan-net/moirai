@@ -11,16 +11,22 @@ under the ``annotations`` key.
 
 import json
 import logging
-import os
 import time
-from dataclasses import dataclass
+from dataclasses import replace
 from typing import Any, Optional
 
 import requests
 from openai import NotFoundError
 
 from api.db_config import get_couchdb_uri
-from api.llm.aisa import aisa_default_model
+from api.llm.catalog import (
+    DEFAULT_MODEL,
+    PURPOSE_ANNOTATION,
+    ModelEntry,
+    configured_models,
+    legacy_default_entry,
+    resolve_models,
+)
 from api.llm.factory import LLMProviderFactory
 
 logger = logging.getLogger(__name__)
@@ -135,68 +141,26 @@ ANNOTATION_VIEWS = {
     }
 }
 
-DEFAULT_ANNOTATION_MODEL = "llama3.1"
+DEFAULT_ANNOTATION_MODEL = DEFAULT_MODEL
 
 # When a backend reports its model as missing (HTTP 404), pause that backend
 # instead of sending one doomed request per incoming article.
 MODEL_NOT_FOUND_BACKOFF_SECONDS = 600
 _paused_until: dict[str, float] = {}
 
-
-@dataclass(frozen=True)
-class AnnotationBackend:
-    """An LLM endpoint + model used for annotation.
-
-    ``primary`` is the optional dedicated annotation backend (e.g. a
-    low-power NPU running hailo-ollama) configured via ``ANNOTATION_*`` env
-    vars. ``default`` is the general LLM configuration (``DEFAULT_LLM_PROVIDER``,
-    ``OLLAMA_BASE_URL``, ``MODEL_NAME``) and serves as the fallback.
-    """
-
-    name: str
-    provider: str
-    base_url: str
-    model: str
-
-
-def _default_model_name(provider: str) -> str:
-    """MODEL_NAME wins; for the aisa provider fall back to the Secret's default model."""
-    model = os.environ.get("MODEL_NAME", "")
-    if not model and provider == "aisa":
-        model = aisa_default_model()
-    return model or DEFAULT_ANNOTATION_MODEL
+# Annotation backends are model catalog entries (``api/llm/catalog.py``): the
+# ``annotation`` purpose of LLM_CATALOG_FILE, or without one the legacy
+# ``primary`` (ANNOTATION_* env vars) and ``default`` (DEFAULT_LLM_PROVIDER,
+# OLLAMA_BASE_URL, MODEL_NAME) backends.
+AnnotationBackend = ModelEntry
 
 
 def _default_backend(model: Optional[str] = None) -> AnnotationBackend:
-    # OLLAMA_BASE_URL is set via docker-compose.yml; no hardcoded default
-    # to avoid SonarCloud S5332 (http:// in source).
-    provider = os.environ.get("DEFAULT_LLM_PROVIDER", "ollama")
-    return AnnotationBackend(
-        name="default",
-        provider=provider,
-        base_url=os.environ.get("OLLAMA_BASE_URL", ""),
-        model=model or _default_model_name(provider),
-    )
-
-
-def _primary_backend() -> Optional[AnnotationBackend]:
-    base_url = os.environ.get("ANNOTATION_OLLAMA_BASE_URL", "")
-    model = os.environ.get("ANNOTATION_MODEL_NAME", "")
-    if not (base_url and model):
-        return None
-    return AnnotationBackend(
-        name="primary", provider="ollama", base_url=base_url, model=model
-    )
-
-
-def _primary_languages() -> set[str]:
-    raw = os.environ.get("ANNOTATION_LANGUAGES", "en")
-    return {lang.strip().lower() for lang in raw.split(",") if lang.strip()}
+    return legacy_default_entry(model)
 
 
 def _configured_backends() -> list[AnnotationBackend]:
-    primary = _primary_backend()
-    return ([primary] if primary else []) + [_default_backend()]
+    return configured_models(PURPOSE_ANNOTATION)
 
 
 def _backends_for(
@@ -204,16 +168,13 @@ def _backends_for(
 ) -> list[AnnotationBackend]:
     """Backends to try, in order, for an article in *language*.
 
-    Small NPU models only understand a few languages, so the primary backend
-    is used only for languages listed in ``ANNOTATION_LANGUAGES``; everything
-    else goes straight to the default backend. A primary failure (invalid
-    output, error) falls back to the default backend.
+    Backends restricted to some languages (small NPU models) are skipped for
+    other languages; a failure (invalid output, error) falls through to the
+    next backend. *model* overrides the model of the last (fallback) backend.
     """
-    backends = []
-    primary = _primary_backend()
-    if primary and language and language.lower() in _primary_languages():
-        backends.append(primary)
-    backends.append(_default_backend(model))
+    backends = resolve_models(PURPOSE_ANNOTATION, language)
+    if model and backends:
+        backends[-1] = replace(backends[-1], model=model)
     return backends
 
 
@@ -221,16 +182,10 @@ def _get_llm_provider(backend: Optional[AnnotationBackend] = None) -> Any:
     """Create an LLM provider for *backend* (default: env configuration)."""
     backend = backend or _default_backend()
 
-    # Select the API key matching the chosen provider to avoid passing
-    # the wrong credential (e.g. OpenAI key to a Gemini provider).
-    api_key = ""
-    if backend.provider == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-    elif backend.provider == "gemini":
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-
+    # The entry selects the API key matching its provider, so the wrong
+    # credential (e.g. OpenAI key to a Gemini provider) is never passed.
     return LLMProviderFactory().get_provider(
-        backend.provider, api_key, backend.base_url
+        backend.provider, backend.api_key(), backend.base_url
     )
 
 

@@ -143,7 +143,7 @@ spec:
             value: "http://{{ include "moirai.fullname" . }}-mcp-server:{{ .Values.mcpServer.service.port }}/sse"
           - name: ARTICLE_EXPIRATION_DAYS
             value: {{ .Values.api.articleExpirationDays | quote }}
-          {{- include "moirai.aisaEnv" . | nindent 10 }}
+          {{- include "moirai.llmEnv" . | nindent 10 }}
           {{- include "moirai.userspaceEnv" . | nindent 10 }}
           {{- if .Values.redis.enabled }}
           - name: REDIS_HOST
@@ -159,13 +159,13 @@ spec:
           volumeMounts:
             - name: feeds-volume
               mountPath: /app/feeds
-            {{- with (include "moirai.aisaVolumeMounts" .) }}
+            {{- with (include "moirai.llmVolumeMounts" .) }}
             {{- . | nindent 12 }}
             {{- end }}
       volumes:
         - name: feeds-volume
           configMap:
             name: {{ include "moirai.fullname" . }}-feed-lists
-        {{- with (include "moirai.aisaVolumes" .) }}
+        {{- with (include "moirai.llmVolumes" .) }}
         {{- . | nindent 8 }}
         {{- end }}
