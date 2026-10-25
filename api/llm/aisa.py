@@ -179,3 +179,8 @@ def log_llm_startup_config(log: logging.Logger) -> None:
         log.info("LLM config: aisa not configured (no AISA_BASE_URL / OPENAI_BASE_URL)")
     if default_provider == AISA_PROVIDER_NAME and not status["configured"]:
         log.warning("DEFAULT_LLM_PROVIDER=aisa but AISA credentials are not available")
+
+    # Imported here: the catalog module imports this one.
+    from .catalog import describe_catalog
+
+    log.info(describe_catalog())

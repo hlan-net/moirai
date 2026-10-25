@@ -177,6 +177,29 @@ llm:
     endpoint: ""
     model: ""
     languages: "en"
+  # -- Model catalog: named LLM endpoints and what they can do. When set, it
+  # is rendered into a ConfigMap (LLM_CATALOG_FILE) and `purposes` decides
+  # which entries each job uses, in fallback order. A purpose not listed keeps
+  # the legacy configuration above. Keys: provider (ollama | openai | gemini |
+  # aisa), endpoint, model (aisa: defaults to the Secret's model),
+  # capabilities (default [chat, json]), languages (empty = any), apiKeyEnv.
+  # API keys never go here. Example replacing `annotation` above:
+  #   catalog:
+  #     npu-qwen:
+  #       provider: ollama
+  #       endpoint: "http://ergo:8000/v1"
+  #       model: "qwen3:1.7b"
+  #       languages: [en]
+  #     cpu-llama:
+  #       provider: ollama
+  #       endpoint: "http://ergo:11434/v1"
+  #       model: "llama3.2:3b"
+  #   purposes:
+  #     annotation: [npu-qwen, cpu-llama]
+  catalog: {}
+  # -- Purpose -> ordered list of catalog entry names. Supported: annotation.
+  purposes: {}
+  catalogMountPath: "/etc/moirai/llm"
 
 # -- UUID of the deployment's single implicit userspace (DEFAULT_USERSPACE).
 # Leave empty to use the only document in the userspaces database.

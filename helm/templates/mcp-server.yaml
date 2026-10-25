@@ -98,7 +98,7 @@ spec:
               value: {{ .Values.llm.model | quote }}
             - name: OPEN_WEBUI_ENDPOINT
               value: {{ .Values.openWebui.endpoint | quote }}
-            {{- include "moirai.aisaEnv" . | nindent 12 }}
+            {{- include "moirai.llmEnv" . | nindent 12 }}
             {{- include "moirai.userspaceEnv" . | nindent 12 }}
             - name: COUCHDB_USER
               valueFrom:
@@ -144,11 +144,11 @@ spec:
                   name: {{ include "moirai.fullname" . }}-redis-secret
                   key: password
             {{- end }}
-          {{- with (include "moirai.aisaVolumeMounts" .) }}
+          {{- with (include "moirai.llmVolumeMounts" .) }}
           volumeMounts:
             {{- . | nindent 12 }}
           {{- end }}
-      {{- with (include "moirai.aisaVolumes" .) }}
+      {{- with (include "moirai.llmVolumes" .) }}
       volumes:
         {{- . | nindent 8 }}
       {{- end }}

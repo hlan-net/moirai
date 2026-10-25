@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Model catalog for annotation
+Which model served which job was spread over env vars with purpose-specific names (`ANNOTATION_OLLAMA_BASE_URL`, `MODEL_NAME`, ...), and the dedicated annotation tier could only be Ollama. `api/llm/catalog.py` adds a deployment-wide catalog: named entries (provider, endpoint, model, capabilities, languages) and purposes mapping to ordered fallback lists, set in Helm as `llm.catalog` / `llm.purposes` and read from `LLM_CATALOG_FILE`. The annotator now resolves its backends through the `annotation` purpose, so any provider, including AISA, can be a tier. Without a catalog the legacy env vars are synthesised into the same entries, and the rendered chart is unchanged. Chat and agents move onto purposes in a follow-up; Moirai is single-tenant, so there is no per-userspace model layer.
+
 ### Single implicit userspace, step 1
 Moirai was designed multi-tenant, but it runs as one person's deployment and the dashboard REST API never filtered by userspace anyway. Multi-tenancy is being dismantled: everything belongs to one default userspace, and LLM configuration becomes deployment-level (AISA handles inference cost protection). This first step adds `get_default_userspace()` (`DEFAULT_USERSPACE` env, Helm `defaultUserspace`, falling back to the only document in `userspaces`). Scheduled ingestion now stamps articles with it: articles stored by the enrichment worker had no `userspace` field, so `ON_NEW_ARTICLE` agents silently skipped every article not fetched through the MCP `read_feed` tool. The orchestrator also routes any article still lacking a `userspace` (older articles, or a failed lookup at write time) to the default userspace. The unreachable per-owner `GET /api/userspaces` handler in `api/userspace_routes.py` (shadowed by the one in `api/routes.py`) is removed.
 
