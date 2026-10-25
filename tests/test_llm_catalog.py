@@ -346,3 +346,58 @@ class TestAgentLlmConfig:
         }
         assert "secret" not in json.dumps(redact_llm_config(config))
         assert config["openai_api_key"] == "secret"
+
+
+class TestCatalogDocument:
+    DOC = {
+        "_rev": "1-a",
+        "catalog": {"db-only": {"provider": "aisa", "model": "m"}},
+        "purposes": {"annotation": ["db-only"]},
+    }
+
+    def test_document_wins_over_file(self, catalog_file, monkeypatch):
+        catalog_file(CATALOG)
+        monkeypatch.setattr(cat, "_fetch_catalog_doc", lambda: self.DOC)
+        cat.invalidate_catalog_cache()
+        assert cat.catalog_source() == cat.SOURCE_DATABASE
+        assert _names(cat.resolve_models("annotation", "en")) == ["db-only"]
+
+    def test_document_is_cached(self, monkeypatch):
+        calls = []
+
+        def fetch():
+            calls.append(1)
+            return self.DOC
+
+        monkeypatch.setattr(cat, "_fetch_catalog_doc", fetch)
+        cat.invalidate_catalog_cache()
+        for _ in range(3):
+            cat.load_catalog()
+        assert len(calls) == 1
+        cat.load_catalog_doc(force=True)
+        assert len(calls) == 2
+
+    def test_db_error_keeps_last_known_catalog(self, monkeypatch):
+        import requests
+
+        monkeypatch.setattr(cat, "_fetch_catalog_doc", lambda: self.DOC)
+        cat.invalidate_catalog_cache()
+        cat.load_catalog()
+
+        def broken():
+            raise requests.ConnectionError("down")
+
+        monkeypatch.setattr(cat, "_fetch_catalog_doc", broken)
+        assert cat.load_catalog_doc(force=True) == self.DOC
+        assert _names(cat.resolve_models("annotation")) == ["db-only"]
+
+    def test_fetch_treats_404_as_no_document(self, real_fetch_catalog_doc):
+        import requests
+
+        response = MagicMock(status_code=404)
+        with patch.object(cat.requests, "get", return_value=response):
+            assert real_fetch_catalog_doc() is None
+        response.status_code = 500
+        with patch.object(cat.requests, "get", return_value=response):
+            with pytest.raises(requests.RequestException):
+                real_fetch_catalog_doc()
