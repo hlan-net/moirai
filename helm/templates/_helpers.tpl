@@ -157,3 +157,14 @@ OPENAI_BASE_URL / OPENAI_MODEL changes, which are read as env at start.
 secret.reloader.stakater.com/reload: {{ .Values.aisa.secretName | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+DEFAULT_USERSPACE: the deployment's single implicit userspace UUID. Empty
+means the app falls back to the only document in the userspaces database.
+*/}}
+{{- define "moirai.userspaceEnv" -}}
+{{- if .Values.defaultUserspace }}
+- name: DEFAULT_USERSPACE
+  value: {{ .Values.defaultUserspace | quote }}
+{{- end }}
+{{- end }}

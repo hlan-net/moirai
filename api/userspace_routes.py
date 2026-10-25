@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from api.auth import jwt_required
 from api.db import fetch_from_couchdb, store_to_couchdb, update_couchdb_doc_safe, delete_from_couchdb
 from api.extensions import limiter
-from api.userspace_ops import USERSPACES_DB, get_userspaces_for_user, get_userspace
+from api.userspace_ops import USERSPACES_DB, get_userspace
 from api.validation import UserspaceCreateRequest, UserspaceUpdateRequest
 
 logger = logging.getLogger(__name__)
@@ -32,14 +32,6 @@ def _check_ownership(doc: dict) -> None:
     """Abort 403 if the current user does not own this userspace."""
     if doc.get("owner_user_id") != g.user_id:
         abort(403, description=ERROR_ACCESS_DENIED)
-
-
-@userspace_blueprint.route("/userspaces", methods=["GET"])
-@jwt_required
-@limiter.limit("60/minute")
-def list_userspaces():
-    docs = get_userspaces_for_user(g.user_id)
-    return jsonify(docs)
 
 
 @userspace_blueprint.route("/userspaces", methods=["POST"])

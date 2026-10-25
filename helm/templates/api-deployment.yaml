@@ -144,6 +144,7 @@ spec:
           - name: ARTICLE_EXPIRATION_DAYS
             value: {{ .Values.api.articleExpirationDays | quote }}
           {{- include "moirai.aisaEnv" . | nindent 10 }}
+          {{- include "moirai.userspaceEnv" . | nindent 10 }}
           {{- if .Values.redis.enabled }}
           - name: REDIS_HOST
             value: "{{ include "moirai.fullname" . }}-redis"

@@ -7,13 +7,17 @@ from individual user settings or agent configs.
 """
 
 import logging
+import os
+import uuid
 from typing import Optional
 
-from api.db import fetch_from_couchdb, query_couchdb, store_to_couchdb
+from api.db import fetch_from_couchdb, store_to_couchdb
 
 logger = logging.getLogger(__name__)
 
 USERSPACES_DB = "userspaces"
+
+_default_userspace_cache: str | None = None
 
 
 def get_userspace(userspace_id: str) -> Optional[dict]:
@@ -33,9 +37,45 @@ def resolve_llm_config(userspace_id: str) -> dict:
     return {}
 
 
-def get_userspaces_for_user(owner_user_id: str) -> list[dict]:
-    """Return all userspaces owned by a user."""
-    return query_couchdb(USERSPACES_DB, {"owner_user_id": owner_user_id})
+def get_default_userspace() -> str | None:
+    """Return the deployment's single implicit userspace UUID.
+
+    Moirai runs as a single-tenant deployment: everything belongs to one
+    default userspace. Resolution order:
+
+    1. ``DEFAULT_USERSPACE`` env var (must be a UUID).
+    2. The only document in the ``userspaces`` database, when exactly one exists.
+
+    Returns None when neither yields a value; the result is cached once found.
+    """
+    global _default_userspace_cache
+    if _default_userspace_cache:
+        return _default_userspace_cache
+
+    configured = os.environ.get("DEFAULT_USERSPACE", "").strip()
+    if configured:
+        try:
+            _default_userspace_cache = str(uuid.UUID(configured))
+            return _default_userspace_cache
+        except ValueError:
+            logger.error("DEFAULT_USERSPACE is not a valid UUID: %r", configured)
+            return None
+
+    docs = [
+        doc
+        for doc in (fetch_from_couchdb(USERSPACES_DB) or [])
+        if not doc.get("_id", "").startswith("_design/")
+    ]
+    if len(docs) == 1:
+        _default_userspace_cache = docs[0]["_id"]
+        return _default_userspace_cache
+
+    logger.warning(
+        "Cannot resolve default userspace: DEFAULT_USERSPACE unset and %d userspace "
+        "documents exist",
+        len(docs),
+    )
+    return None
 
 
 def migrate_user_llm_settings_to_userspace(user_doc: dict) -> bool:
