@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Model catalog for chat, agents and social export
+The catalog's purposes now cover every LLM call: `event_synthesis` (event-creating and -updating agents, with per-call fallback through the listed entries), `chat` and `social_export` (first entry). `resolve_llm_config(userspace, purpose)` returns the catalog entry as an `llm_config` dict and falls back to the userspace document when the purpose is not listed, so deployments without a catalog are unchanged. Agent `llm_model_config`, stored but ignored until now, can pin one entry with `catalog_entry`. Session logs redact API keys inside fallbacks too.
+
 ### Model catalog for annotation
 Which model served which job was spread over env vars with purpose-specific names (`ANNOTATION_OLLAMA_BASE_URL`, `MODEL_NAME`, ...), and the dedicated annotation tier could only be Ollama. `api/llm/catalog.py` adds a deployment-wide catalog: named entries (provider, endpoint, model, capabilities, languages) and purposes mapping to ordered fallback lists, set in Helm as `llm.catalog` / `llm.purposes` and read from `LLM_CATALOG_FILE`. The annotator now resolves its backends through the `annotation` purpose, so any provider, including AISA, can be a tier. Without a catalog the legacy env vars are synthesised into the same entries, and the rendered chart is unchanged. Chat and agents move onto purposes in a follow-up; Moirai is single-tenant, so there is no per-userspace model layer.
 

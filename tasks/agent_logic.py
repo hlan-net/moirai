@@ -86,7 +86,24 @@ def _call_llm(
     llm_config: dict,
     mcp_client: object = None,
 ) -> Optional[str]:
-    """Call the configured LLM with a prompt and return the text response.
+    """Call the configured LLM, then each of ``llm_config["fallbacks"]`` in order.
+
+    Returns the first text response, or ``None`` when every model fails. The
+    fallbacks come from the model catalog (see ``resolve_llm_config``).
+    """
+    for config in [llm_config, *(llm_config.get("fallbacks") or [])]:
+        text = _call_llm_once(prompt, config, mcp_client=mcp_client)
+        if text is not None:
+            return text
+    return None
+
+
+def _call_llm_once(
+    prompt: str,
+    llm_config: dict,
+    mcp_client: object = None,
+) -> Optional[str]:
+    """Call one LLM config with a prompt and return the text response.
 
     If *mcp_client* is a :class:`TracingMCPClient` (or any object exposing
     ``session_logger`` / ``session_id`` attributes), the call is recorded as

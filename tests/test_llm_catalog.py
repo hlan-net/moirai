@@ -211,3 +211,138 @@ class TestAnnotatorUsesCatalog:
         catalog_file(CATALOG)
         backends = annotator._backends_for("en", "override")
         assert [b.model for b in backends] == ["qwen3:1.7b", "override"]
+
+
+PURPOSES_CATALOG = {
+    "catalog": {
+        "aisa": {"provider": "aisa", "model": "qwen3:8b"},
+        "cpu-llama": {
+            "provider": "ollama",
+            "endpoint": "http://ergo:11434/v1",
+            "model": "llama3.2:3b",
+        },
+        "gpt": {"provider": "openai", "model": "gpt-x"},
+        "embed-only": {
+            "provider": "ollama",
+            "model": "nomic",
+            "capabilities": ["embedding"],
+        },
+    },
+    "purposes": {
+        "event_synthesis": ["embed-only", "aisa", "cpu-llama"],
+        "chat": ["gpt"],
+    },
+}
+
+
+class TestLlmConfigFromCatalog:
+    def test_to_llm_config_shapes(self, monkeypatch, catalog_file):
+        monkeypatch.setenv("OPENAI_API_KEY", "k1")
+        catalog_file(PURPOSES_CATALOG)
+        assert cat.catalog_entry("cpu-llama").to_llm_config() == {
+            "provider": "ollama",
+            "model": "llama3.2:3b",
+            "ollama_endpoint": "http://ergo:11434/v1",
+            "catalog_entry": "cpu-llama",
+        }
+        gpt = cat.catalog_entry("gpt").to_llm_config()
+        assert gpt["openai_api_key"] == "k1"
+        assert gpt["ollama_endpoint"] is None
+        assert cat.catalog_entry("missing") is None
+
+    def test_catalog_models_has_no_legacy_synthesis(self, catalog_file):
+        assert cat.catalog_models("event_synthesis") == []
+        catalog_file(PURPOSES_CATALOG)
+        assert _names(cat.catalog_models("event_synthesis")) == ["aisa", "cpu-llama"]
+        assert cat.catalog_models("social_export") == []
+
+    def test_resolve_llm_config_uses_catalog_then_userspace(self, catalog_file):
+        from api import userspace_ops
+
+        legacy = {"provider": "ollama", "model": "legacy"}
+        catalog_file(PURPOSES_CATALOG)
+        with patch.object(
+            userspace_ops, "get_userspace", return_value={"llm_config": legacy}
+        ) as get:
+            config = userspace_ops.resolve_llm_config("uid", "event_synthesis")
+            assert config["catalog_entry"] == "aisa"
+            assert [f["catalog_entry"] for f in config["fallbacks"]] == ["cpu-llama"]
+            get.assert_not_called()
+            assert userspace_ops.resolve_llm_config("uid", "social_export") == legacy
+            assert userspace_ops.resolve_llm_config("uid") == legacy
+
+
+class TestCallLlmFallbacks:
+    def test_tries_fallbacks_in_order(self):
+        from tasks import agent_logic
+
+        config = {"model": "a", "fallbacks": [{"model": "b"}, {"model": "c"}]}
+        replies = {"a": None, "b": "ok", "c": "unused"}
+        with patch.object(
+            agent_logic,
+            "_call_llm_once",
+            side_effect=lambda prompt, cfg, mcp_client=None: replies[cfg["model"]],
+        ) as once:
+            assert agent_logic._call_llm("p", config) == "ok"
+        assert [c.args[1]["model"] for c in once.call_args_list] == ["a", "b"]
+
+    def test_none_when_all_fail(self):
+        from tasks import agent_logic
+
+        with patch.object(agent_logic, "_call_llm_once", return_value=None) as once:
+            assert agent_logic._call_llm("p", {"fallbacks": [{}]}) is None
+        assert once.call_count == 2
+
+
+class TestAgentLlmConfig:
+    CREATE = "tasks.agent_logic.create_event_from_articles"
+
+    def test_logic_module_purpose(self, catalog_file):
+        from tasks.agent_orchestrator import resolve_agent_llm_config
+
+        catalog_file(PURPOSES_CATALOG)
+        config = resolve_agent_llm_config({"logic_module": self.CREATE}, "uid")
+        assert config["catalog_entry"] == "aisa"
+
+    def test_pinned_catalog_entry_wins(self, catalog_file):
+        from tasks.agent_orchestrator import resolve_agent_llm_config
+
+        catalog_file(PURPOSES_CATALOG)
+        agent = {
+            "logic_module": self.CREATE,
+            "llm_model_config": {"catalog_entry": "cpu-llama"},
+        }
+        config = resolve_agent_llm_config(agent, "uid")
+        assert config["catalog_entry"] == "cpu-llama"
+        assert "fallbacks" not in config
+
+    def test_unknown_pin_or_unlisted_module_falls_back(self, catalog_file):
+        from tasks import agent_orchestrator
+
+        catalog_file(PURPOSES_CATALOG)
+        agent = {
+            "logic_module": self.CREATE,
+            "llm_model_config": {"catalog_entry": "gone"},
+        }
+        assert (
+            agent_orchestrator.resolve_agent_llm_config(agent, "uid")["catalog_entry"]
+            == "aisa"
+        )
+        with patch.object(
+            agent_orchestrator, "resolve_llm_config", return_value={}
+        ) as resolve:
+            agent_orchestrator.resolve_agent_llm_config(
+                {"logic_module": "tasks.agent_logic.check_event_staleness"}, "uid"
+            )
+        resolve.assert_called_once_with("uid", None)
+
+    def test_redact_strips_keys_in_fallbacks(self):
+        from tasks.agent_orchestrator import redact_llm_config
+
+        config = {
+            "provider": "openai",
+            "openai_api_key": "secret",
+            "fallbacks": [{"provider": "gemini", "gemini_api_key": "secret2"}],
+        }
+        assert "secret" not in json.dumps(redact_llm_config(config))
+        assert config["openai_api_key"] == "secret"

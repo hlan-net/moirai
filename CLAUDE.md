@@ -155,7 +155,7 @@ The `AgentOrchestrator` runs in the MCP server as a daemon thread:
 - **SCHEDULED agents:** Checked every 60s (poll interval). Respects `last_run_at` and `schedule_interval`.
 - **ON_NEW_ARTICLE agents:** Dispatched via `_changes` feed longpoll on `articles` database. Each agent receives only articles from its own `userspace`. Sequence tracking persists across restarts.
 - **Errors:** On exception, agent is marked with `status: ERROR` and logged; `last_run_at` is updated before dispatch so failed runs still count.
-- **LLM config:** Resolved by the orchestrator via `resolve_llm_config(userspace)` before dispatch. Logic modules receive `llm_config` as a kwarg and must NOT re-resolve it themselves.
+- **LLM config:** Resolved by the orchestrator via `resolve_agent_llm_config()` before dispatch: an agent's `llm_model_config.catalog_entry`, else the model catalog purpose of its logic module (`LOGIC_MODULE_PURPOSES`), else the userspace document. Logic modules receive `llm_config` as a kwarg and must NOT re-resolve it themselves.
 
 ### Agentic Philosophy
 
@@ -179,7 +179,7 @@ Agent orchestration supports two trigger types: `SCHEDULED` (runs on interval) a
    - Set `trigger_type` to `SCHEDULED` (with `schedule_interval` like `"1h"`, `"2d"`) or `ON_NEW_ARTICLE`
    - Set `logic_module` to `"tasks.agent_logic.my_logic"`
    - Set `userspace` (UUID) for the agent's data scope
-   - Set `llm_model_config` if the logic uses LLM calls
+   - Optionally pin a model with `llm_model_config: {"catalog_entry": "<name>"}`; otherwise add the module to `LOGIC_MODULE_PURPOSES` in `tasks/agent_orchestrator.py` so the catalog purpose applies
 
 3. **Testing:**
    - Dispatch is automatic: `SCHEDULED` agents checked every 60s, `ON_NEW_ARTICLE` agents triggered within 1s of article arrival (via changes feed)
