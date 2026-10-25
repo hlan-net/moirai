@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { authFetch } from '../utils/authFetch'
 import { ALLOWED_LOGIC_MODULES, LOGIC_MODULE_INFO, TRIGGER_TYPE_INFO } from '../utils/agentConstants'
@@ -14,7 +14,6 @@ const statuses = ['active', 'paused']
 
 const draftAgent = ref({
   name: '',
-  userspace: '',
   owner_user_id: '',
   status: 'active',
   trigger_type: 'scheduled',
@@ -39,10 +38,8 @@ type AgentDoc = {
 }
 
 const agents = ref<AgentDoc[]>([])
-const userspaces = ref<string[]>([])
 const loading = ref(false)
 const saving = ref(false)
-const loadingUserspaces = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const showAdvanced = ref(false)
@@ -50,8 +47,6 @@ const showAdvanced = ref(false)
 const ownerHint = computed(() => {
   return authStore.user?._id || authStore.user?.id || ''
 })
-
-const userspaceReady = computed(() => draftAgent.value.userspace.trim().length > 0)
 
 const selectedModuleInfo = computed(() => {
   return LOGIC_MODULE_INFO[draftAgent.value.logic_module] || null
@@ -95,40 +90,12 @@ const resetFeedback = () => {
   successMessage.value = ''
 }
 
-const loadUserspaces = async () => {
-  loadingUserspaces.value = true
-  resetFeedback()
-  try {
-    const response = await authFetch('/api/userspaces')
-    if (response.ok) {
-      userspaces.value = await response.json()
-      // Auto-select first userspace if available and none selected
-      if (userspaces.value.length > 0 && !draftAgent.value.userspace) {
-        draftAgent.value.userspace = userspaces.value[0]
-      }
-    } else {
-      errorMessage.value = 'Failed to load userspaces. Please try again later.'
-      console.error('Failed to load userspaces:', response.status, response.statusText)
-    }
-  } catch (error) {
-    errorMessage.value = 'Unable to connect to server. Please check your connection.'
-    console.error('Failed to load userspaces:', error)
-  } finally {
-    loadingUserspaces.value = false
-  }
-}
-
 const loadAgents = async () => {
   resetFeedback()
-  if (!userspaceReady.value) {
-    agents.value = []
-    return
-  }
-
   loading.value = true
   try {
     const response = await authFetch(
-      `/api/agents?userspace=${encodeURIComponent(draftAgent.value.userspace)}&owner_only=true`
+      '/api/agents?owner_only=true'
     )
     if (!response.ok) {
       const msg = await response.text()
@@ -153,7 +120,6 @@ const createAgent = async () => {
 
     const payload = {
       name: draftAgent.value.name,
-      userspace: draftAgent.value.userspace,
       owner_user_id: ownerUserId,
       status: draftAgent.value.status,
       trigger_type: draftAgent.value.trigger_type,
@@ -192,7 +158,7 @@ const deleteAgent = async (agentId: string) => {
   resetFeedback()
   try {
     const response = await authFetch(
-      `/api/agents/${encodeURIComponent(agentId)}?userspace=${encodeURIComponent(draftAgent.value.userspace)}`,
+      `/api/agents/${encodeURIComponent(agentId)}`,
       { method: 'DELETE' }
     )
     if (!response.ok) {
@@ -218,18 +184,11 @@ const getStatusClass = (status: string) => {
   return ''
 }
 
-// Auto-load agents when userspace changes
-watch(() => draftAgent.value.userspace, () => {
-  if (userspaceReady.value) {
-    loadAgents()
-  }
-})
-
 onMounted(async () => {
   if (ownerHint.value) {
     draftAgent.value.owner_user_id = ownerHint.value
   }
-  await loadUserspaces()
+  await loadAgents()
 })
 </script>
 
@@ -301,31 +260,19 @@ onMounted(async () => {
     <section class="card">
       <h2>Configure Your Agent</h2>
 
-      <!-- Userspace Selection (Primary) -->
-      <div class="userspace-section">
-        <label>
-          <span class="label-text">Kingdom (Userspace)</span>
-          <span class="label-hint">The realm where this agent will serve</span>
-          <select v-model="draftAgent.userspace" :disabled="loadingUserspaces">
-            <option value="" disabled>{{ loadingUserspaces ? 'Loading...' : 'Select a userspace' }}</option>
-            <option v-for="us in userspaces" :key="us" :value="us">{{ us }}</option>
-          </select>
-        </label>
-      </div>
-
       <!-- Main Form -->
-      <div class="form-section" :class="{ disabled: !userspaceReady }">
+      <div class="form-section">
         <div class="form-grid">
           <label>
             <span class="label-text">Agent Name</span>
             <span class="label-hint">A memorable name for this mortal</span>
-            <input v-model="draftAgent.name" type="text" placeholder="e.g., Climate News Watcher" :disabled="!userspaceReady" />
+            <input v-model="draftAgent.name" type="text" placeholder="e.g., Climate News Watcher" />
           </label>
 
           <label>
             <span class="label-text">Quest Type (Logic Module)</span>
             <span class="label-hint">What task will this agent perform?</span>
-            <select v-model="draftAgent.logic_module" :disabled="!userspaceReady">
+            <select v-model="draftAgent.logic_module">
               <option v-for="logic in logicModules" :key="logic" :value="logic">
                 {{ getModuleDisplayName(logic) }}
               </option>
@@ -344,7 +291,7 @@ onMounted(async () => {
           <label>
             <span class="label-text">Trigger</span>
             <span class="label-hint">When should the agent act?</span>
-            <select v-model="draftAgent.trigger_type" :disabled="!userspaceReady">
+            <select v-model="draftAgent.trigger_type">
               <option v-for="trigger in triggerTypes" :key="trigger" :value="trigger">
                 {{ TRIGGER_TYPE_INFO[trigger]?.name || trigger }}
               </option>
@@ -358,14 +305,13 @@ onMounted(async () => {
               v-model="draftAgent.schedule_interval"
               type="text"
               placeholder="1d"
-              :disabled="!userspaceReady"
             />
           </label>
 
           <label>
             <span class="label-text">Status</span>
             <span class="label-hint">Active agents run; paused agents wait</span>
-            <select v-model="draftAgent.status" :disabled="!userspaceReady">
+            <select v-model="draftAgent.status">
               <option v-for="status in statuses" :key="status" :value="status">{{ status }}</option>
             </select>
           </label>
@@ -386,13 +332,13 @@ onMounted(async () => {
           <div class="form-grid">
             <label>
               <span class="label-text">Target Database</span>
-              <input v-model="draftAgent.target_db" type="text" :disabled="!userspaceReady" />
+              <input v-model="draftAgent.target_db" type="text" />
             </label>
 
             <label>
               <span class="label-text">Linked Entity ID</span>
               <span class="label-hint">Optional: Link to a specific Event/Issue</span>
-              <input v-model="draftAgent.linked_entity_id" type="text" placeholder="Event/Issue UUID" :disabled="!userspaceReady" />
+              <input v-model="draftAgent.linked_entity_id" type="text" placeholder="Event/Issue UUID" />
             </label>
 
             <label>
@@ -401,7 +347,6 @@ onMounted(async () => {
                 v-model="draftAgent.owner_user_id"
                 type="text"
                 :placeholder="ownerHint || 'Auto-filled from your account'"
-                :disabled="!userspaceReady"
               />
             </label>
           </div>
@@ -409,7 +354,7 @@ onMounted(async () => {
           <label class="full-width">
             <span class="label-text">Parameters (JSON)</span>
             <span class="label-hint">Custom configuration for the logic module</span>
-            <textarea v-model="draftAgent.parameters" rows="6" :disabled="!userspaceReady" />
+            <textarea v-model="draftAgent.parameters" rows="6" />
           </label>
         </div>
       </div>
@@ -420,7 +365,7 @@ onMounted(async () => {
           type="button"
           class="primary"
           @click="createAgent"
-          :disabled="saving || !userspaceReady || !draftAgent.name.trim()"
+          :disabled="saving || !draftAgent.name.trim()"
         >
           {{ saving ? 'Summoning...' : 'Summon Agent' }}
         </button>
@@ -433,12 +378,9 @@ onMounted(async () => {
     <!-- Existing Agents -->
     <section class="card">
       <h2>Your Mortal Servants</h2>
-      <p class="muted">Agents currently serving in {{ draftAgent.userspace || 'your kingdom' }}.</p>
+      <p class="muted">Agents currently serving in your kingdom.</p>
 
-      <div v-if="!userspaceReady" class="empty-state">
-        <p>Select a userspace above to see your agents.</p>
-      </div>
-      <div v-else-if="loading" class="empty-state">
+      <div v-if="loading" class="empty-state">
         <p>Consulting the roster...</p>
       </div>
       <div v-else-if="!agents.length" class="empty-state">
@@ -613,20 +555,11 @@ p {
   opacity: 0.7;
 }
 
-.userspace-section {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-color);
-}
 
 .form-section {
   transition: opacity 0.2s;
 }
 
-.form-section.disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
 
 .form-grid {
   display: grid;

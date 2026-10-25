@@ -178,7 +178,7 @@ Agent orchestration supports two trigger types: `SCHEDULED` (runs on interval) a
 2. **Configure agent** via admin UI or API:
    - Set `trigger_type` to `SCHEDULED` (with `schedule_interval` like `"1h"`, `"2d"`) or `ON_NEW_ARTICLE`
    - Set `logic_module` to `"tasks.agent_logic.my_logic"`
-   - Set `userspace` (UUID) for the agent's data scope
+   - `userspace` (UUID) is optional; the API fills in the deployment default
    - Optionally pin a model with `llm_model_config: {"catalog_entry": "<name>"}`; otherwise add the module to `LOGIC_MODULE_PURPOSES` in `tasks/agent_orchestrator.py` so the catalog purpose applies
 
 3. **Testing:**

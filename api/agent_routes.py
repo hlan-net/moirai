@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from api.auth import jwt_required
 from api.db import delete_from_couchdb, fetch_from_couchdb, query_couchdb, update_couchdb_doc
+from api.userspace_ops import get_default_userspace
 from api.validation import (
     AgentConfigCreateRequest,
     AgentConfigUpdateRequest,
@@ -47,6 +48,7 @@ def _enforce_owner(owner_user_id: str | None) -> str:
 
 
 def _validate_userspace(userspace: str | None, field_name: str) -> str:
+    userspace = userspace or get_default_userspace()
     if not userspace:
         abort(400, description=f"'{field_name}' is required")
     validated_userspace = cast(str, userspace)
@@ -88,6 +90,7 @@ def list_agents():
 def create_agent():
     payload = _sanitize_create_payload(request.get_json() or {})
     payload["owner_user_id"] = _enforce_owner(payload.get("owner_user_id"))
+    payload["userspace"] = payload.get("userspace") or get_default_userspace()
     validated: dict = {}
 
     try:

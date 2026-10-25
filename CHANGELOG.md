@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Single implicit userspace, step 3: UI and REST API
+The Agents and Sessions pages no longer ask for a userspace; the REST API fills in the deployment default. `/api/agents`, `/api/sessions` (non-admin callers) and `/api/approvals/pending` default a missing `userspace` to it, and `POST /api/agents` stores it when the payload has none. Access checks go through `can_access_userspace()`: any authenticated user may use the default userspace, other (legacy) userspaces stay limited to their owner and admins. Chat resolves its LLM config and MCP tool scope from the default userspace instead of the caller's user id, so a user who signs in through GitHub, Google or Entra works on the same data as the admin account.
+
 ### Single implicit userspace, step 2: optional MCP `userspace`
 The `userspace` argument of the feed, issue, search, annotation, staleness and social-export MCP tools is now optional. When it is empty, `resolve_userspace()` in `mcp_service/core.py` substitutes the deployment default (`DEFAULT_USERSPACE`, or the only userspace document), so MCP clients no longer need to know a UUID. Agent-config tools still require it. `social_export.py` imported `validate_userspace` from the wrong module; the import is fixed (the module is still not registered in `mcp_service/main.py`).
 

@@ -467,3 +467,26 @@ def test_create_agent_xss_name_is_sanitized(client, db):
     # Script tags must be gone
     assert "<script>" not in stored_name
     assert "</script>" not in stored_name
+
+
+# ---------------------------------------------------------------------------
+# Default userspace (single-tenant)
+# ---------------------------------------------------------------------------
+
+def test_list_agents_without_userspace_uses_default(client):
+    """GET /api/agents without userspace falls back to the deployment default."""
+    headers = {"Authorization": f"Bearer {_tokens['user']}"}
+    with patch("api.agent_routes.get_default_userspace", return_value=VALID_USERSPACE):
+        resp = client.get("/api/agents", headers=headers)
+    assert resp.status_code == 200
+
+
+def test_create_agent_without_userspace_uses_default(client):
+    """POST /api/agents without userspace stores the deployment default."""
+    headers = {"Authorization": f"Bearer {_tokens['user']}"}
+    payload = _agent_payload(owner_user_id=_user_ids["user"])
+    del payload["userspace"]
+    with patch("api.agent_routes.get_default_userspace", return_value=VALID_USERSPACE):
+        resp = client.post("/api/agents", json=payload, headers=headers)
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    assert resp.get_json()["userspace"] == VALID_USERSPACE
