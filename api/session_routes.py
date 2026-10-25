@@ -6,7 +6,7 @@ from flask import Blueprint, abort, g, jsonify, request
 
 from api.auth import jwt_required
 from api.extensions import get_redis_client, get_session_logger
-from api.userspace_ops import get_userspace
+from api.userspace_ops import can_access_userspace, get_default_userspace
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,8 @@ session_blueprint = Blueprint("sessions", __name__)
 
 
 def _user_owns_userspace(userspace_id: str) -> bool:
-    """Return True if the authenticated user owns the given userspace."""
-    doc = get_userspace(userspace_id)
-    if not doc:
-        return False
-    return doc.get("owner_user_id") == g.user_id
+    """Return True if the authenticated user may access the given userspace."""
+    return can_access_userspace(userspace_id, g.user_id, g.user_role)
 
 
 @session_blueprint.route("/sessions", methods=["GET"])
@@ -32,11 +29,14 @@ def list_sessions():
 
     Query params
     ------------
-    userspace : optional UUID to filter; must be owned by caller.
+    userspace : optional UUID; defaults to the deployment's userspace
+                (admins without it see every session).
     limit     : default 50, max 200.
     offset    : default 0.
     """
     userspace = request.args.get("userspace")
+    if not userspace and g.user_role != _ADMIN_ROLE:
+        userspace = get_default_userspace()
     if userspace:
         if not _user_owns_userspace(userspace):
             abort(403, description=_ACCESS_DENIED)

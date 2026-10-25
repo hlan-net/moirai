@@ -11,7 +11,7 @@ from flask import Blueprint, abort, g, jsonify, request
 
 from api.auth import jwt_required
 from api.extensions import get_redis_client
-from api.userspace_ops import get_userspace
+from api.userspace_ops import can_access_userspace, get_default_userspace
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,7 @@ approval_blueprint = Blueprint("approvals", __name__)
 
 
 def _user_owns_userspace(userspace_id: str) -> bool:
-    doc = get_userspace(userspace_id)
-    if not doc:
-        return False
-    return doc.get("owner_user_id") == g.user_id
+    return can_access_userspace(userspace_id, g.user_id, g.user_role)
 
 
 @approval_blueprint.route("/approvals/pending", methods=["GET"])
@@ -39,9 +36,9 @@ def list_pending_approvals():
 
     Query params
     ------------
-    userspace : required UUID (must be owned by caller or caller is admin).
+    userspace : optional UUID; defaults to the deployment's userspace.
     """
-    userspace = request.args.get("userspace")
+    userspace = request.args.get("userspace") or get_default_userspace()
     if not userspace:
         abort(400, description="'userspace' parameter is required")
     if not _user_owns_userspace(userspace) and g.user_role != _ADMIN_ROLE:

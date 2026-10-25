@@ -7,8 +7,7 @@ import { formatDate, formatDuration } from '../utils/formatters'
 
 const router = useRouter()
 const sessionsStore = useSessionsStore()
-const { userspaces, currentUserspace, sessions, loading, loadingUserspaces, error } =
-  storeToRefs(sessionsStore)
+const { sessions, loading, error } = storeToRefs(sessionsStore)
 
 const SESSION_TYPE_LABELS: Record<SessionDoc['session_type'], string> = {
   scheduled_agent: 'Scheduled',
@@ -25,10 +24,6 @@ const STATUS_LABELS: Record<SessionDoc['status'], string> = {
 
 const hasSessions = computed(() => sessions.value.length > 0)
 
-const onUserspaceChange = async () => {
-  await sessionsStore.loadSessions()
-}
-
 const refresh = () => sessionsStore.loadSessions()
 
 const openSession = (sessionId: string) => {
@@ -42,7 +37,6 @@ const statusLabel = (status: SessionDoc['status']) => STATUS_LABELS[status] || s
 const statusClass = (status: SessionDoc['status']) => `status-${status}`
 
 onMounted(async () => {
-  await sessionsStore.loadUserspaces()
   await sessionsStore.loadSessions()
 })
 </script>
@@ -56,24 +50,6 @@ onMounted(async () => {
           <p class="muted">Agent runs and chat turns from the last 7 days.</p>
         </div>
         <div class="controls">
-          <label class="userspace-picker">
-            <span class="label-text">Userspace</span>
-            <select
-              :value="currentUserspace"
-              :disabled="loadingUserspaces"
-              @change="
-                (e) => {
-                  sessionsStore.setCurrentUserspace((e.target as HTMLSelectElement).value)
-                  onUserspaceChange()
-                }
-              "
-            >
-              <option value="" disabled>
-                {{ loadingUserspaces ? 'Loading…' : 'Select a userspace' }}
-              </option>
-              <option v-for="us in userspaces" :key="us" :value="us">{{ us }}</option>
-            </select>
-          </label>
           <button type="button" class="refresh-btn" :disabled="loading" @click="refresh">
             {{ loading ? 'Loading…' : 'Refresh' }}
           </button>
@@ -82,15 +58,9 @@ onMounted(async () => {
 
       <div v-if="error" class="error-message">{{ error }}</div>
 
-      <div v-if="!currentUserspace && !loadingUserspaces" class="empty-state">
-        Select a userspace to see its sessions.
-      </div>
+      <div v-if="loading && !hasSessions" class="empty-state">Loading sessions…</div>
 
-      <div v-else-if="loading && !hasSessions" class="empty-state">Loading sessions…</div>
-
-      <div v-else-if="!hasSessions" class="empty-state">
-        No sessions in the last 7 days for this userspace.
-      </div>
+      <div v-else-if="!hasSessions" class="empty-state">No sessions in the last 7 days.</div>
 
       <table v-else class="sessions-table">
         <thead>
@@ -159,26 +129,6 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 12px;
-}
-
-.userspace-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.label-text {
-  font-size: 0.8rem;
-  color: var(--text-muted, #888);
-}
-
-.userspace-picker select {
-  min-width: 240px;
-  padding: 6px 10px;
-  background-color: var(--card-bg);
-  color: var(--text-color);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
-  border-radius: 4px;
 }
 
 .refresh-btn {

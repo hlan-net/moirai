@@ -91,6 +91,19 @@ def get_default_userspace() -> str | None:
     return None
 
 
+def can_access_userspace(userspace_id: str, user_id: str | None, role: str | None) -> bool:
+    """Return True if the user may read or act on data in the given userspace.
+
+    Moirai is single-tenant: any authenticated user may use the deployment's
+    default userspace. Other (legacy) userspaces stay limited to their owner
+    and admins.
+    """
+    if role == "admin" or userspace_id == get_default_userspace():
+        return True
+    doc = get_userspace(userspace_id)
+    return bool(doc) and doc.get("owner_user_id") == user_id
+
+
 def migrate_user_llm_settings_to_userspace(user_doc: dict) -> bool:
     """Create a userspace document for an existing user if one does not exist yet.
 

@@ -204,3 +204,31 @@ class TestStoreArticleStampsUserspace:
             stored = self._store(article)
         assert stored["userspace"] == other
         mock_default.assert_not_called()
+
+
+class TestCanAccessUserspace:
+    def test_default_userspace_open_to_any_user(self):
+        from api.userspace_ops import can_access_userspace
+
+        with patch("api.userspace_ops.get_default_userspace", return_value=DEFAULT_UUID), \
+             patch("api.userspace_ops.fetch_from_couchdb") as mock_fetch:
+            assert can_access_userspace(DEFAULT_UUID, "someone", "user")
+        mock_fetch.assert_not_called()
+
+    def test_other_userspace_limited_to_owner_and_admin(self):
+        from api.userspace_ops import can_access_userspace
+
+        other = "44444444-4444-4444-8444-444444444444"
+        doc = {"_id": other, "owner_user_id": "owner"}
+        with patch("api.userspace_ops.get_default_userspace", return_value=DEFAULT_UUID), \
+             patch("api.userspace_ops.fetch_from_couchdb", return_value=doc):
+            assert can_access_userspace(other, "owner", "user")
+            assert not can_access_userspace(other, "intruder", "user")
+            assert can_access_userspace(other, "intruder", "admin")
+
+    def test_missing_userspace_doc_denied(self):
+        from api.userspace_ops import can_access_userspace
+
+        with patch("api.userspace_ops.get_default_userspace", return_value=None), \
+             patch("api.userspace_ops.fetch_from_couchdb", return_value=None):
+            assert not can_access_userspace(DEFAULT_UUID, "someone", "user")
