@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from ..core import mcp, auth_required, validate_userspace
+from ..core import mcp, auth_required, resolve_userspace, validate_userspace
 from ..db import store_doc, db_request, get_doc, update_doc, delete_doc
 from .userspace import build_userspace_selector, extract_userspace, with_userspace
 from ..responses import (
@@ -19,10 +19,11 @@ def _forge_issue_internal(
     logos: str,
     description: str,
     premises: list[dict],
-    userspace: str,
+    userspace: str = "",
     longevity: str = "transient",
     public: bool = False,
 ) -> dict:
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -65,11 +66,12 @@ def _forge_issue_internal(
 
 def _measure_issue_internal(
     issue_id: str,
-    userspace: str,
+    userspace: str = "",
     longevity: str = None,
     description: str = None,
     add_premises: list[dict] = None,
 ) -> dict:
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -126,7 +128,8 @@ def _measure_issue_internal(
         ).to_dict()
 
 
-def _seal_issue_internal(issue_id: str, userspace: str) -> dict:
+def _seal_issue_internal(issue_id: str, userspace: str = "") -> dict:
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -153,10 +156,11 @@ def _seal_issue_internal(issue_id: str, userspace: str) -> dict:
 
 
 def _list_issues_internal(
-    userspace: str,
+    userspace: str = "",
     longevity: str = None,
     status: str = None,
 ) -> dict:
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -207,7 +211,8 @@ def _list_issues_internal(
         ).to_dict()
 
 
-def _read_issue_internal(issue_id: str, userspace: str) -> dict:
+def _read_issue_internal(issue_id: str, userspace: str = "") -> dict:
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -222,7 +227,8 @@ def _read_issue_internal(issue_id: str, userspace: str) -> dict:
     ).to_dict()
 
 
-def _delete_issue_internal(issue_id: str, userspace: str) -> dict:
+def _delete_issue_internal(issue_id: str, userspace: str = "") -> dict:
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -251,7 +257,7 @@ def forge_issue(
     logos: str,
     description: str,
     premises: list[dict],
-    userspace: str,
+    userspace: str = "",
     longevity: str = "transient",
     public: bool = False,
 ) -> dict:
@@ -266,7 +272,7 @@ def forge_issue(
         logos: The name/title of the issue (the story's identity)
         description: What this issue represents
         premises: List of initial article references that define this story
-        userspace: GUID of the userspace
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         longevity: Scale of the thread - "transient" (event), "temporal" (trend), or "epic"
         public: Whether this issue is visible on the public Mythology page
         
@@ -278,6 +284,7 @@ def forge_issue(
         - retryable: bool indicating if operation can be retried
     """
     # Validate userspace
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -324,7 +331,7 @@ def forge_issue(
 @auth_required
 def measure_issue(
     issue_id: str,
-    userspace: str,
+    userspace: str = "",
     longevity: str = None,
     description: str = None,
     add_premises: list[dict] = None,
@@ -337,7 +344,7 @@ def measure_issue(
     
     Args:
         issue_id: ID of the issue to measure
-        userspace: GUID of the userspace
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         longevity: New scale if changing - "transient", "temporal", or "epic"
         description: New description if updating
         add_premises: New article premises to add to the thread
@@ -348,6 +355,7 @@ def measure_issue(
         - data: {issue_id, updated_fields, longevity, premises_count}
         - error_code: canonical code on error
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -414,7 +422,7 @@ def measure_issue(
 @auth_required
 def seal_issue(
     issue_id: str,
-    userspace: str,
+    userspace: str = "",
 ) -> dict:
     """
     (Atropos - The Inflexible) Cut the thread of an active Issue.
@@ -424,7 +432,7 @@ def seal_issue(
     
     Args:
         issue_id: ID of the issue to seal
-        userspace: GUID of the userspace
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         
     Returns:
         Standardized MCPResponse as dict with:
@@ -432,6 +440,7 @@ def seal_issue(
         - data: {issue_id, logos, born_at, passed_at, lifespan_days}
         - error_code: canonical code on error
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -499,7 +508,7 @@ def seal_issue(
 @mcp.tool()
 @auth_required
 def list_issues(
-    userspace: str,
+    userspace: str = "",
     longevity: str = None, 
     status: str = None
 ) -> dict:
@@ -510,7 +519,7 @@ def list_issues(
     being tracked in the flow of news.
     
     Args:
-        userspace: GUID of the userspace
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         longevity: Filter by scale - "transient", "temporal", or "epic"
         status: Filter by status - "active" or "eternal" (sealed)
         
@@ -519,6 +528,7 @@ def list_issues(
         - status: success/error
         - data: {issues: [{id, logos, longevity, status, premises_count}], count: int}
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -585,7 +595,7 @@ def list_issues(
 
 @mcp.tool()
 @auth_required
-def read_issue(issue_id: str, userspace: str) -> dict:
+def read_issue(issue_id: str, userspace: str = "") -> dict:
     """
     Read full details of a specific Issue (Zeitgeist).
     
@@ -593,13 +603,14 @@ def read_issue(issue_id: str, userspace: str) -> dict:
     
     Args:
         issue_id: ID of the issue to read
-        userspace: GUID of the userspace
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
         - data: Complete issue document with all fields
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -616,7 +627,7 @@ def read_issue(issue_id: str, userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def delete_issue(issue_id: str, userspace: str) -> dict:
+def delete_issue(issue_id: str, userspace: str = "") -> dict:
     """Irreversibly remove an issue record."""
     return _delete_issue_internal(issue_id, userspace)
 
@@ -629,7 +640,7 @@ def add_event(
     name: str,
     description: str,
     article_links: list[str],
-    userspace: str,
+    userspace: str = "",
 ) -> dict:
     """
     (Alias for forge_issue) Create a new Event.
@@ -640,7 +651,7 @@ def add_event(
 
 @mcp.tool()
 @auth_required
-def list_events(userspace: str) -> dict:
+def list_events(userspace: str = "") -> dict:
     """
     (Alias for list_issues) List transient issues.
     """
@@ -649,7 +660,7 @@ def list_events(userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def read_event(event_id: str, userspace: str) -> dict:
+def read_event(event_id: str, userspace: str = "") -> dict:
     """
     (Alias for read_issue) Get details of a specific event.
     """
@@ -658,7 +669,7 @@ def read_event(event_id: str, userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def get_event(event_id: str, userspace: str) -> dict:
+def get_event(event_id: str, userspace: str = "") -> dict:
     """
     (Alias for read_issue) Returns the event document as a dictionary.
     """
@@ -669,7 +680,7 @@ def get_event(event_id: str, userspace: str) -> dict:
 @auth_required
 def update_event(
     event_id: str,
-    userspace: str,
+    userspace: str = "",
     name: str = None,
     description: str = None,
     article_links: list[str] = None,
@@ -688,7 +699,7 @@ def update_event(
 
 @mcp.tool()
 @auth_required
-def delete_event(event_id: str, userspace: str) -> dict:
+def delete_event(event_id: str, userspace: str = "") -> dict:
     """
     (Alias for delete_issue) Delete an event.
     """
@@ -701,7 +712,7 @@ def add_trend(
     name: str,
     description: str,
     event_ids: list[str],
-    userspace: str,
+    userspace: str = "",
 ) -> dict:
     """
     (Alias for forge_issue) Create a new Trend.
@@ -712,7 +723,7 @@ def add_trend(
 
 @mcp.tool()
 @auth_required
-def list_trends(userspace: str) -> dict:
+def list_trends(userspace: str = "") -> dict:
     """
     (Alias for list_issues) List temporal issues.
     """
@@ -721,7 +732,7 @@ def list_trends(userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def read_trend(trend_id: str, userspace: str) -> dict:
+def read_trend(trend_id: str, userspace: str = "") -> dict:
     """
     (Alias for read_issue) Get details of a specific trend.
     """
@@ -730,7 +741,7 @@ def read_trend(trend_id: str, userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def get_trend(trend_id: str, userspace: str) -> dict:
+def get_trend(trend_id: str, userspace: str = "") -> dict:
     """
     (Alias for read_issue) Returns the trend document as a dictionary.
     """
@@ -741,7 +752,7 @@ def get_trend(trend_id: str, userspace: str) -> dict:
 @auth_required
 def update_trend(
     trend_id: str,
-    userspace: str,
+    userspace: str = "",
     name: str = None,
     description: str = None,
     event_ids: list[str] = None,
@@ -760,7 +771,7 @@ def update_trend(
 
 @mcp.tool()
 @auth_required
-def delete_trend(trend_id: str, userspace: str) -> dict:
+def delete_trend(trend_id: str, userspace: str = "") -> dict:
     """
     (Alias for delete_issue) Delete a trend.
     """

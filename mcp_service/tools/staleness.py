@@ -1,4 +1,4 @@
-from mcp_service.core import mcp, validate_userspace
+from mcp_service.core import mcp, resolve_userspace, validate_userspace
 from api.db import (
     fetch_from_couchdb,
     update_couchdb_doc,
@@ -28,7 +28,7 @@ def mark_entity_stale(
     entity_type: Literal["event", "trend", "issue"],
     entity_id: str,
     is_stale: bool,
-    userspace: str,
+    userspace: str = "",
 ) -> dict:
     """
     Marks a specific issue with a stale flag.
@@ -37,12 +37,14 @@ def mark_entity_stale(
         entity_type: The type of entity ('event', 'trend', or 'issue').
         entity_id: The GUID of the entity.
         is_stale: Boolean value to set the staleness flag.
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
 
     Returns:
         Standardized MCPResponse as dict.
     """
     db_name = ISSUES_DB
+
+    userspace = resolve_userspace(userspace)
 
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -74,19 +76,21 @@ def mark_entity_stale(
     description="Deletes all issues marked as stale for a given type (event/trend scale).",
 )
 def delete_stale_entities(
-    entity_type: Literal["event", "trend", "issue"], userspace: str
+    entity_type: Literal["event", "trend", "issue"], userspace: str = ""
 ) -> dict:
     """
     Deletes all issues that are currently marked as stale.
 
     Args:
         entity_type: The type of entity to delete ('event', 'trend', or 'issue').
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
 
     Returns:
         Standardized MCPResponse as dict.
     """
     db_name = ISSUES_DB
+
+    userspace = resolve_userspace(userspace)
 
     valid, err = validate_userspace(userspace)
     if not valid:

@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
-from ..core import mcp, auth_required, validate_userspace
+from ..core import mcp, auth_required, resolve_userspace, validate_userspace
 from ..db import db_request
 from api.db_constants import MONGO_REGEX, MONGO_OR
 from .userspace import build_userspace_selector, extract_userspace
@@ -59,11 +59,13 @@ def _build_date_filter(date_from, date_to):
     return date_filter
 
 def _search_issues_internal(
-    query: str, userspace: str, longevity: Optional[str] = None, limit: int = 50
+    query: str, userspace: str = "", longevity: Optional[str] = None, limit: int = 50
 ) -> dict:
     """Internal implementation of issue search."""
     if not query.strip():
         return validation_error("Query cannot be empty").to_dict()
+
+    userspace = resolve_userspace(userspace)
 
     valid, err = validate_userspace(userspace)
     if not valid:
@@ -324,7 +326,7 @@ def get_recent_articles(
 @mcp.tool()
 @auth_required
 def search_issues(
-    query: str, userspace: str, longevity: Optional[str] = None, limit: int = 50
+    query: str, userspace: str = "", longevity: Optional[str] = None, limit: int = 50
 ) -> dict:
     """
     Search Issues (Resonances) by keyword within a userspace.
@@ -338,7 +340,7 @@ def search_issues(
 @mcp.tool()
 @auth_required
 def search_events(
-    query: str, userspace: str, limit: int = 50
+    query: str, userspace: str = "", limit: int = 50
 ) -> dict:
     """
     (Alias for search_issues) Search events (transient issues) by keyword.
@@ -352,7 +354,7 @@ def search_events(
 @mcp.tool()
 @auth_required
 def search_trends(
-    query: str, userspace: str, limit: int = 20
+    query: str, userspace: str = "", limit: int = 20
 ) -> dict:
     """
     (Alias for search_issues) Search trends (temporal issues) by keyword.

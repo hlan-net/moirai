@@ -133,3 +133,28 @@ def test_list_events_alias_unit(mock_db):
     _, kwargs = mock_db['request'].call_args
     # Verify it filters by transient longevity
     assert kwargs['json_data']['selector']['longevity'] == "transient"
+
+
+def test_forge_issue_defaults_to_deployment_userspace(mock_db):
+    mock_db['store'].return_value = "issue_456"
+    default_userspace = "11111111-1111-4111-8111-111111111111"
+
+    with patch('mcp_service.core.get_default_userspace', return_value=default_userspace):
+        result = forge_issue(
+            logos="No userspace given",
+            description="Desc",
+            premises=[],
+        )
+
+    assert result["status"] == "success"
+    stored = mock_db['store'].call_args[0][1]
+    assert stored["userspace"] == default_userspace
+
+
+def test_forge_issue_without_userspace_or_default_fails(mock_db):
+    with patch('mcp_service.core.get_default_userspace', return_value=None):
+        result = forge_issue(logos="x", description="y", premises=[])
+
+    assert result["status"] == "error"
+    assert "DEFAULT_USERSPACE" in str(result)
+    mock_db['store'].assert_not_called()
