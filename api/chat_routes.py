@@ -25,6 +25,7 @@ from .db import (
 from .auth import jwt_required
 from .userspace_ops import resolve_llm_config
 from .llm.aisa import aisa_default_model, aisa_status, is_aisa_configured
+from .llm.catalog import PURPOSE_CHAT
 
 chat_blueprint = Blueprint("chat", __name__)
 
@@ -676,7 +677,7 @@ def list_llm_providers():
 @chat_blueprint.route("/models", methods=["GET"])
 @jwt_required
 def list_models():
-    userspace_llm = resolve_llm_config(g.user_id)
+    userspace_llm = resolve_llm_config(g.user_id, PURPOSE_CHAT)
     llm_endpoint = request.args.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
 
     api_key = None
@@ -715,9 +716,9 @@ def chat():
     history = data.get("history", [])
     context = data.get("context")
 
-    # Resolve LLM config from the userspace document (authoritative source).
+    # Resolve LLM config: the catalog's chat purpose, else the userspace document.
     # The request body may override provider and model for this chat session only.
-    userspace_llm = resolve_llm_config(g.user_id)
+    userspace_llm = resolve_llm_config(g.user_id, PURPOSE_CHAT)
 
     llm_endpoint = data.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
     model = data.get("model") or userspace_llm.get("model")

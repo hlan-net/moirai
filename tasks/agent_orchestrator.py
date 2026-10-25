@@ -10,6 +10,7 @@ import requests
 from api.db import query_couchdb, update_couchdb_doc_safe
 from api.db_config import get_couchdb_uri
 from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
+from api.llm.catalog import PURPOSE_EVENT_SYNTHESIS, catalog_entry
 from api.userspace_ops import get_default_userspace, resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
@@ -22,6 +23,43 @@ REDIS_LOCK_NAME = "agent_orchestrator_lock"
 
 # Constants for sequence tracking
 ORCHESTRATOR_SEQ_DOC_ID = "orchestrator_last_seq"
+
+# Model catalog purpose of each agent logic module (see api/llm/catalog.py).
+# Modules not listed make no LLM calls.
+LOGIC_MODULE_PURPOSES = {
+    "tasks.agent_logic.create_event_from_articles": PURPOSE_EVENT_SYNTHESIS,
+    "tasks.agent_logic.add_articles_to_event": PURPOSE_EVENT_SYNTHESIS,
+}
+
+_SECRET_LLM_KEYS = ("openai_api_key", "gemini_api_key")
+
+
+def resolve_agent_llm_config(agent_config: dict, userspace: str) -> dict:
+    """LLM config for an agent run.
+
+    An agent's ``llm_model_config.catalog_entry`` pins one catalog entry;
+    otherwise the catalog purpose of its logic module decides, with the
+    userspace document as the legacy fallback.
+    """
+    pinned = (agent_config.get("llm_model_config") or {}).get("catalog_entry")
+    if pinned:
+        entry = catalog_entry(pinned)
+        if entry:
+            return entry.to_llm_config()
+        logger.warning(
+            f"Agent {agent_config.get('_id')}: catalog entry '{pinned}' not found; "
+            "using the purpose default."
+        )
+    purpose = LOGIC_MODULE_PURPOSES.get(agent_config.get("logic_module", ""))
+    return resolve_llm_config(userspace, purpose)
+
+
+def redact_llm_config(llm_config: dict) -> dict:
+    """*llm_config* without API keys, fallbacks included, for session logs."""
+    redacted = {k: v for k, v in llm_config.items() if k not in _SECRET_LLM_KEYS}
+    if redacted.get("fallbacks"):
+        redacted["fallbacks"] = [redact_llm_config(f) for f in redacted["fallbacks"]]
+    return redacted
 
 
 class AgentOrchestrator(threading.Thread):
@@ -270,7 +308,7 @@ class AgentOrchestrator(threading.Thread):
                     f"Dispatching on_new_article agent {agent_config.get('_id')} "
                     f"with {len(agent_articles)} articles."
                 )
-                llm_config = resolve_llm_config(userspace)
+                llm_config = resolve_agent_llm_config(agent_config, userspace)
                 self.execute_agent_logic(
                     agent_config,
                     new_articles=agent_articles,
@@ -399,7 +437,7 @@ class AgentOrchestrator(threading.Thread):
         if self.is_scheduled_agent_due(last_run_at_str, schedule_interval):
             logger.info(f"Triggering scheduled agent {agent_id}.")
             userspace = agent_config.get("userspace") or agent_config.get("namespace", "")
-            llm_config = resolve_llm_config(userspace)
+            llm_config = resolve_agent_llm_config(agent_config, userspace)
             self.execute_agent_logic(agent_config, llm_config=llm_config)
 
     def is_scheduled_agent_due(
@@ -465,7 +503,7 @@ class AgentOrchestrator(threading.Thread):
             agent_config_id=agent_id,
             agent_name=agent_config.get("name") or logic_module_path,
             trigger=trigger_type,
-            resolved_llm={k: v for k, v in llm_config.items() if k not in ("openai_api_key", "gemini_api_key")},
+            resolved_llm=redact_llm_config(llm_config),
             articles_count=articles_count,
         ) as counters:
             try:

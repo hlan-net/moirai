@@ -185,8 +185,7 @@ The model catalog names the LLM endpoints a deployment has and says which job
 uses which of them. It is deployment-wide: Moirai is single-tenant, and cost
 control and quotas belong to AISA. Each **entry** is a provider, endpoint and
 model with its capabilities; each **purpose** is an ordered fallback list of
-entries. Today the catalog drives `annotation`; chat and agents still use the
-Settings page configuration.
+entries.
 
 ```yaml
 llm:
@@ -205,7 +204,21 @@ llm:
       capabilities: [chat, json, tools]
   purposes:
     annotation: [npu-qwen, cpu-llama]
+    event_synthesis: [aisa, cpu-llama]
+    chat: [aisa]
+    social_export: [aisa]
 ```
+
+| Purpose | Used by | Needs | Fallback |
+|---|---|---|---|
+| `annotation` | annotation worker, `reannotate_outdated`, MCP `reannotate_article` | `json` | every entry in order, per article |
+| `event_synthesis` | agents `create_event_from_articles`, `add_articles_to_event` | `json` | every entry in order, per LLM call |
+| `chat` | chat page, model list | `chat` | first entry only |
+| `social_export` | Bluesky post text | `chat` | first entry only |
+
+An agent can pin one entry with `llm_model_config: {"catalog_entry": "<name>"}`;
+an unknown name is logged and the purpose's list is used instead. The chat
+request may still override provider and model for one session.
 
 | Entry key | Meaning |
 |---|---|
@@ -229,7 +242,9 @@ changes, so editing the values and running `helm upgrade` needs no restart
 `LLM_CATALOG_FILE` at a JSON file with the same `catalog` and `purposes` keys.
 
 Without a catalog, or for a purpose it does not list, the legacy settings stay
-in effect: `llm.annotation` (`ANNOTATION_*`) then `llm.provider` / `llm.model`.
+in effect: for `annotation`, `llm.annotation` (`ANNOTATION_*`) then
+`llm.provider` / `llm.model`; for the other purposes, the Settings page
+configuration stored in the userspace document.
 The startup log line `LLM catalog: ...` shows which applies.
 
 ## Switching Providers

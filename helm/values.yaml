@@ -197,7 +197,8 @@ llm:
   #   purposes:
   #     annotation: [npu-qwen, cpu-llama]
   catalog: {}
-  # -- Purpose -> ordered list of catalog entry names. Supported: annotation.
+  # -- Purpose -> ordered list of catalog entry names. Supported: annotation,
+  # event_synthesis, chat, social_export (see docs/llm-configuration.md).
   purposes: {}
   catalogMountPath: "/etc/moirai/llm"
 

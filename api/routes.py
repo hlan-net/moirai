@@ -22,6 +22,7 @@ from .db import (
 from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
 from .userspace_ops import get_userspace, resolve_llm_config
 from .llm.aisa import aisa_status
+from .llm.catalog import PURPOSE_SOCIAL_EXPORT
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
 from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest, ShareIssueRequest
@@ -823,7 +824,7 @@ def share_issue(issue_id: str):
     ]
     articles = query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
 
-    llm_config = resolve_llm_config(userspace_id)
+    llm_config = resolve_llm_config(userspace_id, PURPOSE_SOCIAL_EXPORT)
     post_text = generate_bluesky_post_text(issue, articles, llm_config)
 
     try:

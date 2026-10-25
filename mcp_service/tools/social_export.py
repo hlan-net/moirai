@@ -8,6 +8,7 @@ import logging
 
 from api.bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
 from api.db import fetch_from_couchdb, query_couchdb, update_couchdb_doc_safe
+from api.llm.catalog import PURPOSE_SOCIAL_EXPORT
 from api.userspace_ops import get_userspace, resolve_llm_config
 from mcp_service.core import mcp
 
@@ -65,7 +66,7 @@ def publish_to_bluesky(issue_id: str, userspace: str) -> dict:
         else []
     )
 
-    llm_config = resolve_llm_config(userspace)
+    llm_config = resolve_llm_config(userspace, PURPOSE_SOCIAL_EXPORT)
     post_text = generate_bluesky_post_text(issue, articles, llm_config)
 
     try:

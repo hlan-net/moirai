@@ -49,11 +49,17 @@ DEFAULT_MODEL = "llama3.1"
 KNOWN_PROVIDERS = frozenset({"ollama", "openai", "gemini", "aisa"})
 
 PURPOSE_ANNOTATION = "annotation"
+PURPOSE_CHAT = "chat"
+PURPOSE_EVENT_SYNTHESIS = "event_synthesis"
+PURPOSE_SOCIAL_EXPORT = "social_export"
 
 # Capability each purpose needs from a catalog entry. An entry that does not
 # declare ``capabilities`` is assumed to support chat + json.
 PURPOSE_CAPABILITIES: dict[str, str] = {
     PURPOSE_ANNOTATION: "json",
+    PURPOSE_CHAT: "chat",
+    PURPOSE_EVENT_SYNTHESIS: "json",
+    PURPOSE_SOCIAL_EXPORT: "chat",
 }
 DEFAULT_CAPABILITIES = frozenset({"chat", "json"})
 
@@ -83,6 +89,18 @@ class ModelEntry:
     def api_key(self) -> str:
         env = self.api_key_env or _DEFAULT_API_KEY_ENV.get(self.provider, "")
         return os.environ.get(env, "") if env else ""
+
+    def to_llm_config(self) -> dict:
+        """The ``llm_config`` dict shape chat, agents and social export consume."""
+        config = {
+            "provider": self.provider,
+            "model": self.model,
+            "ollama_endpoint": self.base_url or None,
+            "catalog_entry": self.name,
+        }
+        if self.provider in _DEFAULT_API_KEY_ENV:
+            config[f"{self.provider}_api_key"] = self.api_key()
+        return config
 
 
 @dataclass(frozen=True)
@@ -249,6 +267,30 @@ def resolve_models(purpose: str, language: Optional[str] = None) -> list[ModelEn
         for entry in configured_models(purpose)
         if entry.supports_language(language)
     ]
+
+
+def catalog_models(purpose: str) -> list[ModelEntry]:
+    """Entries the catalog file lists for *purpose* (empty when it lists none).
+
+    Unlike :func:`configured_models` there is no legacy synthesis: callers
+    whose legacy configuration lives elsewhere (the userspace document) fall
+    back on their own.
+    """
+    catalog = load_catalog()
+    if not catalog or not catalog.purposes.get(purpose):
+        return []
+    needed = PURPOSE_CAPABILITIES.get(purpose)
+    return [
+        catalog.entries[n]
+        for n in catalog.purposes[purpose]
+        if not needed or needed in catalog.entries[n].capabilities
+    ]
+
+
+def catalog_entry(name: str) -> Optional[ModelEntry]:
+    """The catalog entry called *name*, or ``None``."""
+    catalog = load_catalog()
+    return catalog.entries.get(name) if catalog else None
 
 
 def describe_catalog() -> str:

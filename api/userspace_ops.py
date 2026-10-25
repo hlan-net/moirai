@@ -1,9 +1,10 @@
 """
 Userspace operations — fetch userspace documents and resolve LLM config.
 
-The userspace document is the authoritative source for LLM provider credentials
-and preferences. Chat and agent sessions resolve config from here rather than
-from individual user settings or agent configs.
+LLM configuration is deployment-wide: the model catalog (``api/llm/catalog.py``)
+decides which model serves each purpose. The userspace document's
+``llm_config`` remains as the legacy fallback for purposes the catalog does
+not list.
 """
 
 import logging
@@ -12,6 +13,7 @@ import uuid
 from typing import Optional
 
 from api.db import fetch_from_couchdb, store_to_couchdb
+from api.llm.catalog import catalog_models
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,23 @@ def get_userspace(userspace_id: str) -> Optional[dict]:
     return fetch_from_couchdb(USERSPACES_DB, userspace_id)
 
 
-def resolve_llm_config(userspace_id: str) -> dict:
-    """Return the llm_config block from a userspace document.
+def resolve_llm_config(userspace_id: str, purpose: Optional[str] = None) -> dict:
+    """Return the LLM config for *purpose*.
 
-    Returns an empty dict if the userspace does not exist or has no llm_config.
-    Callers should check for required fields (provider, model) before use.
+    When the model catalog lists *purpose*, its first entry is returned as an
+    ``llm_config`` dict, with the remaining entries under ``fallbacks``.
+    Otherwise (no catalog, no purpose, or a purpose it does not list) the
+    legacy ``llm_config`` block of the userspace document is returned.
+
+    Returns an empty dict if neither yields a config. Callers should check for
+    required fields (provider, model) before use.
     """
+    if purpose:
+        entries = catalog_models(purpose)
+        if entries:
+            config = entries[0].to_llm_config()
+            config["fallbacks"] = [e.to_llm_config() for e in entries[1:]]
+            return config
     doc = get_userspace(userspace_id)
     if doc:
         return doc.get("llm_config") or {}
