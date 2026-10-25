@@ -1,7 +1,7 @@
 import hashlib
 import requests
 from datetime import datetime, timezone
-from ..core import mcp, auth_required, validate_userspace
+from ..core import mcp, auth_required, resolve_userspace, validate_userspace
 from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
 from .userspace import build_userspace_selector, extract_userspace, with_userspace
 from ..responses import (
@@ -18,7 +18,7 @@ from ..responses import (
 @mcp.tool()
 @auth_required
 def add_feed(
-    url: str, title: str, userspace: str, category: str = "general"
+    url: str, title: str, userspace: str = "", category: str = "general"
 ) -> dict:
     """
     Register a new RSS feed into a specific userspace.
@@ -26,7 +26,7 @@ def add_feed(
     Args:
         url: The RSS feed URL.
         title: Human-readable title for the feed.
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
         category: Optional category (e.g., 'tech', 'finance').
         
     Returns:
@@ -38,6 +38,7 @@ def add_feed(
         - next_action: suggested next step for agent
     """
     # Validate userspace
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -101,12 +102,12 @@ def add_feed(
 
 @mcp.tool()
 @auth_required
-def list_feeds(userspace: str) -> dict:
+def list_feeds(userspace: str = "") -> dict:
     """
     List all RSS feeds registered in a specific userspace.
 
     Args:
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
         
     Returns:
         Standardized MCPResponse as dict with:
@@ -114,6 +115,7 @@ def list_feeds(userspace: str) -> dict:
         - data: {feeds: [{id, title, url, category, added_at}], count: int}
         - error_code: canonical code on error
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -178,17 +180,18 @@ def list_feeds(userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def delete_feed(feed_id: str, userspace: str) -> dict:
+def delete_feed(feed_id: str, userspace: str = "") -> dict:
     """
     Remove a feed from a userspace.
 
     Args:
         feed_id: The ID of the feed to delete.
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
 
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -229,19 +232,20 @@ def delete_feed(feed_id: str, userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def read_feed(url: str, userspace: str, limit: int = 20) -> dict:
+def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
     """
     Fetch and process articles from a specific RSS feed URL.
     This triggers a live fetch and returns the latest articles.
 
     Args:
         url: The RSS feed URL to fetch
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
         limit: Max number of articles to return (default: 20)
 
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -311,7 +315,7 @@ def read_feed(url: str, userspace: str, limit: int = 20) -> dict:
 @mcp.tool()
 @auth_required
 def update_feed_category(
-    feed_id: str, new_category: str, userspace: str
+    feed_id: str, new_category: str, userspace: str = ""
 ) -> dict:
     """
     Update the category of an existing feed.
@@ -319,11 +323,12 @@ def update_feed_category(
     Args:
         feed_id: The ID of the feed to update.
         new_category: New category name.
-        userspace: GUID of the userspace.
+        userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
 
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()

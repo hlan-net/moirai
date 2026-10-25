@@ -3,6 +3,8 @@ import functools
 import uuid
 from mcp.server.fastmcp import FastMCP
 
+from api.userspace_ops import get_default_userspace
+
 # Initialize FastMCP Server
 mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
 
@@ -27,10 +29,20 @@ def auth_required(func):
     return wrapper
 
 
+def resolve_userspace(userspace: str | None) -> str:
+    """Return the given userspace, or the deployment's default when it is empty."""
+    if userspace:
+        return userspace
+    return get_default_userspace() or ""
+
+
 def validate_userspace(userspace_guid: str):
     """Validate that the userspace is a valid GUID/UUID."""
     if not userspace_guid:
-        return False, "Error: 'userspace' parameter is required."
+        return False, (
+            "Error: 'userspace' was not given and no default is configured "
+            "(set DEFAULT_USERSPACE)."
+        )
     try:
         uuid.UUID(userspace_guid)
         return True, ""

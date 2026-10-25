@@ -6,7 +6,7 @@ Provides tools to:
 - get annotation statistics for a userspace
 """
 
-from ..core import mcp, auth_required, validate_userspace
+from ..core import mcp, auth_required, resolve_userspace, validate_userspace
 from ..db import db_request
 from .userspace import build_userspace_selector
 from tasks.annotator import annotate_article, store_annotation
@@ -24,13 +24,14 @@ ARTICLES_DB = "articles"
 
 @mcp.tool()
 @auth_required
-def reannotate_article(article_id: str, userspace: str) -> dict:
+def reannotate_article(article_id: str, userspace: str = "") -> dict:
     """
     Re-run AI annotation on a specific article, overwriting any existing annotation.
 
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -92,13 +93,14 @@ def reannotate_article(article_id: str, userspace: str) -> dict:
 
 @mcp.tool()
 @auth_required
-def list_unannotated_articles(userspace: str, limit: int = 50) -> dict:
+def list_unannotated_articles(userspace: str = "", limit: int = 50) -> dict:
     """
     List articles in a userspace that have not yet been annotated by AI.
 
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()
@@ -165,7 +167,7 @@ def list_unannotated_articles(userspace: str, limit: int = 50) -> dict:
 
 @mcp.tool()
 @auth_required
-def get_annotation_stats(userspace: str) -> dict:
+def get_annotation_stats(userspace: str = "") -> dict:
     """
     Get annotation statistics for a userspace: total articles, annotated count,
     and breakdowns by priority and sentiment.
@@ -173,6 +175,7 @@ def get_annotation_stats(userspace: str) -> dict:
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()

@@ -10,9 +10,9 @@ from api.bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post
 from api.db import fetch_from_couchdb, query_couchdb, update_couchdb_doc_safe
 from api.llm.catalog import PURPOSE_SOCIAL_EXPORT
 from api.userspace_ops import get_userspace, resolve_llm_config
-from mcp_service.core import mcp
+from mcp_service.core import mcp, resolve_userspace, validate_userspace
 
-from .userspace import extract_userspace, validate_userspace
+from .userspace import extract_userspace
 from ..responses import (
     success,
     validation_error,
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool()
-def publish_to_bluesky(issue_id: str, userspace: str) -> dict:
+def publish_to_bluesky(issue_id: str, userspace: str = "") -> dict:
     """Share a Moirai Issue to Bluesky.
 
     Fetches the issue and its linked articles, generates a post via the
@@ -34,6 +34,7 @@ def publish_to_bluesky(issue_id: str, userspace: str) -> dict:
     Returns:
         Standardized MCPResponse as dict.
     """
+    userspace = resolve_userspace(userspace)
     valid, err = validate_userspace(userspace)
     if not valid:
         return validation_error(f"Invalid userspace: {err}").to_dict()

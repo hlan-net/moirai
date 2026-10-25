@@ -102,7 +102,7 @@ GitHub Actions (`ci.yml`): two jobs — `test` (conda env + ruff + pytest + Dock
 
 ### Security & Auth
 - API routes MUST use `@requires_auth` decorator (`api/auth.py`). Public read mode available via `ALLOW_PUBLIC_READ=true`.
-- MCP tools: first parameter MUST be `userspace: str`, validated as UUID.
+- MCP tools: take `userspace: str = ""`, resolve it with `resolve_userspace()` (empty → the deployment's default userspace) and validate it as UUID with `validate_userspace()`.
 - All text inputs sanitized with `bleach.clean()`. Request validation via Pydantic models in `api/validation.py`.
 - CSRF enabled by default (Flask-WTF); disabled in test mode or via `DISABLE_CSRF=true`.
 
@@ -143,7 +143,7 @@ def _process_changes(self) -> None:
 - State: Pinia stores in `ui/src/stores/`.
 
 ### Adding an MCP Tool
-Define in `mcp_service/tools/` with `@mcp.tool()`. First arg must be `userspace: str` with UUID validation. FastMCP auto-discovers decorated functions — no registration needed.
+Define in `mcp_service/tools/` with `@mcp.tool()`. Take an optional `userspace: str = ""`, then `userspace = resolve_userspace(userspace)` and `validate_userspace(userspace)` from `mcp_service/core.py`. FastMCP auto-discovers decorated functions — no registration needed.
 
 ### Adding an API Endpoint
 1. Pydantic model in `api/validation.py` with `bleach.clean()` sanitization.

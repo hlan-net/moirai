@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Single implicit userspace, step 2: optional MCP `userspace`
+The `userspace` argument of the feed, issue, search, annotation, staleness and social-export MCP tools is now optional. When it is empty, `resolve_userspace()` in `mcp_service/core.py` substitutes the deployment default (`DEFAULT_USERSPACE`, or the only userspace document), so MCP clients no longer need to know a UUID. Agent-config tools still require it. `social_export.py` imported `validate_userspace` from the wrong module; the import is fixed (the module is still not registered in `mcp_service/main.py`).
+
 ### Model catalog for chat, agents and social export
 The catalog's purposes now cover every LLM call: `event_synthesis` (event-creating and -updating agents, with per-call fallback through the listed entries), `chat` and `social_export` (first entry). `resolve_llm_config(userspace, purpose)` returns the catalog entry as an `llm_config` dict and falls back to the userspace document when the purpose is not listed, so deployments without a catalog are unchanged. Agent `llm_model_config`, stored but ignored until now, can pin one entry with `catalog_entry`. Session logs redact API keys inside fallbacks too.
 
