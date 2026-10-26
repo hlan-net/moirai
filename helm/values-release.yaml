@@ -19,9 +19,20 @@ ui:
   image:
     tag: "latest"  # Or pin to specific version like "0.6.1"
 
-# Bump worker memory: at 512Mi the release worker OOMKills under feed-fetch
-# load (~63 feeds / 10 min) combined with OpenAI retry buffering.
+# Bump worker and scheduler memory: at 512Mi feed-fetch load (~63 feeds / 10 min)
+# can exceed the container limit.
 worker:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+      ephemeral-storage: "1Gi"
+    limits:
+      cpu: 500m
+      memory: 1Gi
+      ephemeral-storage: "2Gi"
+
+scheduler:
   resources:
     requests:
       cpu: 100m

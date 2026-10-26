@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Scheduler bounded feed-fetch pool and configurable resources (#246)
+`_process_feeds` in `tasks/scheduler.py` previously spawned one unbounded thread per feed simultaneously, buffering every feed body in memory at once and causing periodic `OOMKilled` (exit code 137) restarts of the `scheduler` CronJob at 512Mi. Feed fetching now runs through a bounded `ThreadPoolExecutor` (`SCHEDULER_MAX_WORKERS`, default 4, Helm `scheduler.maxWorkers`), `FetchFeedTask` sends conditional `If-None-Match` / `If-Modified-Since` headers when `etag` / `last_modified` are stored on the feed document and skips unchanged `304 Not Modified` feeds, and `scheduler-cronjob.yaml` reads `scheduler.resources` from Helm values (raised to `1Gi` limit in `values-release.yaml`, matching the worker).
+
 ### Model catalog editable in the admin UI
 Changing which model serves a purpose needed a Helm values change and an upgrade. Admins now edit the catalog on Settings → System Settings → Model Catalog: models (provider, model, endpoint, API key variable, languages, capabilities) and an ordered model list per purpose. The catalog is stored in `config/llm_catalog` and replaces the Helm one while it exists; "Reset to Helm values" deletes it. Every service re-reads it within 30 seconds and keeps the last known catalog if CouchDB is unreachable. `PUT /api/llm/catalog` validates the whole catalog (`LlmCatalogUpdateRequest`): known providers and capabilities, an endpoint for Ollama, purposes only naming entries with the capability they need, and API key variables restricted to `*_API_KEY` names so an edit cannot hand another secret to a provider.
 

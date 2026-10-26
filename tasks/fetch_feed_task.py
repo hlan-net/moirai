@@ -1,42 +1,57 @@
+from datetime import datetime, timezone
 import hashlib
+import logging
 import secrets
 import threading
 import time
-import requests
-import logging
-from datetime import datetime, timezone
-from .favicon_fetcher import fetch_favicon_url
-from api.db_config import get_couchdb_uri
+
 import feedparser
+import requests
+
+from api.db_config import get_couchdb_uri
+from .favicon_fetcher import fetch_favicon_url
 
 logger = logging.getLogger(__name__)
 
 
 class FetchFeedTask(threading.Thread):
-    def __init__(self, feed_id, url, original_url, delay_ignored=0):
+    def __init__(
+        self,
+        feed_id: str,
+        url: str,
+        original_url: str,
+        delay_ignored: int = 0,
+        etag: str | None = None,
+        last_modified: str | None = None,
+    ) -> None:
         threading.Thread.__init__(self)
         self.feed_id = feed_id
         self.url = url  # The current URL of the feed
         self.original_url = original_url  # The unchanging original URL
-        
+        self.etag = etag
+        self.last_modified = last_modified
+
         base_url = get_couchdb_uri()
         self.registry_url = base_url + "feeds"
         self.content_url = base_url + "feed_content"
         self.user_agent = "MoiraiBot/1.0 (+https://github.com/hlan-net/moirai)"
 
-    def run(self):
-        # Add random jitter to avoid thundering herd and be polite
-        # Sleep between 1 and 30 seconds
+    def run(self) -> None:
+        # Add random jitter to avoid thundering herd when started as raw threads
         time.sleep(1 + secrets.randbelow(29))
         self.fetch_url()
 
-    def fetch_url(self):
+    def fetch_url(self) -> None:
         try:
             # Ensure databases exist (this is an init container responsibility, but kept for robustness)
             requests.put(self.registry_url, timeout=10)
             requests.put(self.content_url, timeout=10)
 
             headers = {"User-Agent": self.user_agent}
+            if self.etag:
+                headers["If-None-Match"] = self.etag
+            if self.last_modified:
+                headers["If-Modified-Since"] = self.last_modified
             response = requests.get(self.url, headers=headers, timeout=30)
             self.handle_response(response)
         except requests.exceptions.RequestException as e:
@@ -44,7 +59,12 @@ class FetchFeedTask(threading.Thread):
             logger.error(error_msg)
             self.record_fetch_error(str(e))
 
-    def handle_response(self, response):
+    def handle_response(self, response: requests.Response) -> None:
+        if response.status_code == 304:
+            logger.info(f"Feed not modified (HTTP 304): {self.url}")
+            self.clear_fetch_error()
+            return
+
         if response.status_code != 200:
             error_msg = f"HTTP {response.status_code}"
             logger.error(
@@ -61,15 +81,28 @@ class FetchFeedTask(threading.Thread):
 
         # Check for redirect
         final_url = response.url
-        is_redirect = final_url and final_url.rstrip("/") != self.url.rstrip("/")
+        is_redirect = bool(
+            final_url and final_url.rstrip("/") != self.url.rstrip("/")
+        )
         if is_redirect:
             logger.info(f"Redirect detected: {self.url} -> {final_url}")
 
+        response_headers = getattr(response, "headers", None) or {}
+        etag = response_headers.get("ETag")
+        last_modified = response_headers.get("Last-Modified")
+
         # Pass feed_id directly
-        self._update_registry(self.feed_id, feed_title, final_url, is_redirect)
+        self._update_registry(
+            self.feed_id,
+            feed_title,
+            final_url,
+            is_redirect,
+            etag=etag,
+            last_modified=last_modified,
+        )
         self._store_content(self.feed_id, response, final_url, is_redirect)
 
-    def process_articles(self, content):
+    def process_articles(self, content: str) -> str:
         """Extract feed title using feedparser."""
         try:
             feed = feedparser.parse(content)
@@ -78,74 +111,108 @@ class FetchFeedTask(threading.Thread):
             logger.error(f"Error parsing feed for title: {e}")
             return ""
 
-    def _update_registry(self, feed_id, feed_title, final_url, is_redirect):
+    def _update_registry(
+        self,
+        feed_id: str,
+        feed_title: str,
+        final_url: str,
+        is_redirect: bool,
+        etag: str | None = None,
+        last_modified: str | None = None,
+    ) -> None:
         """Update feed registry with title, resolved URL and favicon."""
         try:
             res = requests.get(f"{self.registry_url}/{feed_id}", timeout=10)
             if res.status_code == 200:
                 self._update_existing_registry(
-                    feed_id, res.json(), feed_title, final_url, is_redirect
+                    feed_id,
+                    res.json(),
+                    feed_title,
+                    final_url,
+                    is_redirect,
+                    etag=etag,
+                    last_modified=last_modified,
                 )
             else:
-                # This should ideally not happen if FetchFeedTask is only used for existing feeds
-                # For robustness, we can log an error or attempt to re-create a minimal entry
-                logger.error(f"Error: Feed {feed_id} not found in registry. Cannot update.")
+                logger.error(
+                    f"Error: Feed {feed_id} not found in registry. Cannot update."
+                )
         except Exception as e:
             logger.error(f"Error checking registry for {feed_id}: {e}")
 
     def _update_existing_registry(
-        self, feed_id, reg_doc, feed_title, final_url, is_redirect
-    ):
+        self,
+        feed_id: str,
+        reg_doc: dict,
+        feed_title: str,
+        final_url: str,
+        is_redirect: bool,
+        etag: str | None = None,
+        last_modified: str | None = None,
+    ) -> None:
         needs_update = False
-        if (
-            feed_title and reg_doc.get("title") != feed_title
-        ):  # Only update if title changed
+        if feed_title and reg_doc.get("title") != feed_title:
             reg_doc["title"] = feed_title
             needs_update = True
 
         if is_redirect and reg_doc.get("url") != final_url:
-            reg_doc["url"] = final_url  # Update current URL
+            reg_doc["url"] = final_url
+            needs_update = True
+
+        if etag and reg_doc.get("etag") != etag:
+            reg_doc["etag"] = etag
+            needs_update = True
+
+        if last_modified and reg_doc.get("last_modified") != last_modified:
+            reg_doc["last_modified"] = last_modified
             needs_update = True
 
         # Fetch and store favicon if not already present or if URL changed
         if not reg_doc.get("favicon_url") or (
             is_redirect and reg_doc.get("url") != final_url
         ):
-            favicon_url = fetch_favicon_url(
-                final_url
-            )  # Always use final_url for favicon
+            favicon_url = fetch_favicon_url(final_url)
             if favicon_url and reg_doc.get("favicon_url") != favicon_url:
                 reg_doc["favicon_url"] = favicon_url
                 needs_update = True
 
         if needs_update:
             logger.info(
-                f"Updating registry for {reg_doc.get('original_url', feed_id)} (Title: {feed_title}, URL: {final_url})"
+                f"Updating registry for {reg_doc.get('original_url', feed_id)} "
+                f"(Title: {feed_title}, URL: {final_url})"
             )
             requests.put(f"{self.registry_url}/{feed_id}", json=reg_doc, timeout=10)
 
-    def _store_content(self, feed_id, response, final_url, is_redirect):
+    def _store_content(
+        self,
+        feed_id: str,
+        response: requests.Response,
+        final_url: str,
+        is_redirect: bool,
+    ) -> None:
         """Store the latest feed content if it has changed."""
+        body_hash = hashlib.sha256(response.text.encode("utf-8")).hexdigest()
         doc = {
             "url": final_url,  # Store final resolved URL
             "feed_id": feed_id,  # Link content to stable feed_id
             "headers": dict(response.headers),
             "body": response.text,
+            "body_hash": body_hash,
             "fetched_at": time.time(),
         }
-
-        body_hash = hashlib.sha256(response.text.encode("utf-8")).hexdigest()
 
         try:
             # Get current content doc to check revision and change
             res = requests.get(f"{self.content_url}/{feed_id}", timeout=10)
             if res.status_code == 200:
                 current_doc = res.json()
-                current_body_hash = hashlib.sha256(
+                current_body_hash = current_doc.get("body_hash") or hashlib.sha256(
                     current_doc.get("body", "").encode("utf-8")
                 ).hexdigest()
                 if body_hash == current_body_hash:
-                    logger.info(f"No content changes for {self.url}. Content up to date.")
+                    logger.info(
+                        f"No content changes for {self.url}. Content up to date."
+                    )
                     return
                 doc["_rev"] = current_doc["_rev"]
 
@@ -158,9 +225,9 @@ class FetchFeedTask(threading.Thread):
         except Exception as e:
             logger.error(f"Error updating content: {e}")
 
-    def record_fetch_error(self, error_message):
+    def record_fetch_error(self, error_message: str) -> None:
         """Record a fetch error in the feed registry."""
-        feed_id = self.feed_id  # Use stable feed_id
+        feed_id = self.feed_id
         try:
             res = requests.get(f"{self.registry_url}/{feed_id}", timeout=10)
             if res.status_code == 200:
@@ -169,14 +236,15 @@ class FetchFeedTask(threading.Thread):
                 reg_doc["last_fetch_at"] = datetime.now(timezone.utc).isoformat()
                 requests.put(f"{self.registry_url}/{feed_id}", json=reg_doc, timeout=10)
                 logger.info(
-                    f"Recorded fetch error for {reg_doc.get('original_url', feed_id)}: {error_message}"
+                    f"Recorded fetch error for "
+                    f"{reg_doc.get('original_url', feed_id)}: {error_message}"
                 )
         except Exception as e:
             logger.error(f"Failed to record fetch error for {feed_id}: {e}")
 
-    def clear_fetch_error(self):
+    def clear_fetch_error(self) -> None:
         """Clear any previous fetch error in the feed registry."""
-        feed_id = self.feed_id  # Use stable feed_id
+        feed_id = self.feed_id
         try:
             res = requests.get(f"{self.registry_url}/{feed_id}", timeout=10)
             if res.status_code == 200:
@@ -185,6 +253,8 @@ class FetchFeedTask(threading.Thread):
                     del reg_doc["last_fetch_error"]
                 reg_doc["last_fetch_at"] = datetime.now(timezone.utc).isoformat()
                 requests.put(f"{self.registry_url}/{feed_id}", json=reg_doc, timeout=10)
-                logger.info(f"Cleared fetch error for {reg_doc.get('original_url', feed_id)}")
+                logger.info(
+                    f"Cleared fetch error for {reg_doc.get('original_url', feed_id)}"
+                )
         except Exception as e:
             logger.error(f"Failed to clear fetch error for {feed_id}: {e}")
