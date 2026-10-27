@@ -246,10 +246,9 @@ All tutorials follow these conventions:
 
 ## 📅 Version Info
 
-- **Latest Version:** v0.9.1
+- **Latest Version:** v0.10.0
 - **Python:** 3.10+
-- **Node.js:** 18+
-- **CouchDB:** 3.2+
+- **Node.js:** 18+\n- **CouchDB:** 3.2+
 - **Redis:** 6.0+
 
 For changelog, see [../CHANGELOG.md](../CHANGELOG.md)

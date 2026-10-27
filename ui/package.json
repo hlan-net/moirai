@@ -1,7 +1,7 @@
 {
   "name": "ui",
   "private": true,
-  "version": "0.9.1",
+  "version": "0.10.0",
   "packageManager": "yarn@4.1.0",
   "type": "module",
   "scripts": {

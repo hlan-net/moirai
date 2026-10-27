@@ -6,6 +6,10 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+---
+
+## [v0.10.0] — 2026-10-27
+
 ### Scheduler bounded feed-fetch pool and configurable resources (#246)
 `_process_feeds` in `tasks/scheduler.py` previously spawned one unbounded thread per feed simultaneously, buffering every feed body in memory at once and causing periodic `OOMKilled` (exit code 137) restarts of the `scheduler` CronJob at 512Mi. Feed fetching now runs through a bounded `ThreadPoolExecutor` (`SCHEDULER_MAX_WORKERS`, default 4, Helm `scheduler.maxWorkers`), `FetchFeedTask` sends conditional `If-None-Match` / `If-Modified-Since` headers when `etag` / `last_modified` are stored on the feed document and skips unchanged `304 Not Modified` feeds, and `scheduler-cronjob.yaml` reads `scheduler.resources` from Helm values (raised to `1Gi` limit in `values-release.yaml`, matching the worker).
 
