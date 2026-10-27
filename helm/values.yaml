@@ -111,6 +111,17 @@ mcpInspector:
 scheduler:
   # -- Cron schedule for the feed-fetch scheduler job (default: every 10 minutes)
   schedule: "*/10 * * * *"
+  # -- Maximum concurrent feed fetches per scheduler run (SCHEDULER_MAX_WORKERS)
+  maxWorkers: 4
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      ephemeral-storage: "1Gi"
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: "2Gi"
 
 # -- Environment to run the application in
 environment: production
