@@ -1,9 +1,11 @@
+import json
 import os
 import time
 import requests
 import datetime
 import threading
 import logging
+from collections.abc import Iterator
 from urllib.parse import quote
 import sys
 
@@ -11,6 +13,45 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api.db_config import get_couchdb_uri
 
 logger = logging.getLogger(__name__)
+
+ARTICLE_PAGE_SIZE = 1000
+
+
+def iter_doc_pages(
+    db_name: str, page_size: int = ARTICLE_PAGE_SIZE
+) -> Iterator[list[dict]]:
+    """Yield pages of docs from _all_docs, keyed by _id, without loading the
+    whole database. The articles DB is tens of MB of JSON; reading it in one
+    request OOM-killed the scheduler pod."""
+    url = f"{get_couchdb_uri()}{db_name}/_all_docs"
+    start_key = None
+    while True:
+        params = {"include_docs": "true", "limit": page_size}
+        if start_key is not None:
+            # No skip=1: the previous page's last doc may have been deleted
+            # meanwhile, and skipping would then drop a live doc instead.
+            params["startkey"] = json.dumps(start_key)
+        try:
+            res = requests.get(url, params=params, timeout=30)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Cleanup: Error fetching {db_name}: {e}")
+            return
+        if res.status_code != 200:
+            logger.error(f"Cleanup: Error fetching {db_name}: HTTP {res.status_code}")
+            return
+        rows = res.json().get("rows", [])
+        docs = [
+            row["doc"]
+            for row in rows
+            if row.get("doc")
+            and row["id"] != start_key
+            and not row["id"].startswith("_design/")
+        ]
+        if docs:
+            yield docs
+        if len(rows) < page_size or rows[-1]["id"] == start_key:
+            return
+        start_key = rows[-1]["id"]
 
 
 def get_all_docs(db_name):
@@ -181,8 +222,9 @@ def run_cleanup():
         len(active_article_links),
     )
 
-    articles = get_all_docs("articles")
-    articles_deleted = _process_articles(articles, active_article_links, now)
+    articles_deleted = 0
+    for articles in iter_doc_pages("articles"):
+        articles_deleted += _process_articles(articles, active_article_links, now)
 
     logger.info(
         "Cleanup: Finished. Deleted %s issues and %s articles.",
