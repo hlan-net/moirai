@@ -8,6 +8,13 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [v0.10.1] — 2026-10-31
+
+### Fixes
+- Article cleanup reads the `articles` database in pages of 1000 instead of one `_all_docs?include_docs=true` request (#288). At 30-day retention that request returned ~30k docs and 54 MB of JSON on every scheduler CronJob run, enough to OOM-kill the scheduler in production (2026-10-29). Peak RSS is now ~60 MB against production data; deletion rules are unchanged.
+
+---
+
 ## [v0.10.0] — 2026-10-27
 
 ### Scheduler bounded feed-fetch pool and configurable resources (#246)
