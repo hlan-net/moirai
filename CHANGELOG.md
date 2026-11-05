@@ -8,6 +8,15 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [v0.10.2] — 2026-11-05
+
+### Security and dependency updates (#297)
+Supersedes Dependabot PRs #290–#296 (axios, marked, follow-redirects, UI dev tooling, nginx / debian / miniforge3 base images) and fixes Python advisories that Dependabot cannot raise PRs for, because its pip ecosystem does not read `environment*.yml`. Python pins move to the newest releases that still support Python 3.10: mcp 1.30.0 (stays on 1.x), starlette 1.7.0, PyJWT 2.15.1, cryptography 50.0.2 (with msal 1.39.0 and atproto 0.0.73, whose caps blocked it), requests 2.34.2, bleach 6.4.0, opentelemetry 1.45.2 / 0.66b2. The UI drops the deprecated `@types/dompurify` stub and refreshes node-gyp, which removes the vulnerable glob / minimatch chain; `yarn npm audit` is clean. Transitive filelock and dnspython fixes need Python 3.11 and remain open.
+
+This release also carries the v0.10.1 cleanup paging fix (#288), whose images were never built because v0.10.1 was not tagged.
+
+---
+
 ## [v0.10.1] — 2026-10-31
 
 ### Fixes
