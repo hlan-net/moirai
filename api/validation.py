@@ -279,11 +279,17 @@ class FeedUpdateRequest(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=200)
     new_url: Optional[HttpUrl] = None  # Added field
+    category: Optional[str] = Field(None, max_length=100)
 
     @field_validator("title")
     @classmethod
     def sanitize_title(cls, v: str) -> str:
         return _sanitize_text(v)
+
+    @field_validator("category")
+    @classmethod
+    def sanitize_category(cls, v: Optional[str]) -> Optional[str]:
+        return _sanitize_optional_text(v)
 
     @field_validator("new_url")
     @classmethod

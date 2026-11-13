@@ -264,7 +264,17 @@ def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
 
         processor = ArticleProcessor()
 
-        feed_title, articles = processor.process_feed(url, response.text)
+        # A registered feed's category is the strongest sectioning signal (#266)
+        feed_category = None
+        registered = get_doc(
+            "feeds", hashlib.sha256(f"{url}:{userspace}".encode("utf-8")).hexdigest()
+        )
+        if registered:
+            feed_category = registered.get("category")
+
+        feed_title, articles = processor.process_feed(
+            url, response.text, feed_category
+        )
 
         # Store articles
         count = 0
