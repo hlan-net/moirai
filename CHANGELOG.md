@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Stream sections (#266)
+The Stream page is split into four newspaper-style tabs: Top stories (open on load), Sports, Culture and Business. This is a fixed editorial split of the flow, not a reader-composed filter; the Stream model (no search, no inbox semantics) is unchanged. Every article gets exactly one `section` at ingestion (`tasks/sections.py`): a section-specific feed category wins, then the article URL (`hs.fi/urheilu/…`, `kauppalehti.fi`), then the closed annotation topic vocabulary from #249, else `main`. The deciding signal is stored as `section_source` so the asynchronous annotation never overrides a feed or URL decision. `GET /api/stream.rss?section=` filters the stream, each item carries `<category domain="section">`, the Redis cache is keyed per section and a `(section, published)` Mango index is created at startup; the unparameterised endpoint is unchanged apart from the added category. Admins pick a feed's section from a dropdown on the Feeds column (`PUT /api/feeds/<id>` accepts `category`). Existing articles are filed by `python -m scripts.backfill_sections`, which pages through the database and writes with `_bulk_docs`.
+
 ---
 
 ## [v0.10.2] — 2026-11-05

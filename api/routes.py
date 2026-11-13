@@ -35,6 +35,7 @@ import uuid  # Import uuid
 from api.enrichment import enrich_articles_with_issues, invalidate_feed_mappings_cache
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
+from tasks.sections import SECTIONS, STREAM_CACHE_KEYS, is_valid_section, section_label
 from api.article_ops import build_article_selector, paginate_results
 from api.db_constants import (
     MONGO_REGEX,
@@ -312,6 +313,11 @@ def update_feed(feed_id):
     if validated.new_url:
         feed["url"] = str(validated.new_url)
 
+    # Section/category change (#266). Applies to articles fetched from now
+    # on; run scripts/backfill_sections.py to re-file existing ones.
+    if validated.category is not None:
+        feed["category"] = validated.category or "general"
+
     if update_couchdb_doc("feeds", feed_id, feed):
         invalidate_feed_mappings_cache()
         return jsonify(feed)
@@ -515,6 +521,13 @@ def rss_feed():
     limit = int(request.args.get("limit", 100))  # Default to 100 items for RSS
     limit = min(max(limit, 1), 500)  # Clamp between 1-500
 
+    # Stream section (#266). No parameter keeps the full stream so existing
+    # subscribers are unaffected.
+    section = request.args.get("section") or None
+    if section is not None and not is_valid_section(section):
+        abort(400, description=f"section must be one of: {', '.join(SECTIONS)}")
+    cache_key = f"stream_rss_xml:{section}" if section else "stream_rss_xml"
+
     # Caching: Check Redis for default RSS feed
     is_default_view = (limit == 100)
     redis_client = None
@@ -522,17 +535,20 @@ def rss_feed():
         try:
             redis_client = get_redis_client()
             if redis_client:
-                cached_rss = redis_client.get("stream_rss_xml")
+                cached_rss = redis_client.get(cache_key)
                 if cached_rss:
                     return Response(cached_rss, mimetype="application/rss+xml")
         except Exception as e:
             logger.error(f"Redis error in rss_feed: {e}")
 
     # Query CouchDB directly for RSS
-    # Requires index on 'published' field
+    # Requires index on 'published' (or 'section', 'published') field
+    selector = {"published": {MONGO_GT: None}}
+    if section:
+        selector = {"section": section, "published": {MONGO_GT: None}}
     rss_articles = query_couchdb(
         "articles",
-        selector={"published": {MONGO_GT: None}},
+        selector=selector,
         limit=limit,
         sort=[{"published": "desc"}],
     )
@@ -556,12 +572,18 @@ def rss_feed():
     # Get current datetime for feed metadata
     build_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")
 
+    channel_title = "Moirai Aggregated Stream"
+    channel_description = "Aggregated news stream with AI-synthesized Events and Trends"
+    if section:
+        channel_title = f"{channel_title} — {section_label(section)}"
+        channel_description = f"{channel_description} ({section_label(section)} section)"
+
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Moirai Aggregated Stream</title>
+    <title>{channel_title}</title>
     <link>{request.host_url}</link>
-    <description>Aggregated news stream with AI-synthesized Events and Trends</description>
+    <description>{channel_description}</description>
     <language>en</language>
     <lastBuildDate>{build_date}</lastBuildDate>
     <atom:link href="{request.url}" rel="self" type="application/rss+xml" />
@@ -573,7 +595,7 @@ def rss_feed():
 
     if is_default_view and redis_client:
         try:
-            redis_client.setex("stream_rss_xml", 3600, rss_xml)
+            redis_client.setex(cache_key, 3600, rss_xml)
         except Exception as e:
             logger.error(f"Redis cache set error: {e}")
 
@@ -592,7 +614,7 @@ def delete_article(article_id):
         try:
             redis_client = get_redis_client()
             if redis_client:
-                redis_client.delete("stream_rss_xml", "articles_default_json")
+                redis_client.delete(*STREAM_CACHE_KEYS)
         except Exception as e:
             logger.error(f"Redis invalidation error: {e}")
         return jsonify({"status": "deleted"})

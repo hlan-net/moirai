@@ -10,6 +10,7 @@ from langdetect.lang_detect_exception import LangDetectException
 from api.db_config import get_couchdb_uri
 from api.extensions import get_redis_client
 from api.userspace_ops import get_default_userspace
+from tasks.sections import STREAM_CACHE_KEYS, resolve_section
 
 # Ensure consistent results for language detection
 DetectorFactory.seed = 0
@@ -31,19 +32,27 @@ class ArticleProcessor:
         except LangDetectException:
             return None
 
-    def _extract_entry_data(self, entry, feed_url, feed_title, feed_lang):
+    def _extract_entry_data(
+        self, entry, feed_url, feed_title, feed_lang, feed_category=None
+    ):
         """Helper to extract data from a single feed entry."""
         published_date = None
         if hasattr(entry, "published_parsed") and entry.published_parsed:
             try:
                 published_date = datetime(*entry.published_parsed[:6])
             except (ValueError, TypeError) as err:
-                logger.warning(f"Could not parse date for article '{entry.get('title', 'No Title')}': {err}")
+                logger.warning(
+                    f"Could not parse date for article '{entry.get('title', 'No Title')}': {err}"
+                )
 
-        if published_date and (datetime.now() - published_date) > timedelta(days=self.expiration_days):
+        if published_date and (datetime.now() - published_date) > timedelta(
+            days=self.expiration_days
+        ):
             return None
 
-        content_value = entry.content[0].value if "content" in entry else entry.get("summary", "")
+        content_value = (
+            entry.content[0].value if "content" in entry else entry.get("summary", "")
+        )
         text_to_detect = entry.get("title", "") + " " + entry.get("summary", "")
         detected_lang = self.detect_language(text_to_detect)
         article_lang = detected_lang or feed_lang or "xx"
@@ -51,11 +60,16 @@ class ArticleProcessor:
         if published_date and published_date.tzinfo is None:
             published_date = published_date.replace(tzinfo=timezone.utc)
 
+        link = entry.get("link", "")
+        section, section_source = resolve_section(feed_category, link)
+
         return {
             "feed_url": feed_url,
             "feed_title": feed_title,
             "title": entry.get("title", "No Title"),
-            "link": entry.get("link", ""),
+            "link": link,
+            "section": section,
+            "section_source": section_source,
             "published": (
                 published_date.isoformat()
                 if published_date
@@ -66,22 +80,30 @@ class ArticleProcessor:
             "language": article_lang,
         }
 
-    def process_feed(self, feed_url, feed_content):
-        """Parses the feed content and extracts articles."""
+    def process_feed(self, feed_url, feed_content, feed_category=None):
+        """Parses the feed content and extracts articles.
+
+        ``feed_category`` is the registry's ``category`` for this feed; a
+        section-specific value (``sports``, ``culture``, ``business``) files
+        every article of the feed under that section.
+        """
         articles = []
         try:
             parsed_feed = feedparser.parse(feed_content)
             feed_title = parsed_feed.feed.get("title", "Unknown Feed")
             feed_lang = (
                 parsed_feed.feed.get("language", "").split("-")[0].lower()
-                if parsed_feed.feed.get("language") else None
+                if parsed_feed.feed.get("language")
+                else None
             )
 
             for entry in parsed_feed.entries:
-                article = self._extract_entry_data(entry, feed_url, feed_title, feed_lang)
+                article = self._extract_entry_data(
+                    entry, feed_url, feed_title, feed_lang, feed_category
+                )
                 if article:
                     articles.append(article)
-                    
+
             return feed_title, articles
         except Exception as err:
             logger.error(f"Error parsing feed {feed_url}: {err}")
@@ -98,6 +120,11 @@ class ArticleProcessor:
             json.dumps(hash_payload, sort_keys=True).encode("utf-8")
         ).hexdigest()
         article["_id"] = article_hash
+
+        if "section" not in article:
+            article["section"], article["section_source"] = resolve_section(
+                link=article.get("link")
+            )
 
         try:
             response = requests.head(f"{self.couchdb_url}/{article_hash}", timeout=10)
@@ -119,7 +146,7 @@ class ArticleProcessor:
                 try:
                     redis_client = get_redis_client()
                     if redis_client:
-                        redis_client.delete("stream_rss_xml", "articles_default_json")
+                        redis_client.delete(*STREAM_CACHE_KEYS)
                 except Exception as e:
                     logger.error(f"Redis invalidation error: {e}")
         except requests.exceptions.RequestException as err:

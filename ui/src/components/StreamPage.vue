@@ -13,6 +13,24 @@ interface ArticleGroup {
 
 type GroupMode = 'feed' | 'time'
 
+// Stream sections (#266): a fixed editorial split of the flow, not a filter.
+// The page always opens on Top stories; the choice is not remembered.
+type SectionKey = 'main' | 'sports' | 'culture' | 'business'
+
+interface Section {
+  key: SectionKey
+  label: string
+}
+
+const SECTIONS: Section[] = [
+  { key: 'main', label: 'Top stories' },
+  { key: 'sports', label: 'Sports' },
+  { key: 'culture', label: 'Culture' },
+  { key: 'business', label: 'Business' },
+]
+
+const activeSection = ref<SectionKey>('main')
+
 const articles = ref<Article[]>([])
 const loading = ref(true)
 const fetchingUpdates = ref(false)
@@ -119,12 +137,15 @@ const _extractCategories = (item: Element) => {
   const topics: string[] = []
   let priority: 'low' | 'medium' | 'high' | undefined
   let sentiment: 'positive' | 'neutral' | 'negative' | undefined
+  let section: string | undefined
 
   for (const category of Array.from(item.querySelectorAll('category'))) {
     const label = category.textContent?.trim()
     if (!label) continue
     const domain = category.getAttribute('domain')
-    if (domain === 'event') {
+    if (domain === 'section') {
+      section = label
+    } else if (domain === 'event') {
       events.push(label)
     } else if (domain === 'trend') {
       trends.push(label)
@@ -136,7 +157,7 @@ const _extractCategories = (item: Element) => {
       sentiment = label as 'positive' | 'neutral' | 'negative'
     }
   }
-  return { events, trends, topics, priority, sentiment }
+  return { events, trends, topics, priority, sentiment, section }
 }
 
 const _parseFeedItem = (item: Element, index: number): Article => {
@@ -165,7 +186,7 @@ const _parseFeedItem = (item: Element, index: number): Article => {
     feedUrl = link
   }
 
-  const { events, trends, topics, priority, sentiment } = _extractCategories(item)
+  const { events, trends, topics, priority, sentiment, section } = _extractCategories(item)
 
   const annotations =
     topics.length || priority || sentiment
@@ -187,6 +208,7 @@ const _parseFeedItem = (item: Element, index: number): Article => {
     events: events.length ? events : undefined,
     trends: trends.length ? trends : undefined,
     annotations,
+    section,
   }
 }
 
@@ -199,17 +221,28 @@ const parseRssFeed = (xmlText: string): Article[] => {
   return Array.from(doc.querySelectorAll('item')).map((item, index) => _parseFeedItem(item, index))
 }
 
+const streamUrl = computed(
+  () => `/api/stream.rss?limit=${RSS_LIMIT}&section=${activeSection.value}`
+)
+const rssSubscribeUrl = computed(() => `/api/stream.rss?section=${activeSection.value}`)
+
 const fetchStream = async (isManual = false) => {
+  const section = activeSection.value
   if (articles.value.length === 0) {
     loading.value = true
   }
   fetchingUpdates.value = true
   try {
-    const response = await authFetch(`/api/stream.rss?limit=${RSS_LIMIT}`)
+    const response = await authFetch(streamUrl.value)
     if (!response.ok) {
       throw new Error(`Failed to fetch RSS: ${response.status}`)
     }
     const xmlText = await response.text()
+    if (section !== activeSection.value) {
+      // The reader switched tabs while this request was in flight; the
+      // newer request owns the list now.
+      return
+    }
     const parsed = parseRssFeed(xmlText)
 
     if (articles.value.length === 0 || isManual) {
@@ -235,6 +268,17 @@ const fetchStream = async (isManual = false) => {
 
 const refreshAndReset = () => {
   newArticleCount.value = 0
+  fetchStream(true)
+}
+
+const selectSection = (key: SectionKey) => {
+  if (key === activeSection.value) return
+  activeSection.value = key
+  articles.value = []
+  totalCount.value = 0
+  newArticleCount.value = 0
+  expandedArticles.value = new Set()
+  hideDotDetails()
   fetchStream(true)
 }
 
@@ -363,7 +407,7 @@ const toggleTheme = () => {
                 {{ themeLabel }}
             </button>
 
-            <a href="/api/stream.rss" class="rss-link" title="Subscribe to RSS feed" target="_blank">
+            <a :href="rssSubscribeUrl" class="rss-link" title="Subscribe to RSS feed" target="_blank">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20A2.18 2.18 0 0 1 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
                 </svg>
@@ -375,6 +419,22 @@ const toggleTheme = () => {
             </button>
         </div>
     </header>
+
+    <nav class="section-tabs" role="tablist" aria-label="Stream sections">
+      <button
+        v-for="section in SECTIONS"
+        :key="section.key"
+        type="button"
+        role="tab"
+        class="section-tab"
+        :class="{ active: section.key === activeSection }"
+        :aria-selected="section.key === activeSection"
+        :data-section="section.key"
+        @click="selectSection(section.key)"
+      >
+        {{ section.label }}
+      </button>
+    </nav>
 
     <div v-if="loading" class="loading">Loading stream...</div>
     
@@ -475,7 +535,9 @@ const toggleTheme = () => {
 
     </div>
     
-    <div v-else class="empty-state">No articles found in the stream.</div>
+    <div v-else class="empty-state">
+      {{ activeSection === 'main' ? 'No articles found in the stream.' : 'No articles in this section yet.' }}
+    </div>
 
     <Teleport to="body">
       <div
@@ -684,6 +746,49 @@ const toggleTheme = () => {
     transition: all 0.2s;
 }
 
+
+/* Section tabs (#266): newspaper sections, not a filter */
+.section-tabs {
+    display: flex;
+    gap: 4px;
+    margin: -10px 0 16px;
+    border-bottom: 2px solid var(--border-color);
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+}
+
+.section-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.section-tab {
+    background: transparent;
+    color: var(--text-color);
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    padding: 8px 16px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    border-radius: 0;
+    opacity: 0.7;
+    transition: all 0.2s;
+}
+
+.section-tab:hover {
+    background: var(--button-bg);
+    opacity: 1;
+}
+
+.section-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    opacity: 1;
+    font-weight: 700;
+}
 
 .stream-container {
     overflow-y: auto;
