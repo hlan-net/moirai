@@ -230,6 +230,39 @@ def delete_feed(feed_id: str, userspace: str = "") -> dict:
         ).to_dict()
 
 
+def _registered_feed_category(url: str, userspace: str) -> str | None:
+    """The ``category`` of the registered feed for ``url``, if any.
+
+    Feeds added through MCP have a ``sha256(url:userspace)`` id, but those
+    added through the UI or REST API have a ``uuid4`` id, so the registry is
+    searched by ``url``/``original_url``. A feed of this userspace wins over
+    one without a userspace field (feeds predating userspace scoping).
+    """
+    registered = get_doc(
+        "feeds", hashlib.sha256(f"{url}:{userspace}".encode("utf-8")).hexdigest()
+    )
+    if registered:
+        return registered.get("category")
+
+    res = db_request(
+        "POST",
+        "feeds",
+        path="/_find",
+        json_data={
+            "selector": {"$or": [{"url": url}, {"original_url": url}]},
+            "limit": 25,
+        },
+    )
+    if res.status_code != 200:
+        return None
+    docs = res.json().get("docs", [])
+    own = [d for d in docs if extract_userspace(d) == userspace]
+    unscoped = [d for d in docs if not extract_userspace(d)]
+    for doc in own + unscoped:
+        return doc.get("category")
+    return None
+
+
 @mcp.tool()
 @auth_required
 def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
@@ -265,12 +298,7 @@ def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
         processor = ArticleProcessor()
 
         # A registered feed's category is the strongest sectioning signal (#266)
-        feed_category = None
-        registered = get_doc(
-            "feeds", hashlib.sha256(f"{url}:{userspace}".encode("utf-8")).hexdigest()
-        )
-        if registered:
-            feed_category = registered.get("category")
+        feed_category = _registered_feed_category(url, userspace)
 
         feed_title, articles = processor.process_feed(
             url, response.text, feed_category

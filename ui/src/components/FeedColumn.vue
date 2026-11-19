@@ -249,13 +249,23 @@ const sectionOptions = (feed: Feed) => {
   return [{ value: current, label: current }, ...SECTION_OPTIONS]
 }
 
-const updateFeedCategory = async (feed: Feed, category: string) => {
-  if (category === (feed.category || 'general')) return
+const updateFeedCategory = async (feed: Feed, select: HTMLSelectElement) => {
+  const previous = feed.category || 'general'
+  const category = select.value
+  if (category === previous) return
+  // The <select> is bound one way, so on failure it would keep showing the
+  // unsaved choice: put the stored value back.
+  const revert = () => {
+    select.value = previous
+    showNotification('Failed to update feed section', 'error')
+  }
   try {
+    // Only the category: re-sending the title would re-sanitise (re-escape)
+    // it, and would pin a hostname over a title enrichment has yet to fill.
     const res = await authFetch(`/api/feeds/${feed._id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: feed.title || getHostname(feed.url), category }),
+      body: JSON.stringify({ category }),
     })
     if (res.ok) {
       const updatedFeed = await res.json()
@@ -265,11 +275,11 @@ const updateFeedCategory = async (feed: Feed, category: string) => {
       }
       showNotification('Feed section updated.', 'success')
     } else {
-      showNotification('Failed to update feed section', 'error')
+      revert()
     }
   } catch (e) {
     console.error(e)
-    showNotification('Failed to update feed section', 'error')
+    revert()
   }
 }
 
@@ -726,7 +736,7 @@ const bulkImportFeeds = async () => {
             :title="`Stream section for ${feed.title || getHostname(feed.url)}`"
             :aria-label="`Stream section for ${feed.title || getHostname(feed.url)}`"
             @click.stop
-            @change="updateFeedCategory(feed, ($event.target as HTMLSelectElement).value)"
+            @change="updateFeedCategory(feed, $event.target as HTMLSelectElement)"
           >
             <option v-for="option in sectionOptions(feed)" :key="option.value" :value="option.value">
               {{ option.label }}

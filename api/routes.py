@@ -307,14 +307,16 @@ def update_feed(feed_id):
     except ValidationError as e:
         abort(400, description=str(e))
 
-    feed["title"] = validated.title
+    if validated.title is not None:
+        feed["title"] = validated.title
 
     # If a new URL is provided (e.g., from a redirect), update it
     if validated.new_url:
         feed["url"] = str(validated.new_url)
 
     # Section/category change (#266). Applies to articles fetched from now
-    # on; run scripts/backfill_sections.py to re-file existing ones.
+    # on; the worker's startup backfill re-files existing ones (or run
+    # scripts/backfill_sections.py by hand).
     if validated.category is not None:
         feed["category"] = validated.category or "general"
 

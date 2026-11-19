@@ -148,6 +148,20 @@ class TestApplyTopicSection:
         assert apply_topic_section(doc, ["world"]) is True
         assert doc == {"section": "main", "section_source": "default"}
 
+    def test_unsectioned_legacy_doc_uses_its_link(self):
+        # Annotated before the backfill: the URL must still win over topics,
+        # or the backfill would skip a mis-filed article.
+        doc = {"link": "https://www.hs.fi/urheilu/art-2000011"}
+        assert apply_topic_section(doc, ["politics"]) is True
+        assert doc["section"] == "sports"
+        assert doc["section_source"] == "path"
+
+    def test_unsectioned_legacy_doc_without_path_uses_topics(self):
+        doc = {"link": "https://www.hs.fi/art-2000011"}
+        assert apply_topic_section(doc, ["culture"]) is True
+        assert doc["section"] == "culture"
+        assert doc["section_source"] == "topic"
+
     def test_no_change_when_already_right(self):
         doc = {"section": "sports", "section_source": "topic"}
         assert apply_topic_section(doc, ["sports"]) is False
@@ -226,8 +240,9 @@ class TestIngestion:
             "userspace": "u",
         }
         redis = MagicMock()
-        with patch("tasks.article_processor.requests") as mock_requests, patch(
-            "tasks.article_processor.get_redis_client", return_value=redis
+        with (
+            patch("tasks.article_processor.requests") as mock_requests,
+            patch("tasks.article_processor.get_redis_client", return_value=redis),
         ):
             mock_requests.head.return_value.status_code = 404
             mock_requests.post.return_value.status_code = 201
@@ -247,8 +262,9 @@ class TestStoreAnnotationResections:
         from tasks import annotator
 
         redis = MagicMock()
-        with patch("tasks.annotator.requests") as mock_requests, patch(
-            "tasks.annotator.get_redis_client", return_value=redis
+        with (
+            patch("tasks.annotator.requests") as mock_requests,
+            patch("tasks.annotator.get_redis_client", return_value=redis),
         ):
             mock_requests.get.return_value.status_code = 200
             mock_requests.get.return_value.json.return_value = dict(doc)
@@ -274,3 +290,41 @@ class TestStoreAnnotationResections:
         )
         assert written["section"] == "culture"
         redis.delete.assert_not_called()
+
+
+class TestRegisteredFeedCategory:
+    """MCP read_feed must find UI-added feeds (uuid4 ids) by URL (#266)."""
+
+    US = "23452b089750c31533d258c710000bf9"
+
+    def _lookup(self, by_id: dict | None, found: list[dict]) -> str | None:
+        from mcp_service.tools import feeds as mcp_feeds
+
+        res = MagicMock(status_code=200)
+        res.json.return_value = {"docs": found}
+        with (
+            patch.object(mcp_feeds, "get_doc", return_value=by_id),
+            patch.object(mcp_feeds, "db_request", return_value=res) as db,
+        ):
+            category = mcp_feeds._registered_feed_category("https://x/rss", self.US)
+        self.db = db
+        return category
+
+    def test_mcp_registered_feed_by_hashed_id(self):
+        assert self._lookup({"category": "sports"}, []) == "sports"
+        self.db.assert_not_called()
+
+    def test_ui_added_feed_found_by_url(self):
+        found = [{"_id": "uuid", "url": "https://x/rss", "category": "culture"}]
+        assert self._lookup(None, found) == "culture"
+
+    def test_own_userspace_wins_over_unscoped(self):
+        found = [
+            {"_id": "u1", "category": "business"},
+            {"_id": "u2", "userspace": self.US, "category": "sports"},
+        ]
+        assert self._lookup(None, found) == "sports"
+
+    def test_other_userspace_is_ignored(self):
+        found = [{"_id": "u1", "userspace": "f" * 32, "category": "sports"}]
+        assert self._lookup(None, found) is None

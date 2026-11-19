@@ -2,6 +2,7 @@ import threading
 import time
 import requests
 import logging
+from typing import Optional
 from api.db_config import get_couchdb_uri
 from .article_processor import ArticleProcessor
 
@@ -139,7 +140,7 @@ class EnrichmentWorker(threading.Thread):
         if feed_title:
             self.update_feed_title(content_doc_id, feed_title)
 
-    def get_feed_category(self, registry_doc_id):
+    def get_feed_category(self, registry_doc_id: str) -> Optional[str]:
         """The feed's ``category`` from the registry, or None when unavailable.
 
         A section-specific category (``sports``, ``culture``, ``business``)

@@ -4,6 +4,7 @@ import json
 import os
 import requests
 import logging
+from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
@@ -33,8 +34,13 @@ class ArticleProcessor:
             return None
 
     def _extract_entry_data(
-        self, entry, feed_url, feed_title, feed_lang, feed_category=None
-    ):
+        self,
+        entry: Any,
+        feed_url: str,
+        feed_title: str,
+        feed_lang: Optional[str],
+        feed_category: Optional[str] = None,
+    ) -> Optional[dict]:
         """Helper to extract data from a single feed entry."""
         published_date = None
         if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -80,7 +86,9 @@ class ArticleProcessor:
             "language": article_lang,
         }
 
-    def process_feed(self, feed_url, feed_content, feed_category=None):
+    def process_feed(
+        self, feed_url: str, feed_content: str, feed_category: Optional[str] = None
+    ) -> tuple[str, list[dict]]:
         """Parses the feed content and extracts articles.
 
         ``feed_category`` is the registry's ``category`` for this feed; a

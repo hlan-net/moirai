@@ -41,15 +41,21 @@ def _couch_uri():
 class _FakeCouch:
     """Minimal stand-in for the three CouchDB endpoints the backfill uses."""
 
-    def __init__(self, articles: list[dict], bulk_results: list[list[dict]]):
+    def __init__(
+        self,
+        articles: list[dict],
+        bulk_results: list[list[dict]],
+        feeds: list[dict] | None = None,
+    ):
         self.articles = {a["_id"]: a for a in articles}
+        self.feeds = feeds or []
         self.bulk_results = list(bulk_results)
         self.bulk_calls: list[list[dict]] = []
         self.fetch_calls: list[list[str]] = []
 
     def get(self, url: str, params: dict | None = None, timeout: int = 0):
         if url.endswith("feeds/_all_docs"):
-            return _resp({"rows": []})
+            return _resp({"rows": [{"id": f["_id"], "doc": f} for f in self.feeds]})
         rows = [
             {"id": i, "doc": copy.deepcopy(d)} for i, d in sorted(self.articles.items())
         ]
@@ -125,7 +131,11 @@ def test_conflict_already_sectioned_by_other_writer_is_not_rewritten():
             first_page_served = True
             # After the page is read, the annotation worker sections it.
             couch.articles["a"] = _article(
-                "a", rev="2-a", section="sports", section_source="topic"
+                "a",
+                rev="2-a",
+                section="sports",
+                section_source="topic",
+                annotations={"topics": ["sports"]},
             )
         return res
 
@@ -146,7 +156,7 @@ def test_persistent_conflict_fails_the_run():
 def test_hard_rejection_fails_the_run():
     couch = _FakeCouch(
         [_article("a")],
-        [[{"id": "a", "error": "forbidden", "reason": "validation"}]],
+        [[{"id": "a", "error": "unauthorized", "reason": "no write access"}]],
     )
     assert _run(couch) == 1
     assert len(couch.bulk_calls) == 1
@@ -156,3 +166,76 @@ def test_dry_run_writes_nothing():
     couch = _FakeCouch([_article("a")], [])
     assert _run(couch, ["--dry-run"]) == 0
     assert couch.bulk_calls == []
+
+
+def test_invalid_stored_article_is_skipped_not_failed():
+    # A legacy article that fails validate_doc_update can never be written;
+    # failing the run for it would fail every rerun too.
+    couch = _FakeCouch(
+        [_article("a"), _article("b")],
+        [
+            [
+                {"id": "a", "ok": True},
+                {"id": "b", "error": "forbidden", "reason": "published must be ISO"},
+            ]
+        ],
+    )
+    assert _run(couch) == 0
+    assert len(couch.bulk_calls) == 1
+
+
+def test_default_mode_keeps_feed_decisions():
+    couch = _FakeCouch(
+        [_article("a", section="culture", section_source="feed")],
+        [],
+    )
+    assert _run(couch) == 0
+    assert couch.bulk_calls == []
+
+
+def test_default_mode_refiles_weaker_decision_when_feed_has_category():
+    # Sectioned by the annotator (topic) before the backfill could apply the
+    # feed's category: the default mode must still pick the feed decision.
+    couch = _FakeCouch(
+        [
+            _article(
+                "a",
+                section="main",
+                section_source="default",
+                annotations={"topics": ["politics"]},
+            )
+        ],
+        [[{"id": "a", "ok": True}]],
+        feeds=[{"_id": "f1", "url": "https://example.com/rss", "category": "sports"}],
+    )
+    assert _run(couch) == 0
+    written = couch.bulk_calls[0][0]
+    assert (written["section"], written["section_source"]) == ("sports", "feed")
+
+
+def test_default_mode_writes_nothing_when_up_to_date():
+    couch = _FakeCouch(
+        [
+            _article(
+                "a",
+                section="main",
+                section_source="default",
+            )
+        ],
+        [],
+    )
+    assert _run(couch) == 0
+    assert couch.bulk_calls == []
+
+
+def test_start_background_runs_default_mode():
+    with patch.object(bf, "run", return_value={"failed": 0}) as run:
+        bf.start_background().join(timeout=5)
+    run.assert_called_once_with(recompute_all=False, dry_run=False)
+
+
+def test_start_background_swallows_errors():
+    with patch.object(bf, "run", side_effect=RuntimeError("couch down")):
+        thread = bf.start_background()
+        thread.join(timeout=5)
+    assert not thread.is_alive()

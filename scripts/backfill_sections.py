@@ -5,16 +5,20 @@ New articles get their section at ingestion. This one-off backfill walks the
 section from the same signals the ingestion path uses (feed category, URL,
 annotation topic, default) and writes it back with ``_bulk_docs``.
 
-Run inside the worker or API pod (same env, same network):
+The worker runs it in the default mode at every start (``run_worker.py``), so
+a deploy needs no manual step. It can also be run by hand inside the worker or
+API pod (same env, same network):
 
     python -m scripts.backfill_sections --dry-run     # count only
-    python -m scripts.backfill_sections               # articles without a section
-    python -m scripts.backfill_sections --all         # recompute every article,
-                                                      # e.g. after changing a
-                                                      # feed's category
+    python -m scripts.backfill_sections               # default mode
+    python -m scripts.backfill_sections --all         # also re-file articles a
+                                                      # feed category decided,
+                                                      # e.g. after changing it
 
-Interruptible and resumable: every page is written as soon as it is computed,
-and the default mode only lists articles that still lack a section.
+The default mode recomputes every article except those whose section a feed
+category decided, and writes only the ones whose section changes; so it is
+idempotent and cheap once everything is sectioned. Interruptible and
+resumable: every page is written as soon as it is computed.
 """
 
 from __future__ import annotations
@@ -23,13 +27,14 @@ import argparse
 import json
 import logging
 import sys
+import threading
 from collections import Counter
 from typing import Iterator
 
 import requests
 
 from api.db_config import get_couchdb_uri
-from tasks.sections import STREAM_CACHE_KEYS, resolve_section
+from tasks.sections import SOURCE_FEED, STREAM_CACHE_KEYS, resolve_section
 
 logger = logging.getLogger("backfill_sections")
 
@@ -86,26 +91,36 @@ def section_for(doc: dict, feed_categories: dict[str, str]) -> tuple[str, str]:
     )
 
 
-def _bulk_write(docs: list[dict]) -> tuple[int, list[str], list[str]]:
+def _bulk_write(docs: list[dict]) -> tuple[int, list[str], list[str], list[str]]:
     """Write ``docs`` with ``_bulk_docs``.
 
-    Returns ``(accepted, conflicted_ids, failed_ids)``. ``_bulk_docs`` answers
-    201 even when individual documents are rejected, so every result row is
-    checked: a ``conflict`` (another writer, e.g. the annotation worker,
-    updated the article after this page was read) is retryable, anything else
-    is a hard failure.
+    Returns ``(accepted, conflicted_ids, forbidden_ids, failed_ids)``.
+    ``_bulk_docs`` answers 201 even when individual documents are rejected, so
+    every result row is checked: a ``conflict`` (another writer, e.g. the
+    annotation worker, updated the article after this page was read) is
+    retryable; ``forbidden`` means the stored article itself fails the
+    ``validate_doc_update`` rules (a legacy document), which no rerun can
+    fix, so it is skipped; anything else is a failure.
     """
     url = f"{get_couchdb_uri()}articles/_bulk_docs"
     res = requests.post(url, json={"docs": docs}, timeout=60)
     res.raise_for_status()
     accepted = 0
     conflicted: list[str] = []
+    forbidden: list[str] = []
     failed: list[str] = []
     for result in res.json():
         if result.get("ok"):
             accepted += 1
         elif result.get("error") == "conflict":
             conflicted.append(result.get("id"))
+        elif result.get("error") == "forbidden":
+            logger.warning(
+                "Backfill: %s skipped, the stored article is invalid: %s",
+                result.get("id"),
+                result.get("reason"),
+            )
+            forbidden.append(result.get("id"))
         else:
             logger.warning(
                 "Backfill: %s rejected: %s %s",
@@ -114,7 +129,7 @@ def _bulk_write(docs: list[dict]) -> tuple[int, list[str], list[str]]:
                 result.get("reason"),
             )
             failed.append(result.get("id"))
-    return accepted, conflicted, failed
+    return accepted, conflicted, forbidden, failed
 
 
 def _fetch_docs(ids: list[str]) -> list[dict]:
@@ -133,9 +148,11 @@ def _apply_section(
     """Set ``section``/``section_source`` on ``doc`` if it needs one.
 
     Returns the assigned ``(section, source)``, or ``None`` when the doc is
-    left untouched (already sectioned, or already up to date).
+    left untouched (a feed decision outside ``--all``, or already up to date).
+    Weaker decisions are recomputed: a path/topic/default section may predate
+    the feed's category, or come from the annotator, which cannot see feeds.
     """
-    if not recompute_all and doc.get("section"):
+    if not recompute_all and doc.get("section_source") == SOURCE_FEED:
         return None
     section, source = section_for(doc, feed_categories)
     if doc.get("section") == section and doc.get("section_source") == source:
@@ -147,19 +164,22 @@ def _apply_section(
 
 def _write_with_retry(
     docs: list[dict], feed_categories: dict[str, str], recompute_all: bool
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     """Write ``docs``, re-reading and retrying conflicted ones.
 
-    Returns ``(written, failed)``. A conflicted article is re-fetched with its
+    Returns ``(written, skipped, failed)``; ``skipped`` are invalid stored
+    articles (see ``_bulk_write``). A conflicted article is re-fetched with its
     fresh ``_rev`` and its section recomputed; if the concurrent writer already
     gave it a section, nothing more is written for it.
     """
     written = 0
+    skipped = 0
     failed = 0
     pending = docs
     for attempt in range(MAX_CONFLICT_RETRIES + 1):
-        accepted, conflicted, hard_failed = _bulk_write(pending)
+        accepted, conflicted, forbidden, hard_failed = _bulk_write(pending)
         written += accepted
+        skipped += len(forbidden)
         failed += len(hard_failed)
         if not conflicted:
             break
@@ -180,7 +200,7 @@ def _write_with_retry(
         ]
         if not pending:
             break
-    return written, failed
+    return written, skipped, failed
 
 
 def _invalidate_stream_cache() -> None:
@@ -201,6 +221,7 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
     seen = 0
     changed = 0
     written = 0
+    skipped = 0
     failed = 0
     by_section: Counter[str] = Counter()
     by_source: Counter[str] = Counter()
@@ -218,16 +239,18 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
             updates.append(doc)
         changed += len(updates)
         if updates and not dry_run:
-            page_written, page_failed = _write_with_retry(
+            page_written, page_skipped, page_failed = _write_with_retry(
                 updates, feed_categories, recompute_all
             )
             written += page_written
+            skipped += page_skipped
             failed += page_failed
         logger.info(
-            "Backfill: seen %d, to update %d, written %d, failed %d",
+            "Backfill: seen %d, to update %d, written %d, skipped %d, failed %d",
             seen,
             changed,
             written,
+            skipped,
             failed,
         )
 
@@ -238,12 +261,34 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
         "seen": seen,
         "changed": changed,
         "written": written,
+        "skipped": skipped,
         "failed": failed,
     }
     logger.info("Backfill summary: %s", summary)
     logger.info("By section: %s", dict(by_section))
     logger.info("By source: %s", dict(by_source))
     return summary
+
+
+def _run_logged() -> None:
+    try:
+        summary = run(recompute_all=False, dry_run=False)
+    except Exception:  # never take the worker down
+        logger.exception("Backfill: startup run failed")
+        return
+    if summary["failed"]:
+        logger.error(
+            "Backfill: %d articles were not written; they are retried at the "
+            "next worker start",
+            summary["failed"],
+        )
+
+
+def start_background() -> threading.Thread:
+    """Run the default-mode backfill in a daemon thread (worker startup)."""
+    thread = threading.Thread(target=_run_logged, name="section-backfill", daemon=True)
+    thread.start()
+    return thread
 
 
 def main(argv: list[str] | None = None) -> int:

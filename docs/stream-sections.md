@@ -44,18 +44,20 @@ Top stories is therefore "everything that is not sports, culture or business". I
 
 ## Migration
 
-- A one-off backfill assigns `section` to existing articles with signals 1–3; articles with no signal stay `main`:
+- A backfill assigns `section` to existing articles with signals 1–3; articles with no signal stay `main`. **The worker runs it in the background at every start** (`run_worker.py`), so a deploy needs no manual step. It can also be run by hand:
 
   ```bash
   # inside the worker or API pod
   python -m scripts.backfill_sections --dry-run   # count only
-  python -m scripts.backfill_sections             # articles without a section
-  python -m scripts.backfill_sections --all       # recompute, e.g. after changing a feed's category
+  python -m scripts.backfill_sections             # default mode (what the worker runs)
+  python -m scripts.backfill_sections --all       # also re-file feed-decided articles, e.g. after changing a feed's category
   ```
 
-  It reads the `articles` database in pages of 500 and writes with `_bulk_docs`, so it is safe against the production backlog (see #288). It can run while the workers are up: an article another writer updated in the meantime (a `_bulk_docs` `conflict`) is re-read with its fresh `_rev` and retried up to 3 times, and is skipped if the other writer already gave it a section. If any article still cannot be written, the command exits 1 and the summary's `failed` count says how many; rerun it, since the default mode only picks up articles still lacking a section.
+  The default mode recomputes every article except those a feed category decided, and writes only the ones whose section changes, so it is idempotent and cheap once everything is sectioned. Recomputing path/topic/default decisions matters because the annotator cannot see feed categories: an article it filed before the backfill ran still gets its feed's section. (The annotator itself resolves a pre-sectioning article from its URL as well as its topics.)
+
+  It reads the `articles` database in pages of 500 and writes with `_bulk_docs`, so it is safe against the production backlog (see #288). It runs alongside the other workers: an article another writer updated in the meantime (a `_bulk_docs` `conflict`) is re-read with its fresh `_rev`, recomputed and retried up to 3 times. A stored article that fails the `validate_doc_update` rules (`forbidden`, a legacy document) is logged and skipped, since no rerun can fix it. Any other unwritten article counts as `failed`: the manual command then exits 1, and the worker logs an error and retries at its next start.
 - Feed category values already stored (`tech`, `finance`, …) are mapped where obvious (`finance` → `business`); the rest stay as free text and contribute nothing to sectioning.
-- Until the backfill has run, articles without a `section` appear in no tab (the `?section=` query is an equality on the stored field) but still in the unfiltered `/api/stream.rss`.
+- Until the backfill has finished (minutes after the first worker start), articles without a `section` appear in no tab (the `?section=` query is an equality on the stored field) but still in the unfiltered `/api/stream.rss`.
 
 ## Decisions
 

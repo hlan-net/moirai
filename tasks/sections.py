@@ -187,18 +187,27 @@ def apply_topic_section(doc: dict, topics: Optional[Iterable[object]]) -> bool:
     """Re-section ``doc`` from annotation topics if no stronger signal decided it.
 
     Returns True when ``section`` or ``section_source`` changed. Feed and
-    path decisions are never overridden; a default decision (or a document
-    that predates sectioning) moves to the topic's section when there is
-    one, and otherwise just gets its ``main``/``default`` stamp.
+    path decisions are never overridden; a default decision moves to the
+    topic's section when there is one, and otherwise keeps its
+    ``main``/``default`` stamp.
+
+    A document that predates sectioning has no ``section_source`` and was
+    never checked against its URL, so it is resolved from the link and the
+    topics; otherwise e.g. a legacy ``/urheilu/`` article annotated before
+    the backfill would be filed by topic and then skipped by the backfill.
+    The feed category is not known here; the backfill applies it later.
     """
     source = doc.get("section_source")
     if source in (SOURCE_FEED, SOURCE_PATH):
         return False
-    from_topics = section_from_topics(topics)
-    if from_topics:
-        new_section, new_source = from_topics, SOURCE_TOPIC
+    if source is None:
+        new_section, new_source = resolve_section(None, doc.get("link"), topics)
     else:
-        new_section, new_source = DEFAULT_SECTION, SOURCE_DEFAULT
+        from_topics = section_from_topics(topics)
+        if from_topics:
+            new_section, new_source = from_topics, SOURCE_TOPIC
+        else:
+            new_section, new_source = DEFAULT_SECTION, SOURCE_DEFAULT
     if doc.get("section") == new_section and source == new_source:
         return False
     doc["section"] = new_section

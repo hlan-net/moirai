@@ -84,3 +84,16 @@ def test_feed_update_accepts_category():
     assert FeedUpdateRequest(title="HS", category="sports").category == "sports"
     assert FeedUpdateRequest(title="HS").category is None
     assert FeedUpdateRequest(title="HS", category="<b>sports</b>").category == "sports"
+
+
+def test_feed_update_category_alone_leaves_title_untouched():
+    # A section change sends only the category; re-sending the title would
+    # escape it again on every change (``&amp;`` -> ``&amp;amp;``).
+    validated = FeedUpdateRequest(category="culture")
+    assert validated.title is None
+    assert validated.category == "culture"
+
+
+def test_feed_update_rejects_empty_title():
+    with pytest.raises(ValueError):
+        FeedUpdateRequest(title="", category="culture")
