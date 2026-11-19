@@ -34,6 +34,7 @@ from tasks.sections import STREAM_CACHE_KEYS, resolve_section
 logger = logging.getLogger("backfill_sections")
 
 PAGE_SIZE = 500
+MAX_CONFLICT_RETRIES = 3
 
 
 def _iter_article_pages(page_size: int = PAGE_SIZE) -> Iterator[list[dict]]:
@@ -85,15 +86,26 @@ def section_for(doc: dict, feed_categories: dict[str, str]) -> tuple[str, str]:
     )
 
 
-def _bulk_update(docs: list[dict]) -> int:
-    """Write ``docs`` with ``_bulk_docs``; returns the number of accepted writes."""
+def _bulk_write(docs: list[dict]) -> tuple[int, list[str], list[str]]:
+    """Write ``docs`` with ``_bulk_docs``.
+
+    Returns ``(accepted, conflicted_ids, failed_ids)``. ``_bulk_docs`` answers
+    201 even when individual documents are rejected, so every result row is
+    checked: a ``conflict`` (another writer, e.g. the annotation worker,
+    updated the article after this page was read) is retryable, anything else
+    is a hard failure.
+    """
     url = f"{get_couchdb_uri()}articles/_bulk_docs"
     res = requests.post(url, json={"docs": docs}, timeout=60)
     res.raise_for_status()
     accepted = 0
+    conflicted: list[str] = []
+    failed: list[str] = []
     for result in res.json():
         if result.get("ok"):
             accepted += 1
+        elif result.get("error") == "conflict":
+            conflicted.append(result.get("id"))
         else:
             logger.warning(
                 "Backfill: %s rejected: %s %s",
@@ -101,7 +113,74 @@ def _bulk_update(docs: list[dict]) -> int:
                 result.get("error"),
                 result.get("reason"),
             )
-    return accepted
+            failed.append(result.get("id"))
+    return accepted, conflicted, failed
+
+
+def _fetch_docs(ids: list[str]) -> list[dict]:
+    """Fetch the current revision of ``ids``; deleted or missing ids are dropped."""
+    url = f"{get_couchdb_uri()}articles/_all_docs"
+    res = requests.post(
+        url, params={"include_docs": "true"}, json={"keys": ids}, timeout=60
+    )
+    res.raise_for_status()
+    return [row["doc"] for row in res.json().get("rows", []) if row.get("doc")]
+
+
+def _apply_section(
+    doc: dict, feed_categories: dict[str, str], recompute_all: bool
+) -> tuple[str, str] | None:
+    """Set ``section``/``section_source`` on ``doc`` if it needs one.
+
+    Returns the assigned ``(section, source)``, or ``None`` when the doc is
+    left untouched (already sectioned, or already up to date).
+    """
+    if not recompute_all and doc.get("section"):
+        return None
+    section, source = section_for(doc, feed_categories)
+    if doc.get("section") == section and doc.get("section_source") == source:
+        return None
+    doc["section"] = section
+    doc["section_source"] = source
+    return section, source
+
+
+def _write_with_retry(
+    docs: list[dict], feed_categories: dict[str, str], recompute_all: bool
+) -> tuple[int, int]:
+    """Write ``docs``, re-reading and retrying conflicted ones.
+
+    Returns ``(written, failed)``. A conflicted article is re-fetched with its
+    fresh ``_rev`` and its section recomputed; if the concurrent writer already
+    gave it a section, nothing more is written for it.
+    """
+    written = 0
+    failed = 0
+    pending = docs
+    for attempt in range(MAX_CONFLICT_RETRIES + 1):
+        accepted, conflicted, hard_failed = _bulk_write(pending)
+        written += accepted
+        failed += len(hard_failed)
+        if not conflicted:
+            break
+        if attempt == MAX_CONFLICT_RETRIES:
+            logger.warning(
+                "Backfill: %d articles still conflicted after %d retries: %s",
+                len(conflicted),
+                MAX_CONFLICT_RETRIES,
+                conflicted,
+            )
+            failed += len(conflicted)
+            break
+        logger.info("Backfill: retrying %d conflicted articles", len(conflicted))
+        pending = [
+            doc
+            for doc in _fetch_docs(conflicted)
+            if _apply_section(doc, feed_categories, recompute_all)
+        ]
+        if not pending:
+            break
+    return written, failed
 
 
 def _invalidate_stream_cache() -> None:
@@ -122,6 +201,7 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
     seen = 0
     changed = 0
     written = 0
+    failed = 0
     by_section: Counter[str] = Counter()
     by_source: Counter[str] = Counter()
 
@@ -129,27 +209,37 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
         seen += len(page)
         updates: list[dict] = []
         for doc in page:
-            if not recompute_all and doc.get("section"):
+            assigned = _apply_section(doc, feed_categories, recompute_all)
+            if assigned is None:
                 continue
-            section, source = section_for(doc, feed_categories)
-            if doc.get("section") == section and doc.get("section_source") == source:
-                continue
-            doc["section"] = section
-            doc["section_source"] = source
+            section, source = assigned
             by_section[section] += 1
             by_source[source] += 1
             updates.append(doc)
         changed += len(updates)
         if updates and not dry_run:
-            written += _bulk_update(updates)
+            page_written, page_failed = _write_with_retry(
+                updates, feed_categories, recompute_all
+            )
+            written += page_written
+            failed += page_failed
         logger.info(
-            "Backfill: seen %d, to update %d, written %d", seen, changed, written
+            "Backfill: seen %d, to update %d, written %d, failed %d",
+            seen,
+            changed,
+            written,
+            failed,
         )
 
     if written and not dry_run:
         _invalidate_stream_cache()
 
-    summary = {"seen": seen, "changed": changed, "written": written}
+    summary = {
+        "seen": seen,
+        "changed": changed,
+        "written": written,
+        "failed": failed,
+    }
     logger.info("Backfill summary: %s", summary)
     logger.info("By section: %s", dict(by_section))
     logger.info("By source: %s", dict(by_source))
@@ -172,9 +262,15 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
     try:
-        run(recompute_all=args.all, dry_run=args.dry_run)
+        summary = run(recompute_all=args.all, dry_run=args.dry_run)
     except requests.exceptions.RequestException as e:
         logger.error("Backfill: CouchDB request failed: %s", e)
+        return 1
+    if summary["failed"]:
+        logger.error(
+            "Backfill: %d articles were not written; re-run to retry them",
+            summary["failed"],
+        )
         return 1
     return 0
 

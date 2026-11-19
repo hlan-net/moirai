@@ -226,8 +226,15 @@ const streamUrl = computed(
 )
 const rssSubscribeUrl = computed(() => `/api/stream.rss?section=${activeSection.value}`)
 
+// Every fetch takes a sequence number; only the latest one may write the
+// list or clear the loading flags, so a superseded request (e.g. after a tab
+// switch, including A -> B -> A) can neither show stale data nor end the
+// current request's loading state early.
+let latestRequest = 0
+
 const fetchStream = async (isManual = false) => {
-  const section = activeSection.value
+  const requestId = ++latestRequest
+  const isCurrent = () => requestId === latestRequest
   if (articles.value.length === 0) {
     loading.value = true
   }
@@ -238,11 +245,7 @@ const fetchStream = async (isManual = false) => {
       throw new Error(`Failed to fetch RSS: ${response.status}`)
     }
     const xmlText = await response.text()
-    if (section !== activeSection.value) {
-      // The reader switched tabs while this request was in flight; the
-      // newer request owns the list now.
-      return
-    }
+    if (!isCurrent()) return
     const parsed = parseRssFeed(xmlText)
 
     if (articles.value.length === 0 || isManual) {
@@ -259,10 +262,12 @@ const fetchStream = async (isManual = false) => {
       }
     }
   } catch (error) {
-    console.error('Error fetching RSS stream:', error)
+    if (isCurrent()) console.error('Error fetching RSS stream:', error)
   } finally {
-    fetchingUpdates.value = false
-    loading.value = false
+    if (isCurrent()) {
+      fetchingUpdates.value = false
+      loading.value = false
+    }
   }
 }
 
@@ -279,12 +284,15 @@ const selectSection = (key: SectionKey) => {
   newArticleCount.value = 0
   expandedArticles.value = new Set()
   hideDotDetails()
-  fetchStream(true)
+  void fetchStream(true)
 }
 
 onMounted(async () => {
   await fetchStream(true)
-  refreshInterval = globalThis.setInterval(() => fetchStream(false), RSS_REFRESH_MS)
+  refreshInterval = globalThis.setInterval(() => {
+    // Skip a tick while a fetch is in flight rather than supersede it.
+    if (!fetchingUpdates.value) void fetchStream(false)
+  }, RSS_REFRESH_MS)
 })
 
 onUnmounted(() => {

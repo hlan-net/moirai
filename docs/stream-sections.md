@@ -53,7 +53,7 @@ Top stories is therefore "everything that is not sports, culture or business". I
   python -m scripts.backfill_sections --all       # recompute, e.g. after changing a feed's category
   ```
 
-  It reads the `articles` database in pages of 500 and writes with `_bulk_docs`, so it is safe against the production backlog (see #288).
+  It reads the `articles` database in pages of 500 and writes with `_bulk_docs`, so it is safe against the production backlog (see #288). It can run while the workers are up: an article another writer updated in the meantime (a `_bulk_docs` `conflict`) is re-read with its fresh `_rev` and retried up to 3 times, and is skipped if the other writer already gave it a section. If any article still cannot be written, the command exits 1 and the summary's `failed` count says how many; rerun it, since the default mode only picks up articles still lacking a section.
 - Feed category values already stored (`tech`, `finance`, …) are mapped where obvious (`finance` → `business`); the rest stay as free text and contribute nothing to sectioning.
 - Until the backfill has run, articles without a `section` appear in no tab (the `?section=` query is an equality on the stored field) but still in the unfiltered `/api/stream.rss`.
 
