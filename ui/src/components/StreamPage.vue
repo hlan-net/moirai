@@ -268,7 +268,7 @@ const fetchStream = async (isManual = false) => {
 
 const refreshAndReset = () => {
   newArticleCount.value = 0
-  fetchStream(true)
+  void fetchStream(true)
 }
 
 const selectSection = (key: SectionKey) => {
