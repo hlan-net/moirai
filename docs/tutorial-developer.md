@@ -30,7 +30,7 @@ conda env create -f environment.yml
 conda activate moirai
 
 # Or using pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Step 3: Start External Services (Docker recommended)
