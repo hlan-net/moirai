@@ -6,6 +6,7 @@ import requests
 import logging
 from typing import Any
 from datetime import datetime, timezone
+from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
 from api.extensions import limiter, get_redis_client
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
@@ -613,15 +614,18 @@ def rss_feed():
             f"{channel_description} ({section_label(section)} section)"
         )
 
+    # Every interpolated value is escaped: request.url carries the query
+    # string, and its "&" made the feed malformed for any request with two
+    # parameters, which is every request of the Stream page (#343).
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>{channel_title}</title>
-    <link>{request.host_url}</link>
-    <description>{channel_description}</description>
+    <title>{xml_escape(channel_title)}</title>
+    <link>{xml_escape(request.host_url)}</link>
+    <description>{xml_escape(channel_description)}</description>
     <language>en</language>
     <lastBuildDate>{build_date}</lastBuildDate>
-    <atom:link href="{request.url}" rel="self" type="application/rss+xml" />
+    <atom:link href={xml_quoteattr(request.url)} rel="self" type="application/rss+xml" />
 
 {chr(10).join(rss_items)}
 

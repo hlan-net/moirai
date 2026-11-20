@@ -4,6 +4,13 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [Unreleased / In Development]
+
+### Stream page shows articles again (#343)
+Since v0.11.0 the Stream page listed no articles in any section. `/api/stream.rss` wrote the request URL into the feed's `<atom:link href>` unescaped, so the `&` between two query parameters made the document malformed XML, and the page always sends two (`limit` and `section`). Every value interpolated into the channel header is now escaped, and the route tests parse the feed as XML for each section with the page's own query.
+
+---
+
 ## [v0.11.1] — 2026-11-20
 
 ### Re-filed articles without annotations are annotated

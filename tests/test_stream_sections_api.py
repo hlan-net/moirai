@@ -221,3 +221,47 @@ def test_every_cached_stream_key_is_invalidated():
     assert stream_cache_key("sports", 100) == "stream_rss_xml:sports"
     assert stream_cache_key(None, 100) == "stream_rss_xml"
     assert stream_cache_key("sports", 50) is None
+
+
+# ── The feed is well-formed XML for every query (#343) ────────────────────────
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "",
+        "?section=main",
+        "?limit=200&section=main",  # what the Stream page sends
+        "?limit=200&section=sports",
+        "?limit=200&section=culture",
+        "?limit=200&section=business",
+        "?limit=50&section=main&x=%3Ctag%3E%26%22quoted%22",
+    ],
+)
+def test_feed_is_well_formed_xml(client, query):
+    import xml.etree.ElementTree as ET
+
+    test_client, _query, _redis = client
+    res = test_client.get(f"/api/stream.rss{query}")
+    assert res.status_code == 200
+
+    root = ET.fromstring(res.get_data(as_text=True))  # raises if malformed
+    channel = root.find("channel")
+    assert len(channel.findall("item")) == 1
+    self_link = channel.find("{http://www.w3.org/2005/Atom}link").get("href")
+    # The parsed attribute is the request URL again, "&" included. (Werkzeug
+    # may re-encode percent-escapes, so the last case is checked by parsing only.)
+    assert "/api/stream.rss" in self_link
+    if "%" not in query:
+        assert self_link.endswith(f"/api/stream.rss{query}")
+
+
+def test_cached_stream_page_feed_is_well_formed(client):
+    """What is written to Redis for the Stream page's request must parse too."""
+    import xml.etree.ElementTree as ET
+
+    test_client, _query, redis = client
+    assert test_client.get("/api/stream.rss?limit=200&section=main").status_code == 200
+    key, _ttl, cached = redis.setex.call_args.args
+    assert key == "stream_rss_xml:main@200"
+    ET.fromstring(cached)
