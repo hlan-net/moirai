@@ -354,3 +354,83 @@ class TestRegisteredFeedCategory:
         assert result["status"] == "success", result
         processor.process_feed.assert_called_once_with("https://x/rss", "<rss/>", None)
         processor.store_article.assert_called_once()
+
+
+# ── Re-filing marker (changes-feed consumers skip re-filed articles) ──────────
+
+
+def test_section_rewrite_marks_only_the_revision_it_writes():
+    from tasks.sections import is_section_rewrite, mark_section_rewrite
+
+    doc = {"_id": "a1", "_rev": "4-abc"}
+    assert not is_section_rewrite(doc)
+
+    mark_section_rewrite(doc)
+    assert doc["section_rewrite_gen"] == 5
+    assert not is_section_rewrite(doc)  # not written yet
+
+    doc["_rev"] = "5-def"  # the revision the re-filing produced
+    assert is_section_rewrite(doc)
+
+    doc["_rev"] = "6-ghi"  # any later update is a real change again
+    assert not is_section_rewrite(doc)
+
+
+def test_section_rewrite_ignores_docs_without_a_revision():
+    from tasks.sections import is_section_rewrite, mark_section_rewrite
+
+    doc = {"_id": "a1"}
+    mark_section_rewrite(doc)
+    assert "section_rewrite_gen" not in doc
+    assert not is_section_rewrite(doc)
+    assert not is_section_rewrite({"_id": "a2", "_rev": "1-a"})
+
+
+def test_annotation_worker_skips_refiled_articles():
+    from tasks.annotation_worker import AnnotationWorker
+
+    refiled = {"_id": "old", "_rev": "3-b", "title": "Old", "section_rewrite_gen": 3}
+    fresh = {"_id": "new", "_rev": "1-a", "title": "New"}
+    response = MagicMock(status_code=200)
+    response.json.return_value = {
+        "results": [{"doc": refiled}, {"doc": fresh}],
+        "last_seq": "7",
+    }
+    worker = AnnotationWorker()
+    with (
+        patch("tasks.annotation_worker.requests.get", return_value=response),
+        patch("tasks.annotation_worker.annotation_paused_for", return_value=0),
+        patch.object(worker, "_maybe_annotate") as annotate,
+        patch.object(worker, "_save_last_seq") as save,
+    ):
+        worker._process_changes()
+
+    annotate.assert_called_once_with(fresh)
+    save.assert_called_once_with("7")
+
+
+@pytest.mark.parametrize("new_category, refiled", [("general", True), ("sports", False)])
+def test_mcp_category_update_refiles_existing_articles(new_category, refiled):
+    """The MCP tool must re-file like ``PUT /api/feeds/<id>`` does (#266)."""
+    from mcp_service.tools import feeds as mcp_feeds
+
+    userspace = "00000000-0000-0000-0000-000000000001"
+    feed = {
+        "_id": "f1",
+        "url": "https://www.hs.fi/rss/urheilu.xml",
+        "original_url": "https://hs.fi/rss/urheilu.xml",
+        "category": "sports",
+        "userspace": userspace,
+    }
+    with (
+        patch.object(mcp_feeds, "get_doc", return_value=feed),
+        patch.object(mcp_feeds, "update_doc", return_value=(True, "ok")),
+        patch.object(mcp_feeds.backfill_sections, "start_feed_refile") as refile,
+    ):
+        result = mcp_feeds.update_feed_category("f1", new_category, userspace=userspace)
+
+    assert result["status"] == "success", result
+    if refiled:
+        refile.assert_called_once_with([feed["url"], feed["original_url"]])
+    else:
+        refile.assert_not_called()

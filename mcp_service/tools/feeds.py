@@ -2,6 +2,7 @@ import hashlib
 import logging
 import requests
 from datetime import datetime, timezone
+from scripts import backfill_sections
 from ..core import mcp, auth_required, resolve_userspace, validate_userspace
 from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
 from .userspace import build_userspace_selector, extract_userspace, with_userspace
@@ -387,6 +388,12 @@ def update_feed_category(
 
         ok, msg = update_doc("feeds", feed_id, {"category": new_category})
         if ok:
+            # Stored articles keep their feed-decided section until re-filed
+            # (#266), exactly as for a change made through the REST API.
+            if new_category != existing.get("category"):
+                backfill_sections.start_feed_refile(
+                    [existing.get("url"), existing.get("original_url")]
+                )
             return success(
                 data={
                     "feed_id": feed_id,

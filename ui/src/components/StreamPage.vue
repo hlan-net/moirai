@@ -235,7 +235,9 @@ let latestRequest = 0
 const fetchStream = async (isManual = false) => {
   const requestId = ++latestRequest
   const isCurrent = () => requestId === latestRequest
-  if (articles.value.length === 0) {
+  // Only a first load or a tab switch shows the loading state: a background
+  // poll of an empty section must not flash it over the empty-state message.
+  if (isManual && articles.value.length === 0) {
     loading.value = true
   }
   fetchingUpdates.value = true

@@ -140,3 +140,41 @@ def test_feed_category_change_refiles_existing_articles(stored, sent, refiled):
         refile.assert_called_once_with([feed["url"], feed["original_url"]])
     else:
         refile.assert_not_called()
+
+
+def test_feed_url_and_category_change_refiles_the_replaced_url_too():
+    feed = {
+        "_id": "f1",
+        "url": "https://www.hs.fi/rss/urheilu.xml",
+        "original_url": "https://hs.fi/rss/urheilu.xml",
+        "title": "HS Urheilu",
+        "category": "sports",
+    }
+    with (
+        patch("api.routes.fetch_from_couchdb", return_value=dict(feed)),
+        patch("api.routes.update_couchdb_doc", return_value=True),
+        patch("api.routes.invalidate_feed_mappings_cache"),
+        patch("api.routes.backfill_sections.start_feed_refile") as refile,
+        patch("api.auth.get_user_by_email", return_value=None),
+    ):
+        res = app.test_client().put(
+            "/api/feeds/f1",
+            json={"category": "general", "new_url": "https://www.hs.fi/rss/sport.xml"},
+            headers=_admin_headers(),
+        )
+    assert res.status_code == 200, res.get_data(as_text=True)
+    refile.assert_called_once_with(
+        ["https://www.hs.fi/rss/sport.xml", feed["url"], feed["original_url"]]
+    )
+
+
+def test_feed_update_request_needs_at_least_one_field():
+    from pydantic import ValidationError
+
+    from api.validation import FeedUpdateRequest
+
+    with pytest.raises(ValidationError):
+        FeedUpdateRequest()
+    with pytest.raises(ValidationError):
+        FeedUpdateRequest.model_validate({"tittle": "HS"})
+    assert FeedUpdateRequest(category="sports").category == "sports"

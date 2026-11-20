@@ -43,6 +43,9 @@ SOURCE_PATH = "path"
 SOURCE_TOPIC = "topic"
 SOURCE_DEFAULT = "default"
 
+# Generation of the revision that a re-filing wrote; see ``mark_section_rewrite``.
+SECTION_REWRITE_FIELD = "section_rewrite_gen"
+
 # Feed ``category`` values that name a section. Anything else (``tech``,
 # ``imported``, free text) is kept on the feed but contributes nothing here.
 FEED_CATEGORY_SECTIONS: dict[str, str] = {
@@ -214,6 +217,38 @@ def apply_topic_section(doc: dict, topics: Optional[Iterable[object]]) -> bool:
     doc["section"] = new_section
     doc["section_source"] = new_source
     return True
+
+
+def _rev_generation(rev: object) -> Optional[int]:
+    """The generation number of a CouchDB ``_rev`` (``"7-abc"`` -> 7)."""
+    if not isinstance(rev, str):
+        return None
+    prefix = rev.partition("-")[0]
+    return int(prefix) if prefix.isdigit() else None
+
+
+def mark_section_rewrite(doc: dict) -> None:
+    """Stamp ``doc`` so the revision about to be written reads as a re-filing.
+
+    Re-sectioning stored articles (the backfill, a feed's section change)
+    rewrites them, and every rewrite shows up in ``articles/_changes`` exactly
+    like a newly ingested article. The stamp is the generation the write will
+    produce, so ``is_section_rewrite`` is true for that one revision only: any
+    later update of the article bumps the generation past the stamp.
+    """
+    generation = _rev_generation(doc.get("_rev"))
+    if generation is not None:
+        doc[SECTION_REWRITE_FIELD] = generation + 1
+
+
+def is_section_rewrite(doc: dict) -> bool:
+    """True when this revision of ``doc`` only re-filed it into a section.
+
+    Changes-feed consumers (agent dispatch, annotation) use it to tell a
+    re-filed backlog article from one that is new.
+    """
+    generation = _rev_generation(doc.get("_rev"))
+    return generation is not None and doc.get(SECTION_REWRITE_FIELD) == generation
 
 
 def section_label(section: str) -> str:

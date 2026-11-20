@@ -312,6 +312,7 @@ def update_feed(feed_id):
         feed["title"] = validated.title
 
     # If a new URL is provided (e.g., from a redirect), update it
+    previous_url = feed.get("url")
     if validated.new_url:
         feed["url"] = str(validated.new_url)
 
@@ -327,8 +328,14 @@ def update_feed(feed_id):
     if update_couchdb_doc("feeds", feed_id, feed):
         invalidate_feed_mappings_cache()
         if category_changed:
+            # Stored articles carry the URL they were fetched from, so a URL
+            # replaced in this same request is re-filed too.
             backfill_sections.start_feed_refile(
-                [feed.get("url"), feed.get("original_url")]
+                list(
+                    dict.fromkeys(
+                        [feed.get("url"), previous_url, feed.get("original_url")]
+                    )
+                )
             )
         return jsonify(feed)
     else:

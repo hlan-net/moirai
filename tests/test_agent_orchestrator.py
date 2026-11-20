@@ -320,3 +320,51 @@ def test_unscoped_articles_dispatch_to_default_userspace(mock_query, mock_defaul
     assert mock_execute.call_count == 1
     assert len(mock_execute.call_args[1]["new_articles"]) == 3
     mock_default.assert_called_once()
+
+
+@patch('tasks.agent_orchestrator.requests.get')
+def test_changes_feed_skips_refiled_articles(mock_get, orchestrator):
+    """A stored article re-filed into a section (#266) is not a new article."""
+    refiled = {"_id": "old", "_rev": "5-b", "section_rewrite_gen": 5}
+    updated_since = {"_id": "annotated", "_rev": "6-c", "section_rewrite_gen": 5}
+    fresh = {"_id": "new", "_rev": "1-a"}
+    mock_get.return_value = MagicMock(
+        status_code=200,
+        json=MagicMock(
+            return_value={
+                "results": [{"doc": refiled}, {"doc": updated_since}, {"doc": fresh}],
+                "last_seq": "9",
+            }
+        ),
+    )
+
+    with (
+        patch.object(orchestrator, '_dispatch_on_new_article_agents') as mock_dispatch,
+        patch.object(orchestrator, '_save_last_seq'),
+    ):
+        orchestrator._process_article_changes()
+
+    mock_dispatch.assert_called_once_with([updated_since, fresh])
+    assert orchestrator.last_seq == "9"
+
+
+@patch('tasks.agent_orchestrator.requests.get')
+def test_changes_feed_of_only_refiled_articles_dispatches_nothing(mock_get, orchestrator):
+    mock_get.return_value = MagicMock(
+        status_code=200,
+        json=MagicMock(
+            return_value={
+                "results": [{"doc": {"_id": "old", "_rev": "2-b", "section_rewrite_gen": 2}}],
+                "last_seq": "3",
+            }
+        ),
+    )
+
+    with (
+        patch.object(orchestrator, '_dispatch_on_new_article_agents') as mock_dispatch,
+        patch.object(orchestrator, '_save_last_seq') as mock_save,
+    ):
+        orchestrator._process_article_changes()
+
+    mock_dispatch.assert_not_called()
+    mock_save.assert_called_once_with("3")

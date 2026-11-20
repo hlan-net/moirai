@@ -333,3 +333,35 @@ def test_feed_article_pages_follow_the_bookmark():
     assert [[d["_id"] for d in page] for page in got] == [["a", "b"], ["c"]]
     assert "bookmark" not in bodies[0]
     assert bodies[1]["bookmark"] == "b1"
+
+
+def test_written_articles_are_marked_as_refiled():
+    """The rewrite must not look like a new article in ``articles/_changes``."""
+    couch = _FakeCouch(
+        [_article("a1", rev="3-x")], [[{"ok": True, "id": "a1", "rev": "4-y"}]]
+    )
+    assert _run(couch) == 0
+    assert couch.bulk_calls[0][0]["section_rewrite_gen"] == 4
+
+
+def test_conflict_retry_marks_the_fresh_revision():
+    couch = _FakeCouch(
+        [_article("a1", rev="1-a")],
+        [
+            [{"id": "a1", "error": "conflict", "reason": "x"}],
+            [{"ok": True, "id": "a1", "rev": "3-c"}],
+        ],
+    )
+
+    def post(url: str, json: dict, params: dict | None = None, timeout: int = 0):
+        if not url.endswith("_bulk_docs"):
+            couch.articles["a1"]["_rev"] = "2-b"  # the concurrent writer's revision
+        return couch.post(url, json, params=params, timeout=timeout)
+
+    with (
+        patch.object(bf.requests, "get", side_effect=couch.get),
+        patch.object(bf.requests, "post", side_effect=post),
+    ):
+        assert bf.main([]) == 0
+    assert couch.bulk_calls[1][0]["_rev"] == "2-b"
+    assert couch.bulk_calls[1][0]["section_rewrite_gen"] == 3

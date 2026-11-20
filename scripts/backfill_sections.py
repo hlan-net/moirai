@@ -35,7 +35,12 @@ from typing import Callable, Iterable, Iterator
 import requests
 
 from api.db_config import get_couchdb_uri
-from tasks.sections import SOURCE_FEED, STREAM_CACHE_KEYS, resolve_section
+from tasks.sections import (
+    SOURCE_FEED,
+    STREAM_CACHE_KEYS,
+    mark_section_rewrite,
+    resolve_section,
+)
 
 logger = logging.getLogger("backfill_sections")
 
@@ -188,6 +193,8 @@ def _apply_section(
         return None
     doc["section"] = section
     doc["section_source"] = source
+    # Keep the changes-feed consumers from treating the rewrite as a new article.
+    mark_section_rewrite(doc)
     return section, source
 
 

@@ -302,6 +302,12 @@ class FeedUpdateRequest(BaseModel):
             str(v), "Only HTTP/HTTPS URLs are allowed for new_url"
         )
 
+    @model_validator(mode="after")
+    def require_a_field(self) -> "FeedUpdateRequest":
+        if self.title is None and self.new_url is None and self.category is None:
+            raise ValueError("Provide at least one of: title, new_url, category")
+        return self
+
 
 class EventCreateRequest(BaseModel):
     """Validation for event creation"""
