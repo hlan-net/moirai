@@ -2,8 +2,8 @@
 # Installed by environment.yml.
 -r requirements.txt
 
-pytest==9.0.3
-pytest-asyncio==1.3.0
-pre-commit==4.5.1
+pytest==9.2.0
+pytest-asyncio==1.5.0
+pre-commit==4.7.0
 black==26.10.1
-ruff==0.15.7
+ruff==0.17.5
