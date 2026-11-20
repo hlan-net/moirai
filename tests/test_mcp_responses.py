@@ -1,7 +1,7 @@
 """
 Tests for MCP standardized response envelope.
 
-Validates the response contract defined in TODO_0.7.1.md #1.
+Validates the response contract described in docs/mcp-tool-migration.md.
 """
 
 import json

@@ -94,7 +94,7 @@ This ethos is not about renaming code or enforcing mythology in APIs — it's a 
 - **Environment:** Conda (preferred) or venv. Python 3.12.
 - **Install Dependencies:**
   ```bash
-  pip install -r requirements.txt
+  pip install -r requirements-dev.txt
   # OR
   conda env update -f environment.yml
   ```

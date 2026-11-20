@@ -4,7 +4,7 @@ FROM condaforge/miniforge3:26.9.4-2@sha256:dfb274710eee2bb062c87b15c10fde6ea91f7
 WORKDIR /build
 ENV PIP_ROOT_USER_ACTION=ignore
 
-COPY environment-prod.yml .
+COPY environment-prod.yml requirements.txt ./
 RUN conda install -y mamba && \
     mamba env create -f environment-prod.yml && \
     mamba clean --all --force-pkgs-dirs -y && \
@@ -54,7 +54,7 @@ RUN apt-get update && \
     mkdir -p /app/feeds /app/ui/dist /run/gunicorn && \
     chown -R appuser:appuser /app/feeds /app/ui/dist /run/gunicorn
 
-# Copy the conda environment from builder (cached unless environment-prod.yml changes)
+# Copy the conda environment from builder (cached unless environment-prod.yml or requirements.txt changes)
 COPY --from=builder /opt/conda/envs/moirai /opt/conda/envs/moirai
 
 # Set the PATH to include the conda environment's bin directory

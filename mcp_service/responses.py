@@ -4,7 +4,7 @@ Standardized MCP Tool Response Envelope
 This module defines the canonical response format for all MCP tools,
 ensuring consistent error handling, retry guidance, and observability.
 
-See TODO_0.7.1.md #1 for requirements.
+See docs/mcp-tool-migration.md for the contract and migration guide.
 """
 
 from enum import Enum

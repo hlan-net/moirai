@@ -30,7 +30,7 @@ conda env create -f environment.yml
 conda activate moirai
 
 # Or using pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Step 3: Start External Services (Docker recommended)
@@ -188,8 +188,9 @@ moirai/
 ├── CLAUDE.md                     # Instructions for Claude Code
 ├── CHANGELOG.md                  # Version history
 ├── docker-compose.yml            # Local development stack
-├── environment.yml               # Conda/Mamba dependencies
-└── requirements.txt              # Pip dependencies
+├── environment.yml               # Conda/Mamba environment (installs requirements-dev.txt)
+├── requirements.txt              # Runtime dependency pins
+└── requirements-dev.txt          # Runtime pins + test/lint tooling
 
 ```
 

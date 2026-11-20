@@ -20,13 +20,17 @@ Three principles flow from that vision:
 
 | Version | Highlights |
 |---|---|
+| **v0.11.1** | Python 3.12. Formatting enforced in CI. Re-filed articles without annotations are annotated. |
+| **v0.11.0** | Stream sections: Top stories, Sports, Culture, Business. Stream page served from the `stream.rss` cache. |
+| **v0.10.x** | Single implicit userspace (MCP, REST API, UI). Model catalog for annotation, chat, agents and social export, editable in the admin UI. Bounded feed-fetch pool. Security and dependency updates. |
+| **v0.9.x** | AISA in-cluster inference proxy as an LLM provider. Closed annotation topic vocabulary and re-annotation at backlog scale. Scheduler and worker split from the API. Issues model ("The Fates", 2nd iteration). |
 | **v0.8.1** | Hotfix: worker memory bump (OOMKill), Gemini chat context preamble + copy/download fix. |
 | **v0.8.0** | Agent observability backend: step-level tracing, approval gate, cancellation, session timeline API. MCP tools migrated to standardized `MCPResponse` envelope. Wacom pen click-drag fix. |
 | **v0.7.2** | Hotfix: Wacom pen drag threshold. |
 | **v0.7.1** | Dependency bumps (starlette 1.0, bcrypt 5.0). Public Mythology page; public/private issue distinction. |
 | **v0.7.0** | Userspace as a first-class document with LLM credentials. Session logging foundation. Chat LLM override. Quick actions. Draggable chat. Bluesky export. |
 
-The current production deployment is **v0.8.1**.
+The latest release is **v0.11.1**. See [`CHANGELOG.md`](CHANGELOG.md) for the full history.
 
 ---
 
@@ -41,7 +45,9 @@ After the v0.8.x agent-observability arc and with the Stream page in good shape,
 
 ---
 
-## 🚀 Next release: v0.9.0 — Visible Agents
+## 🚀 Next up: Visible Agents
+
+> This was planned as v0.9.0. The v0.9–v0.11 releases shipped other work (see "What's shipped"), so it is not yet assigned to a version.
 
 **Focus:** Make the v0.8.0 agent observability/intervention work usable by the human in the loop, and surface platform health to the operator.
 
@@ -67,7 +73,7 @@ See [`docs/metrics-and-alerting.md`](docs/metrics-and-alerting.md) for full conc
 
 ## 🛠️ Future Releases
 
-### v0.10.0 (tentative): Foundation Hardening
+### Foundation Hardening (unscheduled; originally pencilled in as v0.10.0)
 **Focus:** Security and deployment ergonomics. Not glamorous, overdue.
 
 - **[Security Hardening](docs/security-enhancements.md):** JWT session model, Role-Based Access Control (RBAC), server-side userspace isolation.
