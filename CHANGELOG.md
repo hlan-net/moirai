@@ -4,6 +4,13 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [Unreleased / In Development]
+
+### Re-filed articles without annotations are annotated
+In v0.11.0 the annotation worker skipped every stored article that the section backfill re-filed, so legacy articles that had never been annotated stayed that way. It now skips only those that already carry annotations; the rest go through the normal annotation path on the first worker start after the upgrade (one LLM call per unannotated stored article, once). `store_annotation` carries the re-filing stamp over to the revision it writes, so annotating a backlog article still does not dispatch `ON_NEW_ARTICLE` agents for it.
+
+---
+
 ## [v0.11.0] — 2026-11-20
 
 ### Stream sections (#266)

@@ -10,7 +10,6 @@ import time
 import requests
 import logging
 from api.db_config import get_couchdb_uri
-from .sections import is_section_rewrite
 from .annotator import (
     annotate_article,
     annotation_paused_for,
@@ -139,10 +138,10 @@ class AnnotationWorker(threading.Thread):
                 doc = change.get("doc")
                 if not doc or doc.get("_id", "").startswith("_design/"):
                     continue
-                if is_section_rewrite(doc):
-                    # A re-filed backlog article (#266), not a new one.
-                    continue
-
+                # A stored article that the section backfill re-filed (#266)
+                # is not skipped here: one that already has annotations is
+                # ignored by _maybe_annotate, and one that never got them is
+                # annotated now instead of being passed over for good.
                 self._maybe_annotate(doc)
 
                 if annotation_paused_for() > 0:

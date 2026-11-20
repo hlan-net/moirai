@@ -386,27 +386,88 @@ def test_section_rewrite_ignores_docs_without_a_revision():
     assert not is_section_rewrite({"_id": "a2", "_rev": "1-a"})
 
 
-def test_annotation_worker_skips_refiled_articles():
+def test_annotation_worker_annotates_refiled_articles_that_lack_annotations():
+    """A re-filed backlog article is skipped only if it is already annotated."""
     from tasks.annotation_worker import AnnotationWorker
 
-    refiled = {"_id": "old", "_rev": "3-b", "title": "Old", "section_rewrite_gen": 3}
+    unannotated = {
+        "_id": "old",
+        "_rev": "3-b",
+        "title": "Old",
+        "section_rewrite_gen": 3,
+    }
+    annotated = {
+        "_id": "done",
+        "_rev": "4-c",
+        "title": "Done",
+        "section_rewrite_gen": 4,
+        "annotations": {"topics": ["sports"]},
+    }
     fresh = {"_id": "new", "_rev": "1-a", "title": "New"}
     response = MagicMock(status_code=200)
     response.json.return_value = {
-        "results": [{"doc": refiled}, {"doc": fresh}],
+        "results": [{"doc": unannotated}, {"doc": annotated}, {"doc": fresh}],
         "last_seq": "7",
     }
     worker = AnnotationWorker()
+    annotation = {"topics": ["politics"], "priority": "low", "sentiment": "neutral"}
     with (
         patch("tasks.annotation_worker.requests.get", return_value=response),
         patch("tasks.annotation_worker.annotation_paused_for", return_value=0),
-        patch.object(worker, "_maybe_annotate") as annotate,
+        patch(
+            "tasks.annotation_worker.annotate_article", return_value=annotation
+        ) as annotate,
+        patch("tasks.annotation_worker.store_annotation", return_value=True) as store,
         patch.object(worker, "_save_last_seq") as save,
     ):
         worker._process_changes()
 
-    annotate.assert_called_once_with(fresh)
+    assert [c.args[0] for c in annotate.call_args_list] == ["Old", "New"]
+    assert [c.args[0] for c in store.call_args_list] == ["old", "new"]
     save.assert_called_once_with("7")
+
+
+@pytest.mark.parametrize(
+    "stored, expected_stamp",
+    [
+        # Re-filed backlog article: the annotation revision stays "not new".
+        ({"_rev": "3-b", "section_rewrite_gen": 3}, 4),
+        # Updated since it was re-filed: the old stamp is left alone.
+        ({"_rev": "5-d", "section_rewrite_gen": 3}, 3),
+        # New article: never stamped.
+        ({"_rev": "1-a"}, None),
+    ],
+)
+def test_store_annotation_keeps_a_refiled_article_out_of_agent_dispatch(
+    stored, expected_stamp
+):
+    from tasks import annotator
+    from tasks.sections import is_section_rewrite
+
+    doc = {
+        "_id": "a1",
+        "title": "T",
+        "link": "https://example.com/news/x",
+        "section": "main",
+        "section_source": "default",
+        **stored,
+    }
+    get_res = MagicMock(status_code=200)
+    get_res.json.return_value = dict(doc)
+    put_res = MagicMock(status_code=201)
+    with (
+        patch.object(annotator.requests, "get", return_value=get_res),
+        patch.object(annotator.requests, "put", return_value=put_res) as put,
+        patch.object(annotator, "_invalidate_stream_cache"),
+    ):
+        assert annotator.store_annotation("a1", {"topics": ["politics"]})
+
+    written = put.call_args.kwargs["json"]
+    assert written.get("section_rewrite_gen") == expected_stamp
+    # The revision CouchDB assigns is one generation past the one that was read.
+    generation = int(stored["_rev"].split("-")[0]) + 1
+    written["_rev"] = f"{generation}-new"
+    assert is_section_rewrite(written) is (expected_stamp == generation)
 
 
 @pytest.mark.parametrize(
