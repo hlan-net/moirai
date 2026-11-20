@@ -508,7 +508,7 @@ const confirmQuickAction = async () => {
   const { message, action } = pendingQuickAction.value
   pendingQuickAction.value = null
   if (action === 'wizard') {
-    openRaiseWizard()
+    void openRaiseWizard()
     return
   }
   input.value = message
@@ -521,7 +521,7 @@ const declineQuickAction = () => {
   pendingQuickAction.value = null
   if (action === 'wizard') {
     // wizard has no prefill fallback — open it directly
-    openRaiseWizard()
+    void openRaiseWizard()
     return
   }
   input.value = message

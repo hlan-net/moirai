@@ -316,7 +316,7 @@ const renameFeed = async (feed: Feed) => {
 }
 
 onMounted(() => {
-  fetchFeeds()
+  void fetchFeeds()
 })
 
 const openFeedInNewTab = (url: string) => {

@@ -165,17 +165,17 @@ const copyAbout = async () => {
 
 watch(llmEndpoint, (newEndpoint) => {
   if (newEndpoint === 'openai' && availableOpenAiModels.value.length === 0 && openaiApiKey.value) {
-    fetchOpenAiModels()
+    void fetchOpenAiModels()
   } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
-    fetchOllamaModels()
+    void fetchOllamaModels()
   } else if (
     newEndpoint === 'gemini' &&
     availableGeminiModels.value.length === 0 &&
     geminiApiKey.value
   ) {
-    fetchGeminiModels()
+    void fetchGeminiModels()
   } else if (newEndpoint === 'aisa' && availableAisaModels.value.length === 0) {
-    fetchAisaModels()
+    void fetchAisaModels()
   }
 })
 
@@ -533,10 +533,10 @@ const fetchConfig = async () => {
 }
 
 onMounted(() => {
-  fetchUserProfile()
+  void fetchUserProfile()
   // Still fetch system config for version and system-wide settings
-  fetchConfig()
-  fetchAisaStatus()
+  void fetchConfig()
+  void fetchAisaStatus()
 })
 </script>
 

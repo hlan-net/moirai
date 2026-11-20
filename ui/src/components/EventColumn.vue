@@ -96,7 +96,7 @@ const selectIssue = (issueId: string) => {
 watch(
   () => filterStore.selectedFeedId,
   () => {
-    fetchIssues()
+    void fetchIssues()
   }
 )
 
@@ -164,7 +164,7 @@ const toggleExpand = (id: string) => {
 }
 
 onMounted(() => {
-  fetchIssues()
+  void fetchIssues()
   refreshInterval = globalThis.setInterval(() => fetchIssues(true), SYNC_REFRESH_INTERVAL)
 })
 

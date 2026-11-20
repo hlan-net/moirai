@@ -166,7 +166,7 @@ const removePremise = async (issueId: string, premiseId: string) => {
 }
 
 onMounted(() => {
-  fetchIssues()
+  void fetchIssues()
   refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
 })
 

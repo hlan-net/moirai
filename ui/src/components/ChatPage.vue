@@ -68,7 +68,7 @@ const normalizeErrorMessage = (raw: string) => {
 const endpointSelection = computed({
   get: () => settingsStore.llmEndpoint,
   set: (value: string) => {
-    updateEndpoint(value)
+    void updateEndpoint(value)
   },
 })
 
@@ -93,8 +93,8 @@ const modelOptions = computed(() => {
 })
 
 onMounted(() => {
-  fetchConfig()
-  fetchSessions()
+  void fetchConfig()
+  void fetchSessions()
 })
 
 onUnmounted(() => {
@@ -143,7 +143,7 @@ const saveUserSetting = async (key: string, value: string) => {
 const updateEndpoint = async (value: string) => {
   if (settingsStore.llmEndpoint === value) return
   settingsStore.llmEndpoint = value
-  saveUserSetting('moirai_llm_endpoint', value)
+  void saveUserSetting('moirai_llm_endpoint', value)
 
   // Auto-load models when provider changes
   await loadModelsForEndpoint(value)
@@ -161,7 +161,7 @@ const updateModel = (value: string) => {
 
   settingsStore.setCurrentModel(value)
   const modelKey = settingsStore.getCurrentModelKey()
-  saveUserSetting(modelKey, value)
+  void saveUserSetting(modelKey, value)
 }
 
 const _fetchModels = async (
@@ -269,7 +269,7 @@ const loadModelsForEndpoint = async (endpoint: string) => {
 const toggleModelSelect = () => {
   modelSelectOpen.value = !modelSelectOpen.value
   if (modelSelectOpen.value) {
-    loadModelsForEndpoint(settingsStore.llmEndpoint)
+    void loadModelsForEndpoint(settingsStore.llmEndpoint)
   }
 }
 
