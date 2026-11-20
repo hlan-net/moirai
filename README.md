@@ -104,7 +104,7 @@ If you want to run components individually without Docker:
 
     If `mamba` is not found after installing Miniforge, run `~/miniforge3/bin/conda init bash` once and open a new shell.
 
-1. **Node.js and Yarn:** the UI needs the Node major in `ui/.nvmrc` and Yarn 4 through Corepack. Node 25 and later no longer bundle Corepack, so install it once per Node version:
+1. **Node.js and Yarn:** the UI needs the Node major in `ui/.nvmrc` and Yarn 4 through Corepack. The commands below use [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) to install Node; install nvm first, or install that Node major another way and skip the `nvm install` line. Node 25 and later no longer bundle Corepack, so install it once per Node version:
 
     ```bash
     cd ui
@@ -113,7 +113,7 @@ If you want to run components individually without Docker:
     yarn install         # also installs the git hooks, see below
     ```
 
-1. **Git hooks:** `yarn install` in `ui/` installs one pre-commit hook for the whole repository (husky, `.husky/pre-commit`). It runs `prettier` on staged UI files and, when Python or YAML files are staged, `black`, `ruff` and the hygiene hooks from `.pre-commit-config.yaml`. The Python half needs `pre-commit` on `PATH`, so commit from a shell with the `moirai` environment active. Do not run `pre-commit install`: husky owns `core.hooksPath`. CI runs the same checks either way.
+1. **Git hooks:** `yarn install` in `ui/` installs one pre-commit hook for the whole repository (husky, `.husky/pre-commit`). It runs `prettier` on staged UI files and, when Python or YAML files are staged, `black`, `ruff` and the hygiene hooks from `.pre-commit-config.yaml`. The Python half needs `pre-commit` on `PATH`, so commit from a shell with the `moirai` environment active. Do not run `pre-commit install`: husky owns `core.hooksPath`. CI enforces `ruff`, `black --check` and `prettier --check` regardless; the hygiene hooks (trailing whitespace, end of file, YAML syntax, large files) run only locally.
 
 1. **Database:** Ensure CouchDB is running (e.g., via `docker compose up couchdb`).
 2. **API:**
