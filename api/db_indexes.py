@@ -95,6 +95,13 @@ def create_articles_indexes() -> int:
             "name": "idx_userspace_feed_published",
             "type": "json"
         },
+        {
+            "index": {
+                "fields": ["section", "published"]
+            },
+            "name": "idx_section_published",
+            "type": "json"
+        },
     ]
     
     success_count = 0

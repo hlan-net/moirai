@@ -277,13 +277,21 @@ class FeedCreateRequest(BaseModel):
 class FeedUpdateRequest(BaseModel):
     """Validation for feed updates"""
 
-    title: str = Field(..., min_length=1, max_length=200)
+    # Optional so a section change can send only ``category``: re-sending the
+    # title would run it through bleach again (``&amp;`` -> ``&amp;amp;``).
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
     new_url: Optional[HttpUrl] = None  # Added field
+    category: Optional[str] = Field(None, max_length=100)
 
     @field_validator("title")
     @classmethod
-    def sanitize_title(cls, v: str) -> str:
-        return _sanitize_text(v)
+    def sanitize_title(cls, v: Optional[str]) -> Optional[str]:
+        return _sanitize_optional_text(v)
+
+    @field_validator("category")
+    @classmethod
+    def sanitize_category(cls, v: Optional[str]) -> Optional[str]:
+        return _sanitize_optional_text(v)
 
     @field_validator("new_url")
     @classmethod
@@ -293,6 +301,12 @@ class FeedUpdateRequest(BaseModel):
         return _validate_http_or_https_url(
             str(v), "Only HTTP/HTTPS URLs are allowed for new_url"
         )
+
+    @model_validator(mode="after")
+    def require_a_field(self) -> "FeedUpdateRequest":
+        if self.title is None and self.new_url is None and self.category is None:
+            raise ValueError("Provide at least one of: title, new_url, category")
+        return self
 
 
 class EventCreateRequest(BaseModel):

@@ -2,8 +2,13 @@ from xml.sax.saxutils import escape
 
 
 def _generate_category_tags(article):
-    """Build category tags for events, trends, and AI annotations."""
+    """Build category tags for the section, events, trends, and AI annotations."""
     categories = []
+
+    # Stream section (#266): main | sports | culture | business
+    section = article.get("section")
+    if section:
+        categories.append(f'    <category domain="section">{escape(str(section))}</category>')
 
     # Events and Trends
     if "events" in article:

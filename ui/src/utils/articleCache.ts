@@ -30,6 +30,8 @@ export interface Article {
   }
   feed_title?: string
   feed_favicon?: string
+  /** Stream section (#266): main | sports | culture | business */
+  section?: string
   cached_at?: string
 }
 

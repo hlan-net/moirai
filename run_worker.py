@@ -17,6 +17,7 @@ import logging
 import signal
 import sys
 
+from scripts import backfill_sections
 from tasks import init
 from tasks.enrichment_worker import worker
 from tasks.annotation_worker import annotation_worker
@@ -54,7 +55,12 @@ if __name__ == "__main__":
     logger.info("Enrichment worker started.")
 
     annotation_worker.start()
-    logger.info("Annotation worker started. Waiting...")
+    logger.info("Annotation worker started.")
+
+    # Give pre-#266 articles (and those whose feed got a category since) their
+    # stream section; idempotent, writes only what changes.
+    backfill_sections.start_background()
+    logger.info("Section backfill started in the background. Waiting...")
 
     # Keep the main thread alive so the daemon worker threads stay running.
     worker.join()

@@ -10,6 +10,7 @@ import time
 import requests
 import logging
 from api.db_config import get_couchdb_uri
+from .sections import is_section_rewrite
 from .annotator import (
     annotate_article,
     annotation_paused_for,
@@ -137,6 +138,9 @@ class AnnotationWorker(threading.Thread):
             for change in results:
                 doc = change.get("doc")
                 if not doc or doc.get("_id", "").startswith("_design/"):
+                    continue
+                if is_section_rewrite(doc):
+                    # A re-filed backlog article (#266), not a new one.
                     continue
 
                 self._maybe_annotate(doc)

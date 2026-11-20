@@ -48,6 +48,13 @@ function(newDoc, oldDoc, userCtx, secObj) {
   if (typeof newDoc.published !== 'string' || !isoDate.test(newDoc.published)) {
     throw({forbidden: 'published must be an ISO 8601 datetime'});
   }
+
+  if (newDoc.section !== undefined && newDoc.section !== null) {
+    var sections = ['main', 'sports', 'culture', 'business'];
+    if (sections.indexOf(newDoc.section) === -1) {
+      throw({forbidden: 'section must be one of: ' + sections.join(', ')});
+    }
+  }
 }
 """
 
@@ -198,6 +205,7 @@ def init_db():
     # Create indexes
     create_index("articles", ["published"], "published-index")
     create_index("articles", ["feed_url"], "feed-url-index")
+    create_index("articles", ["section", "published"], "section-published-index")
     create_index("users", ["email"], "users-email-index")
     create_index("userspaces", ["owner_user_id"], "userspaces-owner-index")
 

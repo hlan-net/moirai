@@ -13,6 +13,7 @@ from api.validation import ALLOWED_LOGIC_MODULES, AgentStatus, AgentTriggerType
 from api.llm.catalog import PURPOSE_EVENT_SYNTHESIS, catalog_entry
 from api.userspace_ops import get_default_userspace, resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
+from tasks.sections import is_section_rewrite
 from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
 from tasks.tracing_mcp_client import TracingMCPClient, AgentCancelledException
 
@@ -235,11 +236,15 @@ class AgentOrchestrator(threading.Thread):
                 time.sleep(5)
                 return
 
-            # Extract documents, excluding design docs
+            # Extract documents, excluding design docs and stored articles
+            # that were only re-filed into a stream section (#266): those are
+            # not new, and the backfill rewrites the whole backlog at once.
             new_docs = [
                 c["doc"]
                 for c in data.get("results", [])
-                if c.get("doc") and not c["doc"].get("_id", "").startswith("_design/")
+                if c.get("doc")
+                and not c["doc"].get("_id", "").startswith("_design/")
+                and not is_section_rewrite(c["doc"])
             ]
 
             if new_docs:

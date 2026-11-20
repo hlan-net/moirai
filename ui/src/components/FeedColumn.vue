@@ -230,6 +230,59 @@ const bulkDeleteFeeds = async () => {
   }
 }
 
+// Stream sections (#266). The feed category decides the section of every
+// article the feed delivers; "General" leaves the decision to the article URL.
+const SECTION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'general', label: 'General' },
+  { value: 'sports', label: 'Sports' },
+  { value: 'culture', label: 'Culture' },
+  { value: 'business', label: 'Business' },
+]
+
+const sectionOptions = (feed: Feed) => {
+  const current = feed.category
+  if (!current || SECTION_OPTIONS.some((option) => option.value === current)) {
+    return SECTION_OPTIONS
+  }
+  // Legacy free-text category (e.g. "tech", "imported"): keep it selectable
+  // so saving another field never silently discards it.
+  return [{ value: current, label: current }, ...SECTION_OPTIONS]
+}
+
+const updateFeedCategory = async (feed: Feed, select: HTMLSelectElement) => {
+  const previous = feed.category || 'general'
+  const category = select.value
+  if (category === previous) return
+  // The <select> is bound one way, so on failure it would keep showing the
+  // unsaved choice: put the stored value back.
+  const revert = () => {
+    select.value = previous
+    showNotification('Failed to update feed section', 'error')
+  }
+  try {
+    // Only the category: re-sending the title would re-sanitise (re-escape)
+    // it, and would pin a hostname over a title enrichment has yet to fill.
+    const res = await authFetch(`/api/feeds/${feed._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category }),
+    })
+    if (res.ok) {
+      const updatedFeed = await res.json()
+      const index = feeds.value.findIndex((f) => f._id === updatedFeed._id)
+      if (index !== -1) {
+        feeds.value[index] = updatedFeed
+      }
+      showNotification('Feed section updated.', 'success')
+    } else {
+      revert()
+    }
+  } catch (e) {
+    console.error(e)
+    revert()
+  }
+}
+
 const startRename = (feed: Feed) => {
   renamingFeedId.value = feed._id
   newFeedTitle.value = feed.title || ''
@@ -676,7 +729,20 @@ const bulkImportFeeds = async () => {
               </svg>
             </a>
           </div>
-          <span v-if="feed.category" class="category-tag">{{ feed.category }}</span>
+          <select
+            v-if="isAdmin"
+            class="section-select"
+            :value="feed.category || 'general'"
+            :title="`Stream section for ${feed.title || getHostname(feed.url)}`"
+            :aria-label="`Stream section for ${feed.title || getHostname(feed.url)}`"
+            @click.stop
+            @change="updateFeedCategory(feed, $event.target as HTMLSelectElement)"
+          >
+            <option v-for="option in sectionOptions(feed)" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+          <span v-else-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
         <div class="feed-actions" @click.stop>
           <div
@@ -954,6 +1020,16 @@ h2 {
   padding: 2px 6px;
   border-radius: 4px;
   align-self: flex-start;
+}
+.section-select {
+  font-size: 0.75rem;
+  background: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--border-color);
+  padding: 2px 4px;
+  border-radius: 4px;
+  align-self: flex-start;
+  cursor: pointer;
 }
 .feed-actions {
   display: flex;

@@ -1,6 +1,8 @@
 import hashlib
+import logging
 import requests
 from datetime import datetime, timezone
+from scripts import backfill_sections
 from ..core import mcp, auth_required, resolve_userspace, validate_userspace
 from ..db import db_request, store_doc, get_doc, delete_doc, update_doc
 from .userspace import build_userspace_selector, extract_userspace, with_userspace
@@ -14,6 +16,9 @@ from ..responses import (
     MCPErrorCode,
     NextAction,
 )
+
+logger = logging.getLogger(__name__)
+
 
 @mcp.tool()
 @auth_required
@@ -230,6 +235,39 @@ def delete_feed(feed_id: str, userspace: str = "") -> dict:
         ).to_dict()
 
 
+def _registered_feed_category(url: str, userspace: str) -> str | None:
+    """The ``category`` of the registered feed for ``url``, if any.
+
+    Feeds added through MCP have a ``sha256(url:userspace)`` id, but those
+    added through the UI or REST API have a ``uuid4`` id, so the registry is
+    searched by ``url``/``original_url``. A feed of this userspace wins over
+    one without a userspace field (feeds predating userspace scoping).
+    """
+    registered = get_doc(
+        "feeds", hashlib.sha256(f"{url}:{userspace}".encode("utf-8")).hexdigest()
+    )
+    if registered:
+        return registered.get("category")
+
+    res = db_request(
+        "POST",
+        "feeds",
+        path="/_find",
+        json_data={
+            "selector": {"$or": [{"url": url}, {"original_url": url}]},
+            "limit": 25,
+        },
+    )
+    if res.status_code != 200:
+        return None
+    docs = res.json().get("docs", [])
+    own = [d for d in docs if extract_userspace(d) == userspace]
+    unscoped = [d for d in docs if not extract_userspace(d)]
+    for doc in own + unscoped:
+        return doc.get("category")
+    return None
+
+
 @mcp.tool()
 @auth_required
 def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
@@ -264,7 +302,17 @@ def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
 
         processor = ArticleProcessor()
 
-        feed_title, articles = processor.process_feed(url, response.text)
+        # A registered feed's category is the strongest sectioning signal
+        # (#266), but only a hint: a failed lookup must not fail the read.
+        try:
+            feed_category = _registered_feed_category(url, userspace)
+        except Exception as e:
+            logger.warning(f"read_feed: feed category lookup failed for {url}: {e}")
+            feed_category = None
+
+        feed_title, articles = processor.process_feed(
+            url, response.text, feed_category
+        )
 
         # Store articles
         count = 0
@@ -340,6 +388,12 @@ def update_feed_category(
 
         ok, msg = update_doc("feeds", feed_id, {"category": new_category})
         if ok:
+            # Stored articles keep their feed-decided section until re-filed
+            # (#266), exactly as for a change made through the REST API.
+            if new_category != existing.get("category"):
+                backfill_sections.start_feed_refile(
+                    [existing.get("url"), existing.get("original_url")]
+                )
             return success(
                 data={
                     "feed_id": feed_id,

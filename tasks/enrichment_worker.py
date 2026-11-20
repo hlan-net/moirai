@@ -2,6 +2,7 @@ import threading
 import time
 import requests
 import logging
+from typing import Optional
 from api.db_config import get_couchdb_uri
 from .article_processor import ArticleProcessor
 
@@ -33,7 +34,9 @@ class EnrichmentWorker(threading.Thread):
     def get_last_seq(self):
         """Get the last processed sequence from the config DB."""
         try:
-            res = requests.get(f"{self.couchdb_url}config/enrichment_last_seq", timeout=10)
+            res = requests.get(
+                f"{self.couchdb_url}config/enrichment_last_seq", timeout=10
+            )
             if res.status_code == 200:
                 return res.json().get("value", "0")
             if res.status_code != 404:
@@ -50,7 +53,9 @@ class EnrichmentWorker(threading.Thread):
         """Save the last processed sequence to the config DB."""
         try:
             doc = {"_id": "enrichment_last_seq", "value": seq}
-            res = requests.get(f"{self.couchdb_url}config/enrichment_last_seq", timeout=10)
+            res = requests.get(
+                f"{self.couchdb_url}config/enrichment_last_seq", timeout=10
+            )
             if res.status_code == 200:
                 doc["_rev"] = res.json()["_rev"]
             elif res.status_code != 404:
@@ -120,7 +125,10 @@ class EnrichmentWorker(threading.Thread):
 
         logger.info(f"Enriching articles for feed: {feed_url}")
 
-        feed_title, articles = self.processor.process_feed(feed_url, body)
+        feed_category = self.get_feed_category(content_doc_id)
+        feed_title, articles = self.processor.process_feed(
+            feed_url, body, feed_category
+        )
 
         # Store each article
         for article in articles:
@@ -131,6 +139,24 @@ class EnrichmentWorker(threading.Thread):
         # Update feed title in registry if it was missing
         if feed_title:
             self.update_feed_title(content_doc_id, feed_title)
+
+    def get_feed_category(self, registry_doc_id: str) -> Optional[str]:
+        """The feed's ``category`` from the registry, or None when unavailable.
+
+        A section-specific category (``sports``, ``culture``, ``business``)
+        is the strongest sectioning signal, so it is read per fetch rather
+        than cached; the registry document is small.
+        """
+        registry_url = f"{self.couchdb_url}{self.registry_name}"
+        try:
+            res = requests.get(f"{registry_url}/{registry_doc_id}", timeout=10)
+            if res.status_code == 200:
+                return res.json().get("category")
+        except requests.exceptions.RequestException as e:
+            logger.warning(
+                f"EnrichmentWorker: Could not read feed category for {registry_doc_id}: {e}"
+            )
+        return None
 
     def update_feed_title(self, registry_doc_id, feed_title):
         """Update the feed title in the registry if it is currently 'Pending Enrichment...' or empty.

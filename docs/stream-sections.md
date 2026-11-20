@@ -1,6 +1,6 @@
 # Stream Sections
 
-Status: proposed (roadmap). Tracking issue: #266.
+Status: implemented (`tasks/sections.py`, unreleased). Tracking issue: #266.
 
 ## Goal
 
@@ -44,14 +44,27 @@ Top stories is therefore "everything that is not sports, culture or business". I
 
 ## Migration
 
-- A one-off backfill assigns `section` to existing articles with signals 1–3; articles with no signal stay `main`.
+- A backfill assigns `section` to existing articles with signals 1–3; articles with no signal stay `main`. **The worker runs it in the background at every start** (`run_worker.py`), so a deploy needs no manual step. It can also be run by hand:
+
+  ```bash
+  # inside the worker or API pod
+  python -m scripts.backfill_sections --dry-run   # count only
+  python -m scripts.backfill_sections             # default mode (what the worker runs)
+  python -m scripts.backfill_sections --all       # also re-file feed-decided articles, e.g. after changing a feed's category
+  ```
+
+  The default mode recomputes every article except those a feed category decided, and writes only the ones whose section changes, so it is idempotent and cheap once everything is sectioned. Recomputing path/topic/default decisions matters because the annotator cannot see feed categories: an article it filed before the backfill ran still gets its feed's section. (The annotator itself resolves a pre-sectioning article from its URL as well as its topics.)
+
+  It reads the `articles` database in pages of 500 and writes with `_bulk_docs`, so it is safe against the production backlog (see #288). It runs alongside the other workers: an article another writer updated in the meantime (a `_bulk_docs` `conflict`) is re-read with its fresh `_rev`, recomputed and retried up to 3 times. A stored article that fails the `validate_doc_update` rules (`forbidden`, a legacy document) is logged and skipped, since no rerun can fix it. Any other unwritten article counts as `failed`: the manual command then exits 1. The worker's background run retries a failed run (an exception such as a CouchDB timeout mid-way, or unwritten articles) after 1, 5 and 15 minutes, then logs an error and tries again at its next start.
 - Feed category values already stored (`tech`, `finance`, …) are mapped where obvious (`finance` → `business`); the rest stay as free text and contribute nothing to sectioning.
+- Until the backfill has finished (minutes after the first worker start), articles without a `section` appear in no tab (the `?section=` query is an equality on the stored field) but still in the unfiltered `/api/stream.rss`.
 
-## Open questions
+## Decisions
 
-- Should the Feeds admin let the user pick the section from a dropdown instead of free text? Probably yes, in the same change.
-- Which hosts go in the initial path map? HS, Yle, IS, Kauppalehti, Taloussanomat are the obvious Finnish ones.
-- Is "Business" the right English label for Talous, or "Economy"? Cosmetic; decide in the PR.
+- The signal that decided an article's section is stored as `section_source` (`feed | path | topic | default`), so the asynchronous annotation signal only ever moves articles whose section was defaulted; it never overrides a feed or URL decision.
+- The Feeds admin shows a section dropdown (General / Sports / Culture / Business) in place of the free-text category tag. A legacy free-text value stays selectable so it is not silently discarded. Changing it applies to new articles at ingestion, and the API re-files the feed's existing articles in a background thread (`start_feed_refile`: `--all` semantics, limited to that feed's `url`/`original_url` via the `feed_url` index), so moving a feed back to General also takes its articles out of the old tab.
+- Path map: whole-host rules (`kauppalehti.fi`, `talouselama.fi`, `taloussanomat.fi`, `arvopaperi.fi`, `urheilulehti.fi`) plus first-path-segment rules (`urheilu`, `kulttuuri`, `talous`, `viihde`, `taloussanomat`, and the English `sport(s)`, `culture`, `arts`, `entertainment`, `business`, `economy`). This covers URLs that carry the section as their first segment, notably HS (`hs.fi/urheilu/…`, `/kulttuuri/`, `/talous/`) and Ilta-Sanomat. Sites whose article URLs carry no section segment — Yle (`yle.fi/a/74-…`), MTV (`mtvuutiset.fi/artikkeli/…`), Iltalehti sport by discipline (`iltalehti.fi/jalkapallo/…`) — fall through to the annotation topic or the feed category; give their section feeds a category.
+- English label for Talous is "Business".
 
 ## Dependencies
 

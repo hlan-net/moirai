@@ -19,6 +19,8 @@ import requests
 from openai import NotFoundError
 
 from api.db_config import get_couchdb_uri
+from api.extensions import get_redis_client
+from tasks.sections import STREAM_CACHE_KEYS, apply_topic_section
 from api.llm.catalog import (
     DEFAULT_MODEL,
     PURPOSE_ANNOTATION,
@@ -414,6 +416,16 @@ def _normalise_topics(topics: list) -> list[str]:
     return result
 
 
+def _invalidate_stream_cache() -> None:
+    """Drop cached stream output after an article moved section."""
+    try:
+        redis_client = get_redis_client()
+        if redis_client:
+            redis_client.delete(*STREAM_CACHE_KEYS)
+    except Exception as e:  # Redis is a cache, never a reason to fail the write
+        logger.error(f"Redis invalidation error after re-sectioning: {e}")
+
+
 def store_annotation(article_id: str, annotation: dict) -> bool:
     """Write the annotation dict onto the article document in CouchDB.
 
@@ -442,9 +454,14 @@ def store_annotation(article_id: str, annotation: dict) -> bool:
         doc["annotations"] = annotation
         doc["annotated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         doc["annotation_version"] = ANNOTATION_VERSION
+        # Signal 3 of stream sectioning (#266): the topic decides the section
+        # only when neither the feed category nor the URL did.
+        section_changed = apply_topic_section(doc, annotation.get("topics"))
 
         put_res = requests.put(doc_url, json=doc, timeout=10)
         if put_res.status_code in (200, 201):
+            if section_changed:
+                _invalidate_stream_cache()
             return True
         else:
             logger.error(
