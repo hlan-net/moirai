@@ -11,7 +11,7 @@ beautifulsoup4==4.14.3
 python-dateutil==2.9.0.post0
 mcp[cli]==1.30.0
 httpx[http2]==0.28.1
-openai==2.29.0
+openai==3.53.0
 uvicorn==0.42.0
 flask-limiter==4.1.1
 prometheus-flask-exporter==0.23.2
