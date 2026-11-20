@@ -7,63 +7,76 @@ This document describes how Moirai releases are created and deployed.
 ## Branch Strategy
 
 ```
-main                          ← stable, always releasable
- └── release/vX.Y.Z           ← collection branch for the next release
-      ├── feat/some-feature    ← feature branches PR into here
-      ├── feat/other-feature
-      └── ...
+main                    ← always releasable; every release is a tag on main
+ ├── feat/some-feature   ← feature and fix branches, PR into main
+ ├── fix/some-bug
+ └── release/X.Y.Z       ← short-lived: version bump + changelog only
 ```
 
-- **Feature branches** target `release/vX.Y.Z` via PR. CI (pytest + Playwright + SonarCloud) runs on every PR.
-- **`release/vX.Y.Z`** collects all features. CI also runs on pushes to this branch.
-- **`main`** is updated only by merging a completed release branch.
+- **Feature and fix branches** target `main` via PR and are squash-merged. CI (pytest, Playwright, formatting checks, SonarCloud, CodeQL) runs on every PR.
+- **`release/X.Y.Z`** is a branch for the release PR only. It carries the version bump and the changelog, not features.
+- **Tags** `vX.Y.Z` on `main` trigger the image build.
 
 ## Version Management
 
-Moirai tracks versions in three critical locations. Every release must update all of them together:
+Every release updates these files together, in the release PR:
 
-- `version.py`: Python-side versioning.
-- `ui/package.json`: Frontend versioning.
-- `helm/Chart.yaml`: Deployment versioning (both `version` and `appVersion`).
+| File | What changes |
+|---|---|
+| `CHANGELOG.md` | The `[Unreleased / In Development]` heading becomes `[vX.Y.Z] — YYYY-MM-DD`; add entries for anything merged without one. |
+| `helm/Chart.yaml` | `version` and `appVersion`. |
+| `ui/package.json` | `version`. |
+| `docs/readme.md` | The "Latest Version" line. |
 
-The standard lifecycle is: **Bump Versions -> Commit -> Tag -> Push -> GitHub Release -> Deploy**.
+`version.py` is not edited. It reads `APP_VERSION` and `BUILD_NUMBER` from `/etc/moirai/build-info`, which the image build writes from the git tag.
+
+The lifecycle is: **release PR → merge → tag → image build → GitHub Release → deploy → verify**.
 
 ---
 
 ## Creating a Release
 
-### 1. Prepare the release branch
-Ensure the release branch is up to date with any hotfixes that landed on `main`:
+### 1. Open the release PR
 
 ```bash
-git checkout release/vX.Y.Z
-git rebase main
-git push --force-with-lease
+git checkout main && git pull
+git checkout -b release/X.Y.Z
+# edit the four files listed above
+git commit -am "release: X.Y.Z"
+git push -u origin release/X.Y.Z
+gh pr create --title "release: X.Y.Z"
 ```
 
-### 2. Version Bump & Tag
-Bump the version strings in the files listed above, then commit and tag:
+Wait for CI and read the review comments before merging.
+
+### 2. Merge and tag
 
 ```bash
-git commit -am "release: X.Y.Z"
-git tag vX.Y.Z
-git push origin main
+gh pr merge --squash --delete-branch
+git checkout main && git pull
+git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-The `docker-release.yml` workflow triggers on `v*.*.*` tags to build and push images.
+The tag must point at the squash-merged release commit on `main`.
 
-### 3. Fast-forward merge to main
-Ensure a clean linear history by fast-forwarding `main`:
+### 3. Wait for the image build
+
+The `docker-release.yml` workflow triggers on `v*.*.*` tags, runs the tests, and builds and pushes `ghcr.io/hlan-net/moirai` and `ghcr.io/hlan-net/moirai-ui` tagged `X.Y.Z`, `X.Y`, `X` and `latest`.
 
 ```bash
-git checkout main
-git merge --ff-only release/vX.Y.Z
-git push origin main
+gh run watch "$(gh run list --workflow docker-release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
 ```
 
-### 4. Deploy to Production
-Update the Helm release with the new image tags:
+Do not continue until it has succeeded: a tag without images cannot be deployed.
+
+### 4. Create the GitHub Release
+
+```bash
+gh release create vX.Y.Z --generate-notes --verify-tag
+```
+
+### 5. Deploy to Production
 
 ```bash
 helm upgrade moirai-release helm/ \
@@ -73,18 +86,18 @@ helm upgrade moirai-release helm/ \
   --set ui.image.tag=X.Y.Z
 ```
 
-### 5. Create GitHub Release
-```bash
-gh release create vX.Y.Z --generate-notes
-```
+### 6. Verify
+
+- The About page shows `Moirai vX.Y.Z (<build number>)`.
+- Work through the "after deploy" items in the release PR and in the changelog entries of the release.
 
 ---
 
 ## Guardrails & Verification
 
-- **Tag Alignment:** The tag must point exactly to the version-bump commit.
-- **Order of Operations:** Never create a GitHub release before the git tag is pushed.
-- **Verification:** Use `git show vX.Y.Z` to verify the commit content.
+- **Tag Alignment:** The tag must point exactly to the version-bump commit. Check with `git show vX.Y.Z`.
+- **Order of Operations:** Never create a GitHub Release before the git tag is pushed and its image build has succeeded.
+- **Every version gets a tag.** A release commit without a tag has no images (this happened to v0.10.1; its changes shipped in v0.10.2).
 
 ### Correcting Mistakes
 If a release is created on the wrong commit:
@@ -96,31 +109,17 @@ If a release is created on the wrong commit:
 
 ## Hotfixes
 
-Hotfixes for the current production version go directly to `main`:
-
-```bash
-git checkout main
-git checkout -b hotfix/description
-# ... make fix, write tests ...
-git push origin hotfix/description
-gh pr create --base main --title "fix: ..."
-```
-
-After merging, tag the hotfix:
+A hotfix follows the same flow with a PATCH version: the fix goes to `main` through a PR, then a release PR bumps the version.
 
 ```bash
 git checkout main && git pull
-git tag vX.Y.Z+1
-git push origin vX.Y.Z+1
+git checkout -b fix/description
+# ... make fix, write tests ...
+git push -u origin fix/description
+gh pr create --base main --title "fix: ..."
 ```
 
-Then rebase the active release branch onto the updated main:
-
-```bash
-git checkout release/vA.B.C
-git rebase main
-git push --force-with-lease
-```
+After it is merged, cut `X.Y.Z+1` as described under "Creating a Release".
 
 ---
 
@@ -128,8 +127,9 @@ git push --force-with-lease
 
 | Event | Branches | Jobs run |
 |-------|----------|----------|
-| Push / PR | `main`, `release/**` | pytest, ui-test (Playwright), SonarCloud |
-| Tag push `v*.*.*` | any | docker-release (build + push images) |
+| Push / PR | `main`, `release/**` | pytest, ui-test (Playwright), formatting checks, SonarCloud, CodeQL |
+| Push | `main` | docker-dev (build + push `:main` and `:sha-<hash>` images) |
+| Tag push `v*.*.*` | any | docker-release (tests, build + push release images) |
 
 ---
 

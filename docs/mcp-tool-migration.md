@@ -4,7 +4,7 @@
 
 This guide explains how to migrate MCP tools from legacy string-based responses to the standardized response envelope defined in `mcp_service/responses.py`.
 
-**Background:** Part of v0.7.1 improvement #1 (MCP Tool Contract Hardening) - see `TODO_0.7.1.md`.
+**Background:** Part of the v0.7.1 improvement "MCP Tool Contract Hardening"; the migration shipped in v0.8.0.
 
 ---
 
@@ -418,7 +418,7 @@ elif response["next_action"] == "escalate":
     ...
 ```
 
-See TODO_0.7.1.md #2 (Agent Observability) and #4 (Plan/Execute/Reflect) for runtime integration details.
+For runtime integration, see [`agentic-improvements.md`](agentic-improvements.md), sections 2 (Agent Observability & Intervention) and 4 (Plan-Execute-Reflect).
 
 ---
 
@@ -434,4 +434,4 @@ See `mcp_service/tools/feeds.py` for fully migrated examples:
 
 - Response envelope design: See `mcp_service/responses.py`
 - Error code taxonomy: See `MCPErrorCode` enum
-- Agent runtime behavior: See TODO_0.7.1.md #2 and #4
+- Agent runtime behavior: See [`agentic-improvements.md`](agentic-improvements.md), sections 2 and 4
