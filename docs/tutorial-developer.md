@@ -188,7 +188,9 @@ moirai/
 ├── CLAUDE.md                     # Instructions for Claude Code
 ├── CHANGELOG.md                  # Version history
 ├── docker-compose.yml            # Local development stack
-├── environment.yml               # Conda/Mamba dependencies
+├── environment.yml               # Conda/Mamba environment (installs requirements-dev.txt)
+├── requirements.txt              # Runtime dependency pins
+├── requirements-dev.txt          # Runtime pins + test/lint tooling
 └── requirements.txt              # Pip dependencies
 
 ```
