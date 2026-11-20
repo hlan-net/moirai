@@ -40,5 +40,5 @@ msal==1.39.0
 cryptography==50.0.2
 langdetect==1.0.9
 redis==7.4.0
-gunicorn==25.2.0
+gunicorn==27.0.1
 atproto==0.0.73
