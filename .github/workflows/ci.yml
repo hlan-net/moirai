@@ -13,6 +13,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       couchdb:
         image: couchdb:3.1.1
@@ -89,6 +90,8 @@ jobs:
   
   ui-test:
     runs-on: ubuntu-latest
+    # A stalled apt mirror once held "Install Playwright Browsers" for 40 minutes.
+    timeout-minutes: 30
     
     steps:
     - uses: actions/checkout@v7
@@ -116,7 +119,9 @@ jobs:
 
     - name: Install dependencies (Yarn)
       working-directory: ./ui
-      run: yarn install
+      env:
+        YARN_ENABLE_SCRIPTS: false
+      run: yarn install --immutable
 
     - name: Check formatting with Prettier
       working-directory: ./ui
@@ -136,7 +141,8 @@ jobs:
 
     - name: Install Playwright Browsers
       working-directory: ./ui
-      run: npx playwright install --with-deps
+      # Chromium is the only project in ui/playwright.config.ts.
+      run: yarn playwright install --with-deps chromium
 
     - name: Build service images (cached)
       run: |
@@ -178,7 +184,7 @@ jobs:
         ADMIN_USERNAME: testuser
         ADMIN_PASSWORD: testpassword
       run: |
-        npx playwright test
+        yarn playwright test
 
     - name: Wait for MCP server
       run: |
