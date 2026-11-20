@@ -4,10 +4,19 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.11.2] — 2026-11-20
 
 ### Stream page shows articles again (#343)
 Since v0.11.0 the Stream page listed no articles in any section. `/api/stream.rss` wrote the request URL into the feed's `<atom:link href>` unescaped, so the `&` between two query parameters made the document malformed XML, and the page always sends two (`limit` and `section`). Every value interpolated into the channel header is now escaped, and the route tests parse the feed as XML for each section with the page's own query. The Redis cache now holds only the feed's items, under new `stream_rss_items…` keys: the channel header, which carries the request's own URL, is built for every response, so a cached feed no longer answers with the self link of whichever request filled the cache, and no malformed document cached by v0.11.1 is served after the upgrade.
+
+### Python pins in requirements files (#317)
+The pip pins move from `environment.yml` / `environment-prod.yml` into `requirements.txt` (runtime) and `requirements-dev.txt` (runtime plus test and lint tooling); both conda environments install from them. Dependabot's pip ecosystem reads these files, which it could not do with the environment files, so Python updates and advisories now arrive as PRs. No version changes.
+
+### Build and CI hardening (#320)
+Workflows install UI dependencies with `yarn install --immutable` and lifecycle scripts disabled, run Playwright through the locked dependency instead of `npx`, and have job timeouts. `api/Dockerfile` drops a no-op `pip install` and asserts the mode of `/tmp` instead of re-granting it. SonarCloud vulnerabilities go from 21 to 0.
+
+### Docs (#322)
+`docs/releasing.md` describes the release flow in use (release PR into `main`, tag, image build, GitHub Release, deploy, verify). `ROADMAP.md` lists what shipped in v0.9–v0.11.
 
 ---
 
