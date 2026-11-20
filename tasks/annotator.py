@@ -20,7 +20,12 @@ from openai import NotFoundError
 
 from api.db_config import get_couchdb_uri
 from api.extensions import get_redis_client
-from tasks.sections import STREAM_CACHE_KEYS, apply_topic_section
+from tasks.sections import (
+    STREAM_CACHE_KEYS,
+    apply_topic_section,
+    is_section_rewrite,
+    mark_section_rewrite,
+)
 from api.llm.catalog import (
     DEFAULT_MODEL,
     PURPOSE_ANNOTATION,
@@ -457,6 +462,11 @@ def store_annotation(article_id: str, annotation: dict) -> bool:
         # Signal 3 of stream sectioning (#266): the topic decides the section
         # only when neither the feed category nor the URL did.
         section_changed = apply_topic_section(doc, annotation.get("topics"))
+        # Annotating a re-filed backlog article must not make it look new to
+        # the agent orchestrator: carry the re-filing stamp over to the
+        # revision written here. New articles have no stamp and are unaffected.
+        if is_section_rewrite(doc):
+            mark_section_rewrite(doc)
 
         put_res = requests.put(doc_url, json=doc, timeout=10)
         if put_res.status_code in (200, 201):
