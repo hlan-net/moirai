@@ -102,7 +102,7 @@ mcpInspector:
   enabled: false
   image:
     repository: ghcr.io/modelcontextprotocol/inspector
-    tag: "latest"
+    tag: "2.16.0"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

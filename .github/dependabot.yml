@@ -78,6 +78,18 @@ updates:
       - dependencies
       - docker
 
+  # Docker Compose — watches the image tags in docker-compose.yml
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(docker):"
+    labels:
+      - dependencies
+      - docker
+
   # GitHub Actions — watches .github/workflows/ for action version updates
   - package-ecosystem: github-actions
     directory: /
