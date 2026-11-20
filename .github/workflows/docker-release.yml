@@ -63,6 +63,8 @@ jobs:
 
       - name: Install Playwright Browsers
         working-directory: ui
+        env:
+          YARN_ENABLE_SCRIPTS: false
         run: yarn playwright install --with-deps chromium
 
       - name: Build service images (no cache)

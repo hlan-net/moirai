@@ -141,6 +141,8 @@ jobs:
 
     - name: Install Playwright Browsers
       working-directory: ./ui
+      env:
+        YARN_ENABLE_SCRIPTS: false
       # Chromium is the only project in ui/playwright.config.ts.
       run: yarn playwright install --with-deps chromium
 
