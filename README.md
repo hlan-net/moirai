@@ -111,6 +111,7 @@ If you want to run components individually without Docker:
     nvm install          # reads ui/.nvmrc
     npm install -g corepack && corepack enable
     yarn install         # also installs the git hooks, see below
+    cd ..                # the steps below run from the repository root
     ```
 
 1. **Git hooks:** `yarn install` in `ui/` installs one pre-commit hook for the whole repository (husky, `.husky/pre-commit`). It runs `prettier` on staged UI files and, when Python or YAML files are staged, `black`, `ruff` and the hygiene hooks from `.pre-commit-config.yaml`. The Python half needs `pre-commit` on `PATH`, so commit from a shell with the `moirai` environment active. Do not run `pre-commit install`: husky owns `core.hooksPath`. CI enforces `ruff`, `black --check` and `prettier --check` regardless; the hygiene hooks (trailing whitespace, end of file, YAML syntax, large files) run only locally.
