@@ -246,7 +246,7 @@ All tutorials follow these conventions:
 
 ## 📅 Version Info
 
-- **Latest Version:** v0.11.1
+- **Latest Version:** v0.11.2
 - **Python:** 3.12
 - **Node.js:** 18+
 - **CouchDB:** 3.2+
