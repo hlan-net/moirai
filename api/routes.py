@@ -6,6 +6,7 @@ import requests
 import logging
 from typing import Any
 from datetime import datetime, timezone
+from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
 from api.extensions import limiter, get_redis_client
 from tasks.fetch_feed_task import FetchFeedTask
 from tasks.favicon_fetcher import fetch_favicon_url
@@ -560,47 +561,53 @@ def rss_feed():
     if section is not None and not is_valid_section(section):
         abort(400, description=f"section must be one of: {', '.join(SECTIONS)}")
     # Caching: the RSS default limit and the Stream page's limit are cached,
-    # per section (#308); any other limit is served uncached.
+    # per section (#308); any other limit is served uncached. Only the items
+    # are cached: the channel header carries the request's own URL, so it is
+    # built for every response instead of being served from whoever happened
+    # to fill the cache.
     cache_key = stream_cache_key(section, limit)
-    is_default_view = cache_key is not None
     redis_client = None
-    if is_default_view:
+    items_xml = None
+    if cache_key is not None:
         try:
             redis_client = get_redis_client()
             if redis_client:
-                cached_rss = redis_client.get(cache_key)
-                if cached_rss:
-                    return Response(cached_rss, mimetype="application/rss+xml")
+                items_xml = redis_client.get(cache_key)
         except Exception as e:
             logger.error(f"Redis error in rss_feed: {e}")
 
-    # Query CouchDB directly for RSS
-    # Requires index on 'published' (or 'section', 'published') field
-    selector = {"published": {MONGO_GT: None}}
-    if section:
-        selector = {"section": section, "published": {MONGO_GT: None}}
-    rss_articles = query_couchdb(
-        "articles",
-        selector=selector,
-        limit=limit,
-        sort=[{"published": "desc"}],
-    )
+    if items_xml is None:
+        # Query CouchDB directly for RSS
+        # Requires index on 'published' (or 'section', 'published') field
+        selector = {"published": {MONGO_GT: None}}
+        if section:
+            selector = {"section": section, "published": {MONGO_GT: None}}
+        rss_articles = query_couchdb(
+            "articles",
+            selector=selector,
+            limit=limit,
+            sort=[{"published": "desc"}],
+        )
 
-    # Enrichment
-    enrich_articles_with_issues(rss_articles)
+        # Enrichment
+        enrich_articles_with_issues(rss_articles)
 
-    # Build RSS XML
-    rss_items = []
+        # Pre-fetch feed info for title mapping
+        feeds = fetch_from_couchdb("feeds")
+        feed_title_map = {
+            feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
+        }
 
-    # Pre-fetch feed info for title mapping
-    feeds = fetch_from_couchdb("feeds")
-    feed_title_map = {
-        feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
-    }
+        items_xml = "\n".join(
+            generate_rss_item_xml(article, feed_title_map, parse_datetime_safe)
+            for article in rss_articles
+        )
 
-    for article in rss_articles:
-        item_xml = generate_rss_item_xml(article, feed_title_map, parse_datetime_safe)
-        rss_items.append(item_xml)
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, 3600, items_xml)
+            except Exception as e:
+                logger.error(f"Redis cache set error: {e}")
 
     # Get current datetime for feed metadata
     build_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")
@@ -613,26 +620,23 @@ def rss_feed():
             f"{channel_description} ({section_label(section)} section)"
         )
 
+    # Every interpolated value is escaped: request.url carries the query
+    # string, and its "&" made the feed malformed for any request with two
+    # parameters, which is every request of the Stream page (#343).
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>{channel_title}</title>
-    <link>{request.host_url}</link>
-    <description>{channel_description}</description>
+    <title>{xml_escape(channel_title)}</title>
+    <link>{xml_escape(request.host_url)}</link>
+    <description>{xml_escape(channel_description)}</description>
     <language>en</language>
     <lastBuildDate>{build_date}</lastBuildDate>
-    <atom:link href="{request.url}" rel="self" type="application/rss+xml" />
+    <atom:link href={xml_quoteattr(request.url)} rel="self" type="application/rss+xml" />
 
-{chr(10).join(rss_items)}
+{items_xml}
 
   </channel>
 </rss>"""
-
-    if is_default_view and redis_client:
-        try:
-            redis_client.setex(cache_key, 3600, rss_xml)
-        except Exception as e:
-            logger.error(f"Redis cache set error: {e}")
 
     return Response(rss_xml, mimetype="application/rss+xml")
 
