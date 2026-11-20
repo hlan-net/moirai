@@ -105,9 +105,30 @@ TOPIC_SECTIONS: dict[str, str] = {
 
 # Redis keys that hold rendered stream output; cleared whenever an article
 # is stored, deleted or moves section.
+STREAM_DEFAULT_LIMIT = 100
+# ``limit`` values of ``/api/stream.rss`` whose output is cached: the RSS
+# default and the Stream page's ``RSS_LIMIT`` (``ui/src/components/StreamPage.vue``).
+STREAM_CACHED_LIMITS: tuple[int, ...] = (STREAM_DEFAULT_LIMIT, 200)
+
+
+def stream_cache_key(section: Optional[str], limit: int) -> Optional[str]:
+    """Redis key for the rendered stream, or ``None`` when ``limit`` is not cached.
+
+    The key space is closed (sections x cached limits) so every key can be
+    listed in ``STREAM_CACHE_KEYS`` and invalidated with one ``DEL``.
+    """
+    if limit not in STREAM_CACHED_LIMITS:
+        return None
+    key = f"stream_rss_xml:{section}" if section else "stream_rss_xml"
+    return key if limit == STREAM_DEFAULT_LIMIT else f"{key}@{limit}"
+
+
 STREAM_CACHE_KEYS: tuple[str, ...] = (
-    "stream_rss_xml",
-    *(f"stream_rss_xml:{section}" for section in SECTIONS),
+    *(
+        stream_cache_key(section, limit)
+        for section in (None, *SECTIONS)
+        for limit in STREAM_CACHED_LIMITS
+    ),
     "articles_default_json",
 )
 

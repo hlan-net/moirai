@@ -178,3 +178,46 @@ def test_feed_update_request_needs_at_least_one_field():
     with pytest.raises(ValidationError):
         FeedUpdateRequest.model_validate({"tittle": "HS"})
     assert FeedUpdateRequest(category="sports").category == "sports"
+
+
+# ── Cache covers the Stream page's limit too (#308) ───────────────────────────
+
+
+def test_stream_page_limit_is_served_from_cache(client):
+    test_client, query, redis = client
+    redis.get.return_value = "<rss>cached</rss>"
+    res = test_client.get("/api/stream.rss?limit=200&section=sports")
+    assert res.get_data(as_text=True) == "<rss>cached</rss>"
+    assert redis.get.call_args.args[0] == "stream_rss_xml:sports@200"
+    query.assert_not_called()
+
+
+def test_stream_page_limit_fills_its_own_cache_key(client):
+    test_client, _query, redis = client
+    assert test_client.get("/api/stream.rss?limit=200").status_code == 200
+    assert redis.setex.call_args.args[0] == "stream_rss_xml@200"
+
+
+def test_other_limits_stay_uncached(client):
+    test_client, query, redis = client
+    assert test_client.get("/api/stream.rss?limit=50&section=main").status_code == 200
+    redis.get.assert_not_called()
+    redis.setex.assert_not_called()
+    query.assert_called_once()
+
+
+def test_every_cached_stream_key_is_invalidated():
+    from tasks.sections import (
+        SECTIONS,
+        STREAM_CACHE_KEYS,
+        STREAM_CACHED_LIMITS,
+        stream_cache_key,
+    )
+
+    assert 200 in STREAM_CACHED_LIMITS  # RSS_LIMIT in ui/src/components/StreamPage.vue
+    for section in (None, *SECTIONS):
+        for limit in STREAM_CACHED_LIMITS:
+            assert stream_cache_key(section, limit) in STREAM_CACHE_KEYS
+    assert stream_cache_key("sports", 100) == "stream_rss_xml:sports"
+    assert stream_cache_key(None, 100) == "stream_rss_xml"
+    assert stream_cache_key("sports", 50) is None

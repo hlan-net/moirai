@@ -35,7 +35,13 @@ import uuid  # Import uuid
 from api.enrichment import enrich_articles_with_issues, invalidate_feed_mappings_cache
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
-from tasks.sections import SECTIONS, STREAM_CACHE_KEYS, is_valid_section, section_label
+from tasks.sections import (
+    SECTIONS,
+    STREAM_CACHE_KEYS,
+    is_valid_section,
+    section_label,
+    stream_cache_key,
+)
 from scripts import backfill_sections
 from api.article_ops import build_article_selector, paginate_results
 from api.db_constants import (
@@ -543,10 +549,10 @@ def rss_feed():
     section = request.args.get("section") or None
     if section is not None and not is_valid_section(section):
         abort(400, description=f"section must be one of: {', '.join(SECTIONS)}")
-    cache_key = f"stream_rss_xml:{section}" if section else "stream_rss_xml"
-
-    # Caching: Check Redis for default RSS feed
-    is_default_view = (limit == 100)
+    # Caching: the RSS default limit and the Stream page's limit are cached,
+    # per section (#308); any other limit is served uncached.
+    cache_key = stream_cache_key(section, limit)
+    is_default_view = cache_key is not None
     redis_client = None
     if is_default_view:
         try:
