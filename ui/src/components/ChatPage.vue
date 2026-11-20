@@ -15,11 +15,11 @@ interface Message {
 }
 
 interface ChatSession {
-  _id: string;
-  title: string;
-  messages: Message[];
-  model?: string;
-  llm_endpoint?: string;
+  _id: string
+  title: string
+  messages: Message[]
+  model?: string
+  llm_endpoint?: string
   context?: {
     type?: 'article' | 'issue' | 'feed'
     entity_id?: string
@@ -69,14 +69,14 @@ const endpointSelection = computed({
   get: () => settingsStore.llmEndpoint,
   set: (value: string) => {
     updateEndpoint(value)
-  }
+  },
 })
 
 const modelSelection = computed({
   get: () => settingsStore.getCurrentModel(),
   set: (value: string) => {
     updateModel(value)
-  }
+  },
 })
 
 const modelOptions = computed(() => {
@@ -93,12 +93,12 @@ const modelOptions = computed(() => {
 })
 
 onMounted(() => {
-    fetchConfig()
-    fetchSessions()
+  fetchConfig()
+  fetchSessions()
 })
 
 onUnmounted(() => {
-    // No need to remove listeners - Pinia handles reactivity
+  // No need to remove listeners - Pinia handles reactivity
 })
 
 const fetchConfig = async () => {
@@ -133,7 +133,7 @@ const saveUserSetting = async (key: string, value: string) => {
     await authFetch('/api/auth/me/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [key]: value })
+      body: JSON.stringify({ [key]: value }),
     })
   } catch (error) {
     console.error(`Failed to save setting ${key} to server:`, error)
@@ -164,12 +164,16 @@ const updateModel = (value: string) => {
   saveUserSetting(modelKey, value)
 }
 
-const _fetchModels = async (endpoint: string, apiKey: string | null, headers: Record<string, string> = {}) => {
+const _fetchModels = async (
+  endpoint: string,
+  apiKey: string | null,
+  headers: Record<string, string> = {}
+) => {
   let url = '/api/models'
   if (endpoint !== 'ollama') {
     url += `?llm_endpoint=${endpoint}`
   }
-  
+
   if (apiKey) {
     headers[`x-${endpoint}-api-key`] = apiKey
   }
@@ -271,22 +275,22 @@ const toggleModelSelect = () => {
 
 const getProviderStatusClass = () => {
   if (settingsStore.llmEndpoint === 'ollama') return 'status-ok'
-  if (settingsStore.llmEndpoint === 'aisa') return aisaAvailable.value === false ? 'status-warning' : 'status-ok'
+  if (settingsStore.llmEndpoint === 'aisa')
+    return aisaAvailable.value === false ? 'status-warning' : 'status-ok'
 
-  const apiKey = settingsStore.llmEndpoint === 'openai'
-    ? settingsStore.openaiApiKey
-    : settingsStore.geminiApiKey
+  const apiKey =
+    settingsStore.llmEndpoint === 'openai' ? settingsStore.openaiApiKey : settingsStore.geminiApiKey
 
   return apiKey ? 'status-ok' : 'status-warning'
 }
 
 const getProviderStatusText = () => {
   if (settingsStore.llmEndpoint === 'ollama') return '✓ Ready'
-  if (settingsStore.llmEndpoint === 'aisa') return aisaAvailable.value === false ? '⚠ Not Configured' : '✓ Cluster Managed'
+  if (settingsStore.llmEndpoint === 'aisa')
+    return aisaAvailable.value === false ? '⚠ Not Configured' : '✓ Cluster Managed'
 
-  const apiKey = settingsStore.llmEndpoint === 'openai'
-    ? settingsStore.openaiApiKey
-    : settingsStore.geminiApiKey
+  const apiKey =
+    settingsStore.llmEndpoint === 'openai' ? settingsStore.openaiApiKey : settingsStore.geminiApiKey
 
   return apiKey ? '✓ API Key Set' : '⚠ API Key Required'
 }
@@ -346,21 +350,21 @@ const newChat = () => {
 }
 
 const getHeaders = () => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (settingsStore.llmEndpoint === 'openai') {
+    if (settingsStore.openaiApiKey) {
+      headers['x-openai-api-key'] = settingsStore.openaiApiKey
     }
-    if (settingsStore.llmEndpoint === 'openai') {
-      if (settingsStore.openaiApiKey) {
-        headers['x-openai-api-key'] = settingsStore.openaiApiKey
-      }
-    } else if (settingsStore.llmEndpoint === 'gemini') {
-      if (settingsStore.geminiApiKey) {
-        headers['x-gemini-api-key'] = settingsStore.geminiApiKey
-      }
-    } else if (settingsStore.ollamaEndpointUrl) {
-      headers['x-ollama-base-url'] = settingsStore.ollamaEndpointUrl
+  } else if (settingsStore.llmEndpoint === 'gemini') {
+    if (settingsStore.geminiApiKey) {
+      headers['x-gemini-api-key'] = settingsStore.geminiApiKey
     }
-    return headers
+  } else if (settingsStore.ollamaEndpointUrl) {
+    headers['x-ollama-base-url'] = settingsStore.ollamaEndpointUrl
+  }
+  return headers
 }
 
 const _ensureSession = async (userMsg: string) => {
@@ -371,10 +375,10 @@ const _ensureSession = async (userMsg: string) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-          title: userMsg,
-          model: settingsStore.getCurrentModel(),
-          llm_endpoint: settingsStore.llmEndpoint
-      })
+        title: userMsg,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
+      }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -396,10 +400,10 @@ const _updateSessionMessages = async () => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-          messages: messages.value,
-          model: settingsStore.getCurrentModel(),
-          llm_endpoint: settingsStore.llmEndpoint
-      })
+        messages: messages.value,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
+      }),
     })
   } catch (e) {
     console.error('Failed to update session messages:', e)
@@ -408,33 +412,33 @@ const _updateSessionMessages = async () => {
 
 const sendMessage = async () => {
   if (!input.value.trim() || loading.value) return
-  
+
   const userMsg = input.value.trim()
   input.value = ''
-  
+
   messages.value.push({ role: 'user', content: userMsg })
   loading.value = true
-  
+
   try {
     await _ensureSession(userMsg)
 
-    const history = messages.value.slice(0, -1).map(m => ({
+    const history = messages.value.slice(0, -1).map((m) => ({
       role: m.role,
-      content: m.content
+      content: m.content,
     }))
-    
+
     const res = await authFetch('/api/chat', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
-          message: userMsg,
-          history,
-          model: settingsStore.getCurrentModel(),
-          llm_endpoint: settingsStore.llmEndpoint,
-          context: getActiveSessionContext()
-      })
+        message: userMsg,
+        history,
+        model: settingsStore.getCurrentModel(),
+        llm_endpoint: settingsStore.llmEndpoint,
+        context: getActiveSessionContext(),
+      }),
     })
-    
+
     if (res.ok) {
       const data = await res.json()
       messages.value.push({
@@ -534,10 +538,11 @@ const filteredSessions = computed(() => {
     return sessions.value
   }
   const query = searchQuery.value.toLowerCase()
-  return sessions.value.filter(session => 
-    session.title?.toLowerCase().includes(query) ||
-    session.model?.toLowerCase().includes(query) ||
-    session.llm_endpoint?.toLowerCase().includes(query)
+  return sessions.value.filter(
+    (session) =>
+      session.title?.toLowerCase().includes(query) ||
+      session.model?.toLowerCase().includes(query) ||
+      session.llm_endpoint?.toLowerCase().includes(query)
   )
 })
 
@@ -554,10 +559,10 @@ const deleteSession = async (id: string, event: Event) => {
   event.stopPropagation()
   try {
     const response = await authFetch(`/api/chat/history/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     })
     if (response.ok) {
-      sessions.value = sessions.value.filter(s => s._id !== id)
+      sessions.value = sessions.value.filter((s) => s._id !== id)
       if (sessionId.value === id) {
         newChat()
       }
@@ -573,11 +578,16 @@ const deleteSession = async (id: string, event: Event) => {
 const getProviderColor = (provider?: string) => {
   if (!provider) return '#444'
   switch (provider.toLowerCase()) {
-    case 'openai': return '#0d8a68'  // Darker green for better contrast
-    case 'ollama': return '#4651d9'  // Darker blue for better contrast
-    case 'gemini': return '#1a66c9'  // Darker blue for better contrast
-    case 'aisa': return '#8a4b0d'    // Dark amber for the in-cluster proxy
-    default: return '#444'
+    case 'openai':
+      return '#0d8a68' // Darker green for better contrast
+    case 'ollama':
+      return '#4651d9' // Darker blue for better contrast
+    case 'gemini':
+      return '#1a66c9' // Darker blue for better contrast
+    case 'aisa':
+      return '#8a4b0d' // Dark amber for the in-cluster proxy
+    default:
+      return '#444'
   }
 }
 
@@ -614,12 +624,12 @@ const renameSession = async (session: ChatSession) => {
         title: newSessionTitle.value,
         messages: session.messages,
         model: session.model,
-        llm_endpoint: session.llm_endpoint
-      })
+        llm_endpoint: session.llm_endpoint,
+      }),
     })
     if (response.ok) {
       const updatedSession = await response.json()
-      const index = sessions.value.findIndex(s => s._id === updatedSession._id)
+      const index = sessions.value.findIndex((s) => s._id === updatedSession._id)
       if (index !== -1) {
         sessions.value[index] = updatedSession
       }
@@ -637,33 +647,38 @@ const renameSession = async (session: ChatSession) => {
   <div class="chat-page">
     <div class="sidebar">
       <button @click="newChat" class="new-chat-btn">New Chat</button>
-      
+
       <!-- Search Input -->
       <div class="search-container">
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          placeholder="Search chats by title, model, or provider..." 
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search chats by title, model, or provider..."
           class="search-input"
         />
-        <button v-if="searchQuery" @click="searchQuery = ''" class="clear-search-btn" title="Clear search">
+        <button
+          v-if="searchQuery"
+          @click="searchQuery = ''"
+          class="clear-search-btn"
+          title="Clear search"
+        >
           ×
         </button>
       </div>
-      
+
       <div v-if="loadingSessions">Loading...</div>
       <div v-else-if="filteredSessions.length" class="session-list">
-        <div 
-          v-for="session in filteredSessions" 
-          :key="session._id" 
+        <div
+          v-for="session in filteredSessions"
+          :key="session._id"
           @click="loadSession(session)"
           :class="['session-item', { active: sessionId === session._id }]"
         >
           <!-- Rename mode -->
           <div v-if="renamingSessionId === session._id" class="rename-mode" @click.stop>
-            <input 
-              v-model="newSessionTitle" 
-              @keyup.enter="renameSession(session)" 
+            <input
+              v-model="newSessionTitle"
+              @keyup.enter="renameSession(session)"
               @keyup.esc="cancelRename"
               class="rename-input"
               autofocus
@@ -673,21 +688,23 @@ const renameSession = async (session: ChatSession) => {
               <button @click="cancelRename" class="rename-cancel">Cancel</button>
             </div>
           </div>
-          
+
           <!-- Normal view -->
           <div v-else>
             <div class="session-header">
-              <span class="session-title" @dblclick="startRename(session, $event)">{{ session.title }}</span>
+              <span class="session-title" @dblclick="startRename(session, $event)">{{
+                session.title
+              }}</span>
               <div class="session-actions">
-                <button 
-                  @click="startRename(session, $event)" 
+                <button
+                  @click="startRename(session, $event)"
                   class="action-btn rename-btn"
                   title="Rename chat"
                 >
                   ✎
                 </button>
-                <button 
-                  @click="confirmDelete(session._id, $event)" 
+                <button
+                  @click="confirmDelete(session._id, $event)"
                   class="action-btn delete-btn"
                   title="Delete chat"
                 >
@@ -696,8 +713,8 @@ const renameSession = async (session: ChatSession) => {
               </div>
             </div>
             <div class="session-tags">
-              <span 
-                class="tag provider-tag" 
+              <span
+                class="tag provider-tag"
                 :style="{ backgroundColor: getProviderColor(session.llm_endpoint) }"
               >
                 {{ session.llm_endpoint || 'ollama' }}
@@ -714,12 +731,14 @@ const renameSession = async (session: ChatSession) => {
               </span>
             </div>
           </div>
-          
+
           <!-- Delete confirmation overlay -->
           <div v-if="deleteConfirmId === session._id" class="delete-confirm" @click.stop>
             <p>Delete this chat?</p>
             <div class="confirm-buttons">
-              <button @click="deleteSession(session._id, $event)" class="confirm-yes">Delete</button>
+              <button @click="deleteSession(session._id, $event)" class="confirm-yes">
+                Delete
+              </button>
               <button @click="cancelDelete" class="confirm-no">Cancel</button>
             </div>
           </div>
@@ -738,20 +757,26 @@ const renameSession = async (session: ChatSession) => {
           @keyup.enter.prevent="toggleModelSelect"
           @keyup.space.prevent="toggleModelSelect"
         >
-            <span class="provider-label">{{ settingsStore.llmEndpoint }}</span>
-            <span class="model-name">{{ settingsStore.getCurrentModel() }}</span>
-            <span class="model-caret" :class="{ open: modelSelectOpen }">▾</span>
+          <span class="provider-label">{{ settingsStore.llmEndpoint }}</span>
+          <span class="model-name">{{ settingsStore.getCurrentModel() }}</span>
+          <span class="model-caret" :class="{ open: modelSelectOpen }">▾</span>
         </button>
         <div v-if="sessionId" class="chat-header-actions">
-          <button @click="copyChat" class="download-btn" :title="copyStatus || 'Copy Chat to Clipboard'">
+          <button
+            @click="copyChat"
+            class="download-btn"
+            :title="copyStatus || 'Copy Chat to Clipboard'"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+              <path
+                d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+              />
             </svg>
             {{ copyStatus || 'Copy' }}
           </button>
           <button @click="downloadChat" class="download-btn" title="Download Chat">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
             </svg>
             Download
           </button>
@@ -760,9 +785,11 @@ const renameSession = async (session: ChatSession) => {
       <div v-if="modelSelectOpen" class="model-select-panel">
         <div class="model-select-header">
           <h3>Select Model Provider &amp; Model</h3>
-          <button class="model-select-close-icon" @click="modelSelectOpen = false" title="Close">×</button>
+          <button class="model-select-close-icon" @click="modelSelectOpen = false" title="Close">
+            ×
+          </button>
         </div>
-        
+
         <div class="model-select-row">
           <label class="model-select-label" for="chat-provider">
             Provider
@@ -777,7 +804,7 @@ const renameSession = async (session: ChatSession) => {
             <option value="aisa">AISA (In-cluster Proxy)</option>
           </select>
         </div>
-        
+
         <div class="model-select-row">
           <label class="model-select-label" for="chat-model">
             Model
@@ -790,14 +817,18 @@ const renameSession = async (session: ChatSession) => {
             class="model-select"
             :disabled="loadingModels"
           >
-            <option 
-              v-for="model in modelOptions" 
-              :key="model" 
+            <option
+              v-for="model in modelOptions"
+              :key="model"
               :value="model"
               :disabled="settingsStore.llmEndpoint === 'ollama' && !supportsToolCalling(model)"
             >
               {{ model }}
-              {{ settingsStore.llmEndpoint === 'ollama' && !supportsToolCalling(model) ? ' (No tool support)' : '' }}
+              {{
+                settingsStore.llmEndpoint === 'ollama' && !supportsToolCalling(model)
+                  ? ' (No tool support)'
+                  : ''
+              }}
             </option>
           </select>
           <input
@@ -809,30 +840,34 @@ const renameSession = async (session: ChatSession) => {
             :disabled="loadingModels"
           />
         </div>
-        
+
         <div class="model-select-footer">
           <div class="model-select-meta">
             <span v-if="modelFetchError" class="error-message">⚠ {{ modelFetchError }}</span>
             <span v-else-if="!loadingModels && !modelOptions.length" class="info-message">
               ℹ No models loaded. Enter a model name manually or check your API key in Settings.
             </span>
-            <span v-else-if="!loadingModels && modelOptions.length && settingsStore.llmEndpoint === 'ollama'" class="info-message">
-              ℹ {{ modelOptions.length }} model(s) available. Models without tool support are disabled.
+            <span
+              v-else-if="
+                !loadingModels && modelOptions.length && settingsStore.llmEndpoint === 'ollama'
+              "
+              class="info-message"
+            >
+              ℹ {{ modelOptions.length }} model(s) available. Models without tool support are
+              disabled.
             </span>
             <span v-else-if="!loadingModels && modelOptions.length" class="success-message">
               ✓ {{ modelOptions.length }} model(s) available
             </span>
           </div>
-          <button class="model-select-apply" @click="modelSelectOpen = false">Apply &amp; Close</button>
+          <button class="model-select-apply" @click="modelSelectOpen = false">
+            Apply &amp; Close
+          </button>
         </div>
       </div>
       <div class="chat-container">
         <div class="messages">
-          <div 
-            v-for="(msg, idx) in messages" 
-            :key="idx" 
-            :class="['message', msg.role]"
-          >
+          <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role]">
             <div class="bubble">
               <strong>{{ msg.role === 'user' ? 'You' : 'GenAI' }}:</strong>
               <div class="msg-content" v-html="parsedContent(msg.content)"></div>
@@ -844,7 +879,9 @@ const renameSession = async (session: ChatSession) => {
                 class="tool-usage"
               >
                 Tools used: {{ msg.tool_calls.length }}
-                <span v-if="msg.tool_execution_errors">(errors: {{ msg.tool_execution_errors }})</span>
+                <span v-if="msg.tool_execution_errors"
+                  >(errors: {{ msg.tool_execution_errors }})</span
+                >
               </div>
             </div>
           </div>
@@ -852,12 +889,12 @@ const renameSession = async (session: ChatSession) => {
             <div class="bubble loading">Thinking...</div>
           </div>
         </div>
-        
+
         <div class="input-area">
-          <input 
-            v-model="input" 
-            @keyup.enter="sendMessage" 
-            placeholder="Ask Moirai..." 
+          <input
+            v-model="input"
+            @keyup.enter="sendMessage"
+            placeholder="Ask Moirai..."
             :disabled="loading"
           />
           <button @click="sendMessage" :disabled="loading">Send</button>
@@ -946,7 +983,8 @@ const renameSession = async (session: ChatSession) => {
   position: relative;
   transition: background-color 0.2s;
 }
-.session-item:hover, .session-item.active {
+.session-item:hover,
+.session-item.active {
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -1057,7 +1095,8 @@ const renameSession = async (session: ChatSession) => {
   gap: 6px;
   justify-content: flex-end;
 }
-.rename-save, .rename-cancel {
+.rename-save,
+.rename-cancel {
   padding: 4px 10px;
   border: none;
   border-radius: 4px;
@@ -1101,7 +1140,8 @@ const renameSession = async (session: ChatSession) => {
   display: flex;
   gap: 8px;
 }
-.confirm-yes, .confirm-no {
+.confirm-yes,
+.confirm-no {
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
@@ -1130,235 +1170,238 @@ const renameSession = async (session: ChatSession) => {
   overflow: hidden;
 }
 .chat-header {
-
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 5px;
-    max-width: 800px;
-    width: 100%;
-    margin: 0 auto 10px auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5px;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto 10px auto;
 }
 .model-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    border-radius: 8px;
-    background: var(--card-bg);
-    border: 2px solid var(--border-color);
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.9rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 .model-info:hover {
-    background: var(--button-bg);
-    border-color: var(--primary-color);
-    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.15);
-    transform: translateY(-1px);
+  background: var(--button-bg);
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.15);
+  transform: translateY(-1px);
 }
 .model-info:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-    border-radius: 6px;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 .provider-label {
-    font-weight: bold;
-    text-transform: capitalize;
-    background: var(--primary-color);
-    color: var(--bg-color);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: capitalize;
+  background: var(--primary-color);
+  color: var(--bg-color);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
 }
 .model-name {
-    opacity: 0.9;
-    font-family: monospace;
+  opacity: 0.9;
+  font-family: monospace;
 }
 .model-caret {
-    font-size: 0.8rem;
-    opacity: 0.7;
-    transition: transform 0.2s;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  transition: transform 0.2s;
 }
 .model-caret.open {
-    transform: rotate(180deg);
+  transform: rotate(180deg);
 }
 .model-select-panel {
-    max-width: 800px;
-    width: 100%;
-    margin: 0 auto 12px auto;
-    padding: 16px;
-    border-radius: 12px;
-    background: var(--card-bg);
-    border: 2px solid var(--primary-color);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto 12px auto;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 2px solid var(--primary-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .model-select-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
 }
 .model-select-header h3 {
-    margin: 0;
-    font-size: 1rem;
-    color: var(--text-color);
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-color);
 }
 .model-select-close-icon {
-    background: none;
-    border: none;
-    color: var(--text-color);
-    font-size: 1.8rem;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s;
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 .model-select-close-icon:hover {
-    background: var(--button-bg);
-    color: var(--primary-color);
+  background: var(--button-bg);
+  color: var(--primary-color);
 }
 .model-select-row {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .model-select-label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .provider-status {
-    font-size: 0.75rem;
-    font-weight: normal;
-    padding: 2px 8px;
-    border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  padding: 2px 8px;
+  border-radius: 12px;
 }
 .provider-status.status-ok {
-    background: rgba(34, 197, 94, 0.15);
-    color: #4ade80;
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
 }
 .provider-status.status-warning {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fcd34d;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
 }
 .loading-indicator {
-    font-size: 0.8rem;
-    color: var(--primary-color);
-    font-weight: normal;
-    animation: spin 1s linear infinite;
+  font-size: 0.8rem;
+  color: var(--primary-color);
+  font-weight: normal;
+  animation: spin 1s linear infinite;
 }
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .model-select,
 .model-input {
-    width: 100%;
-    padding: 10px 12px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--input-bg);
-    color: var(--input-text);
-    font-size: 0.95rem;
-    transition: all 0.2s;
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.95rem;
+  transition: all 0.2s;
 }
 .model-select:focus,
 .model-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 .model-select:disabled,
 .model-input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .model-select option:disabled {
-    opacity: 0.5;
-    color: #999;
-    font-style: italic;
+  opacity: 0.5;
+  color: #999;
+  font-style: italic;
 }
 .model-select-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
 }
 .model-select-meta {
-    flex: 1;
-    font-size: 0.85rem;
+  flex: 1;
+  font-size: 0.85rem;
 }
 .error-message {
-    color: #ef4444;
+  color: #ef4444;
 }
 .info-message {
-    color: var(--text-color);
-    opacity: 0.7;
+  color: var(--text-color);
+  opacity: 0.7;
 }
 .success-message {
-    color: #22c55e;
+  color: #22c55e;
 }
 .model-select-apply {
-    padding: 8px 20px;
-    border: none;
-    border-radius: 8px;
-    background: var(--primary-color);
-    color: white;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 .model-select-apply:hover {
-    background: color-mix(in srgb, var(--primary-color) 85%, black);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+  background: color-mix(in srgb, var(--primary-color) 85%, black);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
 }
 .chat-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .download-btn {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-color);
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .download-btn:hover {
-    background: var(--button-bg);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+  background: var(--button-bg);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .download-btn svg {
-    vertical-align: middle;
+  vertical-align: middle;
 }
 .chat-container {
   max-width: 800px;

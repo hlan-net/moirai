@@ -1,12 +1,13 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
 
-const adminUsername = process.env.ADMIN_USERNAME || 'testuser';
-const adminPassword = process.env.ADMIN_PASSWORD || 'testpassword';
-const basicAuthToken = Buffer.from(`${adminUsername}:${adminPassword}`).toString('base64');
+const adminUsername = process.env.ADMIN_USERNAME || 'testuser'
+const adminPassword = process.env.ADMIN_PASSWORD || 'testpassword'
+const basicAuthToken = Buffer.from(`${adminUsername}:${adminPassword}`).toString('base64')
 
-const defaultBaseURL = (process.env.CI || process.env.TEST_TARGET === 'docker') 
-  ? 'http://localhost:8088' 
-  : 'http://localhost:5173';
+const defaultBaseURL =
+  process.env.CI || process.env.TEST_TARGET === 'docker'
+    ? 'http://localhost:8088'
+    : 'http://localhost:5173'
 
 export default defineConfig({
   testDir: './tests',
@@ -36,9 +37,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: process.env.TEST_TARGET === 'docker' ? undefined : (process.env.CI ? undefined : {
-    command: 'yarnpkg dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  }),
-});
+  webServer:
+    process.env.TEST_TARGET === 'docker'
+      ? undefined
+      : process.env.CI
+        ? undefined
+        : {
+            command: 'yarnpkg dev',
+            url: 'http://localhost:5173',
+            reuseExistingServer: !process.env.CI,
+          },
+})

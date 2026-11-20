@@ -21,9 +21,7 @@ from version import get_version_string
 
 app = Flask(__name__, static_folder="ui/dist")
 # Configure app using update mapping to decouple from literal key assignments where possible
-app.config.update(
-    SECRET_KEY=os.environ.get("APP_SECRET_KEY") or JWT_SECRET_KEY
-)
+app.config.update(SECRET_KEY=os.environ.get("APP_SECRET_KEY") or JWT_SECRET_KEY)
 
 # Initialize Telemetry
 # Don't configure telemetry if running in a test environment
@@ -56,7 +54,7 @@ csrf.exempt(session_blueprint)
 csrf.exempt(approval_blueprint)  # NOSONAR
 
 if (
-    is_test_mode 
+    is_test_mode
     or os.environ.get("DISABLE_CSRF", "false").lower() == "true"
     or os.environ.get("WTF_CSRF_ENABLED", "true").lower() == "false"
 ):
@@ -141,7 +139,7 @@ def start_services():
 
 # Conditional Flask run for local development
 if __name__ == "__main__":
-    start_services() # Call start_services in main process only
+    start_services()  # Call start_services in main process only
     # Check if this is the main process and not a reloader child in development
     if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
         port = int(os.environ.get("HTTP_PORT", 8088))

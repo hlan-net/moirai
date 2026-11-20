@@ -12,14 +12,14 @@ test('anonymous users are redirected when stream is private', async ({ browser }
 
   const adminContext = await browser.newContext({
     extraHTTPHeaders: {
-      Authorization: `Basic ${basicAuthToken}`
-    }
+      Authorization: `Basic ${basicAuthToken}`,
+    },
   })
 
   const configRes = await adminContext.request.put(`${baseURL}/api/config`, {
     data: {
-      allow_public_read: false
-    }
+      allow_public_read: false,
+    },
   })
 
   expect(configRes.ok()).toBeTruthy()
@@ -27,9 +27,9 @@ test('anonymous users are redirected when stream is private', async ({ browser }
   const anonymousContext = await browser.newContext({
     httpCredentials: {
       username: 'invalid',
-      password: 'invalid'
+      password: 'invalid',
     },
-    extraHTTPHeaders: {}
+    extraHTTPHeaders: {},
   })
   const rssRes = await anonymousContext.request.get(`${baseURL}/api/stream.rss`)
   expect(rssRes.status()).toBe(401)

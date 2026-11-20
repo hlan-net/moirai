@@ -2,7 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { authFetch } from '../utils/authFetch'
-import { ALLOWED_LOGIC_MODULES, LOGIC_MODULE_INFO, TRIGGER_TYPE_INFO } from '../utils/agentConstants'
+import {
+  ALLOWED_LOGIC_MODULES,
+  LOGIC_MODULE_INFO,
+  TRIGGER_TYPE_INFO,
+} from '../utils/agentConstants'
 
 const authStore = useAuthStore()
 
@@ -94,9 +98,7 @@ const loadAgents = async () => {
   resetFeedback()
   loading.value = true
   try {
-    const response = await authFetch(
-      '/api/agents?owner_only=true'
-    )
+    const response = await authFetch('/api/agents?owner_only=true')
     if (!response.ok) {
       const msg = await response.text()
       throw new Error(msg || 'Failed to load agents')
@@ -157,10 +159,9 @@ const createAgent = async () => {
 const deleteAgent = async (agentId: string) => {
   resetFeedback()
   try {
-    const response = await authFetch(
-      `/api/agents/${encodeURIComponent(agentId)}`,
-      { method: 'DELETE' }
-    )
+    const response = await authFetch(`/api/agents/${encodeURIComponent(agentId)}`, {
+      method: 'DELETE',
+    })
     if (!response.ok) {
       const msg = await response.text()
       throw new Error(msg || 'Failed to delete agent')
@@ -199,9 +200,10 @@ onMounted(async () => {
       <div class="hero-icon">👁️</div>
       <h1>Give Your Issues Awareness</h1>
       <p class="hero-subtitle">
-        In Moirai, an <strong>Issue is a Zeitgeist</strong> — the spirit of a story unfolding in the world.
-        An <strong>Agent</strong> is not a separate worker; it is the Zeitgeist's own awareness — its eyes
-        looking outward to ask: <em>"What articles are about me? Is my story still being told?"</em>
+        In Moirai, an <strong>Issue is a Zeitgeist</strong> — the spirit of a story unfolding in the
+        world. An <strong>Agent</strong> is not a separate worker; it is the Zeitgeist's own
+        awareness — its eyes looking outward to ask:
+        <em>"What articles are about me? Is my story still being told?"</em>
       </p>
     </section>
 
@@ -212,7 +214,10 @@ onMounted(async () => {
         <div class="guide-item">
           <div class="guide-icon">🌅</div>
           <h3>Awakening</h3>
-          <p>A new Zeitgeist recognizes itself in the flow of articles — a story emerges from the noise.</p>
+          <p>
+            A new Zeitgeist recognizes itself in the flow of articles — a story emerges from the
+            noise.
+          </p>
         </div>
         <div class="guide-item">
           <div class="guide-icon">👁️</div>
@@ -222,7 +227,10 @@ onMounted(async () => {
         <div class="guide-item">
           <div class="guide-icon">🌑</div>
           <h3>Fading</h3>
-          <p>The Zeitgeist senses when its story is no longer told — and acknowledges its time has passed.</p>
+          <p>
+            The Zeitgeist senses when its story is no longer told — and acknowledges its time has
+            passed.
+          </p>
         </div>
       </div>
     </section>
@@ -230,7 +238,10 @@ onMounted(async () => {
     <!-- Quick Start Templates -->
     <section class="card">
       <h2>Quick Start — Choose an Awareness Type</h2>
-      <p class="muted">Select a template to pre-fill the form below. Each gives your issues a different kind of perception.</p>
+      <p class="muted">
+        Select a template to pre-fill the form below. Each gives your issues a different kind of
+        perception.
+      </p>
       <div class="template-grid">
         <button class="template" @click="setTemplate('discover')">
           <div class="template-icon">🌅</div>
@@ -301,11 +312,7 @@ onMounted(async () => {
           <label v-if="draftAgent.trigger_type === 'scheduled'">
             <span class="label-text">Schedule Interval</span>
             <span class="label-hint">How often? (e.g., 1h, 6h, 1d)</span>
-            <input
-              v-model="draftAgent.schedule_interval"
-              type="text"
-              placeholder="1d"
-            />
+            <input v-model="draftAgent.schedule_interval" type="text" placeholder="1d" />
           </label>
 
           <label>
@@ -338,7 +345,11 @@ onMounted(async () => {
             <label>
               <span class="label-text">Linked Entity ID</span>
               <span class="label-hint">Optional: Link to a specific Event/Issue</span>
-              <input v-model="draftAgent.linked_entity_id" type="text" placeholder="Event/Issue UUID" />
+              <input
+                v-model="draftAgent.linked_entity_id"
+                type="text"
+                placeholder="Event/Issue UUID"
+              />
             </label>
 
             <label>
@@ -391,7 +402,9 @@ onMounted(async () => {
           <div class="agent-info">
             <div class="agent-header">
               <strong>{{ agent.name }}</strong>
-              <span class="status-badge" :class="getStatusClass(agent.status)">{{ agent.status }}</span>
+              <span class="status-badge" :class="getStatusClass(agent.status)">{{
+                agent.status
+              }}</span>
             </div>
             <div class="agent-meta">
               <span class="meta-item">
@@ -408,7 +421,12 @@ onMounted(async () => {
               </span>
             </div>
           </div>
-          <button class="danger" type="button" @click="deleteAgent(agent._id)" title="Dismiss this agent">
+          <button
+            class="danger"
+            type="button"
+            @click="deleteAgent(agent._id)"
+            title="Dismiss this agent"
+          >
             Dismiss
           </button>
         </article>
@@ -440,7 +458,11 @@ onMounted(async () => {
 .hero {
   text-align: center;
   padding: 32px 24px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--card-bg) 85%, #4a90a4), var(--card-bg));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--card-bg) 85%, #4a90a4),
+    var(--card-bg)
+  );
   border-top: 3px solid #4a90a4;
 }
 
@@ -515,7 +537,9 @@ onMounted(async () => {
   color: var(--input-text);
   padding: 14px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.1s;
+  transition:
+    border-color 0.2s,
+    transform 0.1s;
 }
 
 .template:hover {
@@ -555,11 +579,9 @@ p {
   opacity: 0.7;
 }
 
-
 .form-section {
   transition: opacity 0.2s;
 }
-
 
 .form-grid {
   display: grid;

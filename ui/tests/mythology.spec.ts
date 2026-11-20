@@ -28,9 +28,7 @@ test.describe('Mythology Page', () => {
   })
 
   test('displays the Distaff/Userspace section', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: 'The Distaff — Userspace' })
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'The Distaff — Userspace' })).toBeVisible()
     await expect(page.getByText('distaff is the tool that holds')).toBeVisible()
   })
 

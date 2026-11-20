@@ -8,16 +8,22 @@ def _generate_category_tags(article):
     # Stream section (#266): main | sports | culture | business
     section = article.get("section")
     if section:
-        categories.append(f'    <category domain="section">{escape(str(section))}</category>')
+        categories.append(
+            f'    <category domain="section">{escape(str(section))}</category>'
+        )
 
     # Events and Trends
     if "events" in article:
         for event_name in article["events"]:
-            categories.append(f'    <category domain="event">{escape(event_name)}</category>')
+            categories.append(
+                f'    <category domain="event">{escape(event_name)}</category>'
+            )
 
     if "trends" in article:
         for trend_name in article["trends"]:
-            categories.append(f'    <category domain="trend">{escape(trend_name)}</category>')
+            categories.append(
+                f'    <category domain="trend">{escape(trend_name)}</category>'
+            )
 
     # AI annotations
     annotations = article.get("annotations")
@@ -32,15 +38,19 @@ def _generate_annotation_tags(annotations):
     tags = []
     for topic in annotations.get("topics", []):
         tags.append(f'    <category domain="topic">{escape(str(topic))}</category>')
-    
+
     priority = annotations.get("priority")
     if priority:
-        tags.append(f'    <category domain="priority">{escape(str(priority))}</category>')
-    
+        tags.append(
+            f'    <category domain="priority">{escape(str(priority))}</category>'
+        )
+
     sentiment = annotations.get("sentiment")
     if sentiment:
-        tags.append(f'    <category domain="sentiment">{escape(str(sentiment))}</category>')
-    
+        tags.append(
+            f'    <category domain="sentiment">{escape(str(sentiment))}</category>'
+        )
+
     return tags
 
 

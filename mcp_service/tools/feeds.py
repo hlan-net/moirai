@@ -33,7 +33,7 @@ def add_feed(
         title: Human-readable title for the feed.
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
         category: Optional category (e.g., 'tech', 'finance').
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -84,21 +84,21 @@ def add_feed(
             },
             message=f"Feed '{title}' added successfully to userspace {userspace}",
         ).to_dict()
-        
+
     except requests.exceptions.Timeout:
         return transient_error(
             message="Database operation timed out while adding feed",
             retry_after_ms=2000,
             max_retries=3,
         ).to_dict()
-        
+
     except requests.exceptions.ConnectionError:
         return transient_error(
             message="Failed to connect to database while adding feed",
             retry_after_ms=5000,
             max_retries=3,
         ).to_dict()
-        
+
     except Exception as e:
         return internal_error(
             message=f"Unexpected error adding feed: {str(e)}"
@@ -113,7 +113,7 @@ def list_feeds(userspace: str = "") -> dict:
 
     Args:
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace).
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -130,16 +130,16 @@ def list_feeds(userspace: str = "") -> dict:
         res = db_request(
             "POST", "feeds", path="/_find", json_data={"selector": selector}
         )
-        
+
         if res.status_code == 404:
             return not_found_error("database", "feeds", None).to_dict()
-        
+
         if res.status_code >= 500:
             return transient_error(
                 message=f"Database error fetching feeds: HTTP {res.status_code}",
                 retry_after_ms=2000,
             ).to_dict()
-        
+
         if res.status_code != 200:
             return internal_error(
                 message=f"Unexpected error fetching feeds: {res.text}"
@@ -148,13 +148,15 @@ def list_feeds(userspace: str = "") -> dict:
         docs = res.json().get("docs", [])
         feeds = []
         for doc in docs:
-            feeds.append({
-                "id": doc["_id"],
-                "title": doc.get("title", "Untitled"),
-                "url": doc.get("url", ""),
-                "category": doc.get("category", "general"),
-                "added_at": doc.get("added_at"),
-            })
+            feeds.append(
+                {
+                    "id": doc["_id"],
+                    "title": doc.get("title", "Untitled"),
+                    "url": doc.get("url", ""),
+                    "category": doc.get("category", "general"),
+                    "added_at": doc.get("added_at"),
+                }
+            )
 
         return success(
             data={
@@ -164,19 +166,19 @@ def list_feeds(userspace: str = "") -> dict:
             },
             message=f"Found {len(feeds)} feed(s) in userspace {userspace}",
         ).to_dict()
-        
+
     except requests.exceptions.Timeout:
         return transient_error(
             message="Database operation timed out while listing feeds",
             retry_after_ms=2000,
         ).to_dict()
-        
+
     except requests.exceptions.ConnectionError:
         return transient_error(
             message="Failed to connect to database while listing feeds",
             retry_after_ms=5000,
         ).to_dict()
-        
+
     except Exception as e:
         return internal_error(
             message=f"Unexpected error listing feeds: {str(e)}"
@@ -213,9 +215,7 @@ def delete_feed(feed_id: str, userspace: str = "") -> dict:
                 message=f"Feed {feed_id} deleted successfully from userspace {userspace}",
             ).to_dict()
         else:
-            return internal_error(
-                message=f"Error deleting feed: {msg}"
-            ).to_dict()
+            return internal_error(message=f"Error deleting feed: {msg}").to_dict()
 
     except requests.exceptions.Timeout:
         return transient_error(
@@ -310,9 +310,7 @@ def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
             logger.warning(f"read_feed: feed category lookup failed for {url}: {e}")
             feed_category = None
 
-        feed_title, articles = processor.process_feed(
-            url, response.text, feed_category
-        )
+        feed_title, articles = processor.process_feed(url, response.text, feed_category)
 
         # Store articles
         count = 0
@@ -355,16 +353,12 @@ def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Error reading feed: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Error reading feed: {str(e)}").to_dict()
 
 
 @mcp.tool()
 @auth_required
-def update_feed_category(
-    feed_id: str, new_category: str, userspace: str = ""
-) -> dict:
+def update_feed_category(feed_id: str, new_category: str, userspace: str = "") -> dict:
     """
     Update the category of an existing feed.
 
@@ -403,9 +397,7 @@ def update_feed_category(
                 message=f"Feed {feed_id} category updated to '{new_category}'",
             ).to_dict()
         else:
-            return internal_error(
-                message=f"Error updating feed: {msg}"
-            ).to_dict()
+            return internal_error(message=f"Error updating feed: {msg}").to_dict()
 
     except requests.exceptions.Timeout:
         return transient_error(

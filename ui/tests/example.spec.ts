@@ -1,15 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
 test('has title', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/')
 
   // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/Moirai/);
-});
+  await expect(page).toHaveTitle(/Moirai/)
+})
 
 test('feeds column loads', async ({ page }) => {
-  await page.goto('/#/dashboard');
-  
+  await page.goto('/#/dashboard')
+
   // Check if the Feeds header exists (with count)
-  await expect(page.getByRole('heading', { name: /Feeds \(\d+\)/ })).toBeVisible();
-});
+  await expect(page.getByRole('heading', { name: /Feeds \(\d+\)/ })).toBeVisible()
+})

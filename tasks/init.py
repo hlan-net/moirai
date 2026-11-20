@@ -135,7 +135,9 @@ def create_index(db_name, fields, name):
         if response.status_code in (200, 201):
             logger.info(f"Index '{name}' created/verified on '{db_name}'")
         else:
-            logger.error(f"Failed to create index '{name}' on '{db_name}': {response.text}")
+            logger.error(
+                f"Failed to create index '{name}' on '{db_name}': {response.text}"
+            )
     except Exception as e:
         logger.error(f"Error creating index on '{db_name}': {e}")
 
@@ -153,7 +155,10 @@ def ensure_design_doc(db_name, design_doc_name, views=None, validate_doc_update=
             current = response.json()
             current_views = current.get("views", {})
             current_validate = current.get("validate_doc_update")
-            if current_views == desired_views and current_validate == validate_doc_update:
+            if (
+                current_views == desired_views
+                and current_validate == validate_doc_update
+            ):
                 return
             design_doc = current
             design_doc["views"] = desired_views
@@ -172,7 +177,9 @@ def ensure_design_doc(db_name, design_doc_name, views=None, validate_doc_update=
         if response.status_code in (200, 201):
             logger.info(f"Design doc '{design_doc_name}' on '{db_name}' updated.")
         else:
-            logger.error(f"Failed to update design doc '{design_doc_name}': {response.text}")
+            logger.error(
+                f"Failed to update design doc '{design_doc_name}': {response.text}"
+            )
     except requests.exceptions.RequestException as e:
         logger.error(f"Error ensuring design doc on '{db_name}': {e}")
 
@@ -280,7 +287,8 @@ def migrate_userspaces():
             if rows is None:
                 return
             user_docs = [
-                r["doc"] for r in rows
+                r["doc"]
+                for r in rows
                 if r.get("doc") and not r["id"].startswith("_design/")
             ]
 
@@ -296,7 +304,9 @@ def migrate_userspaces():
         if migrated:
             logger.info("Migrated %d user(s) to userspace documents.", migrated)
         else:
-            logger.info("Userspace migration: all users already have userspace documents.")
+            logger.info(
+                "Userspace migration: all users already have userspace documents."
+            )
     except Exception as exc:
         logger.error("migrate_userspaces: unexpected error: %s", exc)
 

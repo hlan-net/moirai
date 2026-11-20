@@ -256,7 +256,9 @@ def _should_prefetch_recent_articles(user_message: str) -> bool:
     return any(term in prompt for term in trigger_terms)
 
 
-async def _prefetch_recent_articles_context(session, messages, userspace_id, user_message):
+async def _prefetch_recent_articles_context(
+    session, messages, userspace_id, user_message
+):
     statuses = []
 
     async def _call_tool(tool_name, args, context_title):
@@ -304,7 +306,10 @@ def _record_tool_trace(
 
 def _has_recent_articles_tool_result(messages) -> bool:
     for message in messages:
-        if message.get("role") == "tool" and message.get("name") == "get_recent_articles":
+        if (
+            message.get("role") == "tool"
+            and message.get("name") == "get_recent_articles"
+        ):
             return True
     return False
 
@@ -335,20 +340,29 @@ def _should_force_recent_articles(messages, assistant_content: str) -> bool:
     has_news_intent = any(term in user_text for term in news_intent_terms)
     returned_no_data = any(term in assistant_content.lower() for term in no_data_terms)
 
-    return has_news_intent and returned_no_data and not _has_recent_articles_tool_result(messages)
+    return (
+        has_news_intent
+        and returned_no_data
+        and not _has_recent_articles_tool_result(messages)
+    )
 
 
 def _create_get_recent_articles_call():
     tool_call_id = f"call_{uuid.uuid4().hex[:8]}"
     mock_call = SimpleNamespace(
         id=tool_call_id,
-        function=SimpleNamespace(name="get_recent_articles", arguments=json.dumps({"limit": 20})),
+        function=SimpleNamespace(
+            name="get_recent_articles", arguments=json.dumps({"limit": 20})
+        ),
         type="function",
     )
     mock_data = {
         "id": tool_call_id,
         "type": "function",
-        "function": {"name": "get_recent_articles", "arguments": json.dumps({"limit": 20})},
+        "function": {
+            "name": "get_recent_articles",
+            "arguments": json.dumps({"limit": 20}),
+        },
     }
     return mock_call, mock_data
 
@@ -370,12 +384,18 @@ def _build_article_context_lines(entity_data):
     title = _safe_text(entity_data.get("title", "Untitled article"), 240)
     published = _safe_text(entity_data.get("published", ""), 80)
     source = _safe_text(
-        entity_data.get("feed_title") or entity_data.get("feed_url") or entity_data.get("source") or "",
+        entity_data.get("feed_title")
+        or entity_data.get("feed_url")
+        or entity_data.get("source")
+        or "",
         160,
     )
     language = _safe_text(entity_data.get("language", ""), 32)
     summary = _safe_text(
-        entity_data.get("description") or entity_data.get("summary") or entity_data.get("content") or "",
+        entity_data.get("description")
+        or entity_data.get("summary")
+        or entity_data.get("content")
+        or "",
         480,
     )
 
@@ -399,7 +419,9 @@ def _build_article_context_lines(entity_data):
     # Instructions for issue creation from article
     article_id = entity_data.get("_id", "")
     if article_id:
-        lines.append(f"To create an Issue from this article, use the add_event tool with article_links=['{article_id}']")
+        lines.append(
+            f"To create an Issue from this article, use the add_event tool with article_links=['{article_id}']"
+        )
 
     return lines
 
@@ -424,7 +446,9 @@ def _build_issue_context_lines(entity_data):
         f"Issue premises_count: {premises_count}",
     ]
     if already_linked:
-        lines.append(f"Already linked article IDs (do not suggest these): {', '.join(already_linked)}")
+        lines.append(
+            f"Already linked article IDs (do not suggest these): {', '.join(already_linked)}"
+        )
     lines.append(
         "If asked to find new coverage: use search_articles with keywords from the issue name and description. "
         "Exclude already linked articles from suggestions."
@@ -433,7 +457,9 @@ def _build_issue_context_lines(entity_data):
 
 
 def _build_feed_context_lines(entity_data):
-    title = _safe_text(entity_data.get("title") or entity_data.get("url") or "Untitled feed", 240)
+    title = _safe_text(
+        entity_data.get("title") or entity_data.get("url") or "Untitled feed", 240
+    )
     url = _safe_text(entity_data.get("url", ""), 240)
     category = _safe_text(entity_data.get("category", ""), 80)
     last_fetch = _safe_text(entity_data.get("last_fetch_at", ""), 80)
@@ -508,7 +534,9 @@ def _derive_context_session_title(context, fallback_title="New Chat"):
 
     context_type = str(context.get("type") or "").strip().lower()
     entity_data = context.get("entity_data")
-    if context_type not in {"article", "issue", "feed"} or not isinstance(entity_data, dict):
+    if context_type not in {"article", "issue", "feed"} or not isinstance(
+        entity_data, dict
+    ):
         return fallback_title
 
     if context_type == "article":
@@ -583,7 +611,9 @@ async def run_agent(
     effective_userspace_id = userspace_id
     if isinstance(context, dict) and context.get("type") == "issue":
         entity_data = context.get("entity_data") or {}
-        issue_userspace = (entity_data.get("userspace") or entity_data.get("namespace") or "").strip()
+        issue_userspace = (
+            entity_data.get("userspace") or entity_data.get("namespace") or ""
+        ).strip()
         if issue_userspace:
             effective_userspace_id = issue_userspace
 
@@ -641,7 +671,9 @@ async def run_agent(
     except Exception as e:
         logger.error("Error running agent loop", exc_info=True)
         error_msgs = _flatten_exception_messages(e)
-        response_text = _format_agent_error_message(llm_endpoint, ollama_base_url, error_msgs)
+        response_text = _format_agent_error_message(
+            llm_endpoint, ollama_base_url, error_msgs
+        )
         return {
             "response": response_text,
             "tool_calls": trace["tool_calls"],
@@ -683,17 +715,24 @@ def _chat_userspace() -> str:
 @jwt_required
 def list_models():
     userspace_llm = resolve_llm_config(_chat_userspace(), PURPOSE_CHAT)
-    llm_endpoint = request.args.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
+    llm_endpoint = (
+        request.args.get("llm_endpoint")
+        or userspace_llm.get("provider")
+        or DEFAULT_LLM_PROVIDER
+    )
 
     api_key = None
     if llm_endpoint == "openai":
-        api_key = userspace_llm.get("openai_api_key") or request.headers.get("x-openai-api-key")
+        api_key = userspace_llm.get("openai_api_key") or request.headers.get(
+            "x-openai-api-key"
+        )
     elif llm_endpoint == "gemini":
-        api_key = userspace_llm.get("gemini_api_key") or request.headers.get("x-gemini-api-key")
+        api_key = userspace_llm.get("gemini_api_key") or request.headers.get(
+            "x-gemini-api-key"
+        )
 
-    ollama_base_url = (
-        userspace_llm.get("ollama_endpoint")
-        or request.headers.get("x-ollama-base-url")
+    ollama_base_url = userspace_llm.get("ollama_endpoint") or request.headers.get(
+        "x-ollama-base-url"
     )
 
     if llm_endpoint == "aisa" and not is_aisa_configured():
@@ -725,7 +764,11 @@ def chat():
     # The request body may override provider and model for this chat session only.
     userspace_llm = resolve_llm_config(_chat_userspace(), PURPOSE_CHAT)
 
-    llm_endpoint = data.get("llm_endpoint") or userspace_llm.get("provider") or DEFAULT_LLM_PROVIDER
+    llm_endpoint = (
+        data.get("llm_endpoint")
+        or userspace_llm.get("provider")
+        or DEFAULT_LLM_PROVIDER
+    )
     model = data.get("model") or userspace_llm.get("model")
 
     if llm_endpoint == "aisa":
@@ -735,9 +778,13 @@ def chat():
 
     api_key = None
     if llm_endpoint == "openai":
-        api_key = userspace_llm.get("openai_api_key") or request.headers.get("x-openai-api-key")
+        api_key = userspace_llm.get("openai_api_key") or request.headers.get(
+            "x-openai-api-key"
+        )
     elif llm_endpoint == "gemini":
-        api_key = userspace_llm.get("gemini_api_key") or request.headers.get("x-gemini-api-key")
+        api_key = userspace_llm.get("gemini_api_key") or request.headers.get(
+            "x-gemini-api-key"
+        )
 
     api_key = _get_api_key(llm_endpoint, api_key)
 
@@ -754,9 +801,8 @@ def chat():
             400,
         )
 
-    ollama_base_url = (
-        userspace_llm.get("ollama_endpoint")
-        or request.headers.get("x-ollama-base-url")
+    ollama_base_url = userspace_llm.get("ollama_endpoint") or request.headers.get(
+        "x-ollama-base-url"
     )
 
     auth_token = request.headers.get("Authorization")
@@ -860,7 +906,9 @@ def update_chat_session(session_id):
     if "title" in data:
         session["title"] = data["title"]
     if "context" in data:
-        session["context"] = data["context"] if isinstance(data["context"], dict) else None
+        session["context"] = (
+            data["context"] if isinstance(data["context"], dict) else None
+        )
 
     if update_couchdb_doc("chat_history", session_id, session):
         return jsonify(session)
@@ -872,30 +920,37 @@ def _format_export_message(msg, verbose_export):
     sanitized_msg = _sanitize_export_value(msg)
     role = sanitized_msg.get("role", "unknown").capitalize()
     content = sanitized_msg.get("content", "")
-    
+
     if isinstance(content, str):
         content = bleach.clean(content, strip=True)
         content = content.replace("\n### ", "\n\\#\\#\\# ")
         if content.startswith("### "):
             content = "\\#\\#\\# " + content[4:]
-            
+
     markdown_chunk = f"### {role}\n{content}\n\n"
-    
+
     tool_calls = sanitized_msg.get("tool_calls")
     tool_count = len(tool_calls) if tool_calls else 0
-    error_count = 1 if sanitized_msg.get("role") == "tool" and isinstance(content, str) and "Tool Execution Error" in content else 0
-    
+    error_count = (
+        1
+        if sanitized_msg.get("role") == "tool"
+        and isinstance(content, str)
+        and "Tool Execution Error" in content
+        else 0
+    )
+
     if tool_calls and verbose_export:
         markdown_chunk += "*(Tool Calls)*\n"
         markdown_chunk += _format_tool_call_markdown(tool_calls)
         markdown_chunk += "\n\n"
-        
+
     if verbose_export:
         markdown_chunk += "*(Message Metadata)*\n```json\n"
         markdown_chunk += json.dumps(sanitized_msg, indent=2, default=str)
         markdown_chunk += "\n```\n\n"
-        
+
     return markdown_chunk, tool_count, error_count
+
 
 @chat_blueprint.route("/chat/history/<session_id>/export", methods=["GET"])
 @jwt_required
@@ -920,7 +975,9 @@ def export_chat_session(session_id):
     markdown_content += f"Exported: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     markdown_content += f"Provider: {llm_endpoint}\n"
     markdown_content += f"Model: {model}\n\n"
-    markdown_content += f"Verbose Export: {'enabled' if verbose_export else 'disabled'}\n\n"
+    markdown_content += (
+        f"Verbose Export: {'enabled' if verbose_export else 'disabled'}\n\n"
+    )
     markdown_content += "---\n\n"
 
     tool_call_total = 0
@@ -948,6 +1005,7 @@ def export_chat_session(session_id):
         mimetype="text/markdown",
         headers={"Content-Disposition": f"attachment;filename={safe_title}.md"},
     )
+
 
 @chat_blueprint.route("/chat/history/<session_id>", methods=["DELETE"])
 @jwt_required
@@ -1012,7 +1070,9 @@ async def _run_agent_turn(
         if _should_force_recent_articles(messages, sanitized_content):
             forced_call, forced_call_data = _create_get_recent_articles_call()
             msg_dict["tool_calls"] = [forced_call_data]
-            await _execute_tool_calls(session, [forced_call], messages, userspace_id, trace)
+            await _execute_tool_calls(
+                session, [forced_call], messages, userspace_id, trace
+            )
             return None
         # Final response
         return sanitized_content
@@ -1159,7 +1219,13 @@ async def _run_agent_loop(
 ):
     for _ in range(MAX_AGENT_TURNS):
         result = await _run_agent_turn(
-            messages, llm_provider, target_model, openai_tools, session, userspace_id, trace
+            messages,
+            llm_provider,
+            target_model,
+            openai_tools,
+            session,
+            userspace_id,
+            trace,
         )
         if result:
             return result

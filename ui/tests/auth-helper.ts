@@ -4,13 +4,13 @@ export async function authenticate(page: Page) {
   const email = `${process.env.ADMIN_USERNAME}@localhost.local`
   const password = process.env.ADMIN_PASSWORD || 'testpassword'
 
-  // We can't easily use the login page if it has complex logic, 
+  // We can't easily use the login page if it has complex logic,
   // so we use the API directly to get a token.
   const response = await page.request.post('/api/auth/login', {
     data: {
       email: email,
-      password: password
-    }
+      password: password,
+    },
   })
 
   expect(response.ok()).toBeTruthy()

@@ -91,7 +91,9 @@ def get_default_userspace() -> str | None:
     return None
 
 
-def can_access_userspace(userspace_id: str, user_id: str | None, role: str | None) -> bool:
+def can_access_userspace(
+    userspace_id: str, user_id: str | None, role: str | None
+) -> bool:
     """Return True if the user may read or act on data in the given userspace.
 
     Moirai is single-tenant: any authenticated user may use the deployment's

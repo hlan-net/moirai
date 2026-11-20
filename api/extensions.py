@@ -13,10 +13,10 @@ def get_redis_client() -> redis.Redis:
     host = os.environ.get("REDIS_HOST")
     if not host:
         return None
-    
+
     port = int(os.environ.get("REDIS_PORT", 6379))
     password = os.environ.get("REDIS_PASSWORD")
-    
+
     return redis.Redis(
         host=host,
         port=port,

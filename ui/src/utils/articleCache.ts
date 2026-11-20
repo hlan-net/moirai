@@ -53,7 +53,7 @@ class ArticleCache {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
-        
+
         // Create object store if it doesn't exist
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: '_id' })
@@ -98,17 +98,17 @@ class ArticleCache {
 
     return new Promise((resolve, reject) => {
       const request = store.getAll()
-      
+
       request.onsuccess = () => {
         const articles = request.result as Article[]
         // Sort by published date descending
         articles.sort((a, b) => {
           return new Date(b.published).getTime() - new Date(a.published).getTime()
         })
-        
+
         resolve(limit ? articles.slice(0, limit) : articles)
       }
-      
+
       request.onerror = () => reject(request.error)
     })
   }
@@ -135,12 +135,12 @@ class ArticleCache {
     const transaction = this.db.transaction([STORE_NAME], 'readwrite')
     const store = transaction.objectStore(STORE_NAME)
     const index = store.index('cached_at')
-    
+
     let deletedCount = 0
 
     return new Promise((resolve, reject) => {
       const request = index.openCursor()
-      
+
       request.onsuccess = (event) => {
         const cursor = (event.target as IDBRequest).result
         if (cursor) {
@@ -152,7 +152,7 @@ class ArticleCache {
           cursor.continue()
         }
       }
-      
+
       transaction.oncomplete = () => resolve(deletedCount)
       transaction.onerror = () => reject(transaction.error)
     })
@@ -167,7 +167,7 @@ class ArticleCache {
 
     const transaction = this.db.transaction([STORE_NAME], 'readwrite')
     const store = transaction.objectStore(STORE_NAME)
-    
+
     return new Promise((resolve, reject) => {
       const request = store.clear()
       request.onsuccess = () => resolve()
@@ -178,15 +178,19 @@ class ArticleCache {
   /**
    * Get cache statistics
    */
-  async getStats(): Promise<{ count: number; oldestDate: string | null; newestDate: string | null }> {
+  async getStats(): Promise<{
+    count: number
+    oldestDate: string | null
+    newestDate: string | null
+  }> {
     const articles = await this.getArticles()
     const newestArticle = articles[0]
     const oldestArticle = articles.length > 0 ? articles[articles.length - 1] : undefined
-    
+
     return {
       count: articles.length,
       newestDate: newestArticle?.published ?? null,
-      oldestDate: oldestArticle?.published ?? null
+      oldestDate: oldestArticle?.published ?? null,
     }
   }
 }

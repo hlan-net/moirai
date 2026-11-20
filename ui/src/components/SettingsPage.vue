@@ -9,9 +9,10 @@ import ModelCatalogEditor from './ModelCatalogEditor.vue'
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 
-const uiVersion = __APP_BUILD__ !== 'dev'
-  ? `Moirai UI v${__APP_VERSION__} (build ${__APP_BUILD__})`
-  : `Moirai UI v${__APP_VERSION__}`
+const uiVersion =
+  __APP_BUILD__ !== 'dev'
+    ? `Moirai UI v${__APP_VERSION__} (build ${__APP_BUILD__})`
+    : `Moirai UI v${__APP_VERSION__}`
 const aboutDescription =
   'Moirai is a GenAI-native press review platform powered by the Model Context Protocol (MCP).'
 const availableModels = ref([])
@@ -29,41 +30,59 @@ const availableAisaModels = ref<string[]>([])
 // AISA availability comes from the server environment (AISA-managed Secret)
 const aisaStatus = ref<{ available: boolean; base_url: string; default_model: string } | null>(null)
 const verboseChatExport = ref(false)
-const collapsedSections = ref(new Set(['general', 'ollama', 'openai', 'gemini', 'aisa', 'authentication']))
+const collapsedSections = ref(
+  new Set(['general', 'ollama', 'openai', 'gemini', 'aisa', 'authentication'])
+)
 const activeTab = ref('user')
 
 // Create computed properties for settings store values
 const llmEndpoint = computed({
   get: () => settingsStore.llmEndpoint,
-  set: (value: string) => { settingsStore.llmEndpoint = value }
+  set: (value: string) => {
+    settingsStore.llmEndpoint = value
+  },
 })
 const ollamaEndpointUrl = computed({
   get: () => settingsStore.ollamaEndpointUrl,
-  set: (value: string) => { settingsStore.ollamaEndpointUrl = value }
+  set: (value: string) => {
+    settingsStore.ollamaEndpointUrl = value
+  },
 })
 const openaiApiKey = computed({
   get: () => settingsStore.openaiApiKey,
-  set: (value: string) => { settingsStore.openaiApiKey = value }
+  set: (value: string) => {
+    settingsStore.openaiApiKey = value
+  },
 })
 const openaiModelName = computed({
   get: () => settingsStore.openaiModel,
-  set: (value: string) => { settingsStore.openaiModel = value }
+  set: (value: string) => {
+    settingsStore.openaiModel = value
+  },
 })
 const geminiApiKey = computed({
   get: () => settingsStore.geminiApiKey,
-  set: (value: string) => { settingsStore.geminiApiKey = value }
+  set: (value: string) => {
+    settingsStore.geminiApiKey = value
+  },
 })
 const geminiModelName = computed({
   get: () => settingsStore.geminiModel,
-  set: (value: string) => { settingsStore.geminiModel = value }
+  set: (value: string) => {
+    settingsStore.geminiModel = value
+  },
 })
 const aisaModelName = computed({
   get: () => settingsStore.aisaModel,
-  set: (value: string) => { settingsStore.aisaModel = value }
+  set: (value: string) => {
+    settingsStore.aisaModel = value
+  },
 })
 const modelName = computed({
   get: () => settingsStore.ollamaModel,
-  set: (value: string) => { settingsStore.ollamaModel = value }
+  set: (value: string) => {
+    settingsStore.ollamaModel = value
+  },
 })
 
 interface ComponentVersion {
@@ -149,7 +168,11 @@ watch(llmEndpoint, (newEndpoint) => {
     fetchOpenAiModels()
   } else if (newEndpoint === 'ollama' && availableModels.value.length === 0) {
     fetchOllamaModels()
-  } else if (newEndpoint === 'gemini' && availableGeminiModels.value.length === 0 && geminiApiKey.value) {
+  } else if (
+    newEndpoint === 'gemini' &&
+    availableGeminiModels.value.length === 0 &&
+    geminiApiKey.value
+  ) {
     fetchGeminiModels()
   } else if (newEndpoint === 'aisa' && availableAisaModels.value.length === 0) {
     fetchAisaModels()
@@ -214,48 +237,50 @@ const formatLogTimestamp = (timestamp: string) => {
 const saveSettings = async () => {
   // Save User Settings
   try {
-      const userSettings = await settingsStore.saveToBackend()
+    const userSettings = await settingsStore.saveToBackend()
 
-      const res = await authFetch('/api/auth/me/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userSettings)
-      })
-      if (!res.ok) {
-        throw new Error('Failed to save user settings')
+    const res = await authFetch('/api/auth/me/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userSettings),
+    })
+    if (!res.ok) {
+      throw new Error('Failed to save user settings')
+    }
+
+    // Save System Config (Admin only or if allowed)
+    const configRes = await authFetch('/api/config', {
+      method: 'PUT',
+      headers: authStore.token
+        ? {
+            Authorization: `Bearer ${authStore.token}`,
+            'Content-Type': 'application/json',
+          }
+        : { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        allow_public_read: allowPublicRead.value,
+        chat_export_verbose: verboseChatExport.value,
+        iteration_interval: schedulerEnabled.value ? iterationInterval.value : 0,
+        google_client_id: googleClientId.value,
+        entra_client_id: entraClientId.value,
+        entra_tenant_id: entraTenantId.value,
+        github_client_id: githubClientId.value,
+        github_client_secret: githubClientSecret.value,
+      }),
+    })
+
+    if (!configRes.ok) {
+      if (configRes.status === 403) {
+        console.warn('User does not have permission to update system config.')
+      } else {
+        throw new Error('Failed to save config')
       }
-      
-      // Save System Config (Admin only or if allowed)
-      const configRes = await authFetch('/api/config', {
-          method: 'PUT',
-          headers: authStore.token ? { 
-              'Authorization': `Bearer ${authStore.token}`,
-              'Content-Type': 'application/json'
-          } : { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ 
-                allow_public_read: allowPublicRead.value,
-                chat_export_verbose: verboseChatExport.value,
-                iteration_interval: schedulerEnabled.value ? iterationInterval.value : 0,
-               google_client_id: googleClientId.value,
-              entra_client_id: entraClientId.value,
-              entra_tenant_id: entraTenantId.value,
-              github_client_id: githubClientId.value,
-              github_client_secret: githubClientSecret.value
-          })
-      })
-      
-      if (!configRes.ok) {
-           if (configRes.status === 403) {
-               console.warn("User does not have permission to update system config.")
-           } else {
-               throw new Error("Failed to save config")
-           }
-      }
-      
-      alert('Settings saved and applied immediately!')
+    }
+
+    alert('Settings saved and applied immediately!')
   } catch (e) {
-      console.error(e)
-      alert("Failed to save settings.")
+    console.error(e)
+    alert('Failed to save settings.')
   }
 }
 
@@ -282,8 +307,8 @@ const fetchOpenAiModels = async () => {
   try {
     const res = await authFetch('/api/models?llm_endpoint=openai', {
       headers: {
-        'x-openai-api-key': openaiApiKey.value
-      }
+        'x-openai-api-key': openaiApiKey.value,
+      },
     })
     if (res.ok) {
       availableOpenAiModels.value = await res.json()
@@ -304,8 +329,8 @@ const fetchGeminiModels = async () => {
   try {
     const res = await authFetch('/api/models?llm_endpoint=gemini', {
       headers: {
-        'x-gemini-api-key': geminiApiKey.value
-      }
+        'x-gemini-api-key': geminiApiKey.value,
+      },
     })
     if (res.ok) {
       availableGeminiModels.value = await res.json()
@@ -321,13 +346,18 @@ const fetchAisaStatus = async () => {
   try {
     const res = await authFetch('/api/llm/providers')
     if (res.ok) {
-      const providers = (await res.json()) as Array<{ id: string; available: boolean; base_url?: string; default_model?: string }>
+      const providers = (await res.json()) as Array<{
+        id: string
+        available: boolean
+        base_url?: string
+        default_model?: string
+      }>
       const aisa = providers.find((p) => p.id === 'aisa')
       if (aisa) {
         aisaStatus.value = {
           available: aisa.available,
           base_url: aisa.base_url || '',
-          default_model: aisa.default_model || ''
+          default_model: aisa.default_model || '',
         }
         if (!aisaModelName.value && aisa.default_model) aisaModelName.value = aisa.default_model
       }
@@ -353,24 +383,26 @@ const fetchAisaModels = async () => {
 }
 
 const fetchUserProfile = async () => {
-    try {
-        const res = await authFetch('/api/auth/me')
-        if (res.ok) {
-            const data = await res.json()
-            const settings = data.settings || {}
-            // Load User Settings into store
-            settingsStore.loadFromBackend(settings)
-            if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
+  try {
+    const res = await authFetch('/api/auth/me')
+    if (res.ok) {
+      const data = await res.json()
+      const settings = data.settings || {}
+      // Load User Settings into store
+      settingsStore.loadFromBackend(settings)
+      if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
 
-            // Refresh models based on loaded settings
-            if (settingsStore.llmEndpoint === 'ollama') fetchOllamaModels()
-            else if (settingsStore.llmEndpoint === 'openai' && settingsStore.openaiApiKey) fetchOpenAiModels()
-            else if (settingsStore.llmEndpoint === 'gemini' && settingsStore.geminiApiKey) fetchGeminiModels()
-            else if (settingsStore.llmEndpoint === 'aisa') fetchAisaModels()
-        }
-    } catch (e) {
-        console.error("Error fetching user profile", e)
+      // Refresh models based on loaded settings
+      if (settingsStore.llmEndpoint === 'ollama') void fetchOllamaModels()
+      else if (settingsStore.llmEndpoint === 'openai' && settingsStore.openaiApiKey)
+        void fetchOpenAiModels()
+      else if (settingsStore.llmEndpoint === 'gemini' && settingsStore.geminiApiKey)
+        void fetchGeminiModels()
+      else if (settingsStore.llmEndpoint === 'aisa') void fetchAisaModels()
     }
+  } catch (e) {
+    console.error('Error fetching user profile', e)
+  }
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -379,12 +411,12 @@ const exportSettings = async () => {
   // 1. Fetch server config
   let serverConfig = {}
   try {
-      const res = await authFetch('/api/config')
-      if (res.ok) {
-          serverConfig = await res.json()
-      }
+    const res = await authFetch('/api/config')
+    if (res.ok) {
+      serverConfig = await res.json()
+    }
   } catch (e) {
-      console.error("Error fetching config for export", e)
+    console.error('Error fetching config for export', e)
   }
 
   // 2. Gather settings from store
@@ -392,20 +424,21 @@ const exportSettings = async () => {
 
   // 3. Construct JSON
   const exportData = {
-      version: 1,
-      timestamp: new Date().toISOString(),
-      client_settings: clientSettings,
-      server_config: serverConfig
+    version: 1,
+    timestamp: new Date().toISOString(),
+    client_settings: clientSettings,
+    server_config: serverConfig,
   }
 
   // 4. Download file
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-  const downloadAnchorNode = document.createElement('a');
-  downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", "moirai-settings.json");
-  document.body.appendChild(downloadAnchorNode); // required for firefox
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
+  const dataStr =
+    'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportData, null, 2))
+  const downloadAnchorNode = document.createElement('a')
+  downloadAnchorNode.setAttribute('href', dataStr)
+  downloadAnchorNode.setAttribute('download', 'moirai-settings.json')
+  document.body.appendChild(downloadAnchorNode) // required for firefox
+  downloadAnchorNode.click()
+  downloadAnchorNode.remove()
 }
 
 const triggerImport = () => {
@@ -428,12 +461,12 @@ const importSettings = async (event: Event) => {
 
       // Validate basic structure
       if (!data.client_settings || !data.server_config) {
-          alert("Invalid settings file format.")
-          return
+        alert('Invalid settings file format.')
+        return
       }
 
-      if (!confirm("This will overwrite your current settings and reload the page. Continue?")) {
-          return
+      if (!confirm('This will overwrite your current settings and reload the page. Continue?')) {
+        return
       }
 
       // Restore client settings via store
@@ -443,25 +476,24 @@ const importSettings = async (event: Event) => {
 
       // Restore server config
       try {
-          const res = await authFetch('/api/config', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data.server_config)
-          })
-          if (!res.ok) {
-              console.error("Failed to restore server config during import")
-              alert("Settings imported, but server configuration failed to update.")
-          }
+        const res = await authFetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data.server_config),
+        })
+        if (!res.ok) {
+          console.error('Failed to restore server config during import')
+          alert('Settings imported, but server configuration failed to update.')
+        }
       } catch (err) {
-          console.error("Error updating server config:", err)
+        console.error('Error updating server config:', err)
       }
 
-      alert("Settings imported successfully! Reloading...")
+      alert('Settings imported successfully! Reloading...')
       location.reload()
-
     } catch (err) {
-      console.error("Error parsing settings file:", err)
-      alert("Failed to parse settings file.")
+      console.error('Error parsing settings file:', err)
+      alert('Failed to parse settings file.')
     }
   }
 
@@ -471,33 +503,33 @@ const importSettings = async (event: Event) => {
 }
 
 const fetchConfig = async () => {
-    try {
-        const res = await authFetch('/api/config')
-        if (res.ok) {
-            const config = await res.json()
-            console.log("Config loaded:", config)
-            componentVersions.value = buildComponentVersions(config)
-            if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
-            if (config.chat_export_verbose !== undefined) {
-              verboseChatExport.value = Boolean(config.chat_export_verbose)
-            }
-            if (config.iteration_interval !== undefined) {
-              const intervalValue = Number(config.iteration_interval)
-              schedulerEnabled.value = intervalValue > 0
-              if (intervalValue > 0) {
-                iterationInterval.value = intervalValue
-              }
-            }
-            if (config.google_client_id) googleClientId.value = config.google_client_id
-            if (config.entra_client_id) entraClientId.value = config.entra_client_id
-            if (config.entra_tenant_id) entraTenantId.value = config.entra_tenant_id
-            if (config.github_client_id) githubClientId.value = config.github_client_id
-            if (config.github_client_secret) githubClientSecret.value = config.github_client_secret
+  try {
+    const res = await authFetch('/api/config')
+    if (res.ok) {
+      const config = await res.json()
+      console.log('Config loaded:', config)
+      componentVersions.value = buildComponentVersions(config)
+      if (config.allow_public_read !== undefined) allowPublicRead.value = config.allow_public_read
+      if (config.chat_export_verbose !== undefined) {
+        verboseChatExport.value = Boolean(config.chat_export_verbose)
+      }
+      if (config.iteration_interval !== undefined) {
+        const intervalValue = Number(config.iteration_interval)
+        schedulerEnabled.value = intervalValue > 0
+        if (intervalValue > 0) {
+          iterationInterval.value = intervalValue
         }
-    } catch (e) {
-        console.error("Error fetching system config via axios", e)
-        componentVersions.value = buildComponentVersions()
+      }
+      if (config.google_client_id) googleClientId.value = config.google_client_id
+      if (config.entra_client_id) entraClientId.value = config.entra_client_id
+      if (config.entra_tenant_id) entraTenantId.value = config.entra_tenant_id
+      if (config.github_client_id) githubClientId.value = config.github_client_id
+      if (config.github_client_secret) githubClientSecret.value = config.github_client_secret
     }
+  } catch (e) {
+    console.error('Error fetching system config via axios', e)
+    componentVersions.value = buildComponentVersions()
+  }
 }
 
 onMounted(() => {
@@ -510,9 +542,8 @@ onMounted(() => {
 
 <template>
   <div class="settings-page">
-
     <h1>Settings</h1>
-    
+
     <div class="settings-section">
       <h2 class="about-header">
         <span>About Moirai</span>
@@ -545,14 +576,11 @@ onMounted(() => {
 
     <!-- Tabs -->
     <div class="tabs">
-      <button 
-        :class="['tab-btn', { active: activeTab === 'user' }]" 
-        @click="activeTab = 'user'"
-      >
+      <button :class="['tab-btn', { active: activeTab === 'user' }]" @click="activeTab = 'user'">
         User Settings
       </button>
-      <button 
-        :class="['tab-btn', { active: activeTab === 'system' }]" 
+      <button
+        :class="['tab-btn', { active: activeTab === 'system' }]"
         @click="activeTab = 'system'"
       >
         System Settings
@@ -562,13 +590,15 @@ onMounted(() => {
     <!-- User Settings Tab -->
     <div v-show="activeTab === 'user'" class="tab-content">
       <div class="settings-section">
-        <h2>
-          General (User)
-        </h2>
+        <h2>General (User)</h2>
         <div>
           <div class="form-group">
             <label for="theme">Theme:</label>
-            <select id="theme" :value="theme" @change="setTheme(($event.target as HTMLSelectElement).value as Theme)">
+            <select
+              id="theme"
+              :value="theme"
+              @change="setTheme(($event.target as HTMLSelectElement).value as Theme)"
+            >
               <option value="light">Light</option>
               <option value="dark">Dark</option>
               <option value="auto">Auto (System)</option>
@@ -577,234 +607,297 @@ onMounted(() => {
         </div>
       </div>
 
-    <div class="settings-section">
-      <h2>
-        LLM Endpoint Configuration
-      </h2>
-      <div class="form-group">
-        <div class="radio-group">
-          <label>
-            <input type="radio" value="ollama" v-model="llmEndpoint">
+      <div class="settings-section">
+        <h2>LLM Endpoint Configuration</h2>
+        <div class="form-group">
+          <div class="radio-group">
+            <label>
+              <input type="radio" value="ollama" v-model="llmEndpoint" />
+              Ollama
+            </label>
+            <label>
+              <input type="radio" value="openai" v-model="llmEndpoint" />
+              OpenAI
+            </label>
+            <label>
+              <input type="radio" value="gemini" v-model="llmEndpoint" />
+              Gemini
+            </label>
+            <label>
+              <input
+                type="radio"
+                value="aisa"
+                v-model="llmEndpoint"
+                :disabled="aisaStatus !== null && !aisaStatus.available"
+              />
+              AISA (in-cluster)
+            </label>
+          </div>
+        </div>
+        <div class="sub-section">
+          <h3 @click="toggleSection('ollama')">
             Ollama
-          </label>
-          <label>
-            <input type="radio" value="openai" v-model="llmEndpoint">
+            <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+          </h3>
+          <div v-if="!collapsedSections.has('ollama')">
+            <div class="form-group">
+              <label for="ollama-url">Ollama Endpoint URL:</label>
+              <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" />
+            </div>
+            <div class="form-group">
+              <label for="ollama-model">LLM Model Name (Ollama):</label>
+              <select v-if="availableModels.length" id="ollama-model" v-model="modelName">
+                <option v-for="model in availableModels" :key="model" :value="model">
+                  {{ model }}
+                </option>
+              </select>
+              <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
+              <small v-if="loadingModels">Loading available models...</small>
+              <small v-else-if="availableModels.length"
+                >Select a model provided by your Ollama instance.</small
+              >
+              <small v-else
+                >Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small
+              >
+            </div>
+          </div>
+        </div>
+        <div class="sub-section">
+          <h3 @click="toggleSection('openai')">
             OpenAI
-          </label>
-          <label>
-            <input type="radio" value="gemini" v-model="llmEndpoint">
+            <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+          </h3>
+          <div v-if="!collapsedSections.has('openai')">
+            <div class="form-group">
+              <label for="openai-api-key">OpenAI API Key:</label>
+              <input type="password" id="openai-api-key" v-model="openaiApiKey" />
+            </div>
+            <div class="form-group">
+              <label for="openai-model">OpenAI Model Name:</label>
+              <button @click="fetchOpenAiModels" :disabled="!openaiApiKey || loadingModels">
+                {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+              </button>
+              <select
+                v-if="availableOpenAiModels.length"
+                id="openai-model"
+                v-model="openaiModelName"
+              >
+                <option v-for="model in availableOpenAiModels" :key="model" :value="model">
+                  {{ model }}
+                </option>
+              </select>
+              <small v-if="loadingModels">Loading available models...</small>
+              <small v-if="!openaiApiKey"
+                >Provide an API key and click "Fetch Models" to see a list of available
+                models.</small
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <h3 @click="toggleSection('gemini')">
             Gemini
-          </label>
-          <label>
-            <input type="radio" value="aisa" v-model="llmEndpoint" :disabled="aisaStatus !== null && !aisaStatus.available">
-            AISA (in-cluster)
-          </label>
-        </div>
-      </div>
-      <div class="sub-section">
-        <h3 @click="toggleSection('ollama')">
-          Ollama
-          <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
-        </h3>
-        <div v-if="!collapsedSections.has('ollama')">
-          <div class="form-group">
-            <label for="ollama-url">Ollama Endpoint URL:</label>
-            <input type="text" id="ollama-url" v-model="ollamaEndpointUrl" />
-          </div>
-          <div class="form-group">
-            <label for="ollama-model">LLM Model Name (Ollama):</label>
-            <select v-if="availableModels.length" id="ollama-model" v-model="modelName">
-              <option v-for="model in availableModels" :key="model" :value="model">
-                {{ model }}
-              </option>
-            </select>
-            <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
-            <small v-if="loadingModels">Loading available models...</small>
-            <small v-else-if="availableModels.length">Select a model provided by your Ollama instance.</small>
-            <small v-else>Ensure this model is pulled in your Ollama instance. (Could not fetch list)</small>
-          </div>
-        </div>
-      </div>
-      <div class="sub-section">
-        <h3 @click="toggleSection('openai')">
-          OpenAI
-          <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
-        </h3>
-        <div v-if="!collapsedSections.has('openai')">
-          <div class="form-group">
-            <label for="openai-api-key">OpenAI API Key:</label>
-            <input type="password" id="openai-api-key" v-model="openaiApiKey" />
-          </div>
-          <div class="form-group">
-            <label for="openai-model">OpenAI Model Name:</label>
-            <button @click="fetchOpenAiModels" :disabled="!openaiApiKey || loadingModels">
-              {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
-            </button>
-            <select v-if="availableOpenAiModels.length" id="openai-model" v-model="openaiModelName">
-              <option v-for="model in availableOpenAiModels" :key="model" :value="model">
-                {{ model }}
-              </option>
-            </select>
-            <small v-if="loadingModels">Loading available models...</small>
-            <small v-if="!openaiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
+            <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+          </h3>
+          <div v-if="!collapsedSections.has('gemini')">
+            <div class="form-group">
+              <label for="gemini-api-key">Gemini API Key:</label>
+              <input type="password" id="gemini-api-key" v-model="geminiApiKey" />
+            </div>
+            <div class="form-group">
+              <label for="gemini-model">Gemini Model Name:</label>
+              <button @click="fetchGeminiModels" :disabled="!geminiApiKey || loadingModels">
+                {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+              </button>
+              <select
+                v-if="availableGeminiModels.length"
+                id="gemini-model"
+                v-model="geminiModelName"
+              >
+                <option v-for="model in availableGeminiModels" :key="model" :value="model">
+                  {{ model }}
+                </option>
+              </select>
+              <small v-if="loadingModels">Loading available models...</small>
+              <small v-if="!geminiApiKey"
+                >Provide an API key and click "Fetch Models" to see a list of available
+                models.</small
+              >
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="sub-section">
-        <h3 @click="toggleSection('gemini')">
-          Gemini
-          <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
-        </h3>
-        <div v-if="!collapsedSections.has('gemini')">
-          <div class="form-group">
-            <label for="gemini-api-key">Gemini API Key:</label>
-            <input type="password" id="gemini-api-key" v-model="geminiApiKey" />
-          </div>
-          <div class="form-group">
-            <label for="gemini-model">Gemini Model Name:</label>
-            <button @click="fetchGeminiModels" :disabled="!geminiApiKey || loadingModels">
-              {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
-            </button>
-            <select v-if="availableGeminiModels.length" id="gemini-model" v-model="geminiModelName">
-              <option v-for="model in availableGeminiModels" :key="model" :value="model">
-                {{ model }}
-              </option>
-            </select>
-            <small v-if="loadingModels">Loading available models...</small>
-            <small v-if="!geminiApiKey">Provide an API key and click "Fetch Models" to see a list of available models.</small>
-          </div>
-        </div>
-      </div>
-
-      <div class="sub-section">
-        <h3
-          @click="toggleSection('aisa')"
-          @keydown.enter.prevent="toggleSection('aisa')"
-          @keydown.space.prevent="toggleSection('aisa')"
-          tabindex="0"
-          role="button"
-          :aria-expanded="!collapsedSections.has('aisa')"
-        >
-          AISA (in-cluster inference proxy)
-          <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
-        </h3>
-        <div v-if="!collapsedSections.has('aisa')">
-          <div class="form-group">
-            <small v-if="aisaStatus === null">Checking AISA availability...</small>
-            <small v-else-if="aisaStatus.available">
-              Connected via <code>{{ aisaStatus.base_url }}</code>. Credentials are managed by the cluster; no API key is needed here.
-            </small>
-            <small v-else>
-              AISA is not configured on this deployment. Direct providers above keep working. Operators enable it with
-              <code>aisa.enabled=true</code> in the Helm chart (or <code>AISA_BASE_URL</code>/<code>AISA_API_KEY</code>).
-            </small>
-          </div>
-          <div class="form-group">
-            <label for="aisa-model">AISA Model Name:</label>
-            <button @click="fetchAisaModels" :disabled="!aisaStatus?.available || loadingModels">
-              {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
-            </button>
-            <select v-if="availableAisaModels.length" id="aisa-model" v-model="aisaModelName">
-              <option v-for="model in availableAisaModels" :key="model" :value="model">
-                {{ model }}
-              </option>
-            </select>
-            <input v-else id="aisa-model" v-model="aisaModelName" :placeholder="aisaStatus?.default_model || 'e.g. qwen3:8b'" />
-            <small v-if="availableAisaModels.length">Only models with a healthy backend are listed.</small>
-            <small v-else-if="aisaStatus?.default_model">Consumer default model: {{ aisaStatus.default_model }}</small>
+        <div class="sub-section">
+          <h3
+            @click="toggleSection('aisa')"
+            @keydown.enter.prevent="toggleSection('aisa')"
+            @keydown.space.prevent="toggleSection('aisa')"
+            tabindex="0"
+            role="button"
+            :aria-expanded="!collapsedSections.has('aisa')"
+          >
+            AISA (in-cluster inference proxy)
+            <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+          </h3>
+          <div v-if="!collapsedSections.has('aisa')">
+            <div class="form-group">
+              <small v-if="aisaStatus === null">Checking AISA availability...</small>
+              <small v-else-if="aisaStatus.available">
+                Connected via <code>{{ aisaStatus.base_url }}</code>. Credentials are managed by the
+                cluster; no API key is needed here.
+              </small>
+              <small v-else>
+                AISA is not configured on this deployment. Direct providers above keep working.
+                Operators enable it with
+                <code>aisa.enabled=true</code> in the Helm chart (or
+                <code>AISA_BASE_URL</code>/<code>AISA_API_KEY</code>).
+              </small>
+            </div>
+            <div class="form-group">
+              <label for="aisa-model">AISA Model Name:</label>
+              <button @click="fetchAisaModels" :disabled="!aisaStatus?.available || loadingModels">
+                {{ loadingModels ? 'Loading...' : 'Fetch Models' }}
+              </button>
+              <select v-if="availableAisaModels.length" id="aisa-model" v-model="aisaModelName">
+                <option v-for="model in availableAisaModels" :key="model" :value="model">
+                  {{ model }}
+                </option>
+              </select>
+              <input
+                v-else
+                id="aisa-model"
+                v-model="aisaModelName"
+                :placeholder="aisaStatus?.default_model || 'e.g. qwen3:8b'"
+              />
+              <small v-if="availableAisaModels.length"
+                >Only models with a healthy backend are listed.</small
+              >
+              <small v-else-if="aisaStatus?.default_model"
+                >Consumer default model: {{ aisaStatus.default_model }}</small
+              >
+            </div>
           </div>
         </div>
       </div>
     </div>
-
-    </div> <!-- End User Tab -->
+    <!-- End User Tab -->
 
     <!-- System Settings Tab -->
     <div v-show="activeTab === 'system'" class="tab-content">
-    <div class="settings-section">
-      <h2>
-        System Configuration
-      </h2>
-      <div>
-        <div class="form-group checkbox-group">
-          <label for="public-read" class="checkbox-label">
-            <input type="checkbox" id="public-read" v-model="allowPublicRead" />
-            Allow Public Read Access (Stream Page)
-          </label>
-          <small>If enabled, the Stream page can be viewed without logging in.</small>
-        </div>
-        <div class="form-group checkbox-group">
-          <label for="scheduler-enabled" class="checkbox-label">
-            <input type="checkbox" id="scheduler-enabled" v-model="schedulerEnabled" />
-            Enable Scheduler (Automatic Feed Refresh)
-          </label>
-          <small v-if="schedulerEnabled">Feeds will refresh on the interval below.</small>
-          <small v-else>Scheduler is paused. Turn this on to resume automatic updates.</small>
-        </div>
-        <div class="form-group">
-          <label for="interval">Feed Refresh Interval (seconds):</label>
-          <input type="number" id="interval" v-model="iterationInterval" min="60" step="60" :disabled="!schedulerEnabled" />
-          <small>How often the system checks for new articles.</small>
-        </div>
-        <div class="form-group checkbox-group">
-          <label for="verbose-chat-export" class="checkbox-label">
-            <input id="verbose-chat-export" type="checkbox" v-model="verboseChatExport" />
-            Verbose Chat Export
-          </label>
-          <small>Include tool calls, metadata, and trace summary in exported chat markdown for all users.</small>
-        </div>
-        <div class="button-group">
-          <button class="secondary" @click="openSchedulerLogs">View Scheduler Logs</button>
+      <div class="settings-section">
+        <h2>System Configuration</h2>
+        <div>
+          <div class="form-group checkbox-group">
+            <label for="public-read" class="checkbox-label">
+              <input type="checkbox" id="public-read" v-model="allowPublicRead" />
+              Allow Public Read Access (Stream Page)
+            </label>
+            <small>If enabled, the Stream page can be viewed without logging in.</small>
+          </div>
+          <div class="form-group checkbox-group">
+            <label for="scheduler-enabled" class="checkbox-label">
+              <input type="checkbox" id="scheduler-enabled" v-model="schedulerEnabled" />
+              Enable Scheduler (Automatic Feed Refresh)
+            </label>
+            <small v-if="schedulerEnabled">Feeds will refresh on the interval below.</small>
+            <small v-else>Scheduler is paused. Turn this on to resume automatic updates.</small>
+          </div>
+          <div class="form-group">
+            <label for="interval">Feed Refresh Interval (seconds):</label>
+            <input
+              type="number"
+              id="interval"
+              v-model="iterationInterval"
+              min="60"
+              step="60"
+              :disabled="!schedulerEnabled"
+            />
+            <small>How often the system checks for new articles.</small>
+          </div>
+          <div class="form-group checkbox-group">
+            <label for="verbose-chat-export" class="checkbox-label">
+              <input id="verbose-chat-export" type="checkbox" v-model="verboseChatExport" />
+              Verbose Chat Export
+            </label>
+            <small
+              >Include tool calls, metadata, and trace summary in exported chat markdown for all
+              users.</small
+            >
+          </div>
+          <div class="button-group">
+            <button class="secondary" @click="openSchedulerLogs">View Scheduler Logs</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <ModelCatalogEditor />
+      <ModelCatalogEditor />
 
-    <div class="settings-section">
-      <h2 @click="toggleSection('authentication')">
-        Authentication Provider Configuration
-        <span class="toggle-icon">{{ collapsedSections.has('authentication') ? '▶' : '▼' }}</span>
-      </h2>
-      <div v-if="!collapsedSections.has('authentication')">
-         <p class="section-desc">Configure trusted 3rd party authentication providers. <br/>These settings can also be set via environment variables (which take precedence).</p>
-         
-         <div class="form-group">
+      <div class="settings-section">
+        <h2 @click="toggleSection('authentication')">
+          Authentication Provider Configuration
+          <span class="toggle-icon">{{ collapsedSections.has('authentication') ? '▶' : '▼' }}</span>
+        </h2>
+        <div v-if="!collapsedSections.has('authentication')">
+          <p class="section-desc">
+            Configure trusted 3rd party authentication providers. <br />These settings can also be
+            set via environment variables (which take precedence).
+          </p>
+
+          <div class="form-group">
             <label for="google-client-id">Google Client ID:</label>
-            <input type="text" id="google-client-id" v-model="googleClientId" placeholder="e.g. 123...apps.googleusercontent.com" />
-         </div>
-         
-         <div class="form-group">
-            <label for="entra-client-id">Microsoft Entra Client ID (Application ID):</label>
-            <input type="text" id="entra-client-id" v-model="entraClientId" placeholder="e.g. 00000000-0000-0000-0000-000000000000" />
-         </div>
-         
-         <div class="form-group">
-            <label for="entra-tenant-id">Microsoft Entra Tenant ID:</label>
-            <input type="text" id="entra-tenant-id" v-model="entraTenantId" placeholder="e.g. common, organizations, or UUID" />
-         </div>
-      </div>
-    </div>
+            <input
+              type="text"
+              id="google-client-id"
+              v-model="googleClientId"
+              placeholder="e.g. 123...apps.googleusercontent.com"
+            />
+          </div>
 
-    <div class="settings-section">
-      <h2>Backup & Restore</h2>
-      <div>
-        <p>Export your settings to a JSON file or restore from a backup. Note: Export includes your API keys.</p>
-        <div class="button-group">
+          <div class="form-group">
+            <label for="entra-client-id">Microsoft Entra Client ID (Application ID):</label>
+            <input
+              type="text"
+              id="entra-client-id"
+              v-model="entraClientId"
+              placeholder="e.g. 00000000-0000-0000-0000-000000000000"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="entra-tenant-id">Microsoft Entra Tenant ID:</label>
+            <input
+              type="text"
+              id="entra-tenant-id"
+              v-model="entraTenantId"
+              placeholder="e.g. common, organizations, or UUID"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Backup & Restore</h2>
+        <div>
+          <p>
+            Export your settings to a JSON file or restore from a backup. Note: Export includes your
+            API keys.
+          </p>
+          <div class="button-group">
             <button class="secondary" @click="exportSettings">Export Settings</button>
             <button class="secondary" @click="triggerImport">Import Settings</button>
-            <input 
-                type="file" 
-                ref="fileInput" 
-                style="display: none" 
-                accept=".json" 
-                @change="importSettings" 
+            <input
+              type="file"
+              ref="fileInput"
+              style="display: none"
+              accept=".json"
+              @change="importSettings"
             />
+          </div>
         </div>
       </div>
     </div>
-    </div> <!-- End System Tab -->
+    <!-- End System Tab -->
 
     <div class="actions-bar">
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
@@ -821,7 +914,11 @@ onMounted(() => {
           <div v-else-if="schedulerLogsError" class="modal-state">{{ schedulerLogsError }}</div>
           <div v-else-if="!schedulerLogs.length" class="modal-state">No scheduler logs yet.</div>
           <ul v-else class="scheduler-logs">
-            <li v-for="(log, index) in schedulerLogs" :key="`${log.timestamp}-${index}`" class="scheduler-log">
+            <li
+              v-for="(log, index) in schedulerLogs"
+              :key="`${log.timestamp}-${index}`"
+              class="scheduler-log"
+            >
               <div class="log-line">
                 <span class="log-time">{{ formatLogTimestamp(log.timestamp) }}</span>
                 <span class="log-event">{{ log.event }}</span>
@@ -834,7 +931,9 @@ onMounted(() => {
           </ul>
         </div>
         <div class="modal-footer">
-          <button class="secondary" :disabled="schedulerLogsLoading" @click="fetchSchedulerLogs">Refresh</button>
+          <button class="secondary" :disabled="schedulerLogsLoading" @click="fetchSchedulerLogs">
+            Refresh
+          </button>
         </div>
       </div>
     </div>
@@ -1001,19 +1100,20 @@ h3 {
   font-weight: bold;
 }
 .checkbox-group {
-    margin: 20px 0;
+  margin: 20px 0;
 }
 .checkbox-label {
-    display: flex !important;
-    align-items: center;
-    font-weight: normal !important;
-    cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  font-weight: normal !important;
+  cursor: pointer;
 }
 .checkbox-label input {
-    width: auto !important;
-    margin-right: 10px;
+  width: auto !important;
+  margin-right: 10px;
 }
-.form-group input, .form-group select {
+.form-group input,
+.form-group select {
   padding: 8px;
   width: 100%;
   max-width: 300px;
@@ -1051,19 +1151,19 @@ button:hover {
 }
 
 .button-group {
-    display: flex;
-    gap: 15px;
-    margin-top: 15px;
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
 }
 
 button.secondary {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
 }
 
 button.secondary:hover {
-    background: var(--input-bg);
+  background: var(--input-bg);
 }
 
 .save-all-btn {

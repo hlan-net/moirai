@@ -23,7 +23,13 @@ async def live_trend_test():
                 feed_url = "https://feeds.bbci.co.uk/news/rss.xml"
                 print(f"\n--- Adding Feed: {feed_url} ---")
                 await session.call_tool(
-                    "add_feed", {"url": feed_url, "title": "BBC News", "userspace": userspace, "category": "news"}
+                    "add_feed",
+                    {
+                        "url": feed_url,
+                        "title": "BBC News",
+                        "userspace": userspace,
+                        "category": "news",
+                    },
                 )
 
                 # 2. Read Feed

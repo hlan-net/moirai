@@ -132,10 +132,14 @@ class AgentConfigBase(BaseModel):
         3, ge=0, le=10, description="Max automatic retries for transient tool failures"
     )
     require_approval: bool = Field(
-        False, description="Require human approval before executing destructive tool calls"
+        False,
+        description="Require human approval before executing destructive tool calls",
     )
     approval_timeout_seconds: int = Field(
-        300, ge=30, le=3600, description="Seconds to wait for approval before timing out"
+        300,
+        ge=30,
+        le=3600,
+        description="Seconds to wait for approval before timing out",
     )
 
     @field_validator("schedule_interval")
@@ -160,11 +164,17 @@ class AgentConfigBase(BaseModel):
     @model_validator(mode="after")
     def validate_schedule_cross_fields(self) -> "AgentConfigBase":
         """Enforce cross-field rules between trigger_type and schedule_interval."""
-        if self.trigger_type == AgentTriggerType.SCHEDULED and not self.schedule_interval:
+        if (
+            self.trigger_type == AgentTriggerType.SCHEDULED
+            and not self.schedule_interval
+        ):
             raise ValueError(
                 "schedule_interval is required when trigger_type is 'scheduled'."
             )
-        if self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE and self.schedule_interval:
+        if (
+            self.trigger_type == AgentTriggerType.ON_NEW_ARTICLE
+            and self.schedule_interval
+        ):
             raise ValueError(
                 "schedule_interval must not be set when trigger_type is 'on_new_article'."
             )
@@ -172,7 +182,9 @@ class AgentConfigBase(BaseModel):
 
 
 class AgentConfigCreateRequest(AgentConfigBase):
-    userspace: str = Field(..., description="Userspace GUID for this agent configuration")
+    userspace: str = Field(
+        ..., description="Userspace GUID for this agent configuration"
+    )
     owner_user_id: str = Field(
         ..., description="The user who owns credentials for this agent (GUID)"
     )
@@ -416,7 +428,9 @@ class IssueCreateRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=2000)
     article_links: list[str] = Field(..., min_length=1)
     longevity: str = Field("transient")
-    public: bool = Field(False, description="Whether this issue is visible on the public Mythology page")
+    public: bool = Field(
+        False, description="Whether this issue is visible on the public Mythology page"
+    )
 
     @field_validator("name", "description")
     @classmethod
@@ -464,7 +478,9 @@ class LLMConfigRequest(BaseModel):
     def validate_ollama_endpoint(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        return _validate_http_or_https_url(v, "ollama_endpoint must be an HTTP/HTTPS URL")
+        return _validate_http_or_https_url(
+            v, "ollama_endpoint must be an HTTP/HTTPS URL"
+        )
 
 
 class UserspaceCreateRequest(BaseModel):
@@ -681,7 +697,9 @@ class LlmCatalogUpdateRequest(BaseModel):
             for name in names:
                 entry = self.catalog.get(name)
                 if entry is None:
-                    raise ValueError(f"purpose '{purpose}' names unknown entry '{name}'")
+                    raise ValueError(
+                        f"purpose '{purpose}' names unknown entry '{name}'"
+                    )
                 capabilities = set(entry.capabilities) or DEFAULT_CAPABILITIES
                 if needed not in capabilities:
                     raise ValueError(

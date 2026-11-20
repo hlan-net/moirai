@@ -59,17 +59,19 @@ const fetchIssues = async (isRefresh = false) => {
     const params = new URLSearchParams()
     // "Trends" are temporal or epic issues
     params.append('longevity', 'temporal')
-    
+
     if (filterStore.selectedFeedId) {
       params.append('feed_url', filterStore.selectedFeedId)
     }
-    
+
     const queryString = params.toString() ? `?${params.toString()}` : ''
     const response = await authFetch(`/api/issues${queryString}`)
 
     if (response.ok) {
       const data = await response.json()
-      issues.value = Array.isArray(data) ? data.filter((i: Issue) => !i._id.startsWith('_design/')) : []
+      issues.value = Array.isArray(data)
+        ? data.filter((i: Issue) => !i._id.startsWith('_design/'))
+        : []
     } else if (!isRefresh) {
       issues.value = []
     }
@@ -227,9 +229,9 @@ onUnmounted(() => {
         <p v-if="issue.description" class="summary">{{ issue.description }}</p>
 
         <IssueChatActions v-if="authStore.isAuthenticated" :issue="issue" />
-        
+
         <div class="status-tags">
-            <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
+          <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
         </div>
 
         <div v-if="expandedIssues.has(issue._id)" class="events-section">
@@ -333,26 +335,26 @@ h3 {
 }
 
 .status-tags {
-    display: flex;
-    gap: 5px;
-    margin-top: 5px;
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .status-tag {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    text-transform: uppercase;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .status-tag.active {
-    background: #28a745;
-    color: white;
+  background: #28a745;
+  color: white;
 }
 
 .status-tag.eternal {
-    background: #6c757d;
-    color: white;
+  background: #6c757d;
+  color: white;
 }
 
 .delete-btn {

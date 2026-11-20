@@ -1,6 +1,6 @@
 /**
  * Polling configuration for dashboard components.
- * 
+ *
  * All dashboard columns should use these synchronized intervals
  * to prevent erratic update behavior.
  */

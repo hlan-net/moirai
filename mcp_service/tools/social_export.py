@@ -6,7 +6,11 @@ Allows agents to share Moirai Issues to Bluesky.
 
 import logging
 
-from api.bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
+from api.bluesky_ops import (
+    bluesky_uri_to_url,
+    generate_bluesky_post_text,
+    post_to_bluesky,
+)
 from api.db import fetch_from_couchdb, query_couchdb, update_couchdb_doc_safe
 from api.llm.catalog import PURPOSE_SOCIAL_EXPORT
 from api.userspace_ops import get_userspace, resolve_llm_config
@@ -62,9 +66,7 @@ def publish_to_bluesky(issue_id: str, userspace: str = "") -> dict:
         if (p.get("id") if isinstance(p, dict) else p)
     ]
     articles = (
-        query_couchdb("articles", {"_id": {"$in": article_ids}})
-        if article_ids
-        else []
+        query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
     )
 
     llm_config = resolve_llm_config(userspace, PURPOSE_SOCIAL_EXPORT)

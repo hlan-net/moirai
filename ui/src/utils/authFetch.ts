@@ -14,10 +14,7 @@ const redirectToLogin = () => {
   }
 }
 
-export const authFetch = async (
-  input: RequestInfo | URL,
-  init: AuthFetchInit = {}
-) => {
+export const authFetch = async (input: RequestInfo | URL, init: AuthFetchInit = {}) => {
   const headers = new Headers(init.headers || {})
   const token = localStorage.getItem('token')
 

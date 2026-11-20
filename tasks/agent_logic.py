@@ -21,49 +21,56 @@ logger = logging.getLogger(__name__)
 def _handle_mcp_response(result: Any, context: str) -> tuple[bool, Any]:
     """
     Handle MCP tool response (standardized dict or legacy string).
-    
+
     Returns:
         (success: bool, data: Any)
         - success: True if operation succeeded, False on error
         - data: The data payload from response, or None on error
-        
+
     Logs errors and warnings as appropriate.
     """
     # New standardized response format (dict)
     if isinstance(result, dict):
         status = result.get("status")
-        
+
         if status == "success":
             return True, result.get("data")
-        
+
         elif status == "error":
             error_code = result.get("error_code", "UNKNOWN")
             message = result.get("message", "No error message")
             retryable = result.get("retryable", False)
             next_action = result.get("next_action", "unknown")
-            
+
             if retryable:
                 retry_after_ms = result.get("retry_after_ms", 1000)
                 logger.warning(
                     "%s: Retryable error (%s) - %s (retry in %dms, action: %s)",
-                    context, error_code, message, retry_after_ms, next_action
+                    context,
+                    error_code,
+                    message,
+                    retry_after_ms,
+                    next_action,
                 )
             else:
                 logger.error(
                     "%s: Non-retryable error (%s) - %s (action: %s)",
-                    context, error_code, message, next_action
+                    context,
+                    error_code,
+                    message,
+                    next_action,
                 )
-            
+
             return False, None
-        
+
         elif status == "partial":
             logger.warning("%s: Partial success - %s", context, result.get("message"))
             return True, result.get("data")  # Treat partial as success for now
-        
+
         else:
             logger.error("%s: Unknown response status: %s", context, status)
             return False, None
-    
+
     # Legacy string response format
     elif isinstance(result, str):
         if "error" in result.lower():
@@ -72,10 +79,11 @@ def _handle_mcp_response(result: Any, context: str) -> tuple[bool, Any]:
         else:
             logger.info("%s: %s", context, result)
             return True, result
-    
+
     else:
         logger.error("%s: Unexpected response type: %s", context, type(result))
         return False, None
+
 
 _OLLAMA_DEFAULT_ENDPOINT = "http://host.docker.internal:11434/v1"
 _WARN_MISSING_USERSPACE = "Agent '%s': missing userspace, skipping."
@@ -134,7 +142,9 @@ def _call_llm_once(
     try:
         # Inside the try: the AISA provider raises ValueError when the
         # in-cluster credentials are missing, which must be logged, not crash.
-        llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
+        llm_provider = LLMProviderFactory().get_provider(
+            provider_name, api_key, ollama_base_url
+        )
         response = llm_provider.create_chat_completion(
             messages=[{"role": "user", "content": prompt}],
             model=model,
@@ -145,38 +155,44 @@ def _call_llm_once(
 
         if _session_logger and _session_id:
             latency_ms = int((_time.monotonic() - start) * 1000)
-            _session_logger.add_step(_session_id, {
-                "step_id": str(_uuid.uuid4()),
-                "step_type": "llm_call",
-                "tool_name": f"{provider_name}/{model}",
-                "input_summary": prompt[:500],
-                "output_summary": (text or "")[:500],
-                "status": "success",
-                "latency_ms": latency_ms,
-                "correlation_id": str(_uuid.uuid4()),
-                "attempt": 1,
-                "risk_level": "normal",
-                "timestamp": _dt.now(_tz.utc).isoformat(),
-            })
+            _session_logger.add_step(
+                _session_id,
+                {
+                    "step_id": str(_uuid.uuid4()),
+                    "step_type": "llm_call",
+                    "tool_name": f"{provider_name}/{model}",
+                    "input_summary": prompt[:500],
+                    "output_summary": (text or "")[:500],
+                    "status": "success",
+                    "latency_ms": latency_ms,
+                    "correlation_id": str(_uuid.uuid4()),
+                    "attempt": 1,
+                    "risk_level": "normal",
+                    "timestamp": _dt.now(_tz.utc).isoformat(),
+                },
+            )
 
         return text
     except Exception as exc:
         if _session_logger and _session_id:
             latency_ms = int((_time.monotonic() - start) * 1000)
-            _session_logger.add_step(_session_id, {
-                "step_id": str(_uuid.uuid4()),
-                "step_type": "llm_call",
-                "tool_name": f"{provider_name}/{model}",
-                "input_summary": prompt[:500],
-                "output_summary": "",
-                "status": "error",
-                "error_message": str(exc),
-                "latency_ms": latency_ms,
-                "correlation_id": str(_uuid.uuid4()),
-                "attempt": 1,
-                "risk_level": "normal",
-                "timestamp": _dt.now(_tz.utc).isoformat(),
-            })
+            _session_logger.add_step(
+                _session_id,
+                {
+                    "step_id": str(_uuid.uuid4()),
+                    "step_type": "llm_call",
+                    "tool_name": f"{provider_name}/{model}",
+                    "input_summary": prompt[:500],
+                    "output_summary": "",
+                    "status": "error",
+                    "error_message": str(exc),
+                    "latency_ms": latency_ms,
+                    "correlation_id": str(_uuid.uuid4()),
+                    "attempt": 1,
+                    "risk_level": "normal",
+                    "timestamp": _dt.now(_tz.utc).isoformat(),
+                },
+            )
         logger.error("LLM call failed: %s", exc)
         return None
 
@@ -218,12 +234,16 @@ def create_event_from_articles(
         return
 
     if not new_articles:
-        logger.info("Agent '%s' (%s): no new articles to process.", agent_name, userspace)
+        logger.info(
+            "Agent '%s' (%s): no new articles to process.", agent_name, userspace
+        )
         return
 
     logger.info(
         "Agent '%s' (%s): analysing %d article(s) for event creation.",
-        agent_name, userspace, len(new_articles),
+        agent_name,
+        userspace,
+        len(new_articles),
     )
 
     article_lines = "\n".join(
@@ -247,13 +267,17 @@ def create_event_from_articles(
     raw = _call_llm(prompt, llm_config, mcp_client=mcp_client)
     decision = _parse_json_response(raw, f"Agent '{agent_name}'")
     if not decision or not decision.get("should_create"):
-        logger.info("Agent '%s' (%s): LLM decided no new event needed.", agent_name, userspace)
+        logger.info(
+            "Agent '%s' (%s): LLM decided no new event needed.", agent_name, userspace
+        )
         return
 
     name = (decision.get("name") or "").strip()
     description = (decision.get("description") or "").strip()
     if not name:
-        logger.warning("Agent '%s' (%s): LLM returned empty event name.", agent_name, userspace)
+        logger.warning(
+            "Agent '%s' (%s): LLM returned empty event name.", agent_name, userspace
+        )
         return
 
     article_ids = [a["_id"] for a in new_articles if a.get("_id")]
@@ -266,24 +290,35 @@ def create_event_from_articles(
             description=description,
             article_links=article_ids,
         )
-        
-        success, data = _handle_mcp_response(result, f"Agent '{agent_name}' ({userspace}): add_event")
-        
+
+        success, data = _handle_mcp_response(
+            result, f"Agent '{agent_name}' ({userspace}): add_event"
+        )
+
         if success:
             # New format includes issue_id in data
             if isinstance(data, dict) and "issue_id" in data:
                 logger.info(
                     "Agent '%s' (%s): Event created - ID: %s, Name: '%s'",
-                    agent_name, userspace, data["issue_id"], data.get("logos", name)
+                    agent_name,
+                    userspace,
+                    data["issue_id"],
+                    data.get("logos", name),
                 )
             else:
                 # Legacy string response
-                logger.info("Agent '%s' (%s): Event created successfully", agent_name, userspace)
+                logger.info(
+                    "Agent '%s' (%s): Event created successfully", agent_name, userspace
+                )
         else:
-            logger.error("Agent '%s' (%s): Failed to create event", agent_name, userspace)
-            
+            logger.error(
+                "Agent '%s' (%s): Failed to create event", agent_name, userspace
+            )
+
     except Exception as exc:
-        logger.error("Agent '%s' (%s): add_event failed: %s", agent_name, userspace, exc)
+        logger.error(
+            "Agent '%s' (%s): add_event failed: %s", agent_name, userspace, exc
+        )
 
 
 def add_articles_to_event(
@@ -309,39 +344,59 @@ def add_articles_to_event(
         return
 
     if not event_id:
-        logger.warning("Agent '%s' (%s): no linked_entity_id specified.", agent_name, userspace)
+        logger.warning(
+            "Agent '%s' (%s): no linked_entity_id specified.", agent_name, userspace
+        )
         return
 
     if not new_articles:
-        logger.info("Agent '%s' (%s): no new articles to process.", agent_name, userspace)
+        logger.info(
+            "Agent '%s' (%s): no new articles to process.", agent_name, userspace
+        )
         return
 
     logger.info(
         "Agent '%s' (%s): checking %d article(s) against event %s.",
-        agent_name, userspace, len(new_articles), event_id,
+        agent_name,
+        userspace,
+        len(new_articles),
+        event_id,
     )
 
     # Fetch current event state
-    event_result = mcp_client.call_tool("get_event", event_id=event_id, userspace=userspace)
-    
-    success, event_doc = _handle_mcp_response(event_result, f"Agent '{agent_name}' ({userspace}): get_event")
-    
+    event_result = mcp_client.call_tool(
+        "get_event", event_id=event_id, userspace=userspace
+    )
+
+    success, event_doc = _handle_mcp_response(
+        event_result, f"Agent '{agent_name}' ({userspace}): get_event"
+    )
+
     if not success or not event_doc:
         logger.error(
             "Agent '%s' (%s): could not fetch event %s",
-            agent_name, userspace, event_id,
+            agent_name,
+            userspace,
+            event_id,
         )
         return
-    
+
     existing_ids = {
         (p.get("id") if isinstance(p, dict) else p)
         for p in event_doc.get("premises", [])
     }
 
     # Only offer articles not already linked
-    candidates = [a for a in new_articles if a.get("_id") and a["_id"] not in existing_ids]
+    candidates = [
+        a for a in new_articles if a.get("_id") and a["_id"] not in existing_ids
+    ]
     if not candidates:
-        logger.info("Agent '%s' (%s): all new articles already linked to event %s.", agent_name, userspace, event_id)
+        logger.info(
+            "Agent '%s' (%s): all new articles already linked to event %s.",
+            agent_name,
+            userspace,
+            event_id,
+        )
         return
 
     article_lines = "\n".join(
@@ -369,12 +424,20 @@ def add_articles_to_event(
 
     relevant_ids = [str(i) for i in decision.get("relevant_ids", []) if i]
     if not relevant_ids:
-        logger.info("Agent '%s' (%s): LLM found no relevant articles for event %s.", agent_name, userspace, event_id)
+        logger.info(
+            "Agent '%s' (%s): LLM found no relevant articles for event %s.",
+            agent_name,
+            userspace,
+            event_id,
+        )
         return
 
     logger.info(
         "Agent '%s' (%s): adding %d article(s) to event %s.",
-        agent_name, userspace, len(relevant_ids), event_id,
+        agent_name,
+        userspace,
+        len(relevant_ids),
+        event_id,
     )
     _call_update_event(agent_name, userspace, event_id, relevant_ids, mcp_client)
 
@@ -390,19 +453,31 @@ def _call_update_event(
             event_id=event_id,
             article_links=article_links,
         )
-        
-        success, data = _handle_mcp_response(result, f"Agent '{agent_name}' ({userspace}): update_event")
-        
+
+        success, data = _handle_mcp_response(
+            result, f"Agent '{agent_name}' ({userspace}): update_event"
+        )
+
         if success:
             logger.info(
                 "Agent '%s' (%s): Event %s updated with %d article(s)",
-                agent_name, userspace, event_id, len(article_links)
+                agent_name,
+                userspace,
+                event_id,
+                len(article_links),
             )
         else:
-            logger.error("Agent '%s' (%s): Failed to update event %s", agent_name, userspace, event_id)
-            
+            logger.error(
+                "Agent '%s' (%s): Failed to update event %s",
+                agent_name,
+                userspace,
+                event_id,
+            )
+
     except Exception as exc:
-        logger.error("Agent '%s' (%s): update_event failed: %s", agent_name, userspace, exc)
+        logger.error(
+            "Agent '%s' (%s): update_event failed: %s", agent_name, userspace, exc
+        )
 
 
 def _parse_iso_timestamp(ts_str: str) -> Optional[Any]:
@@ -441,28 +516,47 @@ def check_event_staleness(
         return
 
     if not event_id:
-        logger.warning("Agent '%s' (%s): no linked_entity_id specified.", agent_name, userspace)
+        logger.warning(
+            "Agent '%s' (%s): no linked_entity_id specified.", agent_name, userspace
+        )
         return
 
-    event_result = mcp_client.call_tool("get_event", event_id=event_id, userspace=userspace)
-    
-    success, event_doc = _handle_mcp_response(event_result, f"Agent '{agent_name}' ({userspace}): get_event")
-    
+    event_result = mcp_client.call_tool(
+        "get_event", event_id=event_id, userspace=userspace
+    )
+
+    success, event_doc = _handle_mcp_response(
+        event_result, f"Agent '{agent_name}' ({userspace}): get_event"
+    )
+
     if not success or not event_doc:
         logger.error(
             "Agent '%s' (%s): could not fetch event %s",
-            agent_name, userspace, event_id,
+            agent_name,
+            userspace,
+            event_id,
         )
         return
-    
+
     last_activity_str = event_doc.get("updated_at") or event_doc.get("created_at")
     if not last_activity_str:
-        logger.warning("Agent '%s' (%s): event %s has no activity timestamp.", agent_name, userspace, event_id)
+        logger.warning(
+            "Agent '%s' (%s): event %s has no activity timestamp.",
+            agent_name,
+            userspace,
+            event_id,
+        )
         return
 
     last_activity = _parse_iso_timestamp(last_activity_str)
     if last_activity is None:
-        logger.error("Agent '%s' (%s): invalid date on event %s: %s", agent_name, userspace, event_id, last_activity_str)
+        logger.error(
+            "Agent '%s' (%s): invalid date on event %s: %s",
+            agent_name,
+            userspace,
+            event_id,
+            last_activity_str,
+        )
         return
 
     now = datetime.now(timezone.utc)
@@ -472,11 +566,25 @@ def check_event_staleness(
 
     if should_be_stale == is_stale_now:
         status = "stale" if is_stale_now else "active"
-        logger.info("Agent '%s' (%s): event %s remains %s (%d days).", agent_name, userspace, event_id, status, days_inactive)
+        logger.info(
+            "Agent '%s' (%s): event %s remains %s (%d days).",
+            agent_name,
+            userspace,
+            event_id,
+            status,
+            days_inactive,
+        )
         return
 
     action = "stale" if should_be_stale else "active"
-    logger.info("Agent '%s' (%s): marking event %s as %s (%d days inactive).", agent_name, userspace, event_id, action, days_inactive)
+    logger.info(
+        "Agent '%s' (%s): marking event %s as %s (%d days inactive).",
+        agent_name,
+        userspace,
+        event_id,
+        action,
+        days_inactive,
+    )
     try:
         result = mcp_client.call_tool(
             "mark_entity_stale",
@@ -485,13 +593,29 @@ def check_event_staleness(
             entity_id=event_id,
             is_stale=should_be_stale,
         )
-        
-        success, data = _handle_mcp_response(result, f"Agent '{agent_name}' ({userspace}): mark_entity_stale")
-        
+
+        success, data = _handle_mcp_response(
+            result, f"Agent '{agent_name}' ({userspace}): mark_entity_stale"
+        )
+
         if success:
-            logger.info("Agent '%s' (%s): Event %s marked as %s", agent_name, userspace, event_id, action)
+            logger.info(
+                "Agent '%s' (%s): Event %s marked as %s",
+                agent_name,
+                userspace,
+                event_id,
+                action,
+            )
         else:
-            logger.error("Agent '%s' (%s): Failed to mark event %s as %s", agent_name, userspace, event_id, action)
-            
+            logger.error(
+                "Agent '%s' (%s): Failed to mark event %s as %s",
+                agent_name,
+                userspace,
+                event_id,
+                action,
+            )
+
     except Exception as exc:
-        logger.error("Agent '%s' (%s): mark_entity_stale failed: %s", agent_name, userspace, exc)
+        logger.error(
+            "Agent '%s' (%s): mark_entity_stale failed: %s", agent_name, userspace, exc
+        )

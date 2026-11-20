@@ -115,7 +115,7 @@ watch(
       pollTimer = setTimeout(poll, 3000)
     }
   },
-  { immediate: true },
+  { immediate: true }
 )
 
 onUnmounted(() => {
@@ -209,7 +209,8 @@ onUnmounted(() => {
                     v-if="step.risk_level === 'destructive'"
                     class="badge badge-destructive"
                     title="Destructive tool"
-                  >!</span>
+                    >!</span
+                  >
                   <span v-if="(step.attempt ?? 1) > 1" class="badge badge-attempt">
                     attempt {{ step.attempt }}
                   </span>

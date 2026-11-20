@@ -37,6 +37,3 @@ def get_couchdb_uri():
         couchdb_uri += "/"
 
     return couchdb_uri
-
-
-

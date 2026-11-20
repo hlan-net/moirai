@@ -56,11 +56,9 @@ class TestUpdateCouchdbDocSafe:
         fetch_side_effects = [doc_v1, doc_v2]
         request_side_effects = [_make_response(409), _make_response(200)]
 
-        with patch(
-            "api.db.fetch_from_couchdb", side_effect=fetch_side_effects
-        ), patch("api.db._request", side_effect=request_side_effects) as mock_req, patch(
-            "api.db.time"
-        ):
+        with patch("api.db.fetch_from_couchdb", side_effect=fetch_side_effects), patch(
+            "api.db._request", side_effect=request_side_effects
+        ) as mock_req, patch("api.db.time"):
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}, max_retries=3
             )
@@ -75,11 +73,9 @@ class TestUpdateCouchdbDocSafe:
         """Should return False after max_retries all result in 409."""
         existing_doc = {"_id": "agent1", "_rev": "1-abc", "status": "active"}
 
-        with patch(
-            "api.db.fetch_from_couchdb", return_value=existing_doc
-        ), patch("api.db._request", return_value=_make_response(409)) as mock_req, patch(
-            "api.db.time"
-        ):
+        with patch("api.db.fetch_from_couchdb", return_value=existing_doc), patch(
+            "api.db._request", return_value=_make_response(409)
+        ) as mock_req, patch("api.db.time"):
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}, max_retries=2
             )
@@ -104,9 +100,9 @@ class TestUpdateCouchdbDocSafe:
         """Non-409 HTTP errors should not be retried; return False immediately."""
         existing_doc = {"_id": "agent1", "_rev": "1-abc", "status": "active"}
 
-        with patch(
-            "api.db.fetch_from_couchdb", return_value=existing_doc
-        ), patch("api.db._request", return_value=_make_response(500, "Server error")) as mock_req:
+        with patch("api.db.fetch_from_couchdb", return_value=existing_doc), patch(
+            "api.db._request", return_value=_make_response(500, "Server error")
+        ) as mock_req:
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}
             )
@@ -131,9 +127,9 @@ class TestUpdateCouchdbDocSafe:
             captured_bodies.append(kwargs.get("json", {}))
             return _make_response(200)
 
-        with patch(
-            "api.db.fetch_from_couchdb", return_value=existing_doc
-        ), patch("api.db._request", side_effect=capture_request):
+        with patch("api.db.fetch_from_couchdb", return_value=existing_doc), patch(
+            "api.db._request", side_effect=capture_request
+        ):
             result = update_couchdb_doc_safe(
                 "agent_configs", "agent1", {"status": "error"}
             )

@@ -77,9 +77,7 @@ def add_agent_config(
             message=f"Agent configuration '{name}' created with ID: {agent_id}",
         ).to_dict()
     else:
-        return internal_error(
-            message="Failed to add agent configuration."
-        ).to_dict()
+        return internal_error(message="Failed to add agent configuration.").to_dict()
 
 
 @mcp.tool(
@@ -178,9 +176,7 @@ def update_agent_config(
             message=f"Agent configuration {agent_id} updated",
         ).to_dict()
     else:
-        return internal_error(
-            message="Failed to update agent configuration."
-        ).to_dict()
+        return internal_error(message="Failed to update agent configuration.").to_dict()
 
 
 @mcp.tool(name="delete_agent_config", description="Deletes an agent configuration.")
@@ -201,9 +197,7 @@ def delete_agent_config(agent_id: str, userspace: str) -> dict:
             message=f"Agent configuration {agent_id} deleted.",
         ).to_dict()
     else:
-        return internal_error(
-            message="Failed to delete agent configuration."
-        ).to_dict()
+        return internal_error(message="Failed to delete agent configuration.").to_dict()
 
 
 @mcp.tool(

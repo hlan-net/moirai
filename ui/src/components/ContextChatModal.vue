@@ -76,7 +76,7 @@ const previousActiveElement = ref<HTMLElement | null>(null)
 
 const { dragStyle, handleProps: dragHandleProps } = useDraggable(
   drawerRef,
-  computed(() => chatContextStore.isOpen),
+  computed(() => chatContextStore.isOpen)
 )
 
 let modalKeydownListenerAttached = false
@@ -138,8 +138,7 @@ const quickActions = computed<QuickAction[]>(() => {
       },
       {
         label: 'Summarize in 3 bullets',
-        message:
-          'Summarize the key points of this article in exactly 3 concise bullet points.',
+        message: 'Summarize the key points of this article in exactly 3 concise bullet points.',
       },
     ]
   }
@@ -468,7 +467,10 @@ const submitRaiseWizard = async () => {
     const description = descMatch?.[1]?.split('\n')[0]?.trim() || text.trim()
 
     if (!articleId) {
-      messages.value.push({ role: 'assistant', content: `Drafted issue but could not determine article ID. Name: **${name}**` })
+      messages.value.push({
+        role: 'assistant',
+        content: `Drafted issue but could not determine article ID. Name: **${name}**`,
+      })
       return
     }
 
@@ -574,7 +576,9 @@ const copyChat = async () => {
       <header class="drawer-header" v-bind="dragHandleProps">
         <div class="header-title-block">
           <span class="context-badge">{{ contextEmoji }} {{ contextLabel }}</span>
-          <h3 id="context-chat-title" class="context-title" :title="contextTitle">{{ contextTitle }}</h3>
+          <h3 id="context-chat-title" class="context-title" :title="contextTitle">
+            {{ contextTitle }}
+          </h3>
           <button
             class="model-selector-btn"
             :title="'Override model for this chat session'"
@@ -591,7 +595,12 @@ const copyChat = async () => {
             </label>
             <label class="llm-selector-label">
               Model
-              <input v-model="sessionModel" class="llm-model-input" type="text" placeholder="model name" />
+              <input
+                v-model="sessionModel"
+                class="llm-model-input"
+                type="text"
+                placeholder="model name"
+              />
             </label>
           </div>
         </div>
@@ -605,7 +614,9 @@ const copyChat = async () => {
             <span aria-hidden="true">{{ copyStatus || '📋' }}</span>
             <span class="sr-only">Copy chat to clipboard</span>
           </button>
-          <button class="close-btn" @click="closeModal" aria-label="Close contextual chat">×</button>
+          <button class="close-btn" @click="closeModal" aria-label="Close contextual chat">
+            ×
+          </button>
         </div>
       </header>
 
@@ -644,7 +655,11 @@ const copyChat = async () => {
         <p class="wizard-hint">Answer briefly so the issue is generic and reusable.</p>
         <div v-if="raiseWizardLoading" class="wizard-hint">Generating questions...</div>
         <div v-else>
-          <div v-for="(question, index) in raiseWizardQuestions" :key="index" class="wizard-question">
+          <div
+            v-for="(question, index) in raiseWizardQuestions"
+            :key="index"
+            class="wizard-question"
+          >
             <label>{{ index + 1 }}. {{ question }}</label>
             <textarea v-model="raiseWizardAnswers[index]" rows="2"></textarea>
           </div>

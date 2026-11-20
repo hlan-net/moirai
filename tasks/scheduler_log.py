@@ -27,7 +27,9 @@ def add_scheduler_log(
     }
 
     if metadata:
-        entry["metadata"] = {key: _sanitize_text(str(value)) for key, value in metadata.items()}
+        entry["metadata"] = {
+            key: _sanitize_text(str(value)) for key, value in metadata.items()
+        }
 
     with _LOG_LOCK:
         _LOGS.append(entry)

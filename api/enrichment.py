@@ -41,20 +41,20 @@ def enrich_articles_with_issues(articles):
 def _get_cached_feed_mappings():
     """
     Get cached feed title and favicon mappings.
-    
+
     Returns:
         Tuple of (feed_title_map, feed_favicon_map) or None if not cached
     """
     try:
         redis_client = get_redis_client()
         cached = redis_client.get(ENRICHMENT_CACHE_KEY)
-        
+
         if cached:
             data = json.loads(cached)
             return data.get("titles", {}), data.get("favicons", {})
     except (redis.exceptions.RedisError, json.JSONDecodeError) as e:
         logger.warning(f"Failed to get cached feed mappings: {e}")
-    
+
     return None, None
 
 
@@ -62,15 +62,8 @@ def _cache_feed_mappings(feed_title_map, feed_favicon_map):
     """Cache feed mappings in Redis."""
     try:
         redis_client = get_redis_client()
-        data = {
-            "titles": feed_title_map,
-            "favicons": feed_favicon_map
-        }
-        redis_client.setex(
-            ENRICHMENT_CACHE_KEY,
-            ENRICHMENT_CACHE_TTL,
-            json.dumps(data)
-        )
+        data = {"titles": feed_title_map, "favicons": feed_favicon_map}
+        redis_client.setex(ENRICHMENT_CACHE_KEY, ENRICHMENT_CACHE_TTL, json.dumps(data))
     except redis.exceptions.RedisError as e:
         logger.warning(f"Failed to cache feed mappings: {e}")
 
@@ -92,13 +85,15 @@ def _fetch_related_data(article_links):
     if article_links:
         issues = query_couchdb(
             "issues",
-            selector={"premises": {MONGO_ELEM_MATCH: { "id": {MONGO_IN: article_links} }}},
+            selector={
+                "premises": {MONGO_ELEM_MATCH: {"id": {MONGO_IN: article_links}}}
+            },
             limit=1000,
         )
 
     # Try to get feed mappings from cache first
     feed_title_map, feed_favicon_map = _get_cached_feed_mappings()
-    
+
     if feed_title_map is None or feed_favicon_map is None:
         # Cache miss - fetch from database
         feeds = fetch_from_couchdb("feeds")
@@ -106,12 +101,14 @@ def _fetch_related_data(article_links):
             feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
         }
         feed_favicon_map = {
-            feed.get("url"): feed.get("favicon_url") for feed in feeds if feed.get("url")
+            feed.get("url"): feed.get("favicon_url")
+            for feed in feeds
+            if feed.get("url")
         }
-        
+
         # Cache for next time
         _cache_feed_mappings(feed_title_map, feed_favicon_map)
-    
+
     return issues, (feed_title_map, feed_favicon_map)
 
 
@@ -130,12 +127,14 @@ def _build_article_issue_map(issues):
                 link = premise.get("id")
                 if link:
                     # Map link -> issue summary info
-                    article_issue_map.setdefault(link, []).append({
-                        "id": issue_id,
-                        "logos": issue_logos,
-                        "longevity": issue.get("longevity"),
-                        "status": issue.get("status")
-                    })
+                    article_issue_map.setdefault(link, []).append(
+                        {
+                            "id": issue_id,
+                            "logos": issue_logos,
+                            "longevity": issue.get("longevity"),
+                            "status": issue.get("status"),
+                        }
+                    )
 
     return article_issue_map
 
@@ -183,7 +182,7 @@ def enrich_issues_with_constituents(issues, recursive=True):
             doc = _fetch_premise_doc(premise, recursive)
             if doc:
                 enriched_premises.append(doc)
-        
+
         issue["enriched_premises"] = enriched_premises
     return issues
 
@@ -205,5 +204,5 @@ def _fetch_premise_doc(premise, recursive):
             return doc
     except Exception as e:
         logger.warning(f"Could not fetch premise {p_id} of type {p_type}: {e}")
-    
+
     return None

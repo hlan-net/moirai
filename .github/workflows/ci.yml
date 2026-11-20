@@ -60,6 +60,10 @@ jobs:
       run: |
         conda run --name moirai ruff check . --target-version=py310
 
+    - name: Check formatting with Black
+      run: |
+        conda run --name moirai black --check --diff .
+
     - name: Run tests
       env:
         COUCHDB_USER: admin
@@ -114,6 +118,10 @@ jobs:
     - name: Install dependencies (Yarn)
       working-directory: ./ui
       run: yarn install
+
+    - name: Check formatting with Prettier
+      working-directory: ./ui
+      run: yarn prettier --check .
 
     - name: Cache Playwright browsers
       uses: actions/cache@v6

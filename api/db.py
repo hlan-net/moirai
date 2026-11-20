@@ -72,7 +72,9 @@ def fetch_from_couchdb(db_name, doc_id=None):
         if doc_id:
             safe_db_name = urllib.parse.quote(db_name, safe="")
             safe_doc_id = urllib.parse.quote(doc_id, safe="")
-            response = _request("GET", f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}")
+            response = _request(
+                "GET", f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}"
+            )
         else:
             response = _request(
                 "GET",
@@ -119,7 +121,9 @@ def delete_from_couchdb(db_name, doc_id, rev):
     safe_doc_id = urllib.parse.quote(doc_id, safe="")
     try:
         response = _request(
-            "DELETE", f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}", params={"rev": rev}
+            "DELETE",
+            f"{get_couchdb_uri()}{safe_db_name}/{safe_doc_id}",
+            params={"rev": rev},
         )
         return response.status_code in (200, 202)
     except requests.exceptions.RequestException as e:
@@ -295,9 +299,7 @@ def query_couchdb_view(db_name, design_doc, view_name, group=True):
     safe_design_doc = urllib.parse.quote(design_doc, safe="")
     safe_view_name = urllib.parse.quote(view_name, safe="")
 
-    url = (
-        f"{get_couchdb_uri()}{safe_db_name}/_design/{safe_design_doc}/_view/{safe_view_name}"
-    )
+    url = f"{get_couchdb_uri()}{safe_db_name}/_design/{safe_design_doc}/_view/{safe_view_name}"
     params = {"group": "true" if group else "false"}
 
     try:

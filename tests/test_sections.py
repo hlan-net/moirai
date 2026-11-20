@@ -409,7 +409,9 @@ def test_annotation_worker_skips_refiled_articles():
     save.assert_called_once_with("7")
 
 
-@pytest.mark.parametrize("new_category, refiled", [("general", True), ("sports", False)])
+@pytest.mark.parametrize(
+    "new_category, refiled", [("general", True), ("sports", False)]
+)
 def test_mcp_category_update_refiles_existing_articles(new_category, refiled):
     """The MCP tool must re-file like ``PUT /api/feeds/<id>`` does (#266)."""
     from mcp_service.tools import feeds as mcp_feeds

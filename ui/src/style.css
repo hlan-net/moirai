@@ -3,9 +3,9 @@
   --text-color: rgba(255, 255, 255, 0.9); /* Slightly brighter text */
   --card-bg: #2b2b2b; /* Softer card background */
   --border-color: #444;
-  --primary-color: #6200EE; /* Vibrant primary blue/purple */
+  --primary-color: #6200ee; /* Vibrant primary blue/purple */
   --primary-hover: #9e47ff; /* Lighter hover for primary */
-  --button-bg: #3700B3; /* Button background derived from primary */
+  --button-bg: #3700b3; /* Button background derived from primary */
   --input-bg: #333;
   --input-text: #fff;
 
@@ -29,8 +29,8 @@
   --text-color: #212121; /* Darker text */
   --card-bg: #ffffff;
   --border-color: #e0e0e0;
-  --primary-color: #6200EE;
-  --primary-hover: #3700B3;
+  --primary-color: #6200ee;
+  --primary-hover: #3700b3;
   --button-bg: #f9f9f9;
   --input-bg: #ffffff;
   --input-text: #333;
@@ -45,8 +45,8 @@
     --text-color: #212121;
     --card-bg: #ffffff;
     --border-color: #e0e0e0;
-    --primary-color: #6200EE;
-    --primary-hover: #3700B3;
+    --primary-color: #6200ee;
+    --primary-hover: #3700b3;
     --button-bg: #f9f9f9;
     --input-bg: #ffffff;
     --input-text: #333;
@@ -112,7 +112,9 @@ button {
   background-color: var(--primary-color); /* Primary color button */
   color: white; /* White text for primary button */
   cursor: pointer;
-  transition: background-color 0.25s, box-shadow 0.25s;
+  transition:
+    background-color 0.25s,
+    box-shadow 0.25s;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Subtle shadow */
 }
 
@@ -207,7 +209,9 @@ button:focus-visible {
   background: var(--input-bg);
   color: var(--input-text);
   font-size: 0.9rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .search-input:focus {

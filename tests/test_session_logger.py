@@ -16,7 +16,9 @@ from tasks.session_logger import (
 @pytest.fixture
 def mock_redis():
     client = MagicMock()
-    client.pipeline.return_value.__enter__ = MagicMock(return_value=client.pipeline.return_value)
+    client.pipeline.return_value.__enter__ = MagicMock(
+        return_value=client.pipeline.return_value
+    )
     client.pipeline.return_value.__exit__ = MagicMock(return_value=False)
     return client
 
