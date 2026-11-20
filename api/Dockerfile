@@ -12,7 +12,6 @@ RUN conda install -y mamba && \
     # 1. Google API discovery cache (93 MB of JSON, fetched at runtime anyway)
     rm -rf /opt/conda/envs/moirai/lib/python3.*/site-packages/googleapiclient/discovery_cache/documents && \
     # 2. pip and setuptools (not needed at runtime)
-    pip install --target /dev/null 2>/dev/null; \
     rm -rf /opt/conda/envs/moirai/lib/python3.*/site-packages/pip \
            /opt/conda/envs/moirai/lib/python3.*/site-packages/setuptools \
            /opt/conda/envs/moirai/lib/python3.*/site-packages/pkg_resources \
@@ -83,7 +82,9 @@ RUN chown -R root:appuser /app && \
     chmod -R 700 /app/feeds && \
     chmod -R 770 /app/ui/dist && \
     chmod +x /app/create_dbs.sh && \
-    chmod 1777 /tmp && \
+    # /tmp must stay world-writable with the sticky bit for the non-root user;
+    # the base image ships it that way, so assert it instead of re-granting it.
+    test "$(stat -c %a /tmp)" = "1777" && \
     chmod 644 /etc/moirai/build-info
 
 USER appuser
