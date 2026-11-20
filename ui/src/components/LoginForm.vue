@@ -150,8 +150,8 @@ const checkGithubCallback = async () => {
 }
 
 onMounted(() => {
-  fetchAuthConfig()
-  checkGithubCallback()
+  void fetchAuthConfig()
+  void checkGithubCallback()
 })
 </script>
 

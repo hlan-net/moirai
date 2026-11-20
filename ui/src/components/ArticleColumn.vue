@@ -284,7 +284,7 @@ watch(
       clearTimeout(searchDebounceTimer)
     }
     searchDebounceTimer = globalThis.setTimeout(() => {
-      fetchSupplementalSearchResults(searchQuery.value)
+      void fetchSupplementalSearchResults(searchQuery.value)
     }, 300)
   }
 )
@@ -310,7 +310,7 @@ const setupIntersectionObserver = () => {
     (entries) => {
       const firstEntry = entries[0]
       if (firstEntry?.isIntersecting && hasMore.value && !loadingMore.value) {
-        loadMore()
+        void loadMore()
       }
     },
     { rootMargin: '200px' }
@@ -328,7 +328,7 @@ onMounted(async () => {
 
   // Sync polling interval with other columns and always refresh (no conditional check)
   refreshInterval = globalThis.setInterval(() => {
-    fetchLatestUpdates()
+    void fetchLatestUpdates()
   }, SYNC_REFRESH_INTERVAL)
 })
 
