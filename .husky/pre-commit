@@ -1,8 +1,14 @@
 # Installed by `yarn install` in ui/ (the "postinstall" script runs husky from the
 # repository root). One hook for both halves of the repo.
 
-# UI: prettier on staged files.
-(cd ui && yarn lint-staged) || exit 1
+# UI: prettier on staged files. A shell without the Node toolchain (for
+# example a Python-only commit from an IDE) gets a warning, not a failure.
+if command -v yarn >/dev/null 2>&1 && [ -d ui/node_modules ]; then
+  (cd ui && yarn lint-staged) || exit 1
+elif git diff --cached --name-only --diff-filter=ACMR | grep -q '^ui/'; then
+  echo "yarn or ui/node_modules not found: staged UI files were not formatted." >&2
+  echo "Run 'yarn install' in ui/ from a shell with Node on PATH. CI checks prettier either way." >&2
+fi
 
 # Python and YAML: black, ruff and the hygiene hooks from .pre-commit-config.yaml.
 if git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(py|ya?ml)$'; then
