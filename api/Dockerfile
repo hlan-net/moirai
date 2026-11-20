@@ -10,20 +10,20 @@ RUN conda install -y mamba && \
     mamba clean --all --force-pkgs-dirs -y && \
     # ---- Aggressively strip the conda env for production ----
     # 1. Google API discovery cache (93 MB of JSON, fetched at runtime anyway)
-    rm -rf /opt/conda/envs/moirai/lib/python3.10/site-packages/googleapiclient/discovery_cache/documents && \
+    rm -rf /opt/conda/envs/moirai/lib/python3.*/site-packages/googleapiclient/discovery_cache/documents && \
     # 2. pip and setuptools (not needed at runtime)
     pip install --target /dev/null 2>/dev/null; \
-    rm -rf /opt/conda/envs/moirai/lib/python3.10/site-packages/pip \
-           /opt/conda/envs/moirai/lib/python3.10/site-packages/setuptools \
-           /opt/conda/envs/moirai/lib/python3.10/site-packages/pkg_resources \
-           /opt/conda/envs/moirai/lib/python3.10/ensurepip && \
+    rm -rf /opt/conda/envs/moirai/lib/python3.*/site-packages/pip \
+           /opt/conda/envs/moirai/lib/python3.*/site-packages/setuptools \
+           /opt/conda/envs/moirai/lib/python3.*/site-packages/pkg_resources \
+           /opt/conda/envs/moirai/lib/python3.*/ensurepip && \
     # 3. Tkinter / tcl / tk (not needed for a web server)
     rm -rf /opt/conda/envs/moirai/lib/libtcl* \
            /opt/conda/envs/moirai/lib/libtk* \
            /opt/conda/envs/moirai/lib/tcl8* \
            /opt/conda/envs/moirai/lib/tk8* \
-           /opt/conda/envs/moirai/lib/python3.10/tkinter \
-           /opt/conda/envs/moirai/lib/python3.10/lib-tk && \
+           /opt/conda/envs/moirai/lib/python3.*/tkinter \
+           /opt/conda/envs/moirai/lib/python3.*/lib-tk && \
     # 4. C headers and static libraries (only needed for compiling)
     rm -rf /opt/conda/envs/moirai/include \
            /opt/conda/envs/moirai/lib/*.a && \

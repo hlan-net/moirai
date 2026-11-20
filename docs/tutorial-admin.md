@@ -8,7 +8,7 @@ Welcome to the Moirai admin guide! This document covers deploying, configuring, 
 
 ### Prerequisites
 
-- **Docker & Docker Compose** (recommended) OR Linux/macOS with Python 3.10+
+- **Docker & Docker Compose** (recommended) OR Linux/macOS with Python 3.12
 - **CouchDB 3.2+** (persistent database)
 - **Redis 6.0+** (caching & distributed locks)
 - **3-4 GB RAM, 20 GB disk** minimum

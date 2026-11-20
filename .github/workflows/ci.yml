@@ -57,7 +57,7 @@ jobs:
 
     - name: Lint with Ruff
       run: |
-        conda run --name moirai ruff check . --target-version=py310
+        conda run --name moirai ruff check . --target-version=py312
 
     - name: Check formatting with Black
       run: |
