@@ -20,8 +20,7 @@ Three principles flow from that vision:
 
 | Version | Highlights |
 |---|---|
-| **v0.11.1** | Python 3.12. Formatting enforced in CI. Re-filed articles without annotations are annotated. |
-| **v0.11.0** | Stream sections: Top stories, Sports, Culture, Business. Stream page served from the `stream.rss` cache. |
+| **v0.11.x** | Stream sections: Top stories, Sports, Culture, Business. Stream page served from the `stream.rss` cache. Python 3.12. Formatting enforced in CI; Python pins visible to Dependabot. |
 | **v0.10.x** | Single implicit userspace (MCP, REST API, UI). Model catalog for annotation, chat, agents and social export, editable in the admin UI. Bounded feed-fetch pool. Security and dependency updates. |
 | **v0.9.x** | AISA in-cluster inference proxy as an LLM provider. Closed annotation topic vocabulary and re-annotation at backlog scale. Scheduler and worker split from the API. Issues model ("The Fates", 2nd iteration). |
 | **v0.8.1** | Hotfix: worker memory bump (OOMKill), Gemini chat context preamble + copy/download fix. |
@@ -30,7 +29,7 @@ Three principles flow from that vision:
 | **v0.7.1** | Dependency bumps (starlette 1.0, bcrypt 5.0). Public Mythology page; public/private issue distinction. |
 | **v0.7.0** | Userspace as a first-class document with LLM credentials. Session logging foundation. Chat LLM override. Quick actions. Draggable chat. Bluesky export. |
 
-The latest release is **v0.11.1**. See [`CHANGELOG.md`](CHANGELOG.md) for the full history.
+See [`CHANGELOG.md`](CHANGELOG.md) for the latest release and the full history.
 
 ---
 
