@@ -1,7 +1,15 @@
-cd ui
+# Installed by `yarn install` in ui/ (the "prepare" script runs husky from the
+# repository root). One hook for both halves of the repo.
 
-if command -v yarn >/dev/null 2>&1; then
-  yarn lint-staged
-else
-  yarnpkg lint-staged
+# UI: prettier on staged files.
+(cd ui && yarn lint-staged) || exit 1
+
+# Python and YAML: black, ruff and the hygiene hooks from .pre-commit-config.yaml.
+if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.(py|ya?ml)$'; then
+  if command -v pre-commit >/dev/null 2>&1; then
+    pre-commit run || exit 1
+  else
+    echo "pre-commit not found: activate the moirai environment (mamba activate moirai)" >&2
+    echo "to format and lint Python before committing. CI checks it either way." >&2
+  fi
 fi

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "prepare": "husky"
+    "postinstall": "cd .. && husky"
   },
   "dependencies": {
     "axios": "^1.21.1",

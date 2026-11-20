@@ -88,7 +88,7 @@ npx playwright test tests/admin.spec.ts   # Specific test
 ```
 
 ### Linting & Formatting
-Pre-commit hooks run `black`, `ruff`, `trailing-whitespace`, `end-of-file-fixer`. Frontend uses `prettier` via `lint-staged` (husky).
+One git hook, `.husky/pre-commit`, installed by `yarn install` in `ui/`: `prettier` via `lint-staged` on staged UI files, and `pre-commit run` (`black`, `ruff`, `trailing-whitespace`, `end-of-file-fixer`) when Python or YAML files are staged. The Python half needs the `moirai` environment active. Do not run `pre-commit install`; husky owns `core.hooksPath`. CI enforces `black --check` and `prettier --check`.
 ```bash
 ruff check . --fix              # Python lint
 black .                         # Python format
