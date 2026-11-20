@@ -1,7 +1,22 @@
-cd ui
+# Installed by `yarn install` in ui/ (the "postinstall" script runs husky from the
+# repository root). One hook for both halves of the repo.
 
-if command -v yarn >/dev/null 2>&1; then
-  yarn lint-staged
-else
-  yarnpkg lint-staged
+# UI: prettier on staged files. A shell without the Node toolchain (for
+# example a Python-only commit from an IDE) gets a warning, not a failure.
+YARN=$(command -v yarn || command -v yarnpkg)
+if [ -n "$YARN" ] && [ -d ui/node_modules ]; then
+  (cd ui && "$YARN" lint-staged) || exit 1
+elif git diff --cached --name-only --diff-filter=ACMR | grep -q '^ui/'; then
+  echo "yarn or ui/node_modules not found: staged UI files were not formatted." >&2
+  echo "Run 'yarn install' in ui/ from a shell with Node on PATH. CI checks prettier either way." >&2
+fi
+
+# Python and YAML: black, ruff and the hygiene hooks from .pre-commit-config.yaml.
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(py|ya?ml)$'; then
+  if command -v pre-commit >/dev/null 2>&1; then
+    pre-commit run || exit 1
+  else
+    echo "pre-commit not found: activate the moirai environment (mamba activate moirai)" >&2
+    echo "to format and lint Python before committing. CI checks ruff and black either way." >&2
+  fi
 fi

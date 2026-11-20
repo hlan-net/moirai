@@ -8,7 +8,7 @@ Welcome, developer! This guide covers setting up a local development environment
 
 ### Prerequisites
 - **Python 3.12** (check: `python --version`)
-- **Node.js 18+** (check: `node --version`)
+- **Node.js 26** (the major in `ui/.nvmrc`; `nvm install` in `ui/` selects it) with Corepack for Yarn 4: `npm install -g corepack && corepack enable`
 - **Git** (check: `git --version`)
 - **Docker** (recommended, check: `docker --version`)
 - **Mamba or Conda** (for Python environment isolation)
