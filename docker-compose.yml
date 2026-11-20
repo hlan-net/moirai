@@ -48,7 +48,7 @@ services:
       context: ./ui
 
   nginx:
-    image: nginx:1.30.7-alpine
+    image: nginx:1.31.8-alpine
     ports:
       - "8088:80"
     volumes:
