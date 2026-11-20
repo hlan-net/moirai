@@ -4,10 +4,19 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.11.1] — 2026-11-20
 
 ### Re-filed articles without annotations are annotated
 In v0.11.0 the annotation worker skipped every stored article that the section backfill re-filed, so legacy articles that had never been annotated stayed that way. It now skips only those that already carry annotations; the rest go through the normal annotation path on the first worker start after the upgrade (one LLM call per unannotated stored article, once). `store_annotation` carries the re-filing stamp over to the revision it writes, so annotating a backlog article still does not dispatch `ON_NEW_ARTICLE` agents for it.
+
+### Python 3.12 (#315)
+The backend moves from Python 3.10, which reached end of life in October 2026, to 3.12. Both conda environments, the ruff target and the image-pruning paths in `api/Dockerfile` follow. No dependency pins change; unpinned transitive packages that 3.10 held back (filelock, dnspython) resolve to their fixed releases. 3.13 is blocked by `passlib` 1.7.4, which imports the removed `crypt` module. Local environments need recreating from `environment.yml`.
+
+### CI tests the pinned dependency versions (#316)
+`ci.yml` and `security.yml` reinstalled `google-genai` 1.3.0 and `google-auth` 2.38.0 with pip after creating the conda environment, below the pinned 1.7.0 and 2.49.1. The step is gone; CI prints the versions it resolved.
+
+### Formatting is enforced (#314)
+The codebase is formatted once with `black` and `prettier`, and CI now fails on unformatted code (`black --check`, `prettier --check`). Pre-commit pins black and ruff to the versions in `environment.yml`; the `ruff-format` hook is dropped because it and black reformat each other's output.
 
 ---
 
