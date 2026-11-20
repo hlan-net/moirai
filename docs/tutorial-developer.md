@@ -7,7 +7,7 @@ Welcome, developer! This guide covers setting up a local development environment
 ## Part 1: Development Environment Setup
 
 ### Prerequisites
-- **Python 3.10+** (check: `python --version`)
+- **Python 3.12** (check: `python --version`)
 - **Node.js 18+** (check: `node --version`)
 - **Git** (check: `git --version`)
 - **Docker** (recommended, check: `docker --version`)

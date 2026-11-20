@@ -91,7 +91,7 @@ This ethos is not about renaming code or enforcing mythology in APIs — it's a 
 ## 1. Build, Run, and Test Commands
 
 ### Backend (Python/Flask/MCP)
-- **Environment:** Conda (preferred) or venv. Python 3.10+.
+- **Environment:** Conda (preferred) or venv. Python 3.12.
 - **Install Dependencies:**
   ```bash
   pip install -r requirements.txt
