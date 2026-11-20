@@ -15,7 +15,12 @@ from flask import Blueprint, abort, g, jsonify, request
 from pydantic import ValidationError
 
 from api.auth import jwt_required
-from api.db import fetch_from_couchdb, store_to_couchdb, update_couchdb_doc_safe, delete_from_couchdb
+from api.db import (
+    fetch_from_couchdb,
+    store_to_couchdb,
+    update_couchdb_doc_safe,
+    delete_from_couchdb,
+)
 from api.extensions import limiter
 from api.userspace_ops import USERSPACES_DB, get_userspace
 from api.validation import UserspaceCreateRequest, UserspaceUpdateRequest

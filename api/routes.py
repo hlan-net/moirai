@@ -26,7 +26,13 @@ from .llm import catalog as llm_catalog
 from .llm.catalog import PURPOSE_SOCIAL_EXPORT
 from .auth import jwt_required, admin_required, verify_jwt_in_request
 from pydantic import ValidationError
-from .validation import FeedCreateRequest, FeedUpdateRequest, ConfigUpdateRequest, IssueCreateRequest, ShareIssueRequest
+from .validation import (
+    FeedCreateRequest,
+    FeedUpdateRequest,
+    ConfigUpdateRequest,
+    IssueCreateRequest,
+    ShareIssueRequest,
+)
 from .validation import LlmCatalogUpdateRequest
 from .auth import get_auth_config
 
@@ -479,7 +485,9 @@ def list_articles():
     skip = max(skip, 0)
 
     # Caching
-    is_default_view = (limit == 50 and skip == 0 and not since and not feed_id and not issue_id)
+    is_default_view = (
+        limit == 50 and skip == 0 and not since and not feed_id and not issue_id
+    )
     cached = _get_cached_articles_view(is_default_view)
     if cached:
         return cached
@@ -488,13 +496,15 @@ def list_articles():
 
     # If selector indicates no match (e.g., non-existent event/trend), return empty
     if selector.get("_id", {}).get("$eq") == "no_match":
-        return jsonify({
-            "articles": [],
-            "total_count": 0,
-            "has_more": False,
-            "limit": limit,
-            "skip": skip,
-        })
+        return jsonify(
+            {
+                "articles": [],
+                "total_count": 0,
+                "has_more": False,
+                "limit": limit,
+                "skip": skip,
+            }
+        )
 
     # Query CouchDB
     articles = query_couchdb(
@@ -515,7 +525,7 @@ def list_articles():
         "limit": limit,
         "skip": skip,
     }
-    
+
     if is_default_view:
         _cache_articles_view(response_data)
 
@@ -599,7 +609,9 @@ def rss_feed():
     channel_description = "Aggregated news stream with AI-synthesized Events and Trends"
     if section:
         channel_title = f"{channel_title} — {section_label(section)}"
-        channel_description = f"{channel_description} ({section_label(section)} section)"
+        channel_description = (
+            f"{channel_description} ({section_label(section)} section)"
+        )
 
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -656,7 +668,10 @@ def _resolve_feed_url(feed_filter):
 def _filter_issues_by_feed(selector, resolved_feed_url):
     """Filter issues by feed URL and selector."""
     articles = query_couchdb(
-        "articles", selector={"feed_url": resolved_feed_url}, fields=["link"], limit=10000
+        "articles",
+        selector={"feed_url": resolved_feed_url},
+        fields=["link"],
+        limit=10000,
     )
     links = [a.get("link") for a in articles if a.get("link")]
     if not links:
@@ -665,7 +680,8 @@ def _filter_issues_by_feed(selector, resolved_feed_url):
     issues = query_couchdb("issues", selector=selector, limit=1000)
     link_set = set(links)
     return [
-        issue for issue in issues
+        issue
+        for issue in issues
         if not (issue.get("premises") or [])
         or any((p or {}).get("id") in link_set for p in issue.get("premises", []))
     ]
@@ -676,7 +692,8 @@ def _filter_issues_by_selector(issues, longevity, status):
     if not (longevity or status):
         return issues
     return [
-        i for i in issues
+        i
+        for i in issues
         if (not longevity or i.get("longevity") == longevity)
         and (not status or i.get("status") == status)
     ]
@@ -771,9 +788,7 @@ def remove_issue_premise(issue_id):
         abort(404)
 
     if "premises" in issue:
-        issue["premises"] = [
-            p for p in issue["premises"] if p.get("id") != premise_id
-        ]
+        issue["premises"] = [p for p in issue["premises"] if p.get("id") != premise_id]
         if update_couchdb_doc("issues", issue_id, issue):
             return jsonify(issue)
 
@@ -827,9 +842,19 @@ def get_mythology():
     return jsonify(
         {
             "stats": {
-                "feeds": len([f for f in feeds if not f["_id"].startswith(DESIGN_DOC_PREFIX)]),
-                "articles": len([a for a in articles if not a["_id"].startswith(DESIGN_DOC_PREFIX)]),
-                "issues": len([i for i in all_issues if not i["_id"].startswith(DESIGN_DOC_PREFIX)]),
+                "feeds": len(
+                    [f for f in feeds if not f["_id"].startswith(DESIGN_DOC_PREFIX)]
+                ),
+                "articles": len(
+                    [a for a in articles if not a["_id"].startswith(DESIGN_DOC_PREFIX)]
+                ),
+                "issues": len(
+                    [
+                        i
+                        for i in all_issues
+                        if not i["_id"].startswith(DESIGN_DOC_PREFIX)
+                    ]
+                ),
             },
             "public_issues": public_issues,
         }
@@ -869,7 +894,9 @@ def share_issue(issue_id: str):
         for p in premises[:10]
         if (p.get("id") if isinstance(p, dict) else p)
     ]
-    articles = query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
+    articles = (
+        query_couchdb("articles", {"_id": {"$in": article_ids}}) if article_ids else []
+    )
 
     llm_config = resolve_llm_config(userspace_id, PURPOSE_SOCIAL_EXPORT)
     post_text = generate_bluesky_post_text(issue, articles, llm_config)
@@ -1039,7 +1066,9 @@ def update_llm_catalog():
         abort(500, description="Failed to store model catalog")
     llm_catalog.invalidate_catalog_cache()
     logger.info(
-        "Model catalog updated by %s: %d entries", doc["updated_by"], len(doc["catalog"])
+        "Model catalog updated by %s: %d entries",
+        doc["updated_by"],
+        len(doc["catalog"]),
     )
     return jsonify(_llm_catalog_payload())
 
@@ -1076,11 +1105,11 @@ def list_scheduler_logs():
 @admin_required
 def list_userspaces():
     userspaces = set()
-    for doc in (fetch_from_couchdb("issues") or []):
+    for doc in fetch_from_couchdb("issues") or []:
         value = _extract_userspace(doc)
         if value:
             userspaces.add(value)
-    for doc in (fetch_from_couchdb("feeds") or []):
+    for doc in fetch_from_couchdb("feeds") or []:
         value = _extract_userspace(doc)
         if value:
             userspaces.add(value)
@@ -1184,11 +1213,14 @@ def search_articles_endpoint():
             from_dt = datetime.fromisoformat(date_from)
             selector["published"] = {MONGO_GTE: from_dt.isoformat()}
         except ValueError:
-            return jsonify(
-                {
-                    "error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
-                }
-            ), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
+                    }
+                ),
+                400,
+            )
 
     if date_to:
         try:
@@ -1199,11 +1231,14 @@ def search_articles_endpoint():
             else:
                 selector["published"] = {MONGO_LTE: to_dt.isoformat()}
         except ValueError:
-            return jsonify(
-                {
-                    "error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
-                }
-            ), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
+                    }
+                ),
+                400,
+            )
 
     # Query CouchDB with selector
     articles = query_couchdb("articles", selector=selector, limit=limit)

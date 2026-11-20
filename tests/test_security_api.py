@@ -130,7 +130,9 @@ def test_rate_limiting():
     # Let's try /api/feeds without auth (if public read) or with auth.
 
     # We will just verify the headers exist on a standard API call
-    response = requests.get(f"{BASE_URL}/api/feeds", auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
+    response = requests.get(
+        f"{BASE_URL}/api/feeds", auth=(ADMIN_USERNAME, ADMIN_PASSWORD)
+    )
 
     # These headers are configurable, but default is usually X-RateLimit-Limit
     # If using memory storage and default config, they should be there.
@@ -263,7 +265,9 @@ def test_bulk_import_empty_request(wait_for_bulk_rate_limit):
     wait_for_rate_limit()
 
     # Empty urls array
-    response = requests.post(url, json={"urls": []}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
+    response = requests.post(
+        url, json={"urls": []}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD)
+    )
     assert response.status_code == 400
 
     wait_for_rate_limit()
@@ -283,7 +287,9 @@ def test_bulk_import_mixed_results(wait_for_bulk_rate_limit):
 
     # First create one feed to test duplicate detection
     valid_url = f"https://example.com/existing-{unique_id}"
-    requests.post(url, json={"urls": [valid_url]}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD))
+    requests.post(
+        url, json={"urls": [valid_url]}, auth=(ADMIN_USERNAME, ADMIN_PASSWORD)
+    )
 
     wait_for_rate_limit()
 

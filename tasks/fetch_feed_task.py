@@ -81,9 +81,7 @@ class FetchFeedTask(threading.Thread):
 
         # Check for redirect
         final_url = response.url
-        is_redirect = bool(
-            final_url and final_url.rstrip("/") != self.url.rstrip("/")
-        )
+        is_redirect = bool(final_url and final_url.rstrip("/") != self.url.rstrip("/"))
         if is_redirect:
             logger.info(f"Redirect detected: {self.url} -> {final_url}")
 
@@ -206,9 +204,12 @@ class FetchFeedTask(threading.Thread):
             res = requests.get(f"{self.content_url}/{feed_id}", timeout=10)
             if res.status_code == 200:
                 current_doc = res.json()
-                current_body_hash = current_doc.get("body_hash") or hashlib.sha256(
-                    current_doc.get("body", "").encode("utf-8")
-                ).hexdigest()
+                current_body_hash = (
+                    current_doc.get("body_hash")
+                    or hashlib.sha256(
+                        current_doc.get("body", "").encode("utf-8")
+                    ).hexdigest()
+                )
                 if body_hash == current_body_hash:
                     logger.info(
                         f"No content changes for {self.url}. Content up to date."

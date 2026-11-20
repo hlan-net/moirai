@@ -15,7 +15,6 @@ import pytest
 from tasks.session_logger import SessionLogger, SESSION_TTL_SECONDS
 from tasks.tracing_mcp_client import TracingMCPClient, DESTRUCTIVE_TOOLS, _truncate
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -112,7 +111,9 @@ class TestSessionLoggerSteps:
 
 
 class TestTracingMCPClient:
-    def test_successful_tool_call_records_step(self, tracing_client, mock_inner_client, mock_session_logger):
+    def test_successful_tool_call_records_step(
+        self, tracing_client, mock_inner_client, mock_session_logger
+    ):
         mock_inner_client.call_tool.return_value = {
             "status": "success",
             "data": {"feed_id": "f1"},
@@ -133,7 +134,9 @@ class TestTracingMCPClient:
         assert step["correlation_id"] == "corr-1"
         assert "latency_ms" in step
 
-    def test_error_tool_call_records_error_step(self, tracing_client, mock_inner_client, mock_session_logger):
+    def test_error_tool_call_records_error_step(
+        self, tracing_client, mock_inner_client, mock_session_logger
+    ):
         mock_inner_client.call_tool.return_value = {
             "status": "error",
             "error_code": "RESOURCE_NOT_FOUND",
@@ -149,7 +152,9 @@ class TestTracingMCPClient:
         assert step["error_code"] == "RESOURCE_NOT_FOUND"
         assert step["error_message"] == "Feed not found"
 
-    def test_destructive_tool_flagged(self, tracing_client, mock_inner_client, mock_session_logger):
+    def test_destructive_tool_flagged(
+        self, tracing_client, mock_inner_client, mock_session_logger
+    ):
         mock_inner_client.call_tool.return_value = {"status": "success", "data": {}}
 
         tracing_client.call_tool("delete_feed", userspace="ws-1")
@@ -157,7 +162,9 @@ class TestTracingMCPClient:
         step = mock_session_logger.add_step.call_args[0][1]
         assert step["risk_level"] == "destructive"
 
-    def test_non_dict_result_recorded(self, tracing_client, mock_inner_client, mock_session_logger):
+    def test_non_dict_result_recorded(
+        self, tracing_client, mock_inner_client, mock_session_logger
+    ):
         mock_inner_client.call_tool.return_value = "legacy string result"
 
         result = tracing_client.call_tool("some_tool", userspace="ws-1")
@@ -179,7 +186,9 @@ class TestTracingMCPClient:
         assert step["status"] == "error"
         assert "timeout" in step["error_message"]
 
-    def test_retries_on_transient_error(self, tracing_client, mock_inner_client, mock_session_logger):
+    def test_retries_on_transient_error(
+        self, tracing_client, mock_inner_client, mock_session_logger
+    ):
         # First call: retryable error. Second call: success.
         mock_inner_client.call_tool.side_effect = [
             {
@@ -205,7 +214,9 @@ class TestTracingMCPClient:
         assert second_step["status"] == "success"
         assert second_step["attempt"] == 2
 
-    def test_retries_exhausted_returns_last_error(self, mock_inner_client, mock_session_logger):
+    def test_retries_exhausted_returns_last_error(
+        self, mock_inner_client, mock_session_logger
+    ):
         client = TracingMCPClient(
             mcp_client=mock_inner_client,
             session_logger=mock_session_logger,
@@ -251,7 +262,9 @@ class TestTracingMCPClient:
         mock_inner_client.some_attr = "hello"
         assert tracing_client.some_attr == "hello"
 
-    def test_session_logger_and_session_id_exposed(self, tracing_client, mock_session_logger):
+    def test_session_logger_and_session_id_exposed(
+        self, tracing_client, mock_session_logger
+    ):
         assert tracing_client.session_logger is mock_session_logger
         assert tracing_client.session_id == "test-session-123"
 
@@ -264,8 +277,15 @@ class TestTracingMCPClient:
 class TestDestructiveTools:
     @pytest.mark.parametrize(
         "tool_name",
-        ["delete_issue", "delete_event", "delete_trend", "delete_feed",
-         "delete_stale_entities", "publish_to_bluesky", "delete_user"],
+        [
+            "delete_issue",
+            "delete_event",
+            "delete_trend",
+            "delete_feed",
+            "delete_stale_entities",
+            "publish_to_bluesky",
+            "delete_user",
+        ],
     )
     def test_destructive_tools_in_set(self, tool_name):
         assert tool_name in DESTRUCTIVE_TOOLS

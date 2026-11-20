@@ -27,10 +27,11 @@ async def verify_filtering():
 
     print("Connecting to MCP server...")
     import base64
+
     creds = f"{username}:{password}"
     auth_header = f"Basic {base64.b64encode(creds.encode()).decode()}"
     headers = {"Authorization": auth_header, "Host": "localhost:8090"}
-    
+
     try:
         async with sse_client(mcp_url, headers=headers) as (read, write):
             async with ClientSession(read, write) as session:

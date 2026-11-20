@@ -8,7 +8,7 @@ def _extract_template(content):
     end_idx = content.rfind(end_tag)
     if start_idx == -1 or end_idx == -1:
         return None, 0
-    
+
     template = content[start_idx + len(start_tag) : end_idx]
     offset = content[:start_idx].count("\n") + 1
     return template, offset
@@ -23,12 +23,16 @@ def _handle_tag(tag_str, tag_name, line_num, stack, void_elements):
 
     if is_closing:
         if not stack:
-            print(f"Error at line {line_num}: Unexpected closing tag </{tag_name}> (Stack empty)")
+            print(
+                f"Error at line {line_num}: Unexpected closing tag </{tag_name}> (Stack empty)"
+            )
             return False
 
         last_tag, last_line = stack.pop()
         if last_tag != tag_name:
-            print(f"Error at line {line_num}: Expected closing tag </{last_tag}> (opened at {last_line}), found </{tag_name}>")
+            print(
+                f"Error at line {line_num}: Expected closing tag </{last_tag}> (opened at {last_line}), found </{tag_name}>"
+            )
             return False
     else:
         stack.append((tag_name, line_num))
@@ -45,8 +49,20 @@ def check_balance(filename):
         return
 
     void_elements = {
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr",
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
     }
 
     tag_pattern = re.compile(r"</?([a-zA-Z0-9-]+)(?:\s[^>]*)?/?>")
@@ -59,7 +75,9 @@ def check_balance(filename):
             match = tag_pattern.search(line, pos)
             if not match:
                 break
-            if not _handle_tag(match.group(0), match.group(1).lower(), line_num, stack, void_elements):
+            if not _handle_tag(
+                match.group(0), match.group(1).lower(), line_num, stack, void_elements
+            ):
                 return
             pos = match.end()
 

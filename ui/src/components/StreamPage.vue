@@ -59,7 +59,7 @@ const feedGroupedArticles = computed(() => {
   let currentGroup: ArticleGroup = {
     title: firstArticle.feed_title || getHostname(firstArticle.feed_url),
     favicon: firstArticle.feed_favicon,
-    articles: [firstArticle]
+    articles: [firstArticle],
   }
 
   for (let i = 1; i < articles.value.length; i++) {
@@ -73,7 +73,7 @@ const feedGroupedArticles = computed(() => {
       currentGroup = {
         title: articleFeedTitle,
         favicon: article.feed_favicon,
-        articles: [article]
+        articles: [article],
       }
     }
   }
@@ -312,11 +312,11 @@ function formatDate(dateStr: string) {
 }
 
 function stripHtml(html: string) {
-   const doc = new DOMParser().parseFromString(html, 'text/html');
-   return doc.body.textContent || "";
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return doc.body.textContent || ''
 }
 
-function getHostname(urlStr:string) {
+function getHostname(urlStr: string) {
   try {
     return new URL(urlStr).hostname
   } catch (e) {
@@ -376,58 +376,92 @@ const toggleTheme = () => {
 <template>
   <div class="stream-page">
     <header class="page-header">
-        <div class="header-left">
-            <h2>Aggregated Stream</h2>
-            <span class="count">
-              <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
-              <span v-else-if="!loading">{{ articles.length }}</span>
-              Articles
-            </span>
-            <span v-if="fetchingUpdates" class="update-badge">↻</span>
-        </div>
-        <div class="header-actions">
-            <!-- Login Button for Public View -->
-            <button @click="isHighDensity = !isHighDensity" class="density-btn" :title="isHighDensity ? 'Switch to Expanded View' : 'Switch to High Density View'">
-                <svg v-if="isHighDensity" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/>
-                </svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3 4h18v4H3V4zm0 7h18v4H3v-4zm0 7h18v4H3v-4z"/>
-                </svg>
-                {{ isHighDensity ? 'Compact' : 'Expanded' }}
-            </button>
+      <div class="header-left">
+        <h2>Aggregated Stream</h2>
+        <span class="count">
+          <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
+          <span v-else-if="!loading">{{ articles.length }}</span>
+          Articles
+        </span>
+        <span v-if="fetchingUpdates" class="update-badge">↻</span>
+      </div>
+      <div class="header-actions">
+        <!-- Login Button for Public View -->
+        <button
+          @click="isHighDensity = !isHighDensity"
+          class="density-btn"
+          :title="isHighDensity ? 'Switch to Expanded View' : 'Switch to High Density View'"
+        >
+          <svg v-if="isHighDensity" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z" />
+          </svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 4h18v4H3V4zm0 7h18v4H3v-4zm0 7h18v4H3v-4z" />
+          </svg>
+          {{ isHighDensity ? 'Compact' : 'Expanded' }}
+        </button>
 
-            <button @click="groupMode = groupMode === 'feed' ? 'time' : 'feed'" class="density-btn" :title="groupMode === 'feed' ? 'Switch to Time-Blocked' : 'Switch to Feed-Grouped'">
-                <svg v-if="groupMode === 'feed'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/>
-                </svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                </svg>
-                {{ groupMode === 'feed' ? 'By Feed' : 'By Time' }}
-            </button>
+        <button
+          @click="groupMode = groupMode === 'feed' ? 'time' : 'feed'"
+          class="density-btn"
+          :title="groupMode === 'feed' ? 'Switch to Time-Blocked' : 'Switch to Feed-Grouped'"
+        >
+          <svg
+            v-if="groupMode === 'feed'"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path
+              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"
+            />
+          </svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"
+            />
+          </svg>
+          {{ groupMode === 'feed' ? 'By Feed' : 'By Time' }}
+        </button>
 
-            <button v-if="!isAuthenticated" @click="toggleTheme" class="theme-btn" :title="themeTitle">
-                <svg v-if="resolvedTheme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21.64 13.65a9 9 0 0 1-11.29-11.3A9 9 0 1 0 21.64 13.65z" />
-                </svg>
-                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 0 1-2 0V5.5a1 1 0 0 1 1-1zm0 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 5.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H18.5a1 1 0 0 1 1 1zm-14 0a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H4.5a1 1 0 0 1 1 1zm11.86-5.86a1 1 0 0 1 0-1.41l1.06-1.06a1 1 0 1 1 1.41 1.41l-1.06 1.06a1 1 0 0 1-1.41 0zm-11.31 0a1 1 0 0 1-1.41 0L3.58 5.23a1 1 0 1 1 1.41-1.41l1.06 1.06a1 1 0 0 1 0 1.41zm11.31 11.31a1 1 0 0 1 1.41 0l1.06 1.06a1 1 0 1 1-1.41 1.41l-1.06-1.06a1 1 0 0 1 0-1.41zm-11.31 0a1 1 0 0 1 0 1.41L5 20.27a1 1 0 1 1-1.41-1.41l1.06-1.06a1 1 0 0 1 1.41 0z" />
-                </svg>
-                {{ themeLabel }}
-            </button>
+        <button v-if="!isAuthenticated" @click="toggleTheme" class="theme-btn" :title="themeTitle">
+          <svg
+            v-if="resolvedTheme === 'dark'"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M21.64 13.65a9 9 0 0 1-11.29-11.3A9 9 0 1 0 21.64 13.65z" />
+          </svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 0 1-2 0V5.5a1 1 0 0 1 1-1zm0 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 5.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H18.5a1 1 0 0 1 1 1zm-14 0a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H4.5a1 1 0 0 1 1 1zm11.86-5.86a1 1 0 0 1 0-1.41l1.06-1.06a1 1 0 1 1 1.41 1.41l-1.06 1.06a1 1 0 0 1-1.41 0zm-11.31 0a1 1 0 0 1-1.41 0L3.58 5.23a1 1 0 1 1 1.41-1.41l1.06 1.06a1 1 0 0 1 0 1.41zm11.31 11.31a1 1 0 0 1 1.41 0l1.06 1.06a1 1 0 1 1-1.41 1.41l-1.06-1.06a1 1 0 0 1 0-1.41zm-11.31 0a1 1 0 0 1 0 1.41L5 20.27a1 1 0 1 1-1.41-1.41l1.06-1.06a1 1 0 0 1 1.41 0z"
+            />
+          </svg>
+          {{ themeLabel }}
+        </button>
 
-            <a :href="rssSubscribeUrl" class="rss-link" title="Subscribe to RSS feed" target="_blank">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20A2.18 2.18 0 0 1 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
-                </svg>
-                RSS
-            </a>
-            <button @click="refreshAndReset" :disabled="fetchingUpdates" class="refresh-btn" :class="{ 'has-new': newArticleCount > 0 }" title="Refresh stream">
-                {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
-                <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
-            </button>
-        </div>
+        <a :href="rssSubscribeUrl" class="rss-link" title="Subscribe to RSS feed" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20A2.18 2.18 0 0 1 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"
+            />
+          </svg>
+          RSS
+        </a>
+        <button
+          @click="refreshAndReset"
+          :disabled="fetchingUpdates"
+          class="refresh-btn"
+          :class="{ 'has-new': newArticleCount > 0 }"
+          title="Refresh stream"
+        >
+          {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
+          <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
+        </button>
+      </div>
     </header>
 
     <nav class="section-tabs" role="tablist" aria-label="Stream sections">
@@ -447,28 +481,66 @@ const toggleTheme = () => {
     </nav>
 
     <div v-if="loading" class="loading">Loading stream...</div>
-    
-    <div v-else-if="articles.length" ref="streamContainer" class="stream-container" :class="{ 'high-density': isHighDensity }" @scroll.passive="hideDotDetails">
-      <div v-for="(group, index) in groupedArticles" :key="group.title + '-' + index" class="feed-group">
+
+    <div
+      v-else-if="articles.length"
+      ref="streamContainer"
+      class="stream-container"
+      :class="{ 'high-density': isHighDensity }"
+      @scroll.passive="hideDotDetails"
+    >
+      <div
+        v-for="(group, index) in groupedArticles"
+        :key="group.title + '-' + index"
+        class="feed-group"
+      >
         <h3 class="group-title">
           <template v-if="groupMode === 'feed'">
-            <img v-if="group.favicon" :src="group.favicon" class="group-favicon" :alt="`${group.title} icon`" @error="handleFaviconError" />
-            <img v-else class="group-favicon-placeholder" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E📰%3C/text%3E%3C/svg%3E" alt="Default news icon" />
+            <img
+              v-if="group.favicon"
+              :src="group.favicon"
+              class="group-favicon"
+              :alt="`${group.title} icon`"
+              @error="handleFaviconError"
+            />
+            <img
+              v-else
+              class="group-favicon-placeholder"
+              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E📰%3C/text%3E%3C/svg%3E"
+              alt="Default news icon"
+            />
           </template>
           {{ group.title }}
           <span v-if="groupMode === 'time'" class="group-count">({{ group.articles.length }})</span>
         </h3>
-        
-        <div v-for="article in group.articles" :key="article._id" 
-             :class="['stream-item', { 'compact-item': isHighDensity }]">
-          
+
+        <div
+          v-for="article in group.articles"
+          :key="article._id"
+          :class="['stream-item', { 'compact-item': isHighDensity }]"
+        >
           <!-- High Density (River) View -->
           <template v-if="isHighDensity">
             <div class="compact-row">
-              <span class="compact-time">{{ new Date(article.published).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}</span>
+              <span class="compact-time">{{
+                new Date(article.published).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              }}</span>
               <!-- Inline source tag for time-blocked mode -->
-              <span v-if="groupMode === 'time'" class="inline-source" :title="article.feed_title || getHostname(article.feed_url)">
-                <img v-if="article.feed_favicon" :src="article.feed_favicon" class="inline-favicon" alt="Feed icon" @error="handleFaviconError" />
+              <span
+                v-if="groupMode === 'time'"
+                class="inline-source"
+                :title="article.feed_title || getHostname(article.feed_url)"
+              >
+                <img
+                  v-if="article.feed_favicon"
+                  :src="article.feed_favicon"
+                  class="inline-favicon"
+                  alt="Feed icon"
+                  @error="handleFaviconError"
+                />
                 {{ article.feed_title || getHostname(article.feed_url) }}
               </span>
               <h4 class="item-title compact-title">
@@ -484,10 +556,22 @@ const toggleTheme = () => {
                 @focus="showDotDetails(article, $event)"
                 @blur="hideDotDetails"
               >
-                <span v-if="article.annotations?.priority === 'high'" class="dot-tag priority-high-dot"></span>
-                <span v-if="article.annotations?.priority === 'medium'" class="dot-tag priority-medium-dot"></span>
-                <span v-if="article.annotations?.sentiment === 'positive'" class="dot-tag sentiment-positive-dot"></span>
-                <span v-if="article.annotations?.sentiment === 'negative'" class="dot-tag sentiment-negative-dot"></span>
+                <span
+                  v-if="article.annotations?.priority === 'high'"
+                  class="dot-tag priority-high-dot"
+                ></span>
+                <span
+                  v-if="article.annotations?.priority === 'medium'"
+                  class="dot-tag priority-medium-dot"
+                ></span>
+                <span
+                  v-if="article.annotations?.sentiment === 'positive'"
+                  class="dot-tag sentiment-positive-dot"
+                ></span>
+                <span
+                  v-if="article.annotations?.sentiment === 'negative'"
+                  class="dot-tag sentiment-negative-dot"
+                ></span>
                 <span v-if="article.events?.length" class="dot-tag event-dot"></span>
                 <span v-if="article.trends?.length" class="dot-tag trend-dot"></span>
               </div>
@@ -498,17 +582,23 @@ const toggleTheme = () => {
           <template v-else>
             <!-- Inline source for time-blocked expanded view -->
             <div v-if="groupMode === 'time'" class="inline-source-expanded">
-              <img v-if="article.feed_favicon" :src="article.feed_favicon" class="inline-favicon" alt="Feed icon" @error="handleFaviconError" />
+              <img
+                v-if="article.feed_favicon"
+                :src="article.feed_favicon"
+                class="inline-favicon"
+                alt="Feed icon"
+                @error="handleFaviconError"
+              />
               <span>{{ article.feed_title || getHostname(article.feed_url) }}</span>
             </div>
             <h4 class="item-title">
-                <a :href="article.link" target="_blank">{{ article.title }}</a>
+              <a :href="article.link" target="_blank">{{ article.title }}</a>
             </h4>
             <div class="item-summary">
               <span v-if="!expandedArticles.has(article._id)">
                 {{ stripHtml(article.summary).substring(0, 300) }}
-                <button 
-                  v-if="stripHtml(article.summary).length > 300" 
+                <button
+                  v-if="stripHtml(article.summary).length > 300"
                   @click="toggleExpand(article._id)"
                   class="read-more-btn"
                 >
@@ -517,36 +607,56 @@ const toggleTheme = () => {
               </span>
               <span v-else>
                 {{ stripHtml(article.summary) }}
-                <button @click="toggleExpand(article._id)" class="read-more-btn">
-                  Show Less
-                </button>
+                <button @click="toggleExpand(article._id)" class="read-more-btn">Show Less</button>
               </span>
             </div>
             <div v-if="article.events || article.trends || article.annotations" class="item-tags">
               <div v-if="article.events && article.events.length > 0" class="tag-group">
-                <span v-for="event in article.events" :key="event" class="tag tag-event">{{ event }}</span>
+                <span v-for="event in article.events" :key="event" class="tag tag-event">{{
+                  event
+                }}</span>
               </div>
               <div v-if="article.trends && article.trends.length > 0" class="tag-group">
-                <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+                <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{
+                  trend
+                }}</span>
               </div>
               <div v-if="article.annotations" class="tag-group">
-                <span v-for="topic in article.annotations.topics" :key="topic" class="tag tag-topic">{{ topic }}</span>
-                <span :class="['tag', 'tag-priority', `tag-priority-${article.annotations.priority}`]">{{ article.annotations.priority }}</span>
-                <span :class="['tag', 'tag-sentiment', `tag-sentiment-${article.annotations.sentiment}`]">{{ article.annotations.sentiment }}</span>
+                <span
+                  v-for="topic in article.annotations.topics"
+                  :key="topic"
+                  class="tag tag-topic"
+                  >{{ topic }}</span
+                >
+                <span
+                  :class="['tag', 'tag-priority', `tag-priority-${article.annotations.priority}`]"
+                  >{{ article.annotations.priority }}</span
+                >
+                <span
+                  :class="[
+                    'tag',
+                    'tag-sentiment',
+                    `tag-sentiment-${article.annotations.sentiment}`,
+                  ]"
+                  >{{ article.annotations.sentiment }}</span
+                >
               </div>
             </div>
             <div class="item-meta">
-                <span class="date">{{ formatDate(article.published) }}</span>
+              <span class="date">{{ formatDate(article.published) }}</span>
             </div>
           </template>
         </div>
-        <hr v-if="index < groupedArticles.length - 1 && !isHighDensity" class="group-divider">
+        <hr v-if="index < groupedArticles.length - 1 && !isHighDensity" class="group-divider" />
       </div>
-
     </div>
-    
+
     <div v-else class="empty-state">
-      {{ activeSection === 'main' ? 'No articles found in the stream.' : 'No articles in this section yet.' }}
+      {{
+        activeSection === 'main'
+          ? 'No articles found in the stream.'
+          : 'No articles in this section yet.'
+      }}
     </div>
 
     <Teleport to="body">
@@ -570,7 +680,10 @@ const toggleTheme = () => {
           <span class="dot-tag sentiment-positive-dot"></span>
           <span>Positive sentiment</span>
         </div>
-        <div v-else-if="hoveredArticle.annotations?.sentiment === 'negative'" class="dot-popover-row">
+        <div
+          v-else-if="hoveredArticle.annotations?.sentiment === 'negative'"
+          class="dot-popover-row"
+        >
           <span class="dot-tag sentiment-negative-dot"></span>
           <span>Negative sentiment</span>
         </div>
@@ -578,26 +691,34 @@ const toggleTheme = () => {
           <span class="dot-tag event-dot"></span>
           <span class="dot-popover-label">Events</span>
           <span class="dot-popover-tags">
-            <span v-for="event in hoveredArticle.events" :key="event" class="tag tag-event">{{ event }}</span>
+            <span v-for="event in hoveredArticle.events" :key="event" class="tag tag-event">{{
+              event
+            }}</span>
           </span>
         </div>
         <div v-if="hoveredArticle.trends?.length" class="dot-popover-row">
           <span class="dot-tag trend-dot"></span>
           <span class="dot-popover-label">Trends</span>
           <span class="dot-popover-tags">
-            <span v-for="trend in hoveredArticle.trends" :key="trend" class="tag tag-trend">{{ trend }}</span>
+            <span v-for="trend in hoveredArticle.trends" :key="trend" class="tag tag-trend">{{
+              trend
+            }}</span>
           </span>
         </div>
         <div v-if="hoveredArticle.annotations?.topics?.length" class="dot-popover-row">
           <span class="dot-tag dot-placeholder"></span>
           <span class="dot-popover-label">Topics</span>
           <span class="dot-popover-tags">
-            <span v-for="topic in hoveredArticle.annotations.topics" :key="topic" class="tag tag-topic">{{ topic }}</span>
+            <span
+              v-for="topic in hoveredArticle.annotations.topics"
+              :key="topic"
+              class="tag tag-topic"
+              >{{ topic }}</span
+            >
           </span>
         </div>
       </div>
     </Teleport>
-    
   </div>
 </template>
 
@@ -612,58 +733,58 @@ const toggleTheme = () => {
 }
 
 .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid #eee;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #eee;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
 }
 
 .header-left {
-    display: flex;
-    align-items: baseline;
-    gap: 15px;
+  display: flex;
+  align-items: baseline;
+  gap: 15px;
 }
 
 .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .rss-link {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--text-color);
-    text-decoration: none;
-    font-size: 0.9rem;
-    transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-color);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
 .rss-link:hover {
-    background: var(--button-bg);
-    border-color: #ee802f;
-    color: #ee802f;
+  background: var(--button-bg);
+  border-color: #ee802f;
+  color: #ee802f;
 }
 
 .rss-link svg {
-    vertical-align: middle;
+  vertical-align: middle;
 }
 
 .page-header h2 {
-    margin: 0;
-    color: var(--text-color);
+  margin: 0;
+  color: var(--text-color);
 }
 
 .count {
-    color: var(--text-color);
-    opacity: 0.8;
-    font-size: 0.9rem;
+  color: var(--text-color);
+  opacity: 0.8;
+  font-size: 0.9rem;
 }
 
 .update-badge {
@@ -673,137 +794,140 @@ const toggleTheme = () => {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .refresh-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    position: relative;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  position: relative;
 }
 
 .refresh-btn.has-new {
-    font-weight: 700;
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+  font-weight: 700;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .new-count-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--primary-color);
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 700;
-    min-width: 18px;
-    height: 18px;
-    border-radius: 9px;
-    padding: 0 5px;
-    margin-left: 4px;
-    line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-color);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 5px;
+  margin-left: 4px;
+  line-height: 1;
 }
 
 .refresh-btn:hover:not(:disabled) {
-    background: var(--button-bg);
-    border-color: var(--primary-color);
-    color: white;
+  background: var(--button-bg);
+  border-color: var(--primary-color);
+  color: white;
 }
 
 .refresh-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .density-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
 }
 
 .density-btn:hover,
 .theme-btn:hover {
-    background: var(--button-bg);
-    border-color: var(--primary-color);
+  background: var(--button-bg);
+  border-color: var(--primary-color);
 }
 
 .theme-btn {
-    background: transparent;
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
 }
-
 
 /* Section tabs (#266): newspaper sections, not a filter */
 .section-tabs {
-    display: flex;
-    gap: 4px;
-    margin: -10px 0 16px;
-    border-bottom: 2px solid var(--border-color);
-    overflow-x: auto;
-    scrollbar-width: none;
-    flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  margin: -10px 0 16px;
+  border-bottom: 2px solid var(--border-color);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
 }
 
 .section-tabs::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 .section-tab {
-    background: transparent;
-    color: var(--text-color);
-    border: none;
-    border-bottom: 3px solid transparent;
-    margin-bottom: -2px;
-    padding: 8px 16px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    white-space: nowrap;
-    cursor: pointer;
-    border-radius: 0;
-    opacity: 0.7;
-    transition: all 0.2s;
+  background: transparent;
+  color: var(--text-color);
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 0;
+  opacity: 0.7;
+  transition: all 0.2s;
 }
 
 .section-tab:hover {
-    background: var(--button-bg);
-    opacity: 1;
+  background: var(--button-bg);
+  opacity: 1;
 }
 
 .section-tab.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
-    opacity: 1;
-    font-weight: 700;
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  opacity: 1;
+  font-weight: 700;
 }
 
 .stream-container {
-    overflow-y: auto;
-    flex: 1;
-    padding-right: 10px; /* For scrollbar */
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 10px; /* For scrollbar */
 }
 
 .feed-group {
@@ -849,164 +973,176 @@ const toggleTheme = () => {
 }
 
 .stream-item {
-    background: transparent;
-    padding: 14px 0;
-    margin-bottom: 0;
-    border-bottom: none;
-    text-align: left; /* Ensure stream items are left-aligned */
+  background: transparent;
+  padding: 14px 0;
+  margin-bottom: 0;
+  border-bottom: none;
+  text-align: left; /* Ensure stream items are left-aligned */
 }
 
 .compact-item {
-    padding: 6px 0;
-    margin-bottom: 0;
+  padding: 6px 0;
+  margin-bottom: 0;
 }
 
 .feed-group .stream-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .compact-row {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .compact-time {
-    font-size: 0.8rem;
-    color: var(--text-color);
-    opacity: 0.7;
-    min-width: 60px;
-    flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  opacity: 0.7;
+  min-width: 60px;
+  flex-shrink: 0;
 }
 
 .compact-title {
-    margin: 0 !important;
-    font-size: 1rem !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
+  margin: 0 !important;
+  font-size: 1rem !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .compact-tags {
-    display: flex;
-    gap: 4px;
-    margin-left: auto;
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .dot-tag {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
-.event-dot { background-color: #1565c0; }
-.trend-dot { background-color: #7b1fa2; }
+.event-dot {
+  background-color: #1565c0;
+}
+.trend-dot {
+  background-color: #7b1fa2;
+}
 
 /* Annotation dots (compact view) */
-.priority-high-dot { background-color: #c62828; }
-.priority-medium-dot { background-color: #ef6c00; }
-.sentiment-positive-dot { background-color: #2e7d32; }
-.sentiment-negative-dot { background-color: #d32f2f; }
+.priority-high-dot {
+  background-color: #c62828;
+}
+.priority-medium-dot {
+  background-color: #ef6c00;
+}
+.sentiment-positive-dot {
+  background-color: #2e7d32;
+}
+.sentiment-negative-dot {
+  background-color: #d32f2f;
+}
 
 .compact-tags:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-    border-radius: 4px;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Dot-details popover (teleported to body, fixed position) */
 .dot-popover {
-    position: fixed;
-    z-index: 2000;
-    max-width: 320px;
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    background: var(--card-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    font-size: 0.85rem;
-    text-align: left;
-    pointer-events: none;
+  position: fixed;
+  z-index: 2000;
+  max-width: 320px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-size: 0.85rem;
+  text-align: left;
+  pointer-events: none;
 }
 
 .dot-popover.place-above {
-    transform: translateY(-100%);
+  transform: translateY(-100%);
 }
 
 .dot-popover-row {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .dot-popover-row .dot-tag {
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .dot-placeholder {
-    visibility: hidden;
+  visibility: hidden;
 }
 
 .dot-popover-label {
-    font-weight: 600;
-    opacity: 0.8;
-    flex-shrink: 0;
+  font-weight: 600;
+  opacity: 0.8;
+  flex-shrink: 0;
 }
 
 .dot-popover-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .dot-popover-tags .tag {
-    padding: 1px 8px;
-    font-size: 0.75rem;
+  padding: 1px 8px;
+  font-size: 0.75rem;
 }
 
 .item-meta {
-    font-size: 0.8rem;
-    color: var(--text-color);
-    opacity: 0.7;
-    margin-top: 10px;
-    text-align: right;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  opacity: 0.7;
+  margin-top: 10px;
+  text-align: right;
 }
 
 .source {
-    font-weight: 600;
-    color: var(--text-color);
-    opacity: 0.8;
+  font-weight: 600;
+  color: var(--text-color);
+  opacity: 0.8;
 }
 
 .item-title {
-    margin: 0 0 10px 0;
-    font-size: 1.2rem;
-    line-height: 1.3;
-    text-align: left;
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+  line-height: 1.3;
+  text-align: left;
 }
 
 .item-title a {
-    color: #af9fc5;
-    text-decoration: none;
+  color: #af9fc5;
+  text-decoration: none;
 }
 
 .item-title a:hover {
-    text-decoration: underline;
-    color: var(--primary-hover);
+  text-decoration: underline;
+  color: var(--primary-hover);
 }
 
 .item-summary {
-    color: var(--text-color);
-    opacity: 0.9;
-    line-height: 1.6;
-    font-size: 1rem;
-    text-align: justify;
+  color: var(--text-color);
+  opacity: 0.9;
+  line-height: 1.6;
+  font-size: 1rem;
+  text-align: justify;
 }
 
 .read-more-btn {
@@ -1125,54 +1261,55 @@ const toggleTheme = () => {
   margin: 20px 0;
 }
 
-.loading, .empty-state {
-    text-align: center;
-    padding: 40px;
-    color: var(--text-color);
-    opacity: 0.8;
-    font-size: 1.2rem;
+.loading,
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-color);
+  opacity: 0.8;
+  font-size: 1.2rem;
 }
 
 /* Group count for time-blocked headers */
 .group-count {
-    font-size: 0.85rem;
-    font-weight: 400;
-    opacity: 0.85;
+  font-size: 0.85rem;
+  font-weight: 400;
+  opacity: 0.85;
 }
 
 /* Inline source tag (compact / time-blocked) */
 .inline-source {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.75rem;
-    color: var(--text-color);
-    opacity: 0.8;
-    background: rgba(255, 255, 255, 0.06);
-    padding: 1px 6px;
-    border-radius: 3px;
-    white-space: nowrap;
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-color);
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .inline-source-expanded {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.8rem;
-    color: var(--text-color);
-    opacity: 0.8;
-    margin-bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  opacity: 0.8;
+  margin-bottom: 4px;
 }
 
 .inline-favicon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    object-fit: contain;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 /* Mobile responsiveness */

@@ -9,9 +9,11 @@ Verifies that:
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.chat_routes import _build_article_context_lines, _build_context_preamble
+
 
 def test_article_context_includes_add_event_instruction():
     """Test that article context lines include add_event instruction with article ID."""
@@ -22,7 +24,7 @@ def test_article_context_includes_add_event_instruction():
         "feed_title": "Tech News",
         "language": "en",
         "description": "Some article content",
-        "issues": []
+        "issues": [],
     }
 
     lines = _build_article_context_lines(entity_data)
@@ -47,16 +49,20 @@ def test_context_preamble_includes_issue_creation_guidance():
             "feed_title": "News Source",
             "language": "en",
             "description": "Article summary",
-            "issues": []
-        }
+            "issues": [],
+        },
     }
 
     preamble = _build_context_preamble(context)
 
     # Verify guidance is present
     assert "add_event" in preamble, "add_event tool not mentioned in preamble"
-    assert "forge_issue" in preamble, "forge_issue warning not in preamble (should tell agent NOT to use it)"
-    assert "Use the add_event tool" in preamble, "Clear instruction for add_event missing"
+    assert (
+        "forge_issue" in preamble
+    ), "forge_issue warning not in preamble (should tell agent NOT to use it)"
+    assert (
+        "Use the add_event tool" in preamble
+    ), "Clear instruction for add_event missing"
     assert "article_links" in preamble, "article_links parameter not mentioned"
     print("✓ Context preamble includes issue creation guidance")
 
@@ -72,16 +78,19 @@ def test_context_preamble_for_non_article_unchanged():
             "description": "Issue description",
             "longevity": "transient",
             "status": "active",
-            "premises": []
-        }
+            "premises": [],
+        },
     }
 
     preamble = _build_context_preamble(context)
 
     # Should not include add_event guidance for issue context
-    assert "add_event" not in preamble, "add_event guidance should not be in issue context"
-    assert "Create a new Issue" not in preamble.lower() or "contextual chat" in preamble, \
-        "Issue context should not repeat issue creation instructions"
+    assert (
+        "add_event" not in preamble
+    ), "add_event guidance should not be in issue context"
+    assert (
+        "Create a new Issue" not in preamble.lower() or "contextual chat" in preamble
+    ), "Issue context should not repeat issue creation instructions"
     print("✓ Non-article context unaffected by fix")
 
 
@@ -113,5 +122,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

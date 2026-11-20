@@ -6,12 +6,12 @@ const emit = defineEmits(['close', 'success'])
 const dialogRef = ref<HTMLDialogElement | null>(null)
 
 const handleClose = () => {
-    emit('close')
+  emit('close')
 }
 
 const handleSuccess = () => {
-    emit('success')
-    emit('close')
+  emit('success')
+  emit('close')
 }
 
 onMounted(() => {
@@ -27,8 +27,8 @@ onMounted(() => {
       <button class="close-btn" @click="handleClose" aria-label="Close modal">&times;</button>
       <LoginForm @success="handleSuccess">
         <template #header>
-            <h1>Login Required</h1>
-            <p class="subtitle">Please sign in to continue</p>
+          <h1>Login Required</h1>
+          <p class="subtitle">Please sign in to continue</p>
         </template>
       </LoginForm>
     </dialog>
@@ -80,9 +80,9 @@ onMounted(() => {
 }
 
 .subtitle {
-    text-align: center;
-    color: var(--text-color);
-    opacity: 0.8;
-    margin-bottom: 20px;
+  text-align: center;
+  color: var(--text-color);
+  opacity: 0.8;
+  margin-bottom: 20px;
 }
 </style>

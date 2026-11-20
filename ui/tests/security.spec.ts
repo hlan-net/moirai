@@ -18,7 +18,8 @@ const AUTH_CASES: AuthCase[] = [
     method: 'get',
     url: '/api/config',
     expectStatus: 401,
-    expectBodyRegex: /Authorization header is missing|Invalid Basic Auth credentials|login|Invalid Authorization scheme/,
+    expectBodyRegex:
+      /Authorization header is missing|Invalid Basic Auth credentials|login|Invalid Authorization scheme/,
   },
   {
     name: 'PUT /api/config requires authentication',

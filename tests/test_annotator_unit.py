@@ -21,7 +21,6 @@ from tasks.annotator import (
     store_annotation,
 )
 
-
 # ===== _validate_annotation =====
 
 
@@ -215,7 +214,9 @@ class TestAnnotateArticle:
     def test_llm_exception_returns_none(self, mock_get_provider):
         """LLM provider raises exception — should return None."""
         mock_provider = MagicMock()
-        mock_provider.create_chat_completion.side_effect = Exception("Connection refused")
+        mock_provider.create_chat_completion.side_effect = Exception(
+            "Connection refused"
+        )
         mock_get_provider.return_value = mock_provider
 
         result = annotate_article("Some title", "Some summary")
@@ -396,7 +397,9 @@ class TestRssAnnotationCategories:
             },
         }
 
-        xml = generate_rss_item_xml(article, {"https://example.com/feed": "Test Feed"}, mock_parse_dt)
+        xml = generate_rss_item_xml(
+            article, {"https://example.com/feed": "Test Feed"}, mock_parse_dt
+        )
 
         assert '<category domain="topic">technology</category>' in xml
         assert '<category domain="topic">science</category>' in xml
@@ -421,6 +424,6 @@ class TestRssAnnotationCategories:
 
         xml = generate_rss_item_xml(article, {}, mock_parse_dt)
 
-        assert "domain=\"topic\"" not in xml
-        assert "domain=\"priority\"" not in xml
-        assert "domain=\"sentiment\"" not in xml
+        assert 'domain="topic"' not in xml
+        assert 'domain="priority"' not in xml
+        assert 'domain="sentiment"' not in xml

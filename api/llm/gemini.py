@@ -38,7 +38,7 @@ class GeminiProvider(LLMProvider):
         system_instruction = "\n\n".join(system_parts) if system_parts else None
 
         gemini_tools = self._convert_tools(tools)
-        
+
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=gemini_tools,
@@ -54,9 +54,7 @@ class GeminiProvider(LLMProvider):
         try:
             model_id = model if model.startswith("models/") else f"models/{model}"
             response = self.client.models.generate_content(
-                model=model_id,
-                contents=gemini_contents,
-                config=config
+                model=model_id, contents=gemini_contents, config=config
             )
             return self._convert_response(response)
         except Exception as e:
@@ -80,10 +78,10 @@ class GeminiProvider(LLMProvider):
                         ),
                     )
                 )
-        
+
         if not function_declarations:
             return None
-            
+
         return [types.Tool(function_declarations=function_declarations)]
 
     def _sanitize_schema_for_gemini(self, schema):
@@ -147,10 +145,7 @@ class GeminiProvider(LLMProvider):
             func_args = json.loads(func.arguments)
 
         return types.Part(
-            function_call=types.FunctionCall(
-                name=func_name,
-                args=func_args
-            )
+            function_call=types.FunctionCall(name=func_name, args=func_args)
         )
 
     def _convert_tool_message(self, msg, content):
@@ -164,7 +159,7 @@ class GeminiProvider(LLMProvider):
                         response={"result": content},
                     )
                 )
-            ]
+            ],
         )
 
     def _convert_response(self, response):

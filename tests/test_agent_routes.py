@@ -22,10 +22,10 @@ os.environ.setdefault("ADMIN_PASSWORD", "test_password_123")
 
 from main import app  # noqa: E402 – env vars must be set first
 
-
 # ---------------------------------------------------------------------------
 # Minimal in-memory DB fixture
 # ---------------------------------------------------------------------------
+
 
 class AgentMockDB:
     """Minimal mock backing store for agent_configs and users."""
@@ -91,18 +91,20 @@ class AgentMockDB:
         """Check if document matches selector (recursive $or/$and support)."""
         for key, value in sel.items():
             if key == "$or":
-                if not any(self._doc_matches_selector(doc, sub_sel) for sub_sel in value):
+                if not any(
+                    self._doc_matches_selector(doc, sub_sel) for sub_sel in value
+                ):
                     return False
             elif key == "$and":
-                if not all(self._doc_matches_selector(doc, sub_sel) for sub_sel in value):
+                if not all(
+                    self._doc_matches_selector(doc, sub_sel) for sub_sel in value
+                ):
                     return False
             elif doc.get(key) != value:
                 return False
         return True
 
-    def query_couchdb(
-        self, db_name: str, selector: dict, **kwargs: Any
-    ) -> list[dict]:
+    def query_couchdb(self, db_name: str, selector: dict, **kwargs: Any) -> list[dict]:
         if db_name == "users" and "email" in selector:
             u = self.get_user_by_email(selector["email"])
             return [u] if u else []
@@ -122,6 +124,7 @@ class AgentMockDB:
 # Pytest fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def db():
     return AgentMockDB()
@@ -135,14 +138,31 @@ def _make_patches(db_instance: AgentMockDB) -> list:
     return [
         patch("api.auth.get_user_by_email", side_effect=db_instance.get_user_by_email),
         patch("api.auth.create_user", side_effect=db_instance.create_user),
-        patch("api.auth.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
-        patch("api.auth.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
-        patch("api.routes.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
-        patch("api.routes.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
+        patch(
+            "api.auth.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb
+        ),
+        patch(
+            "api.auth.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc
+        ),
+        patch(
+            "api.routes.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb
+        ),
+        patch(
+            "api.routes.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc
+        ),
         patch("api.routes.query_couchdb", side_effect=db_instance.query_couchdb),
-        patch("api.agent_routes.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
-        patch("api.agent_routes.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
-        patch("api.agent_routes.delete_from_couchdb", side_effect=db_instance.delete_from_couchdb),
+        patch(
+            "api.agent_routes.fetch_from_couchdb",
+            side_effect=db_instance.fetch_from_couchdb,
+        ),
+        patch(
+            "api.agent_routes.update_couchdb_doc",
+            side_effect=db_instance.update_couchdb_doc,
+        ),
+        patch(
+            "api.agent_routes.delete_from_couchdb",
+            side_effect=db_instance.delete_from_couchdb,
+        ),
         patch("api.agent_routes.query_couchdb", side_effect=db_instance.query_couchdb),
         # api.db-level patches handle any code paths that call db functions
         # indirectly through the module object rather than the imported name.
@@ -150,7 +170,9 @@ def _make_patches(db_instance: AgentMockDB) -> list:
         patch("api.db.create_user", side_effect=db_instance.create_user),
         patch("api.db.fetch_from_couchdb", side_effect=db_instance.fetch_from_couchdb),
         patch("api.db.update_couchdb_doc", side_effect=db_instance.update_couchdb_doc),
-        patch("api.db.delete_from_couchdb", side_effect=db_instance.delete_from_couchdb),
+        patch(
+            "api.db.delete_from_couchdb", side_effect=db_instance.delete_from_couchdb
+        ),
         patch("api.db.query_couchdb", side_effect=db_instance.query_couchdb),
         patch("api.db.store_to_couchdb", side_effect=db_instance.store_to_couchdb),
         patch("tasks.init.init_db"),
@@ -186,9 +208,17 @@ _tokens: dict[str, str] = {}
 _user_ids: dict[str, str] = {}
 
 
-def _register_and_login(client, db_instance: AgentMockDB, email: str, password: str, make_admin: bool = False) -> tuple[str, str]:
+def _register_and_login(
+    client,
+    db_instance: AgentMockDB,
+    email: str,
+    password: str,
+    make_admin: bool = False,
+) -> tuple[str, str]:
     """Register a user, optionally promote to admin, then return a JWT."""
-    resp = client.post("/api/auth/register", json={"email": email, "password": password})
+    resp = client.post(
+        "/api/auth/register", json={"email": email, "password": password}
+    )
     assert resp.status_code == 201, resp.get_data(as_text=True)
     uid = resp.get_json()["user_id"]
     if make_admin:
@@ -220,6 +250,7 @@ def _agent_payload(
 # Setup tokens (module-scoped, run once via a test)
 # ---------------------------------------------------------------------------
 
+
 def test_00_setup_tokens(client, db):
     """Bootstrap user and admin tokens for subsequent tests."""
     token, uid = _register_and_login(client, db, _USER_EMAIL, _USER_PASSWORD)
@@ -236,6 +267,7 @@ def test_00_setup_tokens(client, db):
 # ---------------------------------------------------------------------------
 # Authentication enforcement
 # ---------------------------------------------------------------------------
+
 
 def test_list_agents_requires_auth(client):
     """GET /api/agents without a token must return 401."""
@@ -270,6 +302,7 @@ def test_delete_agent_requires_auth(client):
 # ---------------------------------------------------------------------------
 # Userspace UUID validation
 # ---------------------------------------------------------------------------
+
 
 def test_list_agents_missing_userspace(client):
     """GET /api/agents without userspace param must return 400."""
@@ -376,6 +409,7 @@ def test_delete_agent_success(client, db):
 # Ownership and cross-userspace access denial
 # ---------------------------------------------------------------------------
 
+
 def test_get_agent_wrong_userspace_returns_404(client):
     """GET /api/agents/<id> with a different userspace must return 404."""
     headers = {"Authorization": f"Bearer {_tokens['user']}"}
@@ -428,6 +462,7 @@ def test_admin_can_create_agent_for_any_owner(client):
 # Payload validation
 # ---------------------------------------------------------------------------
 
+
 def test_create_agent_invalid_logic_module(client):
     """POST /api/agents with an unknown logic_module must return 400."""
     headers = {"Authorization": f"Bearer {_tokens['user']}"}
@@ -472,6 +507,7 @@ def test_create_agent_xss_name_is_sanitized(client, db):
 # ---------------------------------------------------------------------------
 # Default userspace (single-tenant)
 # ---------------------------------------------------------------------------
+
 
 def test_list_agents_without_userspace_uses_default(client):
     """GET /api/agents without userspace falls back to the deployment default."""

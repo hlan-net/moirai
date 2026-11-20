@@ -122,6 +122,7 @@ def _trend_payload_from_issue(issue):
     payload["event_ids"] = _extract_event_ids(issue)
     return payload
 
+
 def _filter_articles_by_date(articles: list, since_str: str) -> list:
     """Filter articles by 'since' ISO 8601 timestamp."""
     try:

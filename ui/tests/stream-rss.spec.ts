@@ -32,7 +32,7 @@ test('stream page renders items from aggregated RSS feed', async ({ page }) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/rss+xml',
-      body: rssXml
+      body: rssXml,
     })
   })
 

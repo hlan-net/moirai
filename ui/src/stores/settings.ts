@@ -13,15 +13,17 @@ export const useSettingsStore = defineStore('settings', () => {
   const geminiModel = ref<string>(localStorage.getItem('moirai_gemini_model') || 'gemini-1.5-pro')
   // AISA (in-cluster proxy): model only — credentials live in the server environment
   const aisaModel = ref<string>(localStorage.getItem('moirai_aisa_model') || '')
-  
+
   // API Keys
   const openaiApiKey = ref<string>(localStorage.getItem('moirai_openai_api_key') || '')
   const geminiApiKey = ref<string>(localStorage.getItem('moirai_gemini_api_key') || '')
-  
+
   // Endpoints
   // Ollama runs locally over plain HTTP by design — NOSONAR (typescript:S5332)
-  const ollamaEndpointUrl = ref<string>(localStorage.getItem('moirai_ollama_endpoint_url') || 'http://host.docker.internal:11434/v1') // NOSONAR
-  
+  const ollamaEndpointUrl = ref<string>(
+    localStorage.getItem('moirai_ollama_endpoint_url') || 'http://host.docker.internal:11434/v1'
+  ) // NOSONAR
+
   // Theme
   const theme = ref<string>(localStorage.getItem('moirai_theme') || 'dark')
 
@@ -74,15 +76,15 @@ export const useSettingsStore = defineStore('settings', () => {
   watch(llmEndpoint, (value) => {
     localStorage.setItem('moirai_llm_endpoint', value)
   })
-  
+
   watch(ollamaModel, (value) => {
     localStorage.setItem('moirai_model', value)
   })
-  
+
   watch(openaiModel, (value) => {
     localStorage.setItem('moirai_openai_model', value)
   })
-  
+
   watch(geminiModel, (value) => {
     localStorage.setItem('moirai_gemini_model', value)
   })
@@ -91,21 +93,21 @@ export const useSettingsStore = defineStore('settings', () => {
     if (value) localStorage.setItem('moirai_aisa_model', value)
     else localStorage.removeItem('moirai_aisa_model')
   })
-  
+
   watch(openaiApiKey, (value) => {
     if (value) localStorage.setItem('moirai_openai_api_key', value)
     else localStorage.removeItem('moirai_openai_api_key')
   })
-  
+
   watch(geminiApiKey, (value) => {
     if (value) localStorage.setItem('moirai_gemini_api_key', value)
     else localStorage.removeItem('moirai_gemini_api_key')
   })
-  
+
   watch(ollamaEndpointUrl, (value) => {
     localStorage.setItem('moirai_ollama_endpoint_url', value)
   })
-  
+
   watch(theme, (value) => {
     localStorage.setItem('moirai_theme', value)
   })
@@ -119,7 +121,8 @@ export const useSettingsStore = defineStore('settings', () => {
     if (settings.moirai_aisa_model) aisaModel.value = settings.moirai_aisa_model
     if (settings.moirai_openai_api_key) openaiApiKey.value = settings.moirai_openai_api_key
     if (settings.moirai_gemini_api_key) geminiApiKey.value = settings.moirai_gemini_api_key
-    if (settings.moirai_ollama_endpoint_url) ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
+    if (settings.moirai_ollama_endpoint_url)
+      ollamaEndpointUrl.value = settings.moirai_ollama_endpoint_url
     if (settings.moirai_theme) theme.value = settings.moirai_theme
   }
 
@@ -136,7 +139,7 @@ export const useSettingsStore = defineStore('settings', () => {
       moirai_ollama_endpoint_url: ollamaEndpointUrl.value,
       moirai_theme: theme.value,
     }
-    
+
     return settingsPayload
   }
 
@@ -164,11 +167,11 @@ export const useSettingsStore = defineStore('settings', () => {
     geminiApiKey,
     ollamaEndpointUrl,
     theme,
-    
+
     // Getters
     getCurrentModel,
     getCurrentModelKey,
-    
+
     // Actions
     setCurrentModel,
     loadFromBackend,

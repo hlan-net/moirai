@@ -59,9 +59,7 @@ def list_users() -> dict:
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Error listing users: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Error listing users: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -120,9 +118,7 @@ def add_user(email: str, password: str, role: str = "user") -> dict:
             message=f"User created with ID: {doc_id}",
         ).to_dict()
     except Exception as e:
-        return internal_error(
-            message=f"Error creating user: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Error creating user: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -144,9 +140,7 @@ def delete_user(user_id: str) -> dict:
             message=f"User {user_id} deleted successfully.",
         ).to_dict()
     else:
-        return internal_error(
-            message=f"Error deleting user: {msg}"
-        ).to_dict()
+        return internal_error(message=f"Error deleting user: {msg}").to_dict()
 
 
 @mcp.tool()
@@ -174,6 +168,4 @@ def update_user_role(user_id: str, role: str) -> dict:
             message=f"User {user_id} role updated to {role}.",
         ).to_dict()
     else:
-        return internal_error(
-            message=f"Error updating user: {msg}"
-        ).to_dict()
+        return internal_error(message=f"Error updating user: {msg}").to_dict()

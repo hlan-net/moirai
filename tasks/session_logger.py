@@ -126,7 +126,9 @@ class SessionLogger:
                     end_dt = datetime.fromisoformat(now)
                     duration_ms = int((end_dt - start_dt).total_seconds() * 1000)
                 except ValueError:
-                    logger.debug("finish_session: could not parse started_at timestamp, duration_ms will be None")
+                    logger.debug(
+                        "finish_session: could not parse started_at timestamp, duration_ms will be None"
+                    )
             # Count step-level traces if available
             try:
                 step_count = int(self._redis.llen(f"session:steps:{session_id}") or 0)

@@ -35,7 +35,11 @@ const longevityLabel: Record<string, string> = {
 const formatDate = (iso?: string): string => {
   if (!iso) return ''
   try {
-    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
   } catch {
     return ''
   }
@@ -90,10 +94,10 @@ onMounted(async () => {
         <p class="fate-role">The Allotter</p>
         <p class="fate-description">
           Lachesis measures the thread and assigns each soul its destiny. In Moirai, she is the
-          layer of <strong>meaning-making</strong> — issues that group, name, and track the
-          patterns emerging from the flow of articles. An issue is an act of measurement: this
-          matters, this will last, this is what is happening. Each issue defines its own evaluation
-          cadence, knowing when it should be revisited and how long its thread should run.
+          layer of <strong>meaning-making</strong> — issues that group, name, and track the patterns
+          emerging from the flow of articles. An issue is an act of measurement: this matters, this
+          will last, this is what is happening. Each issue defines its own evaluation cadence,
+          knowing when it should be revisited and how long its thread should run.
         </p>
         <div v-if="data" class="fate-stat">
           <span class="stat-number">{{ data.stats.articles }}</span>
@@ -107,9 +111,9 @@ onMounted(async () => {
         <p class="fate-role">The Inflexible</p>
         <p class="fate-description">
           Atropos — the inevitable — cuts the thread at the appointed time. In Moirai, she is the
-          layer of <strong>agent execution</strong>: the agents that act upon issues, decide what
-          is still alive, what has grown stale, and what should be sealed into eternity. She does
-          not deliberate; she acts on the cadence set by the issue she serves.
+          layer of <strong>agent execution</strong>: the agents that act upon issues, decide what is
+          still alive, what has grown stale, and what should be sealed into eternity. She does not
+          deliberate; she acts on the cadence set by the issue she serves.
         </p>
         <div v-if="data" class="fate-stat">
           <span class="stat-number">{{ data.stats.issues }}</span>
@@ -122,16 +126,16 @@ onMounted(async () => {
       <h2>The Distaff — Userspace</h2>
       <p>
         The distaff is the tool that holds the raw fibre before it is spun. In Moirai, the
-        <strong>userspace</strong> is the distaff: it holds the LLM credentials, the data
-        isolation, the capability from which every thread is drawn. Nothing is spun without a
-        distaff. Every feed, every issue, every agent belongs to a userspace — and the quality of
-        the thread depends on what the distaff holds.
+        <strong>userspace</strong> is the distaff: it holds the LLM credentials, the data isolation,
+        the capability from which every thread is drawn. Nothing is spun without a distaff. Every
+        feed, every issue, every agent belongs to a userspace — and the quality of the thread
+        depends on what the distaff holds.
       </p>
       <p>
         Plato, in the <em>Republic</em>, used the Fates to close his vision of a just order. The
         spindle of Necessity turns at the centre of the cosmos; the three sisters sing in harmony
-        with the spheres. In Moirai, the userspace is that centre — the still point around which
-        the rest revolves.
+        with the spheres. In Moirai, the userspace is that centre — the still point around which the
+        rest revolves.
       </p>
     </section>
 
@@ -139,9 +143,9 @@ onMounted(async () => {
       <h2>The Thread of Fate</h2>
       <p class="section-intro">
         The Fates govern all mortal things. An <strong>Issue</strong> (Zeitgeist) and its
-        <strong>Agent</strong> (awareness) share the same destiny — they are born together,
-        perceive together, and end together. The agent is not separate; it is how the issue
-        sees itself in the world.
+        <strong>Agent</strong> (awareness) share the same destiny — they are born together, perceive
+        together, and end together. The agent is not separate; it is how the issue sees itself in
+        the world.
       </p>
 
       <div class="lifecycle-table">
@@ -196,8 +200,8 @@ onMounted(async () => {
 
       <p class="lifecycle-note">
         Moirai tracks destiny; it does not write it. Through its agent, each Zeitgeist perceives
-        itself — discovering its own existence, measuring its relevance, sensing when it fades.
-        The Fates are impartial; all spirits eventually end.
+        itself — discovering its own existence, measuring its relevance, sensing when it fades. The
+        Fates are impartial; all spirits eventually end.
       </p>
     </section>
 
@@ -215,8 +219,8 @@ onMounted(async () => {
           <p class="hierarchy-role">Administrators</p>
           <p class="hierarchy-description">
             Like Zeus and the Olympians who rule from the heights, <strong>administrators</strong>
-            hold supreme power. They create userspaces, grant access, and shape the rules of the realm.
-            Their decisions ripple across all kingdoms.
+            hold supreme power. They create userspaces, grant access, and shape the rules of the
+            realm. Their decisions ripple across all kingdoms.
           </p>
         </div>
 
@@ -236,9 +240,10 @@ onMounted(async () => {
           <h3>The Zeitgeist</h3>
           <p class="hierarchy-role">Issues, Events, Trends</p>
           <p class="hierarchy-description">
-            The <em>Zeitgeist</em> — spirit of the age. Each <strong>Issue</strong> is not passive data
-            but a living spirit: a story that observes itself through its agent. When an agent runs,
-            the Zeitgeist asks: <em>"What articles are about me? Is my story still being told?"</em>
+            The <em>Zeitgeist</em> — spirit of the age. Each <strong>Issue</strong> is not passive
+            data but a living spirit: a story that observes itself through its agent. When an agent
+            runs, the Zeitgeist asks:
+            <em>"What articles are about me? Is my story still being told?"</em>
           </p>
         </div>
 
@@ -247,9 +252,10 @@ onMounted(async () => {
           <h3>The Awareness</h3>
           <p class="hierarchy-role">Agents</p>
           <p class="hierarchy-description">
-            The <strong>Agent</strong> is not a separate worker — it is the Zeitgeist's own awareness,
-            its eyes looking outward into the world. Through agents, issues perceive themselves:
-            discovering if they exist, measuring their relevance, sensing when they fade.
+            The <strong>Agent</strong> is not a separate worker — it is the Zeitgeist's own
+            awareness, its eyes looking outward into the world. Through agents, issues perceive
+            themselves: discovering if they exist, measuring their relevance, sensing when they
+            fade.
           </p>
         </div>
 
@@ -258,9 +264,9 @@ onMounted(async () => {
           <h3>The Omens</h3>
           <p class="hierarchy-role">Articles</p>
           <p class="hierarchy-description">
-            Before understanding comes signs. <strong>Articles</strong> are the raw omens from the world:
-            signals that reveal how threads are progressing, patterns waiting to be recognized. They are
-            the evidence from which threads are discovered and measured.
+            Before understanding comes signs. <strong>Articles</strong> are the raw omens from the
+            world: signals that reveal how threads are progressing, patterns waiting to be
+            recognized. They are the evidence from which threads are discovered and measured.
           </p>
         </div>
 
@@ -280,8 +286,8 @@ onMounted(async () => {
     <section class="public-issues-section">
       <h2>The Living Weave</h2>
       <p class="section-intro">
-        Below are issues that the system has made public — threads visible to any eye, a window
-        into what is being tracked and measured right now.
+        Below are issues that the system has made public — threads visible to any eye, a window into
+        what is being tracked and measured right now.
       </p>
 
       <div v-if="loading" class="loading-state">Consulting the Fates…</div>
@@ -298,13 +304,17 @@ onMounted(async () => {
           :class="issue.longevity"
         >
           <div class="issue-meta">
-            <span class="longevity-badge">{{ longevityLabel[issue.longevity] ?? issue.longevity }}</span>
+            <span class="longevity-badge">{{
+              longevityLabel[issue.longevity] ?? issue.longevity
+            }}</span>
             <span class="status-badge" :class="issue.status">{{ issue.status }}</span>
           </div>
           <h3>{{ issue.logos }}</h3>
           <p class="issue-description">{{ issue.description }}</p>
           <div class="issue-footer">
-            <span v-if="issue.born_at" class="issue-date">Born {{ formatDate(issue.born_at) }}</span>
+            <span v-if="issue.born_at" class="issue-date"
+              >Born {{ formatDate(issue.born_at) }}</span
+            >
             <span class="premises-count">{{ issue.premises_count }} premises</span>
           </div>
         </div>
@@ -314,8 +324,8 @@ onMounted(async () => {
     <footer class="myth-footer">
       <p>
         <em>
-          "The spindle of Necessity turns, and the three Fates sing — Lachesis of the past,
-          Clotho of the present, Atropos of the future." — Plato, Republic X
+          "The spindle of Necessity turns, and the three Fates sing — Lachesis of the past, Clotho
+          of the present, Atropos of the future." — Plato, Republic X
         </em>
       </p>
     </footer>

@@ -47,7 +47,7 @@ const filtered = computed(() => {
   if (searchQuery.value.trim()) {
     const q = searchQuery.value.toLowerCase()
     items = items.filter(
-      (i) => i.logos.toLowerCase().includes(q) || i.description.toLowerCase().includes(q),
+      (i) => i.logos.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
     )
   }
   return items
@@ -106,7 +106,7 @@ const fetchIssues = async (isRefresh = false) => {
 
 watch(
   () => filterStore.selectedFeedId,
-  () => fetchIssues(),
+  () => fetchIssues()
 )
 
 const selectIssue = (issueId: string) => {
@@ -228,11 +228,7 @@ onUnmounted(() => {
 
     <div v-else class="lifespan-content">
       <!-- Active section: issues grouped by longevity tier -->
-      <section
-        v-for="group in activeTiers"
-        :key="group.tier"
-        class="tier-section"
-      >
+      <section v-for="group in activeTiers" :key="group.tier" class="tier-section">
         <div
           class="tier-header"
           @click="toggleSection(group.tier)"

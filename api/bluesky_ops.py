@@ -44,7 +44,9 @@ def generate_bluesky_post_text(
         if title:
             article_lines.append(f"- {title[:120]}")
 
-    article_context = "\n".join(article_lines) if article_lines else "(no linked articles)"
+    article_context = (
+        "\n".join(article_lines) if article_lines else "(no linked articles)"
+    )
 
     prompt = (
         f"Write a Bluesky post (max {BLUESKY_MAX_CHARS} characters, no hashtags) "
@@ -56,7 +58,9 @@ def generate_bluesky_post_text(
     )
 
     try:
-        llm_provider = LLMProviderFactory().get_provider(provider_name, api_key, ollama_base_url)
+        llm_provider = LLMProviderFactory().get_provider(
+            provider_name, api_key, ollama_base_url
+        )
         response = llm_provider.create_chat_completion(
             messages=[{"role": "user", "content": prompt}],
             model=model,

@@ -17,7 +17,15 @@ os.environ.setdefault("ADMIN_PASSWORD", "test-password")  # noqa: S105
 from unittest.mock import patch, MagicMock
 
 # Required envelope fields for all responses
-REQUIRED_FIELDS = {"status", "data", "message", "correlation_id", "timestamp", "retryable", "next_action"}
+REQUIRED_FIELDS = {
+    "status",
+    "data",
+    "message",
+    "correlation_id",
+    "timestamp",
+    "retryable",
+    "next_action",
+}
 SUCCESS_STATUS = "success"
 ERROR_STATUS = "error"
 
@@ -29,18 +37,29 @@ def _assert_envelope(response: dict, expected_status: str = None):
     missing = REQUIRED_FIELDS - set(response.keys())
     assert not missing, f"Missing envelope fields: {missing}"
 
-    assert response["status"] in ("success", "error", "partial"), (
-        f"Invalid status: {response['status']}"
-    )
+    assert response["status"] in (
+        "success",
+        "error",
+        "partial",
+    ), f"Invalid status: {response['status']}"
     assert isinstance(response["retryable"], bool)
-    assert response["next_action"] in ("none", "retry", "replan", "escalate", "continue")
-    assert isinstance(response["correlation_id"], str) and len(response["correlation_id"]) > 0
+    assert response["next_action"] in (
+        "none",
+        "retry",
+        "replan",
+        "escalate",
+        "continue",
+    )
+    assert (
+        isinstance(response["correlation_id"], str)
+        and len(response["correlation_id"]) > 0
+    )
     assert isinstance(response["timestamp"], str) and "T" in response["timestamp"]
 
     if expected_status:
-        assert response["status"] == expected_status, (
-            f"Expected status '{expected_status}', got '{response['status']}': {response.get('message')}"
-        )
+        assert (
+            response["status"] == expected_status
+        ), f"Expected status '{expected_status}', got '{response['status']}': {response.get('message')}"
 
     if response["status"] == "error":
         assert "error_code" in response, "Error response missing error_code"
@@ -119,12 +138,15 @@ class TestIssueInternalResponses:
         )
         _assert_error(result, "ISSUE_NOT_FOUND")
 
-    @patch("mcp_service.tools.issues.get_doc", return_value={
-        "_id": "abc123",
-        "logos": "Test",
-        "userspace": "00000000-0000-0000-0000-000000000001",
-        "type": "issue",
-    })
+    @patch(
+        "mcp_service.tools.issues.get_doc",
+        return_value={
+            "_id": "abc123",
+            "logos": "Test",
+            "userspace": "00000000-0000-0000-0000-000000000001",
+            "type": "issue",
+        },
+    )
     @patch("mcp_service.tools.issues.validate_userspace", return_value=(True, None))
     def test_read_issue_success(self, mock_validate, mock_get):
         from mcp_service.tools.issues import _read_issue_internal
@@ -137,10 +159,13 @@ class TestIssueInternalResponses:
         assert data["_id"] == "abc123"
 
     @patch("mcp_service.tools.issues.delete_doc", return_value=(True, "ok"))
-    @patch("mcp_service.tools.issues.get_doc", return_value={
-        "_id": "abc123",
-        "userspace": "00000000-0000-0000-0000-000000000001",
-    })
+    @patch(
+        "mcp_service.tools.issues.get_doc",
+        return_value={
+            "_id": "abc123",
+            "userspace": "00000000-0000-0000-0000-000000000001",
+        },
+    )
     @patch("mcp_service.tools.issues.validate_userspace", return_value=(True, None))
     def test_delete_issue_success(self, mock_validate, mock_get, mock_delete):
         from mcp_service.tools.issues import _delete_issue_internal
@@ -153,12 +178,15 @@ class TestIssueInternalResponses:
         assert data["issue_id"] == "abc123"
 
     @patch("mcp_service.tools.issues.update_doc", return_value=(True, "ok"))
-    @patch("mcp_service.tools.issues.get_doc", return_value={
-        "_id": "abc123",
-        "userspace": "00000000-0000-0000-0000-000000000001",
-        "premises": [],
-        "longevity": "transient",
-    })
+    @patch(
+        "mcp_service.tools.issues.get_doc",
+        return_value={
+            "_id": "abc123",
+            "userspace": "00000000-0000-0000-0000-000000000001",
+            "premises": [],
+            "longevity": "transient",
+        },
+    )
     @patch("mcp_service.tools.issues.validate_userspace", return_value=(True, None))
     def test_measure_issue_success(self, mock_validate, mock_get, mock_update):
         from mcp_service.tools.issues import _measure_issue_internal
@@ -313,13 +341,15 @@ class TestChatRoutesErrorDetection:
         """Verify JSON envelope error detection works."""
         import json
 
-        result_text = json.dumps({
-            "status": "error",
-            "error_code": "VALIDATION_ERROR",
-            "message": "Bad input",
-            "retryable": False,
-            "next_action": "replan",
-        })
+        result_text = json.dumps(
+            {
+                "status": "error",
+                "error_code": "VALIDATION_ERROR",
+                "message": "Bad input",
+                "retryable": False,
+                "next_action": "replan",
+            }
+        )
 
         # Simulate the detection logic from chat_routes.py
         result_is_error = False
@@ -337,11 +367,13 @@ class TestChatRoutesErrorDetection:
         """Verify JSON envelope success is not flagged as error."""
         import json
 
-        result_text = json.dumps({
-            "status": "success",
-            "data": {"feed_id": "abc"},
-            "message": "OK",
-        })
+        result_text = json.dumps(
+            {
+                "status": "success",
+                "data": {"feed_id": "abc"},
+                "message": "OK",
+            }
+        )
 
         result_is_error = False
         try:

@@ -218,7 +218,11 @@ class TracingMCPClient:
     # ------------------------------------------------------------------
 
     def _record_rejection(
-        self, tool_name: str, kwargs: dict, error_code: str, message: str,
+        self,
+        tool_name: str,
+        kwargs: dict,
+        error_code: str,
+        message: str,
     ) -> dict:
         """Record a denied/timeout step and return an error MCPResponse."""
         step = {
@@ -259,12 +263,15 @@ class TracingMCPClient:
             decision = self._request_approval(tool_name, kwargs)
             if decision == "denied":
                 return self._record_rejection(
-                    tool_name, kwargs,
-                    "APPROVAL_DENIED", "Destructive action denied by operator",
+                    tool_name,
+                    kwargs,
+                    "APPROVAL_DENIED",
+                    "Destructive action denied by operator",
                 )
             if decision == "timeout":
                 return self._record_rejection(
-                    tool_name, kwargs,
+                    tool_name,
+                    kwargs,
                     "APPROVAL_TIMEOUT",
                     f"No approval received within {self._approval_timeout}s",
                 )
@@ -313,9 +320,7 @@ class TracingMCPClient:
                             continue
                     else:
                         step["status"] = "success"
-                        step["output_summary"] = _truncate(
-                            str(result.get("data", ""))
-                        )
+                        step["output_summary"] = _truncate(str(result.get("data", "")))
                 else:
                     step["status"] = "success"
                     step["output_summary"] = _truncate(str(result))

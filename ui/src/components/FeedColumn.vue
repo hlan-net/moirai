@@ -86,9 +86,7 @@ const filteredFeeds = computed(() => {
 // Computed: Feeds filtered by contextual selection (articles from selected event)
 const contextuallyFilteredFeeds = computed(() => {
   if (!filterStore.contextualFeedUrls) return filteredFeeds.value
-  return filteredFeeds.value.filter(feed =>
-    filterStore.contextualFeedUrls!.includes(feed.url)
-  )
+  return filteredFeeds.value.filter((feed) => filterStore.contextualFeedUrls!.includes(feed.url))
 })
 
 const showNotification = (message: string, type: 'error' | 'success' | 'warning') => {
@@ -168,7 +166,7 @@ const toggleFeedSelection = (feedId: string) => {
 }
 
 const selectAllFeeds = () => {
-  contextuallyFilteredFeeds.value.forEach(feed => {
+  contextuallyFilteredFeeds.value.forEach((feed) => {
     selectedFeedIds.value.add(feed._id)
   })
 }
@@ -225,7 +223,7 @@ const bulkDeleteFeeds = async () => {
   } else {
     showNotification(
       `Deleted ${label}, ${failCount} failed`,
-      failCount > successCount ? 'error' : 'warning',
+      failCount > successCount ? 'error' : 'warning'
     )
   }
 }
@@ -579,17 +577,25 @@ const bulkImportFeeds = async () => {
     <div class="column-header">
       <h2>
         Feeds ({{ contextuallyFilteredFeeds.length
-        }}<span v-if="filterStore.contextualFeedUrls && contextuallyFilteredFeeds.length !== filteredFeeds.length">
-          &nbsp;/ {{ filteredFeeds.length }}</span>)
+        }}<span
+          v-if="
+            filterStore.contextualFeedUrls &&
+            contextuallyFilteredFeeds.length !== filteredFeeds.length
+          "
+        >
+          &nbsp;/ {{ filteredFeeds.length }}</span
+        >)
       </h2>
       <div class="header-actions" v-if="isAdmin">
-        <button 
-          @click="toggleBulkDeleteMode" 
-          :class="['action-btn', { active: bulkDeleteMode }]" 
+        <button
+          @click="toggleBulkDeleteMode"
+          :class="['action-btn', { active: bulkDeleteMode }]"
           title="Bulk Delete Feeds"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+            <path
+              d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+            />
           </svg>
           {{ bulkDeleteMode ? 'Cancel' : 'Delete' }}
         </button>
@@ -650,8 +656,8 @@ const bulkImportFeeds = async () => {
         <button @click="selectNoneFeeds" class="bulk-action-btn">Select None</button>
         <span class="selection-count">{{ selectedFeedIds.size }} selected</span>
       </div>
-      <button 
-        @click="bulkDeleteFeeds" 
+      <button
+        @click="bulkDeleteFeeds"
         :disabled="selectedFeedIds.size === 0"
         class="bulk-delete-btn"
       >
@@ -672,9 +678,11 @@ const bulkImportFeeds = async () => {
         :key="feed._id"
         class="feed-item"
         @click="
-          bulkDeleteMode 
+          bulkDeleteMode
             ? toggleFeedSelection(feed._id)
-            : filterStore.setSelectedFeedId(filterStore.selectedFeedId === feed._id ? null : feed._id)
+            : filterStore.setSelectedFeedId(
+                filterStore.selectedFeedId === feed._id ? null : feed._id
+              )
         "
         :class="{ 'selected-feed': filterStore.selectedFeedId === feed._id }"
       >
@@ -738,7 +746,11 @@ const bulkImportFeeds = async () => {
             @click.stop
             @change="updateFeedCategory(feed, $event.target as HTMLSelectElement)"
           >
-            <option v-for="option in sectionOptions(feed)" :key="option.value" :value="option.value">
+            <option
+              v-for="option in sectionOptions(feed)"
+              :key="option.value"
+              :value="option.value"
+            >
               {{ option.label }}
             </option>
           </select>
@@ -865,8 +877,7 @@ const bulkImportFeeds = async () => {
               <h5>Errors:</h5>
               <ul>
                 <li v-for="(err, idx) in bulkImportResults.errors" :key="idx">
-                  <strong>{{ err.url }}</strong
-                  >: {{ err.error }}
+                  <strong>{{ err.url }}</strong>: {{ err.error }}
                 </li>
               </ul>
             </div>

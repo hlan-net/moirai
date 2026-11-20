@@ -24,9 +24,7 @@ class TestArticleProcessor(unittest.TestCase):
         """
 
         processor = ArticleProcessor()
-        _, articles = processor.process_feed(
-            "http://example.com/feed", feed_content
-        )
+        _, articles = processor.process_feed("http://example.com/feed", feed_content)
 
         self.assertEqual(len(articles), 1)
         self.assertEqual(articles[0]["title"], "Test Article")

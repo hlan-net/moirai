@@ -60,9 +60,7 @@ def reannotate_article(article_id: str, userspace: str = "") -> dict:
         summary = doc.get("summary", "") or doc.get("description", "")
 
         if not title:
-            return validation_error(
-                "Article has no title — cannot annotate"
-            ).to_dict()
+            return validation_error("Article has no title — cannot annotate").to_dict()
 
         annotation = annotate_article(title, summary, language=doc.get("language"))
         if annotation is None:
@@ -86,9 +84,7 @@ def reannotate_article(article_id: str, userspace: str = "") -> dict:
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Annotation error: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Annotation error: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -135,9 +131,7 @@ def list_unannotated_articles(userspace: str = "", limit: int = 50) -> dict:
             ).to_dict()
 
         if resp.status_code != 200:
-            return internal_error(
-                message=f"Query failed: {resp.text}"
-            ).to_dict()
+            return internal_error(message=f"Query failed: {resp.text}").to_dict()
 
         docs = resp.json().get("docs", [])
         results = [
@@ -160,9 +154,7 @@ def list_unannotated_articles(userspace: str = "", limit: int = 50) -> dict:
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Query execution error: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Query execution error: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -233,9 +225,7 @@ def get_annotation_stats(userspace: str = "") -> dict:
                 topic_counts[t] = topic_counts.get(t, 0) + 1
 
         # Sort topics by count descending
-        top_topics = sorted(
-            topic_counts.items(), key=lambda x: x[1], reverse=True
-        )[:20]
+        top_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:20]
 
         return success(
             data={
@@ -243,14 +233,10 @@ def get_annotation_stats(userspace: str = "") -> dict:
                 "annotated_count": annotated_count,
                 "priority": priority_counts,
                 "sentiment": sentiment_counts,
-                "top_topics": [
-                    {"topic": t, "count": c} for t, c in top_topics
-                ],
+                "top_topics": [{"topic": t, "count": c} for t, c in top_topics],
             },
             message=f"Annotation stats: {annotated_count} annotated articles",
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Stats execution error: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Stats execution error: {str(e)}").to_dict()

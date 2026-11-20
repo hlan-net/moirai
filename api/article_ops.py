@@ -10,7 +10,7 @@ def _get_article_ids_from_issue(issue_id):
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
         return None
-    
+
     article_links = []
     for premise in issue.get("premises", []):
         if premise.get("type") == "message":
@@ -19,14 +19,14 @@ def _get_article_ids_from_issue(issue_id):
             nested_links = _get_article_ids_from_issue(premise.get("id"))
             if nested_links:
                 article_links.extend(nested_links)
-    
+
     return list(set(article_links))
 
 
 def build_article_selector(since=None, feed_id=None, issue_id=None):
     """Build selector for efficient DB querying of articles."""
     selector = {"published": {MONGO_GT: None}}
-    
+
     if since:
         try:
             since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))

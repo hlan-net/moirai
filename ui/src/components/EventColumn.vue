@@ -59,17 +59,19 @@ const fetchIssues = async (isRefresh = false) => {
   try {
     const params = new URLSearchParams()
     params.append('longevity', 'transient') // "Events" are transient issues
-    
+
     if (filterStore.selectedFeedId) {
       params.append('feed_url', filterStore.selectedFeedId) // filter_id is currently the feed URL in some contexts, but check store usage
     }
-    
+
     const queryString = params.toString() ? `?${params.toString()}` : ''
     const response = await authFetch(`/api/issues${queryString}`)
 
     if (response.ok) {
       const data = await response.json()
-      issues.value = Array.isArray(data) ? data.filter((i: Issue) => !i._id.startsWith('_design/')) : []
+      issues.value = Array.isArray(data)
+        ? data.filter((i: Issue) => !i._id.startsWith('_design/'))
+        : []
     } else if (!isRefresh) {
       issues.value = []
     }
@@ -239,15 +241,13 @@ onUnmounted(() => {
               @click.stop="togglePublic(issue)"
               class="public-btn"
               :class="{ 'is-public': issue.public }"
-              :title="issue.public ? 'Public — click to make private' : 'Private — click to make public'"
+              :title="
+                issue.public ? 'Public — click to make private' : 'Private — click to make public'
+              "
             >
               {{ issue.public ? '🌐' : '🔒' }}
             </button>
-            <button
-              @click.stop="deleteIssue(issue._id)"
-              class="delete-btn"
-              title="Delete Event"
-            >
+            <button @click.stop="deleteIssue(issue._id)" class="delete-btn" title="Delete Event">
               ×
             </button>
           </div>
@@ -255,9 +255,9 @@ onUnmounted(() => {
         <p v-if="issue.description" class="summary">{{ issue.description }}</p>
 
         <IssueChatActions v-if="authStore.isAuthenticated" :issue="issue" />
-        
+
         <div class="status-tags">
-            <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
+          <span :class="['status-tag', issue.status]">{{ issue.status }}</span>
         </div>
 
         <div v-if="expandedIssues.has(issue._id)" class="links-section">
@@ -361,26 +361,26 @@ h3 {
 }
 
 .status-tags {
-    display: flex;
-    gap: 5px;
-    margin-top: 5px;
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .status-tag {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    text-transform: uppercase;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .status-tag.active {
-    background: #28a745;
-    color: white;
+  background: #28a745;
+  color: white;
 }
 
 .status-tag.eternal {
-    background: #6c757d;
-    color: white;
+  background: #6c757d;
+  color: white;
 }
 
 .card-actions {

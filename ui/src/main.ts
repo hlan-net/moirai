@@ -8,7 +8,7 @@ import axios from 'axios'
 // Configure axios defaults
 axios.defaults.withCredentials = true
 // Add interceptor to use token from store if available
-axios.interceptors.request.use(config => {
+axios.interceptors.request.use((config) => {
   const authData = localStorage.getItem('moirai_auth')
   if (authData) {
     try {

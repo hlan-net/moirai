@@ -143,10 +143,7 @@ const loadMore = async () => {
 
     if (result.articles.length > 0) {
       articles.value = [...articles.value, ...result.articles]
-      if (
-        !filterStore.selectedFeedId &&
-        !filterStore.selectedIssueId
-      ) {
+      if (!filterStore.selectedFeedId && !filterStore.selectedIssueId) {
         await articleCache.saveArticles(result.articles)
       }
     }
@@ -160,40 +157,32 @@ const loadMore = async () => {
   }
 }
 
-watch(
-  [
-    () => filterStore.selectedFeedId,
-    () => filterStore.selectedIssueId,
-  ],
-  async () => {
-    loading.value = true
-    articles.value = []
-    hasMore.value = true
-    totalCount.value = 0
-    if (observer) {
-      observer.disconnect()
-    }
-    await loadFromCache()
-    await fetchArticlesAndCache(0)
-
-    // Report feed URLs to filter store when an issue is selected
-    if (filterStore.selectedIssueId) {
-      const feedUrls = [
-        ...new Set(
-          articles.value
-            .map((a: Article) => a.feed_url)
-            .filter((url): url is string => Boolean(url))
-        )
-      ]
-      filterStore.setContextualFeedUrls(feedUrls.length > 0 ? feedUrls : null)
-    } else {
-      filterStore.setContextualFeedUrls(null)
-    }
-
-    loading.value = false
-    setupIntersectionObserver()
+watch([() => filterStore.selectedFeedId, () => filterStore.selectedIssueId], async () => {
+  loading.value = true
+  articles.value = []
+  hasMore.value = true
+  totalCount.value = 0
+  if (observer) {
+    observer.disconnect()
   }
-)
+  await loadFromCache()
+  await fetchArticlesAndCache(0)
+
+  // Report feed URLs to filter store when an issue is selected
+  if (filterStore.selectedIssueId) {
+    const feedUrls = [
+      ...new Set(
+        articles.value.map((a: Article) => a.feed_url).filter((url): url is string => Boolean(url))
+      ),
+    ]
+    filterStore.setContextualFeedUrls(feedUrls.length > 0 ? feedUrls : null)
+  } else {
+    filterStore.setContextualFeedUrls(null)
+  }
+
+  loading.value = false
+  setupIntersectionObserver()
+})
 
 const fetchArticlesAndCache = async (skip = 0) => {
   const result = await fetchArticles(
@@ -240,7 +229,9 @@ const displayedArticles = computed(() => {
   }
 
   const seenIds = new Set(filteredArticles.value.map((article) => article._id))
-  const extraResults = supplementalSearchResults.value.filter((article) => !seenIds.has(article._id))
+  const extraResults = supplementalSearchResults.value.filter(
+    (article) => !seenIds.has(article._id)
+  )
   return [...filteredArticles.value, ...extraResults]
 })
 

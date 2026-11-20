@@ -39,7 +39,9 @@ def test_metrics_app_exposes_prometheus_metrics():
 
 def test_main_app_does_not_expose_metrics():
     main = _load_main()
-    headers = _basic_auth_header(os.environ["ADMIN_USERNAME"], os.environ["ADMIN_PASSWORD"])
+    headers = _basic_auth_header(
+        os.environ["ADMIN_USERNAME"], os.environ["ADMIN_PASSWORD"]
+    )
 
     with TestClient(main.app) as client:
         response = client.get("/metrics", headers=headers)

@@ -26,7 +26,9 @@ def _parse_response(res) -> dict:
 
 def _assert_success(parsed: dict, context: str = "") -> dict:
     """Assert response is successful and return data."""
-    assert parsed.get("status") == "success", f"Expected success{f' for {context}' if context else ''}: {parsed}"
+    assert (
+        parsed.get("status") == "success"
+    ), f"Expected success{f' for {context}' if context else ''}: {parsed}"
     return parsed.get("data", {})
 
 
@@ -50,7 +52,13 @@ async def test_crud_flow():
             # Add
             print(f"Adding feed: {feed_url}")
             res = await session.call_tool(
-                "add_feed", {"url": feed_url, "title": "Test Feed", "userspace": "test-userspace", "category": "test"}
+                "add_feed",
+                {
+                    "url": feed_url,
+                    "title": "Test Feed",
+                    "userspace": "test-userspace",
+                    "category": "test",
+                },
             )
             parsed = _parse_response(res)
             data = _assert_success(parsed, "add_feed")
@@ -61,7 +69,11 @@ async def test_crud_flow():
             print(f"Updating category for: {feed_url}")
             res = await session.call_tool(
                 "update_feed_category",
-                {"feed_id": feed_url, "new_category": "updated_test", "userspace": "test-userspace"},
+                {
+                    "feed_id": feed_url,
+                    "new_category": "updated_test",
+                    "userspace": "test-userspace",
+                },
             )
             parsed = _parse_response(res)
             data = _assert_success(parsed, "update_feed_category")
@@ -70,7 +82,9 @@ async def test_crud_flow():
 
             # Delete
             print(f"Deleting feed: {feed_url}")
-            res = await session.call_tool("delete_feed", {"feed_id": feed_url, "userspace": "test-userspace"})
+            res = await session.call_tool(
+                "delete_feed", {"feed_id": feed_url, "userspace": "test-userspace"}
+            )
             parsed = _parse_response(res)
             _assert_success(parsed, "delete_feed")
             print(f"Result: {parsed['message']}")

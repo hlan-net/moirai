@@ -29,12 +29,12 @@ ARTICLE = {
 def client():
     redis = MagicMock()
     redis.get.return_value = None
-    with patch("api.routes.get_public_read_setting", return_value=True), patch(
-        "api.routes.query_couchdb", return_value=[ARTICLE]
-    ) as query, patch("api.routes.fetch_from_couchdb", return_value=[]), patch(
-        "api.routes.enrich_articles_with_issues"
-    ), patch(
-        "api.routes.get_redis_client", return_value=redis
+    with (
+        patch("api.routes.get_public_read_setting", return_value=True),
+        patch("api.routes.query_couchdb", return_value=[ARTICLE]) as query,
+        patch("api.routes.fetch_from_couchdb", return_value=[]),
+        patch("api.routes.enrich_articles_with_issues"),
+        patch("api.routes.get_redis_client", return_value=redis),
     ):
         yield app.test_client(), query, redis
 

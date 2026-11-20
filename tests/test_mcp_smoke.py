@@ -115,7 +115,11 @@ async def test_user_lifecycle():
             # Add user
             res = await session.call_tool(
                 "add_user",
-                {"email": "smoketest@example.com", "password": "testpass123", "role": "user"},  # noqa: S106
+                {
+                    "email": "smoketest@example.com",
+                    "password": "testpass123",
+                    "role": "user",
+                },  # noqa: S106
             )
             result_text = res.content[0].text
             assert result_text is not None

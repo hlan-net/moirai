@@ -57,7 +57,8 @@ async def test_mcp_flow():
 
                     # Verify we can list it using that userspace
                     list_res = await session.call_tool(
-                        "list_issues", {"userspace": auto_userspace, "longevity": "transient"}
+                        "list_issues",
+                        {"userspace": auto_userspace, "longevity": "transient"},
                     )
                     print(f"List Events (Auto NS): {list_res.content[0].text}")
                 else:
@@ -79,7 +80,8 @@ async def test_mcp_flow():
 
                 # Verify listing
                 list_client = await session.call_tool(
-                    "list_issues", {"userspace": client_userspace, "longevity": "transient"}
+                    "list_issues",
+                    {"userspace": client_userspace, "longevity": "transient"},
                 )
                 print(f"List Events (Client NS): {list_client.content[0].text}")
 
@@ -88,7 +90,8 @@ async def test_mcp_flow():
                 # Check auto userspace for client event (should NOT be there)
                 if auto_userspace:
                     list_iso = await session.call_tool(
-                        "list_issues", {"userspace": auto_userspace, "longevity": "transient"}
+                        "list_issues",
+                        {"userspace": auto_userspace, "longevity": "transient"},
                     )
                     if "Client Event" not in list_iso.content[0].text:
                         print("SUCCESS: Client Event not found in Auto Userspace.")

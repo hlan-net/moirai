@@ -108,7 +108,9 @@ class TestChatRoutesRefactor(unittest.TestCase):
         self.assertIn("Context type: article", preamble)
         self.assertIn("Article title: TPS pyytää lisää tukea", preamble)
         self.assertIn("Article summary: Article summary text", preamble)
-        self.assertIn("Currently linked issues: TPS economy, Hockey financing", preamble)
+        self.assertIn(
+            "Currently linked issues: TPS economy, Hockey financing", preamble
+        )
 
     def test_derive_context_session_title(self):
         context = {

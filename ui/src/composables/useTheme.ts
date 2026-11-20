@@ -59,6 +59,6 @@ export function useTheme() {
     systemPrefersDark,
     resolveTheme,
     setTheme,
-    initTheme
+    initTheme,
   }
 }

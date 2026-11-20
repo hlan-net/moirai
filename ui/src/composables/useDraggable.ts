@@ -19,10 +19,7 @@ function clamp(val: number, min: number, max: number) {
   return Math.min(Math.max(val, min), max)
 }
 
-export function useDraggable(
-  targetRef: Ref<HTMLElement | null>,
-  resetSignal?: Ref<unknown>,
-) {
+export function useDraggable(targetRef: Ref<HTMLElement | null>, resetSignal?: Ref<unknown>) {
   const translateX = ref(0)
   const translateY = ref(0)
 
@@ -43,7 +40,7 @@ export function useDraggable(
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return
-    
+
     // Record pointer down but don't start dragging yet
     pointerDown = true
     dragging = false
@@ -51,7 +48,7 @@ export function useDraggable(
     startPointerY = e.clientY
     startTranslateX = translateX.value
     startTranslateY = translateY.value
-    
+
     // Capture pointer but DON'T preventDefault yet - allow click events
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
@@ -82,10 +79,10 @@ export function useDraggable(
     const newY = startTranslateY + dy
 
     // Clamp: keep the element fully within the viewport
-    const minX = -baseLeft                                    // left edge of viewport
-    const maxX = window.innerWidth - baseLeft - rect.width   // right edge of viewport
-    const minY = -baseTop                                     // top edge of viewport
-    const maxY = window.innerHeight - baseTop - rect.height  // bottom edge of viewport
+    const minX = -baseLeft // left edge of viewport
+    const maxX = window.innerWidth - baseLeft - rect.width // right edge of viewport
+    const minY = -baseTop // top edge of viewport
+    const maxY = window.innerHeight - baseTop - rect.height // bottom edge of viewport
 
     translateX.value = clamp(newX, minX, maxX)
     translateY.value = clamp(newY, minY, maxY)
@@ -93,10 +90,10 @@ export function useDraggable(
 
   function onPointerUp(e: PointerEvent) {
     if (!pointerDown) return
-    
+
     pointerDown = false
     dragging = false
-    
+
     ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
   }
 

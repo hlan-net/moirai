@@ -5,7 +5,12 @@ from pydantic import ValidationError
 from typing import Any, cast
 
 from api.auth import jwt_required
-from api.db import delete_from_couchdb, fetch_from_couchdb, query_couchdb, update_couchdb_doc
+from api.db import (
+    delete_from_couchdb,
+    fetch_from_couchdb,
+    query_couchdb,
+    update_couchdb_doc,
+)
 from api.userspace_ops import get_default_userspace
 from api.validation import (
     AgentConfigCreateRequest,
@@ -146,7 +151,10 @@ def update_agent(agent_id: str):
             400,
             description="schedule_interval is required when trigger_type is 'scheduled'.",
         )
-    if effective_trigger == AgentTriggerType.ON_NEW_ARTICLE.value and effective_interval:
+    if (
+        effective_trigger == AgentTriggerType.ON_NEW_ARTICLE.value
+        and effective_interval
+    ):
         abort(
             400,
             description="schedule_interval must not be set when trigger_type is 'on_new_article'.",

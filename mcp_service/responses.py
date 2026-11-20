@@ -15,6 +15,7 @@ import uuid
 
 class MCPStatus(str, Enum):
     """Status codes for MCP tool responses."""
+
     SUCCESS = "success"
     ERROR = "error"
     PARTIAL = "partial"  # Some operations succeeded, others failed
@@ -22,30 +23,30 @@ class MCPStatus(str, Enum):
 
 class MCPErrorCode(str, Enum):
     """Canonical error codes for MCP tool failures."""
-    
+
     # Validation errors (4xx-equivalent)
     VALIDATION_ERROR = "VALIDATION_ERROR"
     INVALID_USERSPACE = "INVALID_USERSPACE"
     INVALID_PARAMETER = "INVALID_PARAMETER"
     MISSING_REQUIRED_FIELD = "MISSING_REQUIRED_FIELD"
     PERMISSION_DENIED = "PERMISSION_DENIED"
-    
+
     # Not found errors
     RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
     FEED_NOT_FOUND = "FEED_NOT_FOUND"
     ISSUE_NOT_FOUND = "ISSUE_NOT_FOUND"
     ARTICLE_NOT_FOUND = "ARTICLE_NOT_FOUND"
-    
+
     # Conflict errors
     CONFLICT_REVISION = "CONFLICT_REVISION"
     DUPLICATE_RESOURCE = "DUPLICATE_RESOURCE"
-    
+
     # Transient errors (5xx-equivalent, retryable)
     TRANSIENT_NETWORK = "TRANSIENT_NETWORK"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
     RATE_LIMITED = "RATE_LIMITED"
     TIMEOUT = "TIMEOUT"
-    
+
     # Internal errors
     INTERNAL_ERROR = "INTERNAL_ERROR"
     UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
@@ -53,6 +54,7 @@ class MCPErrorCode(str, Enum):
 
 class NextAction(str, Enum):
     """Suggested next action for the agent runtime."""
+
     NONE = "none"  # Task complete, no further action needed
     RETRY = "retry"  # Retry the same operation
     REPLAN = "replan"  # Failure requires replanning
@@ -63,7 +65,7 @@ class NextAction(str, Enum):
 class MCPResponse:
     """
     Standardized response envelope for all MCP tools.
-    
+
     Attributes:
         status: success, error, or partial
         data: The actual response data (None on error)
@@ -75,7 +77,7 @@ class MCPResponse:
         retry_after_ms: Suggested retry delay in milliseconds
         max_retries_hint: Suggested maximum retries before giving up
     """
-    
+
     def __init__(
         self,
         status: MCPStatus,
@@ -98,7 +100,7 @@ class MCPResponse:
         self.retry_after_ms = retry_after_ms
         self.max_retries_hint = max_retries_hint
         self.timestamp = datetime.now(timezone.utc).isoformat()
-    
+
     def to_dict(self) -> dict:
         """Convert response to dictionary for JSON serialization."""
         result = {
@@ -108,10 +110,10 @@ class MCPResponse:
             "correlation_id": self.correlation_id,
             "timestamp": self.timestamp,
         }
-        
+
         if self.error_code:
             result["error_code"] = self.error_code.value
-        
+
         if self.retryable:
             result["retryable"] = True
             result["next_action"] = self.next_action.value
@@ -121,18 +123,22 @@ class MCPResponse:
         else:
             result["retryable"] = False
             result["next_action"] = self.next_action.value
-        
+
         return result
-    
+
     def to_json_string(self) -> str:
         """Convert response to JSON string."""
         import json
+
         return json.dumps(self.to_dict(), indent=2)
 
 
 # --- Convenience factory methods ---
 
-def success(data: Any, message: str = "", correlation_id: Optional[str] = None) -> MCPResponse:
+
+def success(
+    data: Any, message: str = "", correlation_id: Optional[str] = None
+) -> MCPResponse:
     """Create a success response."""
     return MCPResponse(
         status=MCPStatus.SUCCESS,
@@ -174,7 +180,9 @@ def validation_error(message: str, correlation_id: Optional[str] = None) -> MCPR
     )
 
 
-def not_found_error(resource_type: str, resource_id: str, correlation_id: Optional[str] = None) -> MCPResponse:
+def not_found_error(
+    resource_type: str, resource_id: str, correlation_id: Optional[str] = None
+) -> MCPResponse:
     """Create a resource not found error response."""
     error_codes = {
         "feed": MCPErrorCode.FEED_NOT_FOUND,
@@ -182,7 +190,7 @@ def not_found_error(resource_type: str, resource_id: str, correlation_id: Option
         "article": MCPErrorCode.ARTICLE_NOT_FOUND,
     }
     code = error_codes.get(resource_type, MCPErrorCode.RESOURCE_NOT_FOUND)
-    
+
     return error(
         error_code=code,
         message=f"{resource_type.capitalize()} '{resource_id}' not found or access denied",
@@ -252,24 +260,27 @@ def partial_success(
 
 # --- Helper for wrapping existing string-based tools ---
 
-def wrap_legacy_response(legacy_response: str, correlation_id: Optional[str] = None) -> MCPResponse:
+
+def wrap_legacy_response(
+    legacy_response: str, correlation_id: Optional[str] = None
+) -> MCPResponse:
     """
     Wrap a legacy string response in the standardized envelope.
-    
+
     This is a temporary helper to gradually migrate existing tools.
     Detects error patterns in the string and maps to appropriate response types.
-    
+
     Args:
         legacy_response: The old-style string response
         correlation_id: Optional correlation ID for tracing
-        
+
     Returns:
         MCPResponse with best-effort classification
     """
     lower = legacy_response.lower()
-    
+
     # Error detection patterns - check specific errors before generic "error" keyword
-    
+
     # Check for duplicate/already exists (may not contain "error" keyword)
     if "already exists" in lower or "duplicate" in lower:
         return error(
@@ -279,7 +290,7 @@ def wrap_legacy_response(legacy_response: str, correlation_id: Optional[str] = N
             next_action=NextAction.REPLAN,
             correlation_id=correlation_id,
         )
-    
+
     # Check for explicit "error" keyword
     if "error" in lower:
         if "not found" in lower or "denied" in lower:
@@ -288,7 +299,7 @@ def wrap_legacy_response(legacy_response: str, correlation_id: Optional[str] = N
             return validation_error(legacy_response, correlation_id)
         else:
             return internal_error(legacy_response, correlation_id)
-    
+
     # Success - treat as data
     return success(
         data={"message": legacy_response},

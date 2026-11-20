@@ -15,6 +15,7 @@ from ..responses import (
 
 # --- Internal Logic (No Auth Decorators) ---
 
+
 def _forge_issue_internal(
     logos: str,
     description: str,
@@ -59,9 +60,7 @@ def _forge_issue_internal(
             message=f"Issue forged with ID: {doc_id} in userspace {userspace} (Scale: {longevity})",
         ).to_dict()
     except Exception as e:
-        return internal_error(
-            message=f"Error forging issue: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Error forging issue: {str(e)}").to_dict()
 
 
 def _measure_issue_internal(
@@ -123,9 +122,7 @@ def _measure_issue_internal(
             message=f"Issue {issue_id} measured and modulated successfully.",
         ).to_dict()
     else:
-        return internal_error(
-            message=f"Error measuring issue: {msg}"
-        ).to_dict()
+        return internal_error(message=f"Error measuring issue: {msg}").to_dict()
 
 
 def _seal_issue_internal(issue_id: str, userspace: str = "") -> dict:
@@ -150,9 +147,7 @@ def _seal_issue_internal(issue_id: str, userspace: str = "") -> dict:
             message=f"Issue {issue_id} sealed into Eternity.",
         ).to_dict()
     else:
-        return internal_error(
-            message=f"Error sealing issue: {msg}"
-        ).to_dict()
+        return internal_error(message=f"Error sealing issue: {msg}").to_dict()
 
 
 def _list_issues_internal(
@@ -244,12 +239,11 @@ def _delete_issue_internal(issue_id: str, userspace: str = "") -> dict:
             message=f"Issue {issue_id} deleted successfully.",
         ).to_dict()
     else:
-        return internal_error(
-            message=f"Error deleting issue: {msg}"
-        ).to_dict()
+        return internal_error(message=f"Error deleting issue: {msg}").to_dict()
 
 
 # --- Issues (Resonances) Tools ---
+
 
 @mcp.tool()
 @auth_required
@@ -263,11 +257,11 @@ def forge_issue(
 ) -> dict:
     """
     (Clotho - The Spinner) Forge a new Issue (Zeitgeist) from identified patterns.
-    
+
     Clotho spins the thread of a new story. An Issue is a Zeitgeist - the spirit
     of a story unfolding in the world. Each Issue has its own awareness (Agent)
     through which it perceives itself in the flow of news.
-    
+
     Args:
         logos: The name/title of the issue (the story's identity)
         description: What this issue represents
@@ -275,7 +269,7 @@ def forge_issue(
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         longevity: Scale of the thread - "transient" (event), "temporal" (trend), or "epic"
         public: Whether this issue is visible on the public Mythology page
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -303,7 +297,7 @@ def forge_issue(
         "public": public,
         "born_at": datetime.now(timezone.utc).isoformat(),
         "passed_at": None,
-        "type": "issue"
+        "type": "issue",
     }
     with_userspace(issue_doc, userspace)
 
@@ -320,11 +314,9 @@ def forge_issue(
             },
             message=f"Issue '{logos}' forged by Clotho (Scale: {longevity}, {len(premises)} premises)",
         ).to_dict()
-        
+
     except Exception as e:
-        return internal_error(
-            message=f"Clotho's spindle faltered: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Clotho's spindle faltered: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -338,17 +330,17 @@ def measure_issue(
 ) -> dict:
     """
     (Lachesis - The Allotter) Measure and modulate an existing Issue's thread.
-    
+
     Lachesis measures the thread's length and adjusts its destiny. She determines
     how long the story should run, what it means, and which premises define it.
-    
+
     Args:
         issue_id: ID of the issue to measure
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         longevity: New scale if changing - "transient", "temporal", or "epic"
         description: New description if updating
         add_premises: New article premises to add to the thread
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -366,17 +358,17 @@ def measure_issue(
 
     updates = {}
     updated_fields = []
-    
+
     if longevity:
         if longevity not in ["transient", "temporal", "epic"]:
             return validation_error("Invalid longevity scale").to_dict()
         updates["longevity"] = longevity
         updated_fields.append("longevity")
-    
+
     if description:
         updates["description"] = description
         updated_fields.append("description")
-        
+
     if add_premises:
         current_premises = existing.get("premises", [])
         # Simple deduplication based on ID
@@ -391,17 +383,21 @@ def measure_issue(
             updated_fields.append(f"premises (+{new_count})")
 
     if not updates:
-        return validation_error("No updates specified - provide longevity, description, or add_premises").to_dict()
+        return validation_error(
+            "No updates specified - provide longevity, description, or add_premises"
+        ).to_dict()
 
     success_update, msg = update_doc("issues", issue_id, updates)
-    
+
     if success_update:
         return success(
             data={
                 "issue_id": issue_id,
                 "updated_fields": updated_fields,
                 "longevity": updates.get("longevity", existing.get("longevity")),
-                "premises_count": len(updates.get("premises", existing.get("premises", []))),
+                "premises_count": len(
+                    updates.get("premises", existing.get("premises", []))
+                ),
             },
             message=f"Lachesis measured issue '{issue_id}': {', '.join(updated_fields)} updated",
         ).to_dict()
@@ -426,14 +422,14 @@ def seal_issue(
 ) -> dict:
     """
     (Atropos - The Inflexible) Cut the thread of an active Issue.
-    
+
     Atropos cuts the thread with her shears - the story has ended. The Issue's
     status becomes 'eternal' (sealed in history) and the thread's end is marked.
-    
+
     Args:
         issue_id: ID of the issue to seal
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -448,7 +444,7 @@ def seal_issue(
     existing = get_doc("issues", issue_id)
     if not existing or extract_userspace(existing) != userspace:
         return not_found_error("issue", issue_id).to_dict()
-    
+
     if existing.get("status") == "eternal":
         # Already sealed - not an error, just acknowledge
         return success(
@@ -468,7 +464,7 @@ def seal_issue(
     }
 
     success_update, msg = update_doc("issues", issue_id, updates)
-    
+
     if success_update:
         # Calculate lifespan
         born_at = existing.get("born_at")
@@ -480,7 +476,7 @@ def seal_issue(
                 lifespan_days = (passed - born).days
             except (ValueError, AttributeError):
                 pass  # Invalid date format - lifespan_days remains None
-        
+
         return success(
             data={
                 "issue_id": issue_id,
@@ -490,7 +486,11 @@ def seal_issue(
                 "lifespan_days": lifespan_days,
                 "status": "eternal",
             },
-            message=f"Atropos cut the thread of '{existing.get('logos')}' ({lifespan_days} days)" if lifespan_days else f"Atropos sealed '{existing.get('logos')}'",
+            message=(
+                f"Atropos cut the thread of '{existing.get('logos')}' ({lifespan_days} days)"
+                if lifespan_days
+                else f"Atropos sealed '{existing.get('logos')}'"
+            ),
         ).to_dict()
     else:
         if "conflict" in msg.lower():
@@ -507,22 +507,18 @@ def seal_issue(
 
 @mcp.tool()
 @auth_required
-def list_issues(
-    userspace: str = "",
-    longevity: str = None, 
-    status: str = None
-) -> dict:
+def list_issues(userspace: str = "", longevity: str = None, status: str = None) -> dict:
     """
     List forged Issues (Zeitgeists) in a userspace.
-    
+
     Returns the threads spun by the Fates - each Issue is a story
     being tracked in the flow of news.
-    
+
     Args:
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
         longevity: Filter by scale - "transient", "temporal", or "epic"
         status: Filter by status - "active" or "eternal" (sealed)
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -543,13 +539,13 @@ def list_issues(
         res = db_request(
             "POST", "issues", path="/_find", json_data={"selector": selector}
         )
-        
+
         if res.status_code >= 500:
             return transient_error(
                 message=f"Database error fetching issues: HTTP {res.status_code}",
                 retry_after_ms=2000,
             ).to_dict()
-        
+
         if res.status_code != 200:
             return internal_error(
                 message=f"Unexpected error fetching issues: {res.text}"
@@ -558,17 +554,19 @@ def list_issues(
         docs = res.json().get("docs", [])
         issues = []
         for doc in docs:
-            issues.append({
-                "id": doc["_id"],
-                "logos": doc.get("logos", "Unnamed"),
-                "description": doc.get("description", ""),
-                "longevity": doc.get("longevity", "transient"),
-                "status": doc.get("status", "active"),
-                "premises_count": len(doc.get("premises", [])),
-                "born_at": doc.get("born_at"),
-                "passed_at": doc.get("passed_at"),
-                "public": doc.get("public", False),
-            })
+            issues.append(
+                {
+                    "id": doc["_id"],
+                    "logos": doc.get("logos", "Unnamed"),
+                    "description": doc.get("description", ""),
+                    "longevity": doc.get("longevity", "transient"),
+                    "status": doc.get("status", "active"),
+                    "premises_count": len(doc.get("premises", [])),
+                    "born_at": doc.get("born_at"),
+                    "passed_at": doc.get("passed_at"),
+                    "public": doc.get("public", False),
+                }
+            )
 
         filters_desc = []
         if longevity:
@@ -586,7 +584,7 @@ def list_issues(
             },
             message=f"Found {len(issues)} issue(s) in userspace{filter_str}",
         ).to_dict()
-        
+
     except Exception as e:
         return internal_error(
             message=f"Unexpected error listing issues: {str(e)}"
@@ -598,13 +596,13 @@ def list_issues(
 def read_issue(issue_id: str, userspace: str = "") -> dict:
     """
     Read full details of a specific Issue (Zeitgeist).
-    
+
     Returns the complete thread - all premises, metadata, and lifecycle info.
-    
+
     Args:
         issue_id: ID of the issue to read
         userspace: GUID of the userspace (optional; defaults to the deployment's userspace)
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -633,6 +631,7 @@ def delete_issue(issue_id: str, userspace: str = "") -> dict:
 
 
 # --- Backward Compatibility Aliases (Legacy Events/Trends) ---
+
 
 @mcp.tool()
 @auth_required

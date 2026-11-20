@@ -19,6 +19,7 @@ COUCHDB_FIND_ENDPOINT = "/_find"
 
 # ===== INTERNAL LOGIC =====
 
+
 def _process_article_docs(docs):
     """Common logic to format article documents for tool output."""
     results = []
@@ -37,6 +38,7 @@ def _process_article_docs(docs):
             }
         )
     return results
+
 
 def _build_date_filter(date_from, date_to):
     """Build date range filter for Mango selector."""
@@ -57,6 +59,7 @@ def _build_date_filter(date_from, date_to):
             date_filter["published"] = {"$lte": to_dt.isoformat()}
 
     return date_filter
+
 
 def _search_issues_internal(
     query: str, userspace: str = "", longevity: Optional[str] = None, limit: int = 50
@@ -91,10 +94,19 @@ def _search_issues_internal(
         query_payload = {
             "selector": selector,
             "limit": limit,
-            "fields": ["_id", "logos", "description", "premises", "longevity", "status"],
+            "fields": [
+                "_id",
+                "logos",
+                "description",
+                "premises",
+                "longevity",
+                "status",
+            ],
         }
 
-        resp = db_request("POST", ISSUES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload)
+        resp = db_request(
+            "POST", ISSUES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload
+        )
 
         if resp.status_code >= 500:
             return transient_error(
@@ -103,9 +115,7 @@ def _search_issues_internal(
             ).to_dict()
 
         if resp.status_code != 200:
-            return internal_error(
-                message=f"Search failed: {resp.text}"
-            ).to_dict()
+            return internal_error(message=f"Search failed: {resp.text}").to_dict()
 
         docs = resp.json().get("docs", [])
 
@@ -128,12 +138,11 @@ def _search_issues_internal(
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Search execution error: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Search execution error: {str(e)}").to_dict()
 
 
 # ===== SEARCH TOOLS =====
+
 
 @mcp.tool()
 @auth_required
@@ -146,17 +155,17 @@ def search_articles(
 ) -> dict:
     """
     Search articles by keyword across the shared global article corpus.
-    
+
     Searches title, description, and content fields. Multi-word queries
     match documents containing ALL terms (in any field, in any order).
-    
+
     Args:
         query: Search keywords (space-separated for AND logic)
         userspace: Accepted for compatibility but ignored (articles are global)
         date_from: Optional ISO 8601 date to filter from
         date_to: Optional ISO 8601 date to filter to
         limit: Max results to return (capped at 200)
-        
+
     Returns:
         Standardized MCPResponse as dict with:
         - status: success/error
@@ -186,7 +195,9 @@ def search_articles(
         )
 
     # All terms must match (AND), each across any of the three fields (OR)
-    text_selector = {"$and": term_selectors} if len(term_selectors) > 1 else term_selectors[0]
+    text_selector = (
+        {"$and": term_selectors} if len(term_selectors) > 1 else term_selectors[0]
+    )
 
     filters = [text_selector]
 
@@ -195,7 +206,9 @@ def search_articles(
         if date_filter:
             filters.append(date_filter)
     except ValueError:
-        return validation_error("Invalid date format - use ISO 8601 (YYYY-MM-DD)").to_dict()
+        return validation_error(
+            "Invalid date format - use ISO 8601 (YYYY-MM-DD)"
+        ).to_dict()
 
     try:
         selector = {"$and": filters} if len(filters) > 1 else filters[0]
@@ -227,11 +240,9 @@ def search_articles(
                 message=f"Database error searching articles: HTTP {resp.status_code}",
                 retry_after_ms=2000,
             ).to_dict()
-        
+
         if resp.status_code != 200:
-            return internal_error(
-                message=f"Search failed: {resp.text}"
-            ).to_dict()
+            return internal_error(message=f"Search failed: {resp.text}").to_dict()
 
         results = _process_article_docs(resp.json().get("docs", []))
 
@@ -247,9 +258,7 @@ def search_articles(
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Search execution error: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Search execution error: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -293,7 +302,9 @@ def get_recent_articles(
             ],
         }
 
-        resp = db_request("POST", ARTICLES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload)
+        resp = db_request(
+            "POST", ARTICLES_DB, COUCHDB_FIND_ENDPOINT, json_data=query_payload
+        )
 
         if resp.status_code >= 500:
             return transient_error(
@@ -302,9 +313,7 @@ def get_recent_articles(
             ).to_dict()
 
         if resp.status_code != 200:
-            return internal_error(
-                message=f"Fetch failed: {resp.text}"
-            ).to_dict()
+            return internal_error(message=f"Fetch failed: {resp.text}").to_dict()
 
         results = _process_article_docs(resp.json().get("docs", []))
 
@@ -318,9 +327,7 @@ def get_recent_articles(
         ).to_dict()
 
     except Exception as e:
-        return internal_error(
-            message=f"Fetch execution error: {str(e)}"
-        ).to_dict()
+        return internal_error(message=f"Fetch execution error: {str(e)}").to_dict()
 
 
 @mcp.tool()
@@ -339,9 +346,7 @@ def search_issues(
 
 @mcp.tool()
 @auth_required
-def search_events(
-    query: str, userspace: str = "", limit: int = 50
-) -> dict:
+def search_events(query: str, userspace: str = "", limit: int = 50) -> dict:
     """
     (Alias for search_issues) Search events (transient issues) by keyword.
 
@@ -353,9 +358,7 @@ def search_events(
 
 @mcp.tool()
 @auth_required
-def search_trends(
-    query: str, userspace: str = "", limit: int = 20
-) -> dict:
+def search_trends(query: str, userspace: str = "", limit: int = 20) -> dict:
     """
     (Alias for search_issues) Search trends (temporal issues) by keyword.
 

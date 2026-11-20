@@ -5,8 +5,8 @@ import { useAuthStore } from '../stores/auth'
 // Add types for window globals if needed or use 'any'
 declare global {
   interface Window {
-    google: any;
-    msal: any;
+    google: any
+    msal: any
   }
 }
 
@@ -26,7 +26,7 @@ const authStore = useAuthStore()
 const handleAuth = async () => {
   loading.value = true
   errorMessage.value = ''
-  
+
   try {
     if (isLogin.value) {
       const success = await authStore.login(email.value, password.value)
@@ -44,22 +44,22 @@ const handleAuth = async () => {
       // For now, assuming store has register or we call axios directly
       // Let's implement basic register call here for MVP
       const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ email: email.value, password: password.value })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.value, password: password.value }),
       })
-      
+
       if (res.ok) {
-          // Auto login after register
-          await authStore.login(email.value, password.value)
-          emit('success')
+        // Auto login after register
+        await authStore.login(email.value, password.value)
+        emit('success')
       } else {
-          const data = await res.json()
-          errorMessage.value = data.message || 'Registration failed'
+        const data = await res.json()
+        errorMessage.value = data.message || 'Registration failed'
       }
     }
   } catch (e) {
-    console.error("Auth error:", e)
+    console.error('Auth error:', e)
     errorMessage.value = 'An error occurred'
   } finally {
     loading.value = false
@@ -67,91 +67,91 @@ const handleAuth = async () => {
 }
 
 const fetchAuthConfig = async () => {
-    try {
-        const res = await fetch('/api/auth/config')
-        if (res.ok) {
-            const data = await res.json()
-            googleClientId.value = data.google_client_id
-            entraClientId.value = data.entra_client_id
-            entraTenantId.value = data.entra_tenant_id
-            // GitHub
-            if (data.github_client_id) {
-                // We use a specific variable or just use the button if config exists
-                 // But wait, we need to pass this to the template
-                 // Let's add a ref for it
-                 githubClientId.value = data.github_client_id
-            }
-            
-            // Initialize providers if config is present
-            if (googleClientId.value) {
-                // Check if Google script is loaded, if not load it dynamically? 
-                // For now assuming script is in index.html (we should add it)
-                // initializeGoogleLogin() 
-            }
-        }
-    } catch (e) {
-        console.error("Failed to fetch auth config", e)
+  try {
+    const res = await fetch('/api/auth/config')
+    if (res.ok) {
+      const data = await res.json()
+      googleClientId.value = data.google_client_id
+      entraClientId.value = data.entra_client_id
+      entraTenantId.value = data.entra_tenant_id
+      // GitHub
+      if (data.github_client_id) {
+        // We use a specific variable or just use the button if config exists
+        // But wait, we need to pass this to the template
+        // Let's add a ref for it
+        githubClientId.value = data.github_client_id
+      }
+
+      // Initialize providers if config is present
+      if (googleClientId.value) {
+        // Check if Google script is loaded, if not load it dynamically?
+        // For now assuming script is in index.html (we should add it)
+        // initializeGoogleLogin()
+      }
     }
+  } catch (e) {
+    console.error('Failed to fetch auth config', e)
+  }
 }
 
 const githubClientId = ref('')
 
 const handleGoogleLogin = () => {
-    if (!googleClientId.value) {
-        alert("Google Client ID not configured. Please contact admin.")
-        return
-    }
-    alert(`Google Login not yet fully implemented. Client ID: ${googleClientId.value}`)
-    // Actual implementation would trigger GIS flow here
+  if (!googleClientId.value) {
+    alert('Google Client ID not configured. Please contact admin.')
+    return
+  }
+  alert(`Google Login not yet fully implemented. Client ID: ${googleClientId.value}`)
+  // Actual implementation would trigger GIS flow here
 }
 
 const handleEntraLogin = () => {
-    if (!entraClientId.value) {
-        alert("Microsoft Entra Client ID not configured. Please contact admin.")
-        return
-    }
-    alert(`Entra Login not yet fully implemented. Client ID: ${entraClientId.value}`)
-    // Actual implementation would call MSAL loginPopup
+  if (!entraClientId.value) {
+    alert('Microsoft Entra Client ID not configured. Please contact admin.')
+    return
+  }
+  alert(`Entra Login not yet fully implemented. Client ID: ${entraClientId.value}`)
+  // Actual implementation would call MSAL loginPopup
 }
 
 const handleGithubLogin = () => {
-    if (!githubClientId.value) {
-        alert("GitHub Client ID not configured. Please contact admin.")
-        return
-    }
-    // Redirect to GitHub
-    const redirectUri = globalThis.location.origin + '/login'
-    const scope = 'user:email'
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId.value}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`
-    globalThis.location.href = authUrl
+  if (!githubClientId.value) {
+    alert('GitHub Client ID not configured. Please contact admin.')
+    return
+  }
+  // Redirect to GitHub
+  const redirectUri = globalThis.location.origin + '/login'
+  const scope = 'user:email'
+  const authUrl = `https://github.com/login/oauth/authorize?client_id=${githubClientId.value}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`
+  globalThis.location.href = authUrl
 }
 
 const checkGithubCallback = async () => {
-    const urlParams = new URLSearchParams(globalThis.location.search)
-    const code = urlParams.get('code')
-    if (code) {
-        loading.value = true
-        try {
-            const success = await authStore.loginWithGithub(code)
-            if (success) {
-                // Clear query params
-                globalThis.history.replaceState({}, document.title, globalThis.location.pathname)
-                emit('success')
-            } else {
-                errorMessage.value = 'GitHub Login Failed'
-            }
-        } catch (e) {
-            console.error(e)
-            errorMessage.value = 'GitHub Login Error'
-        } finally {
-            loading.value = false
-        }
+  const urlParams = new URLSearchParams(globalThis.location.search)
+  const code = urlParams.get('code')
+  if (code) {
+    loading.value = true
+    try {
+      const success = await authStore.loginWithGithub(code)
+      if (success) {
+        // Clear query params
+        globalThis.history.replaceState({}, document.title, globalThis.location.pathname)
+        emit('success')
+      } else {
+        errorMessage.value = 'GitHub Login Failed'
+      }
+    } catch (e) {
+      console.error(e)
+      errorMessage.value = 'GitHub Login Error'
+    } finally {
+      loading.value = false
     }
+  }
 }
 
 onMounted(() => {
-    fetchAuthConfig()
-    checkGithubCallback()
+  fetchAuthConfig()
+  checkGithubCallback()
 })
 </script>
 
@@ -161,27 +161,27 @@ onMounted(() => {
       <h1>Moirai</h1>
       <h2>{{ isLogin ? 'Sign In' : 'Create Account' }}</h2>
     </slot>
-    
+
     <div v-if="errorMessage" class="error-alert">{{ errorMessage }}</div>
-    
+
     <form @submit.prevent="handleAuth">
       <div class="form-group">
         <label for="email">Email</label>
         <input type="email" id="email" v-model="email" required />
       </div>
-      
+
       <div class="form-group">
         <label for="password">Password</label>
         <input type="password" id="password" v-model="password" required />
       </div>
-      
+
       <button type="submit" :disabled="loading" class="primary-btn">
-        {{ loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Register') }}
+        {{ loading ? 'Processing...' : isLogin ? 'Sign In' : 'Register' }}
       </button>
     </form>
-    
+
     <div class="divider">OR</div>
-    
+
     <div class="social-login">
       <button type="button" class="google-btn" @click="handleGoogleLogin">
         Sign in with Google
@@ -193,14 +193,12 @@ onMounted(() => {
         Sign in with GitHub
       </button>
     </div>
-    
+
     <div class="switch-mode">
       <p v-if="isLogin">
         Don't have an account? <a href="#" @click.prevent="isLogin = false">Register</a>
       </p>
-      <p v-else>
-        Already have an account? <a href="#" @click.prevent="isLogin = true">Sign In</a>
-      </p>
+      <p v-else>Already have an account? <a href="#" @click.prevent="isLogin = true">Sign In</a></p>
     </div>
   </div>
 </template>
@@ -270,8 +268,9 @@ input {
   color: var(--text-muted, #777);
 }
 
-.divider::before, .divider::after {
-  content: "";
+.divider::before,
+.divider::after {
+  content: '';
   flex: 1;
   border-bottom: 1px solid var(--border-color, #ddd);
 }

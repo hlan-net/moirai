@@ -6,7 +6,15 @@ from .core import mcp
 from api.telemetry import configure_telemetry
 from api.auth_utils import verify_auth_header
 from tasks.agent_orchestrator import AgentOrchestrator
-from .tools import feeds, issues, search, staleness, users, agent_configs, annotations  # noqa: F401
+from .tools import (  # noqa: F401  (imported to register the MCP tools)
+    feeds,
+    issues,
+    search,
+    staleness,
+    users,
+    agent_configs,
+    annotations,
+)
 from api.llm.aisa import log_llm_startup_config
 from version import get_version_string
 import logging
@@ -19,6 +27,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
 logger = logging.getLogger(__name__)
 
 _metrics_started = False
+
 
 # --- Auth Middleware ---
 class AuthMiddleware:
@@ -35,7 +44,10 @@ class AuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
+        headers = {
+            k.decode("latin-1").lower(): v.decode("latin-1")
+            for k, v in scope.get("headers", [])
+        }
         auth_header = headers.get("authorization")
         success, error_msg, _ = verify_auth_header(auth_header)
 
@@ -45,6 +57,7 @@ class AuthMiddleware:
             return
 
         await self.app(scope, receive, send)
+
 
 # Print version info
 logger.info(f"{get_version_string()} starting...")
@@ -70,7 +83,9 @@ def _build_metrics_app() -> Starlette:
 
 def _run_metrics_server(metrics_host: str, metrics_port: int) -> None:
     metrics_app = _build_metrics_app()
-    config = uvicorn.Config(metrics_app, host=metrics_host, port=metrics_port, log_level="info")
+    config = uvicorn.Config(
+        metrics_app, host=metrics_host, port=metrics_port, log_level="info"
+    )
     server = uvicorn.Server(config)
     server.run()
 
@@ -80,7 +95,11 @@ def start_metrics_server() -> None:
     if _metrics_started:
         return
 
-    metrics_enabled = os.environ.get("METRICS_ENABLED", "true").lower() in ("1", "true", "yes")
+    metrics_enabled = os.environ.get("METRICS_ENABLED", "true").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     if not metrics_enabled:
         logger.info("Metrics server disabled by METRICS_ENABLED.")
         return
@@ -114,20 +133,26 @@ REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD")
 
 try:
-    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=True)
-    redis_client.ping() # Test connection
+    redis_client = redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=True
+    )
+    redis_client.ping()  # Test connection
     logger.info("Connected to Redis successfully.")
 except redis.exceptions.ConnectionError as e:
     logger.error(f"Could not connect to Redis: {e}")
-    redis_client = None # Ensure it's None if connection fails
+    redis_client = None  # Ensure it's None if connection fails
 # --- End Redis Client Setup ---
 
 # Initialize and start the Agent Orchestrator
 # Pass the mcp client so it can make tool calls
 try:
-    agent_orchestrator = AgentOrchestrator(interval=60, redis_client=redis_client) # Pass redis_client
+    agent_orchestrator = AgentOrchestrator(
+        interval=60, redis_client=redis_client
+    )  # Pass redis_client
     agent_orchestrator.mcp_client = mcp  # Assign mcp client
-    agent_orchestrator.daemon = True  # Allow main program to exit even if thread is running
+    agent_orchestrator.daemon = (
+        True  # Allow main program to exit even if thread is running
+    )
     agent_orchestrator.start()
     logger.info("Agent Orchestrator thread started.")
 except Exception as orchestrator_err:

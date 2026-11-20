@@ -17,11 +17,13 @@ JWT_ALGORITHM = "HS256"
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
+
 def decode_token(token: str) -> Optional[Dict[str, Any]]:
     try:
         return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
+
 
 def verify_basic_auth(username: str, password: str) -> Optional[Dict[str, str]]:
     if ADMIN_USERNAME and ADMIN_PASSWORD:
@@ -29,9 +31,10 @@ def verify_basic_auth(username: str, password: str) -> Optional[Dict[str, str]]:
             return {
                 "sub": "system",
                 "email": f"{ADMIN_USERNAME}@localhost.local",
-                "role": "admin"
+                "role": "admin",
             }
     return None
+
 
 def parse_basic_auth(auth_header: str) -> Optional[Tuple[str, str]]:
     try:
@@ -44,7 +47,10 @@ def parse_basic_auth(auth_header: str) -> Optional[Tuple[str, str]]:
         pass
     return None
 
-def verify_auth_header(auth_header: Optional[str]) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+
+def verify_auth_header(
+    auth_header: Optional[str],
+) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
     """
     Common logic to verify Authorization header (Bearer or Basic).
     Returns (success, error_message, user_payload).

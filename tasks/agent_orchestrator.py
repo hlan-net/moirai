@@ -3,8 +3,8 @@ import threading
 import importlib
 from datetime import datetime, timedelta, timezone
 import logging
-import uuid # Added for unique leader ID
-import redis # Added for Redis client
+import uuid  # Added for unique leader ID
+import redis  # Added for Redis client
 import requests
 
 from api.db import query_couchdb, update_couchdb_doc_safe
@@ -14,7 +14,11 @@ from api.llm.catalog import PURPOSE_EVENT_SYNTHESIS, catalog_entry
 from api.userspace_ops import get_default_userspace, resolve_llm_config
 from tasks.agent_config_migration import migrate_legacy_agent_configs
 from tasks.sections import is_section_rewrite
-from tasks.session_logger import SessionLogger, SESSION_TYPE_SCHEDULED, SESSION_TYPE_ON_NEW_ARTICLE
+from tasks.session_logger import (
+    SessionLogger,
+    SESSION_TYPE_SCHEDULED,
+    SESSION_TYPE_ON_NEW_ARTICLE,
+)
 from tasks.tracing_mcp_client import TracingMCPClient, AgentCancelledException
 
 logger = logging.getLogger(__name__)
@@ -75,11 +79,13 @@ class AgentOrchestrator(threading.Thread):
         self.mcp_client = None  # To be initialized with an MCP client for tool calls
 
         # Redis distributed locking
-        self.redis_client: redis.Redis = redis_client # Assigned here
-        self.leader_id = str(uuid.uuid4()) # Unique ID for this orchestrator instance
+        self.redis_client: redis.Redis = redis_client  # Assigned here
+        self.leader_id = str(uuid.uuid4())  # Unique ID for this orchestrator instance
         self.is_leader = False
         self.lock_name = REDIS_LOCK_NAME
-        self.lock_expiry = self.interval * 2 # Lock expiry is twice the check interval, to allow for renewal
+        self.lock_expiry = (
+            self.interval * 2
+        )  # Lock expiry is twice the check interval, to allow for renewal
 
         # Session logger (shares the same Redis client)
         self.session_logger = SessionLogger(redis_client)
@@ -96,7 +102,9 @@ class AgentOrchestrator(threading.Thread):
         # Attempt to set the lock key if it doesn't exist.
         # Set expiry to prevent deadlocks if an orchestrator crashes.
         # Store self.leader_id as the value to identify the lock owner.
-        return self.redis_client.set(self.lock_name, self.leader_id, nx=True, ex=self.lock_expiry)
+        return self.redis_client.set(
+            self.lock_name, self.leader_id, nx=True, ex=self.lock_expiry
+        )
 
     def _renew_lock(self) -> bool:
         """Attempts to renew the distributed lock if this instance is the leader."""
@@ -113,7 +121,12 @@ class AgentOrchestrator(threading.Thread):
                 return 0
             end
         """
-        return self.redis_client.eval(lua_script, 1, self.lock_name, self.leader_id, self.lock_expiry) == 1
+        return (
+            self.redis_client.eval(
+                lua_script, 1, self.lock_name, self.leader_id, self.lock_expiry
+            )
+            == 1
+        )
 
     def _release_lock(self):
         """Attempts to release the distributed lock if this instance is the leader."""
@@ -189,11 +202,13 @@ class AgentOrchestrator(threading.Thread):
                 self.is_leader = True
                 logger.info(f"Agent Orchestrator {self.leader_id} acquired leadership.")
             else:
-                logger.debug(f"Agent Orchestrator {self.leader_id} is not leader. Waiting.")
+                logger.debug(
+                    f"Agent Orchestrator {self.leader_id} is not leader. Waiting."
+                )
         else:
             # We are the leader, try to renew lock
             if not self._renew_lock():
-                self.is_leader = False # Lost leadership
+                self.is_leader = False  # Lost leadership
                 logger.warning(f"Agent Orchestrator {self.leader_id} lost leadership.")
             else:
                 logger.debug(f"Agent Orchestrator {self.leader_id} renewed leadership.")
@@ -340,7 +355,9 @@ class AgentOrchestrator(threading.Thread):
 
         migrate_result = migrate_legacy_agent_configs()
         if migrate_result.get("migrated"):
-            logger.info("Migrated %s legacy agent configs", migrate_result.get("migrated"))
+            logger.info(
+                "Migrated %s legacy agent configs", migrate_result.get("migrated")
+            )
 
         # Start the changes feed thread for on_new_article agents
         changes_thread = threading.Thread(
@@ -360,10 +377,14 @@ class AgentOrchestrator(threading.Thread):
                 self._update_leadership()
 
                 if self.is_leader:
-                    logger.debug(f"Agent Orchestrator {self.leader_id} is leader. Checking scheduled agents.")
+                    logger.debug(
+                        f"Agent Orchestrator {self.leader_id} is leader. Checking scheduled agents."
+                    )
                     self.check_and_run_agents()
                 else:
-                    logger.debug(f"Agent Orchestrator {self.leader_id} skipping agent checks (not leader).")
+                    logger.debug(
+                        f"Agent Orchestrator {self.leader_id} skipping agent checks (not leader)."
+                    )
 
             except Exception as e:
                 logger.error(f"Error in Agent Orchestrator loop: {e}", exc_info=True)
@@ -375,8 +396,6 @@ class AgentOrchestrator(threading.Thread):
         if self.is_leader:
             self._release_lock()
         logger.info(f"Agent Orchestrator {self.leader_id} stopped.")
-
-
 
     def stop(self):
         self.running = False
@@ -424,9 +443,7 @@ class AgentOrchestrator(threading.Thread):
             try:
                 self.run_agent_if_due(agent_config)
             except Exception as e:
-                logger.error(
-                    f"Error running agent {agent_id}: {e}"
-                )
+                logger.error(f"Error running agent {agent_id}: {e}")
                 update_couchdb_doc_safe(
                     self.agent_configs_db,
                     agent_id,
@@ -441,7 +458,9 @@ class AgentOrchestrator(threading.Thread):
 
         if self.is_scheduled_agent_due(last_run_at_str, schedule_interval):
             logger.info(f"Triggering scheduled agent {agent_id}.")
-            userspace = agent_config.get("userspace") or agent_config.get("namespace", "")
+            userspace = agent_config.get("userspace") or agent_config.get(
+                "namespace", ""
+            )
             llm_config = resolve_agent_llm_config(agent_config, userspace)
             self.execute_agent_logic(agent_config, llm_config=llm_config)
 
@@ -487,7 +506,9 @@ class AgentOrchestrator(threading.Thread):
 
         # Security: only execute modules in the shared allowlist (defined in api.validation)
         if logic_module_path not in ALLOWED_LOGIC_MODULES:
-            logger.error(f"Logic module {logic_module_path} is not in the allowed whitelist.")
+            logger.error(
+                f"Logic module {logic_module_path} is not in the allowed whitelist."
+            )
             return
 
         agent_id = agent_config.get("_id", "")

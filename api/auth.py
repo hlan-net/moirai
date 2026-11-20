@@ -94,7 +94,7 @@ def _github_fetch_profile(access_token):
             "Authorization": f"Bearer {access_token}",
             "Accept": JSON_CONTENT_TYPE,
         },
-        timeout=10
+        timeout=10,
     )
     user_res.raise_for_status()
     return user_res.json()
@@ -107,7 +107,7 @@ def _github_fetch_primary_email(access_token):
             "Authorization": f"Bearer {access_token}",
             "Accept": JSON_CONTENT_TYPE,
         },
-        timeout=10
+        timeout=10,
     )
     if emails_res.ok:
         for e in emails_res.json():
@@ -152,7 +152,12 @@ def github_login():
     try:
         token_data = _github_exchange_code_for_token(code, client_id, client_secret)
         if "error" in token_data:
-            return jsonify({"message": f"GitHub Error: {token_data.get('error_description')}"}), 400
+            return (
+                jsonify(
+                    {"message": f"GitHub Error: {token_data.get('error_description')}"}
+                ),
+                400,
+            )
 
         access_token = token_data.get("access_token")
         if not access_token:
@@ -162,20 +167,25 @@ def github_login():
         email = github_user.get("email") or _github_fetch_primary_email(access_token)
 
         if not email:
-            return jsonify({"message": "No verified email found for GitHub account"}), 400
+            return (
+                jsonify({"message": "No verified email found for GitHub account"}),
+                400,
+            )
 
         user_id, role = _get_or_create_github_user(email, github_user.get("id"))
         if not user_id:
             return jsonify({"message": ERROR_FAILED_TO_CREATE_USER}), 500
 
         app_token = create_access_token({"sub": user_id, "email": email, "role": role})
-        return jsonify({
-            "access_token": app_token,
-            "token_type": "bearer",
-            "user_id": user_id,
-            "email": email,
-            "role": role,
-        })
+        return jsonify(
+            {
+                "access_token": app_token,
+                "token_type": "bearer",
+                "user_id": user_id,
+                "email": email,
+                "role": role,
+            }
+        )
 
     except Exception as e:
         logger.error(f"GitHub Auth Error: {e}")
@@ -216,7 +226,7 @@ def verify_request_auth():
         g.user_id = payload.get("sub")
         g.user_email = payload.get("email")
         g.user_role = payload.get("role", "user")
-        
+
         # Additional DB check for Basic Auth mapping if needed
         if g.user_id == "system" and g.user_role == "admin":
             admin_email = f"{ADMIN_USERNAME}@localhost.local"

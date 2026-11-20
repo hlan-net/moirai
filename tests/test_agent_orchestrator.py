@@ -4,14 +4,17 @@ from datetime import datetime, timezone, timedelta
 from tasks.agent_orchestrator import AgentOrchestrator
 from api.validation import AgentStatus, AgentTriggerType
 
+
 @pytest.fixture
 def mock_redis():
     return MagicMock()
+
 
 @pytest.fixture
 def orchestrator(mock_redis):
     orch = AgentOrchestrator(interval=1, redis_client=mock_redis)
     return orch
+
 
 def test_orchestrator_initialization(orchestrator, mock_redis):
     assert orchestrator.interval == 1
@@ -19,27 +22,32 @@ def test_orchestrator_initialization(orchestrator, mock_redis):
     assert orchestrator.is_leader is False
     assert isinstance(orchestrator.leader_id, str)
 
+
 def test_acquire_lock_success(orchestrator, mock_redis):
     mock_redis.set.return_value = True
     assert orchestrator._acquire_lock() is True
     mock_redis.set.assert_called_once_with(
-        orchestrator.lock_name, 
-        orchestrator.leader_id, 
-        nx=True, 
-        ex=orchestrator.lock_expiry
+        orchestrator.lock_name,
+        orchestrator.leader_id,
+        nx=True,
+        ex=orchestrator.lock_expiry,
     )
+
 
 def test_acquire_lock_failure(orchestrator, mock_redis):
     mock_redis.set.return_value = False
     assert orchestrator._acquire_lock() is False
 
+
 def test_renew_lock_success(orchestrator, mock_redis):
     mock_redis.eval.return_value = 1
     assert orchestrator._renew_lock() is True
 
+
 def test_renew_lock_failure(orchestrator, mock_redis):
     mock_redis.eval.return_value = 0
     assert orchestrator._renew_lock() is False
+
 
 def test_release_lock(orchestrator, mock_redis):
     orchestrator.is_leader = True
@@ -47,8 +55,9 @@ def test_release_lock(orchestrator, mock_redis):
     assert orchestrator.is_leader is False
     mock_redis.eval.assert_called_once()
 
-@patch('tasks.agent_orchestrator.query_couchdb')
-@patch('tasks.agent_orchestrator.update_couchdb_doc_safe')
+
+@patch("tasks.agent_orchestrator.query_couchdb")
+@patch("tasks.agent_orchestrator.update_couchdb_doc_safe")
 def test_check_and_run_agents_scheduled(mock_update_safe, mock_query, orchestrator):
     # Setup mock agent config
     agent_id = "test-agent"
@@ -60,34 +69,46 @@ def test_check_and_run_agents_scheduled(mock_update_safe, mock_query, orchestrat
         "trigger_type": AgentTriggerType.SCHEDULED.value,
         "schedule_interval": "1h",
         "last_run_at": last_run,
-        "logic_module": "tasks.agent_logic.check_event_staleness"
+        "logic_module": "tasks.agent_logic.check_event_staleness",
     }
     mock_query.return_value = [agent_config]
 
-    with patch.object(orchestrator, 'execute_agent_logic') as mock_execute:
+    with patch.object(orchestrator, "execute_agent_logic") as mock_execute:
         orchestrator.check_and_run_agents()
         # Verify query was called with SCHEDULED filter
         call_args = mock_query.call_args
-        assert call_args[1]["selector"]["trigger_type"] == AgentTriggerType.SCHEDULED.value
+        assert (
+            call_args[1]["selector"]["trigger_type"] == AgentTriggerType.SCHEDULED.value
+        )
         mock_execute.assert_called_once_with(agent_config, llm_config={})
+
 
 def test_is_scheduled_agent_due(orchestrator):
     now = datetime.now(timezone.utc)
-    
+
     # Due: last run 2 hours ago, interval 1h
     last_run_str = (now - timedelta(hours=2)).isoformat()
     assert orchestrator.is_scheduled_agent_due(last_run_str, "1h") is True
-    
+
     # Not due: last run 30 mins ago, interval 1h
     last_run_str = (now - timedelta(minutes=30)).isoformat()
     assert orchestrator.is_scheduled_agent_due(last_run_str, "1h") is False
-    
-    # Test different units
-    assert orchestrator.is_scheduled_agent_due((now - timedelta(seconds=70)).isoformat(), "60s") is True
-    assert orchestrator.is_scheduled_agent_due((now - timedelta(days=2)).isoformat(), "1d") is True
 
-@patch('importlib.import_module')
-@patch('tasks.agent_orchestrator.update_couchdb_doc_safe')
+    # Test different units
+    assert (
+        orchestrator.is_scheduled_agent_due(
+            (now - timedelta(seconds=70)).isoformat(), "60s"
+        )
+        is True
+    )
+    assert (
+        orchestrator.is_scheduled_agent_due((now - timedelta(days=2)).isoformat(), "1d")
+        is True
+    )
+
+
+@patch("importlib.import_module")
+@patch("tasks.agent_orchestrator.update_couchdb_doc_safe")
 def test_execute_agent_logic(mock_update_safe, mock_import, orchestrator):
     mock_module = MagicMock()
     mock_func = MagicMock()
@@ -101,7 +122,7 @@ def test_execute_agent_logic(mock_update_safe, mock_import, orchestrator):
 
     agent_config = {
         "_id": "agent1",
-        "logic_module": f"{whitelisted_module}.{whitelisted_func}"
+        "logic_module": f"{whitelisted_module}.{whitelisted_func}",
     }
 
     orchestrator.execute_agent_logic(agent_config)
@@ -116,7 +137,7 @@ def test_execute_agent_logic(mock_update_safe, mock_import, orchestrator):
 
 
 # Tests for changes feed functionality
-@patch('tasks.agent_orchestrator.requests.get')
+@patch("tasks.agent_orchestrator.requests.get")
 def test_get_last_seq_returns_stored_value(mock_get, orchestrator):
     """Test that _get_last_seq returns the stored value from config DB."""
     mock_response = MagicMock()
@@ -130,7 +151,7 @@ def test_get_last_seq_returns_stored_value(mock_get, orchestrator):
     mock_get.assert_called_once()
 
 
-@patch('tasks.agent_orchestrator.requests.get')
+@patch("tasks.agent_orchestrator.requests.get")
 def test_get_last_seq_returns_now_on_missing_doc(mock_get, orchestrator):
     """Test that _get_last_seq returns 'now' when config doc doesn't exist."""
     mock_response = MagicMock()
@@ -142,8 +163,8 @@ def test_get_last_seq_returns_now_on_missing_doc(mock_get, orchestrator):
     assert seq == "now"
 
 
-@patch('tasks.agent_orchestrator.requests.put')
-@patch('tasks.agent_orchestrator.requests.get')
+@patch("tasks.agent_orchestrator.requests.put")
+@patch("tasks.agent_orchestrator.requests.get")
 def test_save_last_seq_persists_value(mock_get, mock_put, orchestrator):
     """Test that _save_last_seq saves the sequence to config DB."""
     # Simulate existing doc
@@ -163,8 +184,8 @@ def test_save_last_seq_persists_value(mock_get, mock_put, orchestrator):
     assert call_args[1]["json"]["value"] == "12345"
 
 
-@patch('tasks.agent_orchestrator.query_couchdb')
-@patch('tasks.agent_orchestrator.requests.get')
+@patch("tasks.agent_orchestrator.query_couchdb")
+@patch("tasks.agent_orchestrator.requests.get")
 def test_changes_feed_dispatches_correct_userspace(mock_get, mock_query, orchestrator):
     """Test that changes feed dispatches agents with articles from their own userspace."""
     userspace_a = "00000000-0000-0000-0000-000000000001"
@@ -194,7 +215,7 @@ def test_changes_feed_dispatches_correct_userspace(mock_get, mock_query, orchest
         {"_id": "art3", "userspace": userspace_b},
     ]
 
-    with patch.object(orchestrator, 'execute_agent_logic') as mock_execute:
+    with patch.object(orchestrator, "execute_agent_logic") as mock_execute:
         orchestrator._dispatch_on_new_article_agents(new_docs)
 
         # Should have called execute_agent_logic twice (once per agent)
@@ -205,28 +226,32 @@ def test_changes_feed_dispatches_correct_userspace(mock_get, mock_query, orchest
         first_call = calls[0]
         assert first_call[0][0] == agent_a
         assert len(first_call[1]["new_articles"]) == 2
-        assert all(doc["userspace"] == userspace_a for doc in first_call[1]["new_articles"])
+        assert all(
+            doc["userspace"] == userspace_a for doc in first_call[1]["new_articles"]
+        )
 
         # Check that agent_b received only articles from userspace_b
         second_call = calls[1]
         assert second_call[0][0] == agent_b
         assert len(second_call[1]["new_articles"]) == 1
-        assert all(doc["userspace"] == userspace_b for doc in second_call[1]["new_articles"])
+        assert all(
+            doc["userspace"] == userspace_b for doc in second_call[1]["new_articles"]
+        )
 
 
-@patch('tasks.agent_orchestrator.query_couchdb')
+@patch("tasks.agent_orchestrator.query_couchdb")
 def test_changes_feed_skips_when_not_leader(mock_query, orchestrator):
     """Test that changes feed does not process articles when not leader."""
     orchestrator.is_leader = False
 
-    with patch.object(orchestrator, '_process_article_changes') as mock_process:
+    with patch.object(orchestrator, "_process_article_changes") as mock_process:
         # Simulate one iteration of the changes feed loop
         if not orchestrator.is_leader:
             mock_process.assert_not_called()
 
 
-@patch('tasks.agent_orchestrator.requests.put')
-@patch('tasks.agent_orchestrator.requests.get')
+@patch("tasks.agent_orchestrator.requests.put")
+@patch("tasks.agent_orchestrator.requests.get")
 def test_changes_feed_saves_last_seq(mock_req_get, mock_req_put, orchestrator):
     """Test that _process_article_changes saves the last_seq after processing."""
     orchestrator.last_seq = "0"
@@ -254,14 +279,14 @@ def test_changes_feed_saves_last_seq(mock_req_get, mock_req_put, orchestrator):
     mock_put_response.status_code = 200
     mock_req_put.return_value = mock_put_response
 
-    with patch.object(orchestrator, '_dispatch_on_new_article_agents'):
+    with patch.object(orchestrator, "_dispatch_on_new_article_agents"):
         orchestrator._process_article_changes()
 
     assert orchestrator.last_seq == "12345"
 
 
-@patch('tasks.agent_orchestrator.requests.get')
-@patch('time.sleep')
+@patch("tasks.agent_orchestrator.requests.get")
+@patch("time.sleep")
 def test_changes_feed_retries_on_404(mock_sleep, mock_get, orchestrator):
     """Test that changes feed retries with 10s delay on 404."""
     mock_response = MagicMock()
@@ -273,9 +298,11 @@ def test_changes_feed_retries_on_404(mock_sleep, mock_get, orchestrator):
     mock_sleep.assert_called_once_with(10)
 
 
-@patch('tasks.agent_orchestrator.query_couchdb')
-@patch('tasks.agent_orchestrator.update_couchdb_doc_safe')
-def test_check_and_run_agents_only_schedules(mock_update_safe, mock_query, orchestrator):
+@patch("tasks.agent_orchestrator.query_couchdb")
+@patch("tasks.agent_orchestrator.update_couchdb_doc_safe")
+def test_check_and_run_agents_only_schedules(
+    mock_update_safe, mock_query, orchestrator
+):
     """Test that check_and_run_agents only queries SCHEDULED agents."""
     agent_config = {
         "_id": "agent-scheduled",
@@ -287,20 +314,24 @@ def test_check_and_run_agents_only_schedules(mock_update_safe, mock_query, orche
     }
     mock_query.return_value = [agent_config]
 
-    with patch.object(orchestrator, 'run_agent_if_due') as mock_run:
+    with patch.object(orchestrator, "run_agent_if_due") as mock_run:
         orchestrator.check_and_run_agents()
 
         # Verify query was called with SCHEDULED filter
         call_args = mock_query.call_args
         assert "trigger_type" in call_args[1]["selector"]
-        assert call_args[1]["selector"]["trigger_type"] == AgentTriggerType.SCHEDULED.value
+        assert (
+            call_args[1]["selector"]["trigger_type"] == AgentTriggerType.SCHEDULED.value
+        )
 
         mock_run.assert_called_once_with(agent_config)
 
 
-@patch('tasks.agent_orchestrator.get_default_userspace')
-@patch('tasks.agent_orchestrator.query_couchdb')
-def test_unscoped_articles_dispatch_to_default_userspace(mock_query, mock_default, orchestrator):
+@patch("tasks.agent_orchestrator.get_default_userspace")
+@patch("tasks.agent_orchestrator.query_couchdb")
+def test_unscoped_articles_dispatch_to_default_userspace(
+    mock_query, mock_default, orchestrator
+):
     """Articles without a userspace are routed to the deployment's default userspace."""
     default_userspace = "00000000-0000-0000-0000-000000000001"
     mock_default.return_value = default_userspace
@@ -312,9 +343,13 @@ def test_unscoped_articles_dispatch_to_default_userspace(mock_query, mock_defaul
         "llm_model_config": None,
     }
     mock_query.return_value = [agent]
-    new_docs = [{"_id": "art1"}, {"_id": "art2"}, {"_id": "art3", "userspace": default_userspace}]
+    new_docs = [
+        {"_id": "art1"},
+        {"_id": "art2"},
+        {"_id": "art3", "userspace": default_userspace},
+    ]
 
-    with patch.object(orchestrator, 'execute_agent_logic') as mock_execute:
+    with patch.object(orchestrator, "execute_agent_logic") as mock_execute:
         orchestrator._dispatch_on_new_article_agents(new_docs)
 
     assert mock_execute.call_count == 1
@@ -322,7 +357,7 @@ def test_unscoped_articles_dispatch_to_default_userspace(mock_query, mock_defaul
     mock_default.assert_called_once()
 
 
-@patch('tasks.agent_orchestrator.requests.get')
+@patch("tasks.agent_orchestrator.requests.get")
 def test_changes_feed_skips_refiled_articles(mock_get, orchestrator):
     """A stored article re-filed into a section (#266) is not a new article."""
     refiled = {"_id": "old", "_rev": "5-b", "section_rewrite_gen": 5}
@@ -339,8 +374,8 @@ def test_changes_feed_skips_refiled_articles(mock_get, orchestrator):
     )
 
     with (
-        patch.object(orchestrator, '_dispatch_on_new_article_agents') as mock_dispatch,
-        patch.object(orchestrator, '_save_last_seq'),
+        patch.object(orchestrator, "_dispatch_on_new_article_agents") as mock_dispatch,
+        patch.object(orchestrator, "_save_last_seq"),
     ):
         orchestrator._process_article_changes()
 
@@ -348,21 +383,25 @@ def test_changes_feed_skips_refiled_articles(mock_get, orchestrator):
     assert orchestrator.last_seq == "9"
 
 
-@patch('tasks.agent_orchestrator.requests.get')
-def test_changes_feed_of_only_refiled_articles_dispatches_nothing(mock_get, orchestrator):
+@patch("tasks.agent_orchestrator.requests.get")
+def test_changes_feed_of_only_refiled_articles_dispatches_nothing(
+    mock_get, orchestrator
+):
     mock_get.return_value = MagicMock(
         status_code=200,
         json=MagicMock(
             return_value={
-                "results": [{"doc": {"_id": "old", "_rev": "2-b", "section_rewrite_gen": 2}}],
+                "results": [
+                    {"doc": {"_id": "old", "_rev": "2-b", "section_rewrite_gen": 2}}
+                ],
                 "last_seq": "3",
             }
         ),
     )
 
     with (
-        patch.object(orchestrator, '_dispatch_on_new_article_agents') as mock_dispatch,
-        patch.object(orchestrator, '_save_last_seq') as mock_save,
+        patch.object(orchestrator, "_dispatch_on_new_article_agents") as mock_dispatch,
+        patch.object(orchestrator, "_save_last_seq") as mock_save,
     ):
         orchestrator._process_article_changes()
 
