@@ -3,8 +3,9 @@
 
 # UI: prettier on staged files. A shell without the Node toolchain (for
 # example a Python-only commit from an IDE) gets a warning, not a failure.
-if command -v yarn >/dev/null 2>&1 && [ -d ui/node_modules ]; then
-  (cd ui && yarn lint-staged) || exit 1
+YARN=$(command -v yarn || command -v yarnpkg)
+if [ -n "$YARN" ] && [ -d ui/node_modules ]; then
+  (cd ui && "$YARN" lint-staged) || exit 1
 elif git diff --cached --name-only --diff-filter=ACMR | grep -q '^ui/'; then
   echo "yarn or ui/node_modules not found: staged UI files were not formatted." >&2
   echo "Run 'yarn install' in ui/ from a shell with Node on PATH. CI checks prettier either way." >&2
