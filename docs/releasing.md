@@ -23,7 +23,7 @@ Every release updates these files together, in the release PR:
 
 | File | What changes |
 |---|---|
-| `CHANGELOG.md` | The `[Unreleased / In Development]` heading becomes `[vX.Y.Z] — YYYY-MM-DD`; add entries for anything merged without one. |
+| `CHANGELOG.md` | A `## [vX.Y.Z] — YYYY-MM-DD` heading at the top, above the previous release. If an `[Unreleased / In Development]` heading is present, rename it; otherwise add the heading. Add entries for anything merged without one. |
 | `helm/Chart.yaml` | `version` and `appVersion`. |
 | `ui/package.json` | `version`. |
 | `docs/readme.md` | The "Latest Version" line. |
@@ -65,10 +65,16 @@ The tag must point at the squash-merged release commit on `main`.
 The `docker-release.yml` workflow triggers on `v*.*.*` tags, runs the tests, and builds and pushes `ghcr.io/hlan-net/moirai` and `ghcr.io/hlan-net/moirai-ui` tagged `X.Y.Z`, `X.Y`, `X` and `latest`.
 
 ```bash
-gh run watch "$(gh run list --workflow docker-release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+# The run for the tag appears a few seconds after the push; wait for it,
+# then watch that run and fail if it fails.
+until RUN_ID=$(gh run list --workflow docker-release.yml --branch vX.Y.Z \
+    --limit 1 --json databaseId --jq '.[0].databaseId') && [ -n "$RUN_ID" ]; do
+  sleep 5
+done
+gh run watch "$RUN_ID" --exit-status
 ```
 
-Do not continue until it has succeeded: a tag without images cannot be deployed.
+`--branch vX.Y.Z` selects the run started by this tag, not an earlier release's. Do not continue until it has succeeded: a tag without images cannot be deployed.
 
 ### 4. Create the GitHub Release
 
