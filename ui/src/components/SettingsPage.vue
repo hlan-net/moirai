@@ -393,12 +393,12 @@ const fetchUserProfile = async () => {
       if (settings.moirai_theme) setTheme(settings.moirai_theme as Theme)
 
       // Refresh models based on loaded settings
-      if (settingsStore.llmEndpoint === 'ollama') fetchOllamaModels()
+      if (settingsStore.llmEndpoint === 'ollama') void fetchOllamaModels()
       else if (settingsStore.llmEndpoint === 'openai' && settingsStore.openaiApiKey)
-        fetchOpenAiModels()
+        void fetchOpenAiModels()
       else if (settingsStore.llmEndpoint === 'gemini' && settingsStore.geminiApiKey)
-        fetchGeminiModels()
-      else if (settingsStore.llmEndpoint === 'aisa') fetchAisaModels()
+        void fetchGeminiModels()
+      else if (settingsStore.llmEndpoint === 'aisa') void fetchAisaModels()
     }
   } catch (e) {
     console.error('Error fetching user profile', e)
