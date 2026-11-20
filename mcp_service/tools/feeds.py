@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import requests
 from datetime import datetime, timezone
 from ..core import mcp, auth_required, resolve_userspace, validate_userspace
@@ -14,6 +15,9 @@ from ..responses import (
     MCPErrorCode,
     NextAction,
 )
+
+logger = logging.getLogger(__name__)
+
 
 @mcp.tool()
 @auth_required
@@ -297,8 +301,13 @@ def read_feed(url: str, userspace: str = "", limit: int = 20) -> dict:
 
         processor = ArticleProcessor()
 
-        # A registered feed's category is the strongest sectioning signal (#266)
-        feed_category = _registered_feed_category(url, userspace)
+        # A registered feed's category is the strongest sectioning signal
+        # (#266), but only a hint: a failed lookup must not fail the read.
+        try:
+            feed_category = _registered_feed_category(url, userspace)
+        except Exception as e:
+            logger.warning(f"read_feed: feed category lookup failed for {url}: {e}")
+            feed_category = None
 
         feed_title, articles = processor.process_feed(
             url, response.text, feed_category

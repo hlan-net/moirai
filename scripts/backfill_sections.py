@@ -28,8 +28,9 @@ import json
 import logging
 import sys
 import threading
+import time
 from collections import Counter
-from typing import Iterator
+from typing import Callable, Iterable, Iterator
 
 import requests
 
@@ -40,6 +41,9 @@ logger = logging.getLogger("backfill_sections")
 
 PAGE_SIZE = 500
 MAX_CONFLICT_RETRIES = 3
+# Background runs retry a failed run (exception or unwritten articles) after
+# these delays; a retry only rewrites what is still out of date.
+RETRY_DELAYS_S: tuple[int, ...] = (60, 300, 900)
 
 
 def _iter_article_pages(page_size: int = PAGE_SIZE) -> Iterator[list[dict]]:
@@ -65,6 +69,31 @@ def _iter_article_pages(page_size: int = PAGE_SIZE) -> Iterator[list[dict]]:
         if len(rows) < page_size or rows[-1]["id"] == start_key:
             return
         start_key = rows[-1]["id"]
+
+
+def _iter_feed_article_pages(
+    feed_urls: Iterable[str], page_size: int = PAGE_SIZE
+) -> Iterator[list[dict]]:
+    """Yield pages of the articles of ``feed_urls`` (uses the feed_url index)."""
+    url = f"{get_couchdb_uri()}articles/_find"
+    for feed_url in dict.fromkeys(u for u in feed_urls if u):
+        bookmark = None
+        while True:
+            body: dict[str, object] = {
+                "selector": {"feed_url": feed_url},
+                "limit": page_size,
+            }
+            if bookmark:
+                body["bookmark"] = bookmark
+            res = requests.post(url, json=body, timeout=60)
+            res.raise_for_status()
+            data = res.json()
+            docs = data.get("docs", [])
+            if docs:
+                yield docs
+            if len(docs) < page_size or not data.get("bookmark"):
+                break
+            bookmark = data["bookmark"]
 
 
 def load_feed_categories() -> dict[str, str]:
@@ -214,7 +243,12 @@ def _invalidate_stream_cache() -> None:
         logger.warning("Backfill: could not invalidate Redis stream cache: %s", e)
 
 
-def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
+def run(
+    recompute_all: bool,
+    dry_run: bool,
+    pages: Iterable[list[dict]] | None = None,
+) -> dict[str, int]:
+    """Backfill the articles in ``pages`` (default: the whole database)."""
     feed_categories = load_feed_categories()
     logger.info("Backfill: %d feed URLs carry a category", len(feed_categories))
 
@@ -226,7 +260,7 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
     by_section: Counter[str] = Counter()
     by_source: Counter[str] = Counter()
 
-    for page in _iter_article_pages():
+    for page in _iter_article_pages() if pages is None else pages:
         seen += len(page)
         updates: list[dict] = []
         for doc in page:
@@ -270,25 +304,66 @@ def run(recompute_all: bool, dry_run: bool) -> dict[str, int]:
     return summary
 
 
-def _run_logged() -> None:
-    try:
-        summary = run(recompute_all=False, dry_run=False)
-    except Exception:  # never take the worker down
-        logger.exception("Backfill: startup run failed")
-        return
-    if summary["failed"]:
-        logger.error(
-            "Backfill: %d articles were not written; they are retried at the "
-            "next worker start",
+def _run_with_retry(label: str, attempt_run: Callable[[], dict[str, int]]) -> None:
+    """Run ``attempt_run``, retrying after ``RETRY_DELAYS_S`` until it succeeds.
+
+    A run fails on an exception (e.g. a CouchDB timeout mid-way) or when some
+    articles were left unwritten. Never raises: it runs in a worker/API thread.
+    """
+    for attempt, delay in enumerate((0, *RETRY_DELAYS_S), start=1):
+        if delay:
+            time.sleep(delay)
+        try:
+            summary = attempt_run()
+        except Exception:
+            logger.exception("Backfill: %s failed (attempt %d)", label, attempt)
+            continue
+        if not summary["failed"]:
+            return
+        logger.warning(
+            "Backfill: %s left %d articles unwritten (attempt %d)",
+            label,
             summary["failed"],
+            attempt,
         )
+    logger.error("Backfill: %s gave up after %d attempts", label, attempt)
+
+
+def _start_thread(name: str, target: Callable[[], None]) -> threading.Thread:
+    thread = threading.Thread(target=target, name=name, daemon=True)
+    thread.start()
+    return thread
 
 
 def start_background() -> threading.Thread:
     """Run the default-mode backfill in a daemon thread (worker startup)."""
-    thread = threading.Thread(target=_run_logged, name="section-backfill", daemon=True)
-    thread.start()
-    return thread
+    return _start_thread(
+        "section-backfill",
+        lambda: _run_with_retry(
+            "startup run", lambda: run(recompute_all=False, dry_run=False)
+        ),
+    )
+
+
+def start_feed_refile(feed_urls: Iterable[str]) -> threading.Thread:
+    """Re-file every article of a feed in a daemon thread.
+
+    Called when an admin changes a feed's section: the default mode never
+    touches feed-decided articles, so this recomputes them (``--all``
+    semantics) for the given feed URLs only.
+    """
+    urls = [u for u in feed_urls if u]
+    return _start_thread(
+        "section-refile",
+        lambda: _run_with_retry(
+            f"re-file of {urls}",
+            lambda: run(
+                recompute_all=True,
+                dry_run=False,
+                pages=_iter_feed_article_pages(urls),
+            ),
+        ),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

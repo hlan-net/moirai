@@ -36,6 +36,7 @@ from api.enrichment import enrich_articles_with_issues, invalidate_feed_mappings
 from api.feed_ops import process_bulk_import_url
 from api.rss_ops import generate_rss_item_xml
 from tasks.sections import SECTIONS, STREAM_CACHE_KEYS, is_valid_section, section_label
+from scripts import backfill_sections
 from api.article_ops import build_article_selector, paginate_results
 from api.db_constants import (
     MONGO_REGEX,
@@ -314,14 +315,21 @@ def update_feed(feed_id):
     if validated.new_url:
         feed["url"] = str(validated.new_url)
 
-    # Section/category change (#266). Applies to articles fetched from now
-    # on; the worker's startup backfill re-files existing ones (or run
-    # scripts/backfill_sections.py by hand).
+    # Section/category change (#266). New articles pick it up at ingestion;
+    # existing ones are re-filed in the background below, since the worker's
+    # startup backfill never moves feed-decided articles.
+    category_changed = False
     if validated.category is not None:
-        feed["category"] = validated.category or "general"
+        new_category = validated.category or "general"
+        category_changed = new_category != feed.get("category")
+        feed["category"] = new_category
 
     if update_couchdb_doc("feeds", feed_id, feed):
         invalidate_feed_mappings_cache()
+        if category_changed:
+            backfill_sections.start_feed_refile(
+                [feed.get("url"), feed.get("original_url")]
+            )
         return jsonify(feed)
     else:
         abort(500, description="Failed to update feed")

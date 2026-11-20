@@ -328,3 +328,29 @@ class TestRegisteredFeedCategory:
     def test_other_userspace_is_ignored(self):
         found = [{"_id": "u1", "userspace": "f" * 32, "category": "sports"}]
         assert self._lookup(None, found) is None
+
+    def test_read_feed_survives_a_failed_category_lookup(self):
+        # The category is only a sectioning hint: a CouchDB hiccup during the
+        # lookup must not turn a good feed read into an error.
+        from mcp_service.tools import feeds as mcp_feeds
+
+        fetched = MagicMock(status_code=200, text="<rss/>")
+        processor = MagicMock()
+        processor.process_feed.return_value = (
+            "Feed",
+            [{"_id": "a1", "title": "T", "link": "https://x/a1"}],
+        )
+        with (
+            patch.object(
+                mcp_feeds,
+                "_registered_feed_category",
+                side_effect=RuntimeError("Database connection error"),
+            ),
+            patch.object(mcp_feeds.requests, "get", return_value=fetched),
+            patch("tasks.article_processor.ArticleProcessor", return_value=processor),
+        ):
+            result = mcp_feeds.read_feed("https://x/rss", userspace=self.US)
+
+        assert result["status"] == "success", result
+        processor.process_feed.assert_called_once_with("https://x/rss", "<rss/>", None)
+        processor.store_article.assert_called_once()

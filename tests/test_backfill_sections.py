@@ -234,8 +234,102 @@ def test_start_background_runs_default_mode():
     run.assert_called_once_with(recompute_all=False, dry_run=False)
 
 
-def test_start_background_swallows_errors():
+def test_start_background_swallows_errors(_no_retry_delay):
     with patch.object(bf, "run", side_effect=RuntimeError("couch down")):
         thread = bf.start_background()
         thread.join(timeout=5)
     assert not thread.is_alive()
+
+
+@pytest.fixture
+def _no_retry_delay():
+    with (
+        patch.object(bf, "RETRY_DELAYS_S", (1, 1, 1)),
+        patch.object(bf.time, "sleep") as sleep,
+    ):
+        yield sleep
+
+
+def test_background_run_retries_after_an_error(_no_retry_delay):
+    outcomes = [RuntimeError("504 on page 40"), {"failed": 0}]
+
+    def attempt():
+        result = outcomes.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    bf._run_with_retry("test", attempt)
+    assert outcomes == []
+    assert _no_retry_delay.call_count == 1
+
+
+def test_background_run_retries_unwritten_articles(_no_retry_delay):
+    attempt = MagicMock(side_effect=[{"failed": 2}, {"failed": 0}])
+    bf._run_with_retry("test", attempt)
+    assert attempt.call_count == 2
+
+
+def test_background_run_gives_up_without_raising(_no_retry_delay):
+    attempt = MagicMock(side_effect=RuntimeError("couch down"))
+    bf._run_with_retry("test", attempt)
+    assert attempt.call_count == 1 + len(bf.RETRY_DELAYS_S)
+
+
+def test_feed_refile_recomputes_feed_decided_articles_of_that_feed():
+    # The feed moved from sports back to general: its feed-decided articles
+    # must leave Sports, which the default mode would never do.
+    feed_url = "https://example.com/rss"
+    article = _article(
+        "a",
+        section="sports",
+        section_source="feed",
+        link="https://example.com/news/x",
+    )
+    finds: list[dict] = []
+    bulk: list[list[dict]] = []
+
+    def post(url: str, json: dict, params: dict | None = None, timeout: int = 0):
+        if url.endswith("articles/_find"):
+            finds.append(json)
+            docs = (
+                [copy.deepcopy(article)]
+                if json["selector"]["feed_url"] == feed_url
+                else []
+            )
+            return _resp({"docs": docs, "bookmark": "b1"})
+        bulk.append(json["docs"])
+        return _resp([{"id": d["_id"], "ok": True} for d in json["docs"]])
+
+    feeds = {"rows": [{"id": "f1", "doc": {"url": feed_url, "category": "general"}}]}
+    with (
+        patch.object(bf.requests, "get", return_value=_resp(feeds)),
+        patch.object(bf.requests, "post", side_effect=post),
+    ):
+        bf.start_feed_refile([feed_url, None, "https://old.example.com/rss"]).join(5)
+
+    assert [f["selector"]["feed_url"] for f in finds] == [
+        feed_url,
+        "https://old.example.com/rss",
+    ]
+    assert len(bulk) == 1
+    assert (bulk[0][0]["section"], bulk[0][0]["section_source"]) == ("main", "default")
+
+
+def test_feed_article_pages_follow_the_bookmark():
+    pages = [
+        {"docs": [{"_id": "a"}, {"_id": "b"}], "bookmark": "b1"},
+        {"docs": [{"_id": "c"}], "bookmark": "b2"},
+    ]
+    bodies: list[dict] = []
+
+    def post(url: str, json: dict, timeout: int = 0):
+        bodies.append(dict(json))
+        return _resp(pages.pop(0))
+
+    with patch.object(bf.requests, "post", side_effect=post):
+        got = list(bf._iter_feed_article_pages(["https://x/rss"], page_size=2))
+
+    assert [[d["_id"] for d in page] for page in got] == [["a", "b"], ["c"]]
+    assert "bookmark" not in bodies[0]
+    assert bodies[1]["bookmark"] == "b1"

@@ -97,3 +97,46 @@ def test_feed_update_category_alone_leaves_title_untouched():
 def test_feed_update_rejects_empty_title():
     with pytest.raises(ValueError):
         FeedUpdateRequest(title="", category="culture")
+
+
+def _admin_headers() -> dict:
+    import base64
+
+    creds = base64.b64encode(
+        f"{os.environ['ADMIN_USERNAME']}:{os.environ['ADMIN_PASSWORD']}".encode()
+    ).decode()
+    return {"Authorization": f"Basic {creds}"}
+
+
+@pytest.mark.parametrize(
+    "stored, sent, refiled",
+    [
+        ("sports", "general", True),  # moved back: articles must leave Sports
+        ("general", "culture", True),
+        ("sports", "sports", False),  # unchanged: nothing to re-file
+    ],
+)
+def test_feed_category_change_refiles_existing_articles(stored, sent, refiled):
+    feed = {
+        "_id": "f1",
+        "url": "https://www.hs.fi/rss/urheilu.xml",
+        "original_url": "https://hs.fi/rss/urheilu.xml",
+        "title": "HS Urheilu",
+        "category": stored,
+    }
+    with (
+        patch("api.routes.fetch_from_couchdb", return_value=dict(feed)),
+        patch("api.routes.update_couchdb_doc", return_value=True),
+        patch("api.routes.invalidate_feed_mappings_cache"),
+        patch("api.routes.backfill_sections.start_feed_refile") as refile,
+        patch("api.auth.get_user_by_email", return_value=None),
+    ):
+        res = app.test_client().put(
+            "/api/feeds/f1", json={"category": sent}, headers=_admin_headers()
+        )
+    assert res.status_code == 200, res.get_data(as_text=True)
+    assert res.get_json()["title"] == "HS Urheilu"
+    if refiled:
+        refile.assert_called_once_with([feed["url"], feed["original_url"]])
+    else:
+        refile.assert_not_called()

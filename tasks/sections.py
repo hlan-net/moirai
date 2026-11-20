@@ -72,8 +72,9 @@ HOST_SECTIONS: dict[str, str] = {
     "urheilulehti.fi": SECTION_SPORTS,
 }
 
-# First path segment -> section. Covers the Finnish majors (HS, Yle, IS,
-# Iltalehti, MTV) and the usual English section slugs.
+# First path segment -> section: HS-style section paths and the usual English
+# section slugs. Yle, MTV and Iltalehti article URLs carry no such segment and
+# rely on the feed category or the annotation topic (docs/stream-sections.md).
 PATH_SEGMENT_SECTIONS: dict[str, str] = {
     "urheilu": SECTION_SPORTS,
     "sport": SECTION_SPORTS,
