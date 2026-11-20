@@ -134,7 +134,7 @@ services:
       - couchdb_data:/opt/couchdb/data
 
   redis: # Added Redis service
-    image: redis:7-alpine
+    image: redis:8-alpine
     ports:
       - "6379:6379"
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"] # Use mandatory password
