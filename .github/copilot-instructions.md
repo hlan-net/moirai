@@ -44,7 +44,7 @@ Userspace (GUID)
 docker compose up --build
 
 # MCP server standalone (for debugging)
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 python mcp_server.py
 
 # UI development server

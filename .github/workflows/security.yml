@@ -34,7 +34,7 @@ jobs:
       uses: actions/cache@v6
       with:
         path: /tmp/.buildx-cache
-        key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'environment-prod.yml', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
+        key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'environment-prod.yml', 'requirements*.txt', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
         restore-keys: |
           buildx-${{ runner.os }}-
 
@@ -48,7 +48,7 @@ jobs:
         auto-activate: false
         use-mamba: true
         cache-environment: true
-        cache-environment-key: conda-${{ hashFiles('environment.yml') }}
+        cache-environment-key: conda-${{ hashFiles('environment.yml', 'requirements*.txt') }}
 
     - name: Enable Corepack (Yarn 4)
       run: corepack enable

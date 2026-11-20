@@ -54,7 +54,7 @@ This way you can always tell which local build you're testing by checking the ti
 
 ### Backend (local dev)
 ```bash
-mamba env create -f environment.yml   # or: pip install -r requirements.txt
+mamba env create -f environment.yml   # or: pip install -r requirements-dev.txt
 mamba activate moirai
 python main.py                        # API on :8088
 python mcp_server.py                  # MCP on :8090
