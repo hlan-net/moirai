@@ -48,7 +48,7 @@ services:
       context: ./ui
 
   nginx:
-    image: nginx:latest
+    image: nginx:1.30.7-alpine
     ports:
       - "8088:80"
     volumes:
@@ -115,7 +115,7 @@ services:
       - redis # Added dependency on redis
 
   mcp-inspector:
-    image: ghcr.io/modelcontextprotocol/inspector:latest
+    image: ghcr.io/modelcontextprotocol/inspector:2.16.0
     ports:
       - "6274:6274"
       - "6277:6277"
@@ -123,7 +123,7 @@ services:
       - mcp-server
 
   couchdb:
-    image: couchdb:3
+    image: couchdb:3.5.3
     ports:
       - "5984:5984"
     environment:
