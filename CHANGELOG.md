@@ -4,10 +4,18 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.11.0] — 2026-11-20
 
 ### Stream sections (#266)
 The Stream page is split into four newspaper-style tabs: Top stories (open on load), Sports, Culture and Business. This is a fixed editorial split of the flow, not a reader-composed filter; the Stream model (no search, no inbox semantics) is unchanged. Every article gets exactly one `section` at ingestion (`tasks/sections.py`): a section-specific feed category wins, then the article URL (`hs.fi/urheilu/…`, `kauppalehti.fi`), then the closed annotation topic vocabulary from #249, else `main`. The deciding signal is stored as `section_source` so the asynchronous annotation never overrides a feed or URL decision. `GET /api/stream.rss?section=` filters the stream, each item carries `<category domain="section">`, the Redis cache is keyed per section and a `(section, published)` Mango index is created at startup; the unparameterised endpoint is unchanged apart from the added category. Admins pick a feed's section from a dropdown on the Feeds column (`PUT /api/feeds/<id>` accepts `category`). Existing articles are filed by a backfill (`scripts/backfill_sections.py`) that the worker runs in the background at every start; it pages through the database, writes only changed articles with `_bulk_docs` and retries write conflicts.
+
+Re-filing a stored article is not a new article. The backfill and the feed re-file stamp the revision they write (`section_rewrite_gen`), and the two `articles/_changes` consumers, the agent orchestrator and the annotation worker, skip exactly that revision. Without it the first worker start after the upgrade would have dispatched every `ON_NEW_ARTICLE` agent over the whole backlog. Changing a feed's category re-files its stored articles whether the change comes through `PUT /api/feeds/<id>` or the MCP `update_feed_category` tool. `PUT /api/feeds/<id>` now rejects a body with none of `title`, `new_url`, `category`.
+
+### Stream page uses the stream.rss cache (#308)
+`GET /api/stream.rss` was cached in Redis only for `limit=100`, but the Stream page requests `limit=200`, so every poll and tab switch queried CouchDB. The cache key now comes from `stream_cache_key(section, limit)` over a closed set of limits (100 and 200), and `STREAM_CACHE_KEYS` lists every combination so ingestion, annotation, deletion and re-filing invalidate them all.
+
+### Dependency updates (#310)
+Supersedes Dependabot PRs #303–#307: axios 1.21.1, marked 18.2.0, vue-router 5.5.0, `@vitejs/plugin-vue` 6.0.11, prettier 3.10.1, vite 8.3.8 and the miniforge3 26.9.4-2 builder image.
 
 ---
 
