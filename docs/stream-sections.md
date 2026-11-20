@@ -32,7 +32,7 @@ Top stories is therefore "everything that is not sports, culture or business". I
 
 - `GET /api/stream.rss?section=main|sports|culture|business` — filters the stream; no parameter keeps today's behaviour (all articles) so existing subscribers are unaffected.
 - Each item gains `<category domain="section">sports</category>`.
-- The Redis cache key becomes `stream_rss_xml:{section}` (today: `stream_rss_xml`).
+- The Redis cache key becomes `stream_rss_items:{section}` (today: `stream_rss_items`).
 - CouchDB: Mango index on `(section, published)`.
 
 ## UI

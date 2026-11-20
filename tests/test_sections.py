@@ -252,8 +252,8 @@ class TestIngestion:
         assert stored["section_source"] == "path"
         redis.delete.assert_called_once_with(*STREAM_CACHE_KEYS)
         assert set(STREAM_CACHE_KEYS) >= {
-            "stream_rss_xml",
-            *(f"stream_rss_xml:{s}" for s in SECTIONS),
+            "stream_rss_items",
+            *(f"stream_rss_items:{s}" for s in SECTIONS),
         }
 
 

@@ -25,6 +25,9 @@ ARTICLE = {
 }
 
 
+CACHED_ITEMS = "  <item>\n    <title>Cached</title>\n  </item>"
+
+
 @pytest.fixture
 def client():
     redis = MagicMock()
@@ -45,7 +48,7 @@ def test_without_section_is_unchanged(client):
     assert res.status_code == 200
     selector = query.call_args.kwargs["selector"]
     assert "section" not in selector
-    assert redis.setex.call_args.args[0] == "stream_rss_xml"
+    assert redis.setex.call_args.args[0] == "stream_rss_items"
     body = res.get_data(as_text=True)
     assert "<title>Moirai Aggregated Stream</title>" in body
     assert '<category domain="section">sports</category>' in body
@@ -58,18 +61,20 @@ def test_section_filters_and_caches_per_section(client):
     selector = query.call_args.kwargs["selector"]
     assert selector["section"] == "sports"
     assert "published" in selector
-    assert redis.get.call_args.args[0] == "stream_rss_xml:sports"
-    assert redis.setex.call_args.args[0] == "stream_rss_xml:sports"
+    assert redis.get.call_args.args[0] == "stream_rss_items:sports"
+    assert redis.setex.call_args.args[0] == "stream_rss_items:sports"
     assert "Sports" in res.get_data(as_text=True)
 
 
 def test_cache_hit_is_served_per_section(client):
     test_client, query, redis = client
-    redis.get.return_value = "<rss>cached</rss>"
+    redis.get.return_value = CACHED_ITEMS
     res = test_client.get("/api/stream.rss?section=culture")
     assert res.status_code == 200
-    assert res.get_data(as_text=True) == "<rss>cached</rss>"
-    assert redis.get.call_args.args[0] == "stream_rss_xml:culture"
+    body = res.get_data(as_text=True)
+    assert CACHED_ITEMS in body
+    assert "<title>Moirai Aggregated Stream — Culture</title>" in body
+    assert redis.get.call_args.args[0] == "stream_rss_items:culture"
     query.assert_not_called()
 
 
@@ -185,17 +190,17 @@ def test_feed_update_request_needs_at_least_one_field():
 
 def test_stream_page_limit_is_served_from_cache(client):
     test_client, query, redis = client
-    redis.get.return_value = "<rss>cached</rss>"
+    redis.get.return_value = CACHED_ITEMS
     res = test_client.get("/api/stream.rss?limit=200&section=sports")
-    assert res.get_data(as_text=True) == "<rss>cached</rss>"
-    assert redis.get.call_args.args[0] == "stream_rss_xml:sports@200"
+    assert CACHED_ITEMS in res.get_data(as_text=True)
+    assert redis.get.call_args.args[0] == "stream_rss_items:sports@200"
     query.assert_not_called()
 
 
 def test_stream_page_limit_fills_its_own_cache_key(client):
     test_client, _query, redis = client
     assert test_client.get("/api/stream.rss?limit=200").status_code == 200
-    assert redis.setex.call_args.args[0] == "stream_rss_xml@200"
+    assert redis.setex.call_args.args[0] == "stream_rss_items@200"
 
 
 def test_other_limits_stay_uncached(client):
@@ -218,8 +223,8 @@ def test_every_cached_stream_key_is_invalidated():
     for section in (None, *SECTIONS):
         for limit in STREAM_CACHED_LIMITS:
             assert stream_cache_key(section, limit) in STREAM_CACHE_KEYS
-    assert stream_cache_key("sports", 100) == "stream_rss_xml:sports"
-    assert stream_cache_key(None, 100) == "stream_rss_xml"
+    assert stream_cache_key("sports", 100) == "stream_rss_items:sports"
+    assert stream_cache_key(None, 100) == "stream_rss_items"
     assert stream_cache_key("sports", 50) is None
 
 
@@ -256,12 +261,33 @@ def test_feed_is_well_formed_xml(client, query):
         assert self_link.endswith(f"/api/stream.rss{query}")
 
 
-def test_cached_stream_page_feed_is_well_formed(client):
-    """What is written to Redis for the Stream page's request must parse too."""
-    import xml.etree.ElementTree as ET
-
+def test_only_the_items_are_cached(client):
+    """The channel header carries the request URL, so it must not be cached."""
     test_client, _query, redis = client
     assert test_client.get("/api/stream.rss?limit=200&section=main").status_code == 200
     key, _ttl, cached = redis.setex.call_args.args
-    assert key == "stream_rss_xml:main@200"
-    ET.fromstring(cached)
+    assert key == "stream_rss_items:main@200"
+    assert cached.lstrip().startswith("<item>")
+    assert "atom:link" not in cached and "<channel>" not in cached
+
+
+def test_cache_hit_gets_the_current_request_self_link(client):
+    """Two URLs that share a cache entry each get their own self link."""
+    import xml.etree.ElementTree as ET
+
+    test_client, query, redis = client
+    redis.get.return_value = CACHED_ITEMS
+    for url in (
+        "/api/stream.rss?limit=200&section=main",
+        "/api/stream.rss?section=main&limit=200",
+    ):
+        res = test_client.get(url)
+        root = ET.fromstring(res.get_data(as_text=True))
+        channel = root.find("channel")
+        assert channel.find("item/title").text == "Cached"
+        href = channel.find("{http://www.w3.org/2005/Atom}link").get("href")
+        assert href.endswith(url)
+    assert {c.args[0] for c in redis.get.call_args_list} == {
+        "stream_rss_items:main@200"
+    }
+    query.assert_not_called()

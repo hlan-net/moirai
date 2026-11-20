@@ -103,7 +103,8 @@ TOPIC_SECTIONS: dict[str, str] = {
     "finance": SECTION_BUSINESS,
 }
 
-# Redis keys that hold rendered stream output; cleared whenever an article
+# Redis keys that hold rendered stream output (the feed's ``<item>`` elements,
+# not the channel header); cleared whenever an article
 # is stored, deleted or moves section.
 STREAM_DEFAULT_LIMIT = 100
 # ``limit`` values of ``/api/stream.rss`` whose output is cached: the RSS
@@ -112,14 +113,14 @@ STREAM_CACHED_LIMITS: tuple[int, ...] = (STREAM_DEFAULT_LIMIT, 200)
 
 
 def stream_cache_key(section: Optional[str], limit: int) -> Optional[str]:
-    """Redis key for the rendered stream, or ``None`` when ``limit`` is not cached.
+    """Redis key for the rendered stream items, or ``None`` when ``limit`` is not cached.
 
     The key space is closed (sections x cached limits) so every key can be
     listed in ``STREAM_CACHE_KEYS`` and invalidated with one ``DEL``.
     """
     if limit not in STREAM_CACHED_LIMITS:
         return None
-    key = f"stream_rss_xml:{section}" if section else "stream_rss_xml"
+    key = f"stream_rss_items:{section}" if section else "stream_rss_items"
     return key if limit == STREAM_DEFAULT_LIMIT else f"{key}@{limit}"
 
 
