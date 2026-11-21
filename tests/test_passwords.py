@@ -44,6 +44,8 @@ def test_non_ascii_passwords():
 
 def test_malformed_hash_is_a_failed_login_not_an_error():
     assert not verify_password("anything", "not-a-hash")
+    # Non-ASCII garbage: UnicodeEncodeError is a ValueError, so it is caught too.
+    assert not verify_password("anything", "höpö-ei-tiiviste")
     assert not verify_password("anything", "")
     assert not verify_password("anything", None)  # type: ignore[arg-type]
 
