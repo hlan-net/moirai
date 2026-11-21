@@ -15,7 +15,10 @@ def test_hash_and_verify_round_trip():
 
 
 def test_hashes_are_salted():
-    assert hash_password("same") != hash_password("same")
+    first = hash_password("same")
+    second = hash_password("same")
+    assert first != second
+    assert verify_password("same", first) and verify_password("same", second)
 
 
 def test_verifies_a_hash_made_with_plain_bcrypt():

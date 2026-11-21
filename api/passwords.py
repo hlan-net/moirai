@@ -32,5 +32,5 @@ def verify_password(password: str, hashed: str) -> bool:
     """True when ``password`` matches ``hashed``; False for a malformed hash."""
     try:
         return bcrypt.checkpw(_encode(password), hashed.encode("ascii"))
-    except (ValueError, TypeError, UnicodeEncodeError, AttributeError):
+    except (ValueError, TypeError, AttributeError):
         return False
