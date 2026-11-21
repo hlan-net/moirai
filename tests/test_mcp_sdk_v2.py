@@ -15,8 +15,11 @@ from mcp.server.mcpserver import MCPServer  # noqa: E402
 
 def test_server_is_an_mcpserver_with_the_tools_registered():
     from mcp_service import main  # noqa: F401  (imports the tool modules)
-    from mcp_service.core import mcp
+    from mcp_service.tools import feeds
 
+    # The instance the tool modules registered on. Other test modules reload
+    # mcp_service.core, so ``mcp_service.core.mcp`` may be a fresh, empty one.
+    mcp = feeds.mcp
     assert isinstance(mcp, MCPServer)
     tools = asyncio.run(mcp.list_tools())
     names = {t.name for t in tools}
