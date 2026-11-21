@@ -3,6 +3,7 @@ import json
 import requests
 import logging
 from api.db_config import get_couchdb_uri
+from api.http_session import couchdb_session
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -31,7 +32,7 @@ def _request(method, url, **kwargs):
     """Helper to make HTTP requests with retry logic."""
     if "timeout" not in kwargs:
         kwargs["timeout"] = 10
-    return requests.request(method, url, **kwargs)
+    return couchdb_session().request(method, url, **kwargs)
 
 
 def get_db_url(db_name):
