@@ -15,8 +15,11 @@ Password hashing moves from `passlib.hash.bcrypt` to the `bcrypt` package direct
 ### Gemini model list works (#357)
 `GeminiProvider.list_models()` read `supported_generation_methods`, a field of the older google-generativeai SDK that google-genai does not have (there it is `supported_actions`), so listing Gemini models raised for every model. The unit test used mocks that accept any attribute; it now builds real SDK objects.
 
+### MCP Python SDK 2.x (#339)
+`mcp` moves from 1.30 to 2.3. The server class `FastMCP` is now `MCPServer`; the SSE transport, its `/sse` and `/messages/` endpoints, the tool decorator and the Host-header check behave as before. The chat client reads the renamed result fields (`input_schema`, `is_error`) and builds its HTTP client on `httpx2`, which the SDK's transports now use. A 1.x client can talk to the 2.x server and the reverse, so API and MCP pods can roll in either order.
+
 ### Dependency updates
-Supersedes Dependabot PRs #333–#338, #340–#342 and #348. Major versions: openai 3.53, google-genai 3.4 (with websockets 17.4, which google-genai 1.x capped), redis-py 8.1 and the Redis 8 image, gunicorn 27, structlog 26, python-dateutil 4, bcrypt 5. Minor and patch: pydantic 2.14, starlette 1.10, uvicorn 0.54 and others. `tenacity` stays at 9.1.4 because google-genai 3.4 requires `<9.2`. ruff moves to 0.17.5 with its rule selection pinned to the previous defaults (`E4`, `E7`, `E9`, `F`): 0.17 widened the defaults to several hundred rules. `mcp` stays on 1.30; the 2.x migration is tracked separately.
+Supersedes Dependabot PRs #333–#338, #340–#342 and #348. Major versions: openai 3.53, google-genai 3.4 (with websockets 17.4, which google-genai 1.x capped), redis-py 8.1 and the Redis 8 image, gunicorn 27, structlog 26, python-dateutil 4, bcrypt 5. Minor and patch: pydantic 2.14, starlette 1.10, uvicorn 0.54 and others. `tenacity` stays at 9.1.4 because google-genai 3.4 requires `<9.2`. ruff moves to 0.17.5 with its rule selection pinned to the previous defaults (`E4`, `E7`, `E9`, `F`): 0.17 widened the defaults to several hundred rules. `mcp` 2.x is covered above.
 
 The chart's default CouchDB image is 3.5.3 (#355); an existing deployment keeps its version until upgraded by the procedure in that issue.
 
