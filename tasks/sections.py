@@ -43,6 +43,11 @@ SOURCE_PATH = "path"
 SOURCE_TOPIC = "topic"
 SOURCE_DEFAULT = "default"
 
+# Version of the sectioning rules in this module (feed categories, URL paths,
+# topics). Bump it when a rule changes: the worker then re-scans every stored
+# article once on its next start instead of only those without a section.
+SECTION_RULES_VERSION = 1
+
 # Generation of the revision that a re-filing wrote; see ``mark_section_rewrite``.
 SECTION_REWRITE_FIELD = "section_rewrite_gen"
 

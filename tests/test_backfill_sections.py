@@ -11,6 +11,10 @@ from scripts import backfill_sections as bf
 
 URI = "http://couch/"
 
+# The real helpers; the autouse fixture below replaces them on the module.
+_REAL_READ_MARKER = bf._read_marker
+_REAL_WRITE_MARKER = bf._write_marker
+
 
 def _resp(payload: object) -> MagicMock:
     res = MagicMock()
@@ -34,6 +38,9 @@ def _couch_uri():
     with (
         patch.object(bf, "get_couchdb_uri", return_value=URI),
         patch.object(bf, "_invalidate_stream_cache"),
+        # No completion marker on record unless a test says otherwise.
+        patch.object(bf, "_read_marker", return_value=None),
+        patch.object(bf, "_write_marker"),
     ):
         yield
 
@@ -228,7 +235,7 @@ def test_default_mode_writes_nothing_when_up_to_date():
     assert couch.bulk_calls == []
 
 
-def test_start_background_runs_default_mode():
+def test_start_background_runs_the_startup_run():
     with patch.object(bf, "run", return_value={"failed": 0}) as run:
         bf.start_background().join(timeout=5)
     run.assert_called_once_with(recompute_all=False, dry_run=False)
@@ -365,3 +372,121 @@ def test_conflict_retry_marks_the_fresh_revision():
         assert bf.main([]) == 0
     assert couch.bulk_calls[1][0]["_rev"] == "2-b"
     assert couch.bulk_calls[1][0]["section_rewrite_gen"] == 3
+
+
+# ── Startup run: a full scan only when one is owed (#324) ─────────────────────
+
+
+def test_startup_scans_everything_and_records_completion_the_first_time():
+    with patch.object(bf, "run", return_value={"failed": 0}) as run:
+        bf.run_startup()
+    run.assert_called_once_with(recompute_all=False, dry_run=False)
+    bf._write_marker.assert_called_once_with()
+
+
+def test_startup_does_not_record_completion_when_articles_were_left_unwritten():
+    with patch.object(bf, "run", return_value={"failed": 3}):
+        bf.run_startup()
+    bf._write_marker.assert_not_called()
+
+
+def test_startup_with_a_current_marker_reads_only_unsectioned_articles():
+    """No ``_all_docs`` walk of ``articles`` once a complete scan is on record."""
+    from tasks.sections import SECTION_RULES_VERSION
+
+    bf._read_marker.return_value = SECTION_RULES_VERSION
+    urls: list[str] = []
+
+    def get(url: str, params: dict | None = None, timeout: int = 0):
+        urls.append(url)
+        return _resp({"rows": []})  # feeds/_all_docs
+
+    def post(url: str, json: dict, params: dict | None = None, timeout: int = 0):
+        urls.append(url)
+        assert json["selector"] == {"section": {"$exists": False}}
+        return _resp({"docs": []})
+
+    with (
+        patch.object(bf.requests, "get", side_effect=get),
+        patch.object(bf.requests, "post", side_effect=post),
+    ):
+        summary = bf.run_startup()
+
+    assert urls == [f"{URI}feeds/_all_docs", f"{URI}articles/_find"]
+    assert summary["seen"] == 0 and summary["written"] == 0
+    bf._write_marker.assert_not_called()
+
+
+def test_startup_with_a_current_marker_still_files_an_unsectioned_article():
+    from tasks.sections import SECTION_RULES_VERSION
+
+    bf._read_marker.return_value = SECTION_RULES_VERSION
+    stray = _article("a9", rev="1-a", link="https://www.hs.fi/urheilu/art-9.html")
+    written: list[dict] = []
+
+    def post(url: str, json: dict, params: dict | None = None, timeout: int = 0):
+        if url.endswith("_find"):
+            return _resp({"docs": [copy.deepcopy(stray)]})
+        written.extend(json["docs"])
+        return _resp([{"ok": True, "id": "a9", "rev": "2-b"}])
+
+    with (
+        patch.object(bf.requests, "get", return_value=_resp({"rows": []})),
+        patch.object(bf.requests, "post", side_effect=post),
+    ):
+        summary = bf.run_startup()
+
+    assert summary["written"] == 1
+    assert written[0]["section"] == "sports"
+    assert written[0]["section_source"] == "path"
+
+
+def test_startup_rescans_everything_after_the_rules_version_changes():
+    from tasks.sections import SECTION_RULES_VERSION
+
+    bf._read_marker.return_value = SECTION_RULES_VERSION - 1
+    with patch.object(bf, "run", return_value={"failed": 0}) as run:
+        bf.run_startup()
+    run.assert_called_once_with(recompute_all=False, dry_run=False)
+    bf._write_marker.assert_called_once_with()
+
+
+def test_manual_run_records_completion_but_a_dry_run_does_not():
+    couch = _FakeCouch([_article("a1")], [[{"ok": True, "id": "a1", "rev": "2-b"}]])
+    assert _run(couch) == 0
+    bf._write_marker.assert_called_once_with()
+
+    bf._write_marker.reset_mock()
+    assert _run(_FakeCouch([_article("a1")], []), ["--dry-run"]) == 0
+    bf._write_marker.assert_not_called()
+
+
+def test_marker_round_trip():
+    """The real marker helpers: read what write stored, tolerate a missing doc."""
+    from tasks.sections import SECTION_RULES_VERSION
+
+    store: dict[str, dict] = {}
+
+    def get(url: str, timeout: int = 0):
+        res = MagicMock()
+        doc = store.get(url)
+        res.status_code = 200 if doc else 404
+        res.json.return_value = doc or {"error": "not_found"}
+        return res
+
+    def put(url: str, json: dict, timeout: int = 0):
+        store[url] = {**json, "_rev": "1-x"}
+        return MagicMock(status_code=201)
+
+    with (
+        patch.object(bf.requests, "get", side_effect=get),
+        patch.object(bf.requests, "put", side_effect=put),
+    ):
+        assert _REAL_READ_MARKER() is None  # nothing stored yet
+        _REAL_WRITE_MARKER()
+        assert _REAL_READ_MARKER() == SECTION_RULES_VERSION
+        _REAL_WRITE_MARKER()  # a second write carries the stored _rev
+
+    (doc,) = store.values()
+    assert doc["_id"] == "section_backfill"
+    assert doc["completed_at"].endswith("Z")
