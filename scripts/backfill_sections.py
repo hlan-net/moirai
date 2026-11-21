@@ -18,6 +18,9 @@ API pod (same env, same network):
                                                       # feed category decided,
                                                       # e.g. after changing it
 
+Only ``--all`` records completion for the worker, because only it covers
+every article; the worker's own owed scan runs in that mode too.
+
 The default mode recomputes every article except those whose section a feed
 category decided, and writes only the ones whose section changes; so it is
 idempotent and cheap once everything is sectioned. Interruptible and
@@ -147,7 +150,12 @@ def _read_marker() -> int | None:
 
 
 def _write_marker() -> None:
-    """Record that every stored article was sectioned with the current rules."""
+    """Record that every stored article was sectioned with the current rules.
+
+    Raises ``RuntimeError`` when the marker cannot be stored: a scan whose
+    completion is not on record would be repeated in full at the next start,
+    so the caller must treat that as a failed run.
+    """
     url = f"{get_couchdb_uri()}{MARKER_URL_PATH}"
     doc: dict[str, object] = {
         "_id": "section_backfill",
@@ -159,14 +167,12 @@ def _write_marker() -> None:
         if res.status_code == 200:
             doc["_rev"] = res.json()["_rev"]
         res = requests.put(url, json=doc, timeout=10)
-        if res.status_code not in (200, 201):
-            logger.warning(
-                "Backfill: could not write the completion marker: %s %s",
-                res.status_code,
-                res.text,
-            )
     except (requests.exceptions.RequestException, ValueError) as e:
-        logger.warning("Backfill: could not write the completion marker: %s", e)
+        raise RuntimeError(f"could not write the completion marker: {e}") from e
+    if res.status_code not in (200, 201):
+        raise RuntimeError(
+            f"could not write the completion marker: {res.status_code} {res.text}"
+        )
 
 
 def load_feed_categories() -> dict[str, str]:
@@ -417,6 +423,10 @@ def run_startup() -> dict[str, int]:
     start only picks up articles without any section (none in normal
     operation, since ingestion always sets one). Otherwise it scans the whole
     database and records the completion if nothing was left unwritten.
+
+    The owed scan recomputes every article, feed-decided ones included: a
+    rules change may be a change to the feed-category mapping. It still writes
+    only the articles whose section actually changes.
     """
     if _read_marker() == SECTION_RULES_VERSION:
         return run(
@@ -424,9 +434,9 @@ def run_startup() -> dict[str, int]:
             dry_run=False,
             pages=_iter_unsectioned_article_pages(),
         )
-    summary = run(recompute_all=False, dry_run=False)
+    summary = run(recompute_all=True, dry_run=False)
     if not summary["failed"]:
-        _write_marker()
+        _write_marker()  # raises if it cannot be stored; the run is then retried
     return summary
 
 
@@ -485,10 +495,14 @@ def main(argv: list[str] | None = None) -> int:
             summary["failed"],
         )
         return 1
-    if not args.dry_run:
-        # A manual run scans everything, so it settles the worker's startup
-        # scan as well.
-        _write_marker()
+    if args.all and not args.dry_run:
+        # Only a full recompute settles the worker's startup scan: the default
+        # mode leaves feed-decided articles alone.
+        try:
+            _write_marker()
+        except RuntimeError as e:
+            logger.error("Backfill: %s", e)
+            return 1
     return 0
 
 

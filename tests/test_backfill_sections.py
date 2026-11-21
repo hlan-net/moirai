@@ -238,7 +238,7 @@ def test_default_mode_writes_nothing_when_up_to_date():
 def test_start_background_runs_the_startup_run():
     with patch.object(bf, "run", return_value={"failed": 0}) as run:
         bf.start_background().join(timeout=5)
-    run.assert_called_once_with(recompute_all=False, dry_run=False)
+    run.assert_called_once_with(recompute_all=True, dry_run=False)
 
 
 def test_start_background_swallows_errors(_no_retry_delay):
@@ -380,7 +380,8 @@ def test_conflict_retry_marks_the_fresh_revision():
 def test_startup_scans_everything_and_records_completion_the_first_time():
     with patch.object(bf, "run", return_value={"failed": 0}) as run:
         bf.run_startup()
-    run.assert_called_once_with(recompute_all=False, dry_run=False)
+    # The owed scan recomputes feed-decided articles too.
+    run.assert_called_once_with(recompute_all=True, dry_run=False)
     bf._write_marker.assert_called_once_with()
 
 
@@ -447,18 +448,53 @@ def test_startup_rescans_everything_after_the_rules_version_changes():
     bf._read_marker.return_value = SECTION_RULES_VERSION - 1
     with patch.object(bf, "run", return_value={"failed": 0}) as run:
         bf.run_startup()
-    run.assert_called_once_with(recompute_all=False, dry_run=False)
+    run.assert_called_once_with(recompute_all=True, dry_run=False)
     bf._write_marker.assert_called_once_with()
 
 
-def test_manual_run_records_completion_but_a_dry_run_does_not():
-    couch = _FakeCouch([_article("a1")], [[{"ok": True, "id": "a1", "rev": "2-b"}]])
-    assert _run(couch) == 0
+def test_owed_scan_refiles_a_feed_decided_article_whose_feed_mapping_changed():
+    """A rules change can be a feed-category change; the scan must apply it."""
+    feed = {"_id": "f1", "url": "https://example.com/rss", "category": "business"}
+    stale = _article("a1", rev="2-b", section="sports", section_source="feed")
+    couch = _FakeCouch([stale], [[{"ok": True, "id": "a1", "rev": "3-c"}]], [feed])
+    with (
+        patch.object(bf.requests, "get", side_effect=couch.get),
+        patch.object(bf.requests, "post", side_effect=couch.post),
+    ):
+        summary = bf.run_startup()
+    assert summary["written"] == 1
+    assert couch.bulk_calls[0][0]["section"] == "business"
     bf._write_marker.assert_called_once_with()
 
-    bf._write_marker.reset_mock()
-    assert _run(_FakeCouch([_article("a1")], []), ["--dry-run"]) == 0
+
+def test_startup_run_fails_when_the_marker_cannot_be_stored(_no_retry_delay):
+    """Otherwise the next start would repeat the full scan without a retry."""
+    bf._write_marker.side_effect = RuntimeError("config db down")
+    with patch.object(bf, "run", return_value={"failed": 0}) as run:
+        bf.start_background().join(timeout=5)
+    # _run_with_retry treats the exception as a failed attempt and tries again.
+    assert run.call_count == 1 + len(bf.RETRY_DELAYS_S)
+
+
+def test_only_a_full_manual_recompute_records_completion():
+    def couch() -> _FakeCouch:
+        return _FakeCouch([_article("a1")], [[{"ok": True, "id": "a1", "rev": "2-b"}]])
+
+    # Default mode leaves feed-decided articles alone, so it settles nothing.
+    assert _run(couch()) == 0
     bf._write_marker.assert_not_called()
+
+    assert _run(couch(), ["--all", "--dry-run"]) == 0
+    bf._write_marker.assert_not_called()
+
+    assert _run(couch(), ["--all"]) == 0
+    bf._write_marker.assert_called_once_with()
+
+
+def test_manual_run_exits_nonzero_when_the_marker_cannot_be_stored():
+    bf._write_marker.side_effect = RuntimeError("config db down")
+    couch = _FakeCouch([_article("a1")], [[{"ok": True, "id": "a1", "rev": "2-b"}]])
+    assert _run(couch, ["--all"]) == 1
 
 
 def test_marker_round_trip():
@@ -490,3 +526,14 @@ def test_marker_round_trip():
     (doc,) = store.values()
     assert doc["_id"] == "section_backfill"
     assert doc["completed_at"].endswith("Z")
+
+
+def test_write_marker_raises_when_couchdb_rejects_it():
+    with (
+        patch.object(bf.requests, "get", return_value=MagicMock(status_code=404)),
+        patch.object(
+            bf.requests, "put", return_value=MagicMock(status_code=500, text="boom")
+        ),
+        pytest.raises(RuntimeError, match="completion marker"),
+    ):
+        _REAL_WRITE_MARKER()
