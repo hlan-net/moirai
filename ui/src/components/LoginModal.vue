@@ -22,7 +22,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="handleClose">
+  <div class="modal-overlay" @mousedown.self="handleClose" @keydown.esc="handleClose">
     <dialog ref="dialogRef" class="modal-content" @close="handleClose">
       <button class="close-btn" @click="handleClose" aria-label="Close modal">&times;</button>
       <LoginForm @success="handleSuccess">

@@ -570,6 +570,16 @@ const bulkImportFeeds = async () => {
     bulkImporting.value = false
   }
 }
+
+// Click or Enter/Space on a feed row: select it for bulk deletion in that
+// mode, otherwise toggle it as the active feed filter.
+const activateFeed = (feedId: string) => {
+  if (bulkDeleteMode.value) {
+    toggleFeedSelection(feedId)
+  } else {
+    filterStore.setSelectedFeedId(filterStore.selectedFeedId === feedId ? null : feedId)
+  }
+}
 </script>
 
 <template>
@@ -633,6 +643,7 @@ const bulkImportFeeds = async () => {
         v-model="searchQuery"
         type="text"
         placeholder="Search feeds by title, URL, or category..."
+        aria-label="Search feeds"
         class="search-input"
       />
       <button
@@ -677,17 +688,19 @@ const bulkImportFeeds = async () => {
         v-for="feed in contextuallyFilteredFeeds"
         :key="feed._id"
         class="feed-item"
-        @click="
-          bulkDeleteMode
-            ? toggleFeedSelection(feed._id)
-            : filterStore.setSelectedFeedId(
-                filterStore.selectedFeedId === feed._id ? null : feed._id
-              )
-        "
+        @click="activateFeed(feed._id)"
+        @keydown.enter.self="activateFeed(feed._id)"
+        @keydown.space.self.prevent="activateFeed(feed._id)"
+        tabindex="0"
         :class="{ 'selected-feed': filterStore.selectedFeedId === feed._id }"
       >
         <div v-if="renamingFeedId === feed._id && isAdmin" class="feed-info">
-          <input v-model="newFeedTitle" @keyup.enter="renameFeed(feed)" @keyup.esc="cancelRename" />
+          <input
+            v-model="newFeedTitle"
+            aria-label="Feed title"
+            @keyup.enter="renameFeed(feed)"
+            @keyup.esc="cancelRename"
+          />
           <div class="rename-actions">
             <button @click="renameFeed(feed)">Save</button>
             <button @click="cancelRename">Cancel</button>
@@ -699,6 +712,7 @@ const bulkImportFeeds = async () => {
               v-if="bulkDeleteMode"
               type="checkbox"
               :checked="selectedFeedIds.has(feed._id)"
+              :aria-label="`Select ${feed.title}`"
               @click.stop="toggleFeedSelection(feed._id)"
               @change.stop
               class="feed-checkbox"
@@ -756,7 +770,7 @@ const bulkImportFeeds = async () => {
           </select>
           <span v-else-if="feed.category" class="category-tag">{{ feed.category }}</span>
         </div>
-        <div class="feed-actions" @click.stop>
+        <div class="feed-actions" @click.stop @keydown.stop>
           <div
             v-if="feed.last_fetch_error"
             class="warning-icon"
@@ -806,14 +820,18 @@ const bulkImportFeeds = async () => {
     <div v-else>No feeds found.</div>
 
     <!-- Bulk Import Modal -->
-    <div v-if="showBulkImportModal" class="modal-overlay" @click="closeBulkImportModal">
+    <div
+      v-if="showBulkImportModal"
+      class="modal-overlay"
+      @mousedown.self="closeBulkImportModal"
+      @keydown.esc="closeBulkImportModal"
+    >
       <div
         ref="modalContentRef"
         class="modal-content"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        @click.stop
         @keydown="handleModalKeydown"
       >
         <div class="modal-header">
@@ -826,7 +844,13 @@ const bulkImportFeeds = async () => {
           <p class="import-limit-notice">⚠️ Maximum 50 URLs per import (security limit)</p>
 
           <div class="file-upload-section">
-            <input ref="fileInputRef" type="file" accept=".txt,.opml" @change="handleFileUpload" />
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".txt,.opml"
+              aria-label="File with feed URLs"
+              @change="handleFileUpload"
+            />
           </div>
 
           <textarea
@@ -835,6 +859,7 @@ const bulkImportFeeds = async () => {
             placeholder="https://example.com/feed.xml&#10;https://another.com/rss&#10;..."
             rows="10"
             class="bulk-import-textarea"
+            aria-label="Feed URLs, one per line"
           ></textarea>
 
           <div v-if="bulkImportText.trim()" class="url-preview">

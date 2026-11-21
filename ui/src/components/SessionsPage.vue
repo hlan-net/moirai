@@ -79,6 +79,8 @@ onMounted(async () => {
             :key="session.session_id"
             class="row"
             @click="openSession(session.session_id)"
+            @keydown.enter="openSession(session.session_id)"
+            tabindex="0"
           >
             <td>{{ formatDate(session.started_at) }}</td>
             <td>{{ sessionTypeLabel(session.session_type) }}</td>

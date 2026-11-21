@@ -85,6 +85,7 @@ const togglePublic = async (issue: Issue) => {
         v-model="searchQuery"
         type="text"
         placeholder="Search events by name..."
+        aria-label="Search events"
         class="search-input"
       />
       <button
@@ -108,10 +109,22 @@ const togglePublic = async (issue: Issue) => {
         :key="issue._id"
         class="event-card"
         @click="selectIssue(issue._id)"
+        tabindex="0"
+        @keydown.enter.self="selectIssue(issue._id)"
+        @keydown.space.self.prevent="selectIssue(issue._id)"
         :class="{ 'selected-event': filterStore.selectedIssueId === issue._id }"
       >
         <div class="card-header">
-          <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
+          <h3>
+            <button
+              type="button"
+              class="plain-button clickable"
+              @click.stop="toggleExpand(issue._id)"
+              :aria-expanded="expandedIssues.has(issue._id)"
+            >
+              {{ issue.logos }}
+            </button>
+          </h3>
           <div v-if="isAdmin" class="card-actions">
             <button
               @click.stop="togglePublic(issue)"
@@ -152,9 +165,14 @@ const togglePublic = async (issue: Issue) => {
             </li>
           </ul>
         </div>
-        <div v-else class="expand-hint" @click="toggleExpand(issue._id)">
+        <button
+          v-else
+          type="button"
+          class="plain-button expand-hint"
+          @click="toggleExpand(issue._id)"
+        >
           {{ (issue.premises || []).length }} items (click to expand)
-        </div>
+        </button>
       </div>
     </div>
   </div>

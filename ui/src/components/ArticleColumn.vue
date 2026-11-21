@@ -435,6 +435,7 @@ const raiseArticleAsIssue = (article: Article) => {
         v-model="searchQuery"
         type="text"
         placeholder="Search articles by title, description, or source..."
+        aria-label="Search articles"
         class="search-input"
       />
       <button

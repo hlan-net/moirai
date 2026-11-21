@@ -635,9 +635,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3 @click="toggleSection('ollama')">
-            Ollama
-            <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('ollama')"
+              :aria-expanded="!collapsedSections.has('ollama')"
+            >
+              Ollama
+              <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('ollama')">
             <div class="form-group">
@@ -651,7 +658,12 @@ onMounted(() => {
                   {{ model }}
                 </option>
               </select>
-              <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
+              <input
+                v-else
+                v-model="modelName"
+                placeholder="e.g. gemma3:1b"
+                aria-label="Ollama model name"
+              />
               <small v-if="loadingModels">Loading available models...</small>
               <small v-else-if="availableModels.length"
                 >Select a model provided by your Ollama instance.</small
@@ -663,9 +675,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3 @click="toggleSection('openai')">
-            OpenAI
-            <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('openai')"
+              :aria-expanded="!collapsedSections.has('openai')"
+            >
+              OpenAI
+              <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('openai')">
             <div class="form-group">
@@ -696,9 +715,16 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3 @click="toggleSection('gemini')">
-            Gemini
-            <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('gemini')"
+              :aria-expanded="!collapsedSections.has('gemini')"
+            >
+              Gemini
+              <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('gemini')">
             <div class="form-group">
@@ -729,16 +755,16 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3
-            @click="toggleSection('aisa')"
-            @keydown.enter.prevent="toggleSection('aisa')"
-            @keydown.space.prevent="toggleSection('aisa')"
-            tabindex="0"
-            role="button"
-            :aria-expanded="!collapsedSections.has('aisa')"
-          >
-            AISA (in-cluster inference proxy)
-            <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('aisa')"
+              :aria-expanded="!collapsedSections.has('aisa')"
+            >
+              AISA (in-cluster inference proxy)
+              <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('aisa')">
             <div class="form-group">
@@ -834,9 +860,18 @@ onMounted(() => {
       <ModelCatalogEditor />
 
       <div class="settings-section">
-        <h2 @click="toggleSection('authentication')">
-          Authentication Provider Configuration
-          <span class="toggle-icon">{{ collapsedSections.has('authentication') ? '▶' : '▼' }}</span>
+        <h2>
+          <button
+            type="button"
+            class="plain-button"
+            @click="toggleSection('authentication')"
+            :aria-expanded="!collapsedSections.has('authentication')"
+          >
+            Authentication Provider Configuration
+            <span class="toggle-icon">{{
+              collapsedSections.has('authentication') ? '▶' : '▼'
+            }}</span>
+          </button>
         </h2>
         <div v-if="!collapsedSections.has('authentication')">
           <p class="section-desc">
@@ -891,6 +926,7 @@ onMounted(() => {
               ref="fileInput"
               style="display: none"
               accept=".json"
+              aria-label="Settings file to import"
               @change="importSettings"
             />
           </div>
@@ -903,7 +939,12 @@ onMounted(() => {
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
     </div>
 
-    <div v-if="showSchedulerLogs" class="modal-backdrop" @click.self="closeSchedulerLogs">
+    <div
+      v-if="showSchedulerLogs"
+      class="modal-backdrop"
+      @mousedown.self="closeSchedulerLogs"
+      @keydown.esc="closeSchedulerLogs"
+    >
       <div class="modal-panel">
         <div class="modal-header">
           <h3>Scheduler Logs</h3>
@@ -1087,6 +1128,12 @@ h3 {
   cursor: pointer;
   display: flex;
   justify-content: space-between;
+}
+h2 > .plain-button,
+h3 > .plain-button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
 }
 .toggle-icon {
   transition: transform 0.2s;
