@@ -1,37 +1,36 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
-import { authFetch } from '../utils/authFetch'
 import IssueChatActions from './IssueChatActions.vue'
+import { useIssueList, type LongevityTier } from '../composables/useIssueList'
 
-interface Premise {
-  type: 'message' | 'issue'
-  id: string
-}
-
-interface Issue {
-  _id: string
-  logos: string
-  description: string
-  premises: Premise[]
-  longevity: 'transient' | 'temporal' | 'epic'
-  status: 'active' | 'eternal'
-}
-
-type LongevityTier = 'transient' | 'temporal' | 'epic'
-
-const allIssues = ref<Issue[]>([])
-const loading = ref(true)
-const refreshing = ref(false)
-const expandedIssues = ref<Set<string>>(new Set())
-const searchQuery = ref('')
 const collapsedSections = ref<Set<string>>(new Set())
-let refreshInterval: number | null = null
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
+
+// Every issue, whatever its longevity; `filtered` applies the text search.
+const {
+  loading,
+  refreshing,
+  expandedIssues,
+  searchQuery,
+  filteredIssues: filtered,
+  fetchIssues,
+  selectIssue,
+  deleteIssue,
+  removePremise,
+  toggleExpand,
+} = useIssueList({
+  refreshMs: 30000,
+  text: {
+    fetchError: 'Error fetching issues:',
+    confirmDelete: 'Delete this issue?',
+    confirmRemovePremise: 'Remove this constituent?',
+  },
+})
 
 const tierLabels: Record<LongevityTier, { label: string; color: string }> = {
   transient: { label: 'Events', color: '#d83b01' },
@@ -40,18 +39,6 @@ const tierLabels: Record<LongevityTier, { label: string; color: string }> = {
 }
 
 const tierOrder: LongevityTier[] = ['transient', 'temporal', 'epic']
-
-// Filter issues by search query
-const filtered = computed(() => {
-  let items = allIssues.value
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase()
-    items = items.filter(
-      (i) => i.logos.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
-    )
-  }
-  return items
-})
 
 // Active issues grouped by longevity tier
 const activeTiers = computed(() => {
@@ -70,57 +57,6 @@ const eternalIssues = computed(() => filtered.value.filter((i) => i.status === '
 const activeCount = computed(() => filtered.value.filter((i) => i.status === 'active').length)
 const eternalCount = computed(() => eternalIssues.value.length)
 
-const fetchIssues = async (isRefresh = false) => {
-  if (isRefresh) {
-    refreshing.value = true
-  } else {
-    loading.value = true
-  }
-
-  try {
-    const params = new URLSearchParams()
-    if (filterStore.selectedFeedId) {
-      params.append('feed_url', filterStore.selectedFeedId)
-    }
-    const qs = params.toString() ? `?${params.toString()}` : ''
-    const response = await authFetch(`/api/issues${qs}`)
-
-    if (response.ok) {
-      const data = await response.json()
-      allIssues.value = Array.isArray(data)
-        ? data.filter((i: Issue) => !i._id.startsWith('_design/'))
-        : []
-    } else if (!isRefresh) {
-      allIssues.value = []
-    }
-  } catch (error) {
-    console.error('Error fetching issues:', error)
-    if (!isRefresh) {
-      allIssues.value = []
-    }
-  } finally {
-    loading.value = false
-    refreshing.value = false
-  }
-}
-
-watch(
-  () => filterStore.selectedFeedId,
-  () => fetchIssues()
-)
-
-const selectIssue = (issueId: string) => {
-  filterStore.setSelectedIssueId(filterStore.selectedIssueId === issueId ? null : issueId)
-}
-
-const toggleExpand = (id: string) => {
-  if (expandedIssues.value.has(id)) {
-    expandedIssues.value.delete(id)
-  } else {
-    expandedIssues.value.add(id)
-  }
-}
-
 const toggleSection = (key: string) => {
   if (collapsedSections.value.has(key)) {
     collapsedSections.value.delete(key)
@@ -128,53 +64,6 @@ const toggleSection = (key: string) => {
     collapsedSections.value.add(key)
   }
 }
-
-const deleteIssue = async (id: string) => {
-  if (!confirm('Delete this issue?')) return
-  try {
-    const res = await authFetch(`/api/issues/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      allIssues.value = allIssues.value.filter((i) => i._id !== id)
-      expandedIssues.value.delete(id)
-      if (filterStore.selectedIssueId === id) {
-        filterStore.setSelectedIssueId(null)
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-const removePremise = async (issueId: string, premiseId: string) => {
-  if (!confirm('Remove this constituent?')) return
-  try {
-    const res = await authFetch(`/api/issues/${issueId}/premises`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: premiseId }),
-    })
-    if (res.ok) {
-      const updatedIssue = await res.json()
-      const index = allIssues.value.findIndex((i) => i._id === issueId)
-      if (index !== -1) {
-        allIssues.value[index] = updatedIssue
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-onMounted(() => {
-  void fetchIssues()
-  refreshInterval = globalThis.setInterval(() => fetchIssues(true), 30000)
-})
-
-onUnmounted(() => {
-  if (refreshInterval !== null) {
-    clearInterval(refreshInterval)
-  }
-})
 </script>
 
 <template>

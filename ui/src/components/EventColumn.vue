@@ -1,120 +1,39 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
+import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useFilterStore } from '../stores/filter'
 import { authFetch } from '../utils/authFetch'
 import IssueChatActions from './IssueChatActions.vue'
 import { SYNC_REFRESH_INTERVAL } from '../config/polling'
-
-interface Premise {
-  type: 'message' | 'issue'
-  id: string
-}
-
-interface Issue {
-  _id: string
-  logos: string
-  description: string
-  premises: Premise[]
-  longevity: 'transient' | 'temporal' | 'epic'
-  status: 'active' | 'eternal'
-  public?: boolean
-}
-
-const issues = ref<Issue[]>([])
-const loading = ref(true)
-const refreshing = ref(false)
-const expandedIssues = ref<Set<string>>(new Set())
-const searchQuery = ref('')
-let refreshInterval: number | null = null
+import { useIssueList, type Issue } from '../composables/useIssueList'
 
 const authStore = useAuthStore()
 const filterStore = useFilterStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-// Filtered issues based on search query
-const filteredIssues = computed(() => {
-  let filtered = issues.value
-
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter((issue) => {
-      const logos = issue.logos.toLowerCase()
-      const description = issue.description.toLowerCase()
-      return logos.includes(query) || description.includes(query)
-    })
-  }
-
-  return filtered
+// "Events" are transient issues
+const {
+  loading,
+  refreshing,
+  expandedIssues,
+  searchQuery,
+  filteredIssues,
+  fetchIssues,
+  selectIssue,
+  replaceIssue,
+  deleteIssue,
+  removePremise,
+  toggleExpand,
+} = useIssueList({
+  longevity: 'transient',
+  refreshMs: SYNC_REFRESH_INTERVAL,
+  trackRefresh: true,
+  text: {
+    fetchError: 'Error fetching transient issues:',
+    confirmDelete: 'Delete this event?',
+    confirmRemovePremise: 'Remove this article from the event?',
+  },
 })
-
-const fetchIssues = async (isRefresh = false) => {
-  if (isRefresh) {
-    filterStore.markRefreshStart()
-    refreshing.value = true
-  } else {
-    loading.value = true
-  }
-
-  try {
-    const params = new URLSearchParams()
-    params.append('longevity', 'transient') // "Events" are transient issues
-
-    if (filterStore.selectedFeedId) {
-      params.append('feed_url', filterStore.selectedFeedId) // filter_id is currently the feed URL in some contexts, but check store usage
-    }
-
-    const queryString = params.toString() ? `?${params.toString()}` : ''
-    const response = await authFetch(`/api/issues${queryString}`)
-
-    if (response.ok) {
-      const data = await response.json()
-      issues.value = Array.isArray(data)
-        ? data.filter((i: Issue) => !i._id.startsWith('_design/'))
-        : []
-    } else if (!isRefresh) {
-      issues.value = []
-    }
-  } catch (error) {
-    console.error('Error fetching transient issues:', error)
-    if (!isRefresh) {
-      issues.value = []
-    }
-  } finally {
-    loading.value = false
-    refreshing.value = false
-    if (isRefresh) {
-      filterStore.markRefreshComplete()
-    }
-  }
-}
-
-const selectIssue = (issueId: string) => {
-  filterStore.setSelectedIssueId(filterStore.selectedIssueId === issueId ? null : issueId)
-}
-
-watch(
-  () => filterStore.selectedFeedId,
-  () => {
-    void fetchIssues()
-  }
-)
-
-const deleteIssue = async (id: string) => {
-  if (!confirm('Delete this event?')) return
-  try {
-    const res = await authFetch(`/api/issues/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      issues.value = issues.value.filter((i) => i._id !== id)
-      expandedIssues.value.delete(id)
-      if (filterStore.selectedIssueId === id) {
-        filterStore.setSelectedIssueId(null)
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  }
-}
 
 const togglePublic = async (issue: Issue) => {
   try {
@@ -124,55 +43,12 @@ const togglePublic = async (issue: Issue) => {
       body: JSON.stringify({ public: !issue.public }),
     })
     if (res.ok) {
-      const updated = await res.json()
-      const index = issues.value.findIndex((i) => i._id === issue._id)
-      if (index !== -1) {
-        issues.value[index] = updated
-      }
+      replaceIssue(await res.json())
     }
   } catch (error) {
     console.error(error)
   }
 }
-
-const removePremise = async (issueId: string, premiseId: string) => {
-  if (!confirm('Remove this article from the event?')) return
-  try {
-    const res = await authFetch(`/api/issues/${issueId}/premises`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: premiseId }),
-    })
-    if (res.ok) {
-      const updatedIssue = await res.json()
-      const index = issues.value.findIndex((i) => i._id === issueId)
-      if (index !== -1) {
-        issues.value[index] = updatedIssue
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-const toggleExpand = (id: string) => {
-  if (expandedIssues.value.has(id)) {
-    expandedIssues.value.delete(id)
-  } else {
-    expandedIssues.value.add(id)
-  }
-}
-
-onMounted(() => {
-  void fetchIssues()
-  refreshInterval = globalThis.setInterval(() => fetchIssues(true), SYNC_REFRESH_INTERVAL)
-})
-
-onUnmounted(() => {
-  if (refreshInterval !== null) {
-    clearInterval(refreshInterval)
-  }
-})
 </script>
 
 <template>
