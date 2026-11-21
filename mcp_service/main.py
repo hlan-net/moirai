@@ -63,8 +63,12 @@ class AuthMiddleware:
 logger.info(f"{get_version_string()} starting...")
 log_llm_startup_config(logger)
 
-# Get the ASGI app
-app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()
+# Get the ASGI app (SSE transport, endpoints /sse and /messages/).
+# sse_app() keeps the SDK's default DNS-rebinding protection: only requests
+# whose Host header is localhost are accepted, on mcp 2.x exactly as on 1.x.
+# In-cluster clients therefore send "Host: localhost:8090" (see
+# api/chat_routes.py).
+app = mcp.sse_app()
 
 # Add Auth Middleware
 app.add_middleware(AuthMiddleware)

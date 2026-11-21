@@ -129,7 +129,7 @@ moirai/
 │   └── llm.py                    # LLM provider abstractions
 │
 ├── mcp_service/                  # MCP Server (Starlette)
-│   ├── core.py                   # FastMCP setup
+│   ├── core.py                   # MCPServer setup
 │   ├── mcp_server.py             # Entry point
 │   └── tools/                    # MCP tool definitions
 │       ├── feeds.py              # Feed management tools
@@ -350,7 +350,7 @@ def count_articles_by_topic(userspace: str, topic: str) -> dict:
 ```
 
 #### 2. Register Tool (Auto-discovered)
-MCP tools are auto-discovered by FastMCP. No registration needed!
+MCP tools are auto-discovered by MCPServer. No registration needed!
 
 #### 3. Test It
 ```bash
@@ -833,7 +833,7 @@ docker compose exec redis redis-cli
 | Topic | Link |
 |-------|------|
 | **CouchDB Docs** | https://docs.couchdb.org |
-| **FastMCP** | https://github.com/anthropics/python-sdk (MCP section) |
+| **MCPServer** | https://github.com/anthropics/python-sdk (MCP section) |
 | **Vue 3** | https://vuejs.org/guide |
 | **Flask** | https://flask.palletsprojects.com |
 | **Redis** | https://redis.io/commands |

@@ -28,7 +28,7 @@ The core abstraction is the **Hourglass**: articles are grains of sand (raw sign
 - **Role:** Periodic feed fetcher. Iterates over all registered feeds, triggers a `FetchFeedTask` per feed (writes raw content to `feed_content`), then exits.
 - **Operation:** Runs as a Kubernetes `CronJob` (configurable schedule, default every 10 minutes). Can be triggered manually: `docker compose run --rm api python run_scheduler.py`.
 
-### 2.4 MCP Server (FastMCP / Starlette)
+### 2.4 MCP Server (MCPServer / Starlette)
 - **Port:** `8090`
 - **Transport:** SSE (Server-Sent Events)
 - **Role:** Exposes tools for LLM agents to interact with the system.

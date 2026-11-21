@@ -27,7 +27,7 @@ This starts the following services:
 * `worker` — Enrichment worker (long-running CouchDB changes-feed listener, single instance)
 * `ui` — Vue.js frontend (served by Nginx)
 * `nginx` — Reverse proxy routing traffic to `api` and `ui`
-* `mcp-server` — FastMCP server for agent tool calls
+* `mcp-server` — MCPServer server for agent tool calls
 * `couchdb` — Database
 * `redis` — Cache
 
@@ -76,7 +76,7 @@ Chat responses expose timing metadata, and the UI shows per-response duration to
 .
 ├── api/             # Flask REST API (Port 8088)
 ├── ui/              # Vue.js Frontend
-├── mcp_server.py    # FastMCP Server (Port 8090)
+├── mcp_server.py    # MCPServer Server (Port 8090)
 ├── tasks/           # Background tasks and helpers
 ├── tests/           # Unit and integration tests
 ├── helm/            # Kubernetes charts

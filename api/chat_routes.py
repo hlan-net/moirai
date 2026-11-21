@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import bleach
-import httpx
+import httpx2
 from bs4 import BeautifulSoup
 from flask import Blueprint, abort, g, jsonify, request
 from mcp import ClientSession
@@ -630,7 +630,7 @@ async def run_agent(
 
     try:
         # Connect to MCP Server
-        # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
+        # Force Host header to localhost to bypass the Host check (DNS-rebinding protection) of the MCP SDK
         headers = {"Host": "localhost:8090"}
         if auth_token:
             headers["Authorization"] = auth_token
@@ -1080,14 +1080,18 @@ async def _run_agent_turn(
 
 def _create_http_client(
     headers: dict[str, str] | None = None,
-    timeout: httpx.Timeout | None = None,
-    auth: httpx.Auth | None = None,
-) -> httpx.AsyncClient:
-    """Custom factory that creates AsyncClient for proper DNS resolution"""
+    timeout: httpx2.Timeout | None = None,
+    auth: httpx2.Auth | None = None,
+) -> httpx2.AsyncClient:
+    """Custom factory that creates AsyncClient for proper DNS resolution.
+
+    The MCP SDK (2.x) runs its transports on httpx2 and requires the factory
+    to return an ``httpx2.AsyncClient``.
+    """
     if timeout is None:
         # Very generous timeout for slow LLMs with multi-turn tool calls (10 minutes)
-        timeout = httpx.Timeout(LLM_TIMEOUT_SECONDS)
-    return httpx.AsyncClient(
+        timeout = httpx2.Timeout(LLM_TIMEOUT_SECONDS)
+    return httpx2.AsyncClient(
         headers=headers, timeout=timeout, auth=auth, follow_redirects=True
     )
 
@@ -1146,7 +1150,7 @@ async def _execute_tool_calls(session, tool_calls, messages, userspace_id, trace
             result_text = result.content[0].text if result.content else "Success"
             logger.debug(f"Tool result (truncated): {result_text[:200]}...")
 
-            result_is_error = bool(getattr(result, "isError", False))
+            result_is_error = bool(getattr(result, "is_error", False))
             if not result_is_error:
                 try:
                     parsed = json.loads(result_text)
@@ -1207,7 +1211,7 @@ def _convert_to_openai_tools(mcp_tools):
                 "function": {
                     "name": tool.name,
                     "description": tool.description,
-                    "parameters": tool.inputSchema,
+                    "parameters": tool.input_schema,
                 },
             }
         )
