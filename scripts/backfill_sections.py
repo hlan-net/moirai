@@ -5,8 +5,11 @@ New articles get their section at ingestion. This one-off backfill walks the
 section from the same signals the ingestion path uses (feed category, URL,
 annotation topic, default) and writes it back with ``_bulk_docs``.
 
-The worker runs it in the default mode at every start (``run_worker.py``), so
-a deploy needs no manual step. It can also be run by hand inside the worker or
+The worker runs it at every start (``run_worker.py``), so a deploy needs no
+manual step. The first run, and the first one after the sectioning rules
+change (``SECTION_RULES_VERSION``), scans the whole database and records its
+completion in the ``config`` database; later starts only look for articles
+that have no section at all. It can also be run by hand inside the worker or
 API pod (same env, same network):
 
     python -m scripts.backfill_sections --dry-run     # count only
@@ -14,6 +17,9 @@ API pod (same env, same network):
     python -m scripts.backfill_sections --all         # also re-file articles a
                                                       # feed category decided,
                                                       # e.g. after changing it
+
+Only ``--all`` records completion for the worker, because only it covers
+every article; the worker's own owed scan runs in that mode too.
 
 The default mode recomputes every article except those whose section a feed
 category decided, and writes only the ones whose section changes; so it is
@@ -36,6 +42,7 @@ import requests
 
 from api.db_config import get_couchdb_uri
 from tasks.sections import (
+    SECTION_RULES_VERSION,
     SOURCE_FEED,
     STREAM_CACHE_KEYS,
     mark_section_rewrite,
@@ -99,6 +106,73 @@ def _iter_feed_article_pages(
             if len(docs) < page_size or not data.get("bookmark"):
                 break
             bookmark = data["bookmark"]
+
+
+def _iter_unsectioned_article_pages(page_size: int = PAGE_SIZE) -> Iterator[list[dict]]:
+    """Yield pages of the articles that have no ``section`` field at all.
+
+    CouchDB answers this without a matching index by scanning the database
+    itself; only the matching documents, normally none, are transferred.
+    """
+    url = f"{get_couchdb_uri()}articles/_find"
+    bookmark = None
+    while True:
+        body: dict[str, object] = {
+            "selector": {"section": {"$exists": False}},
+            "limit": page_size,
+        }
+        if bookmark:
+            body["bookmark"] = bookmark
+        res = requests.post(url, json=body, timeout=120)
+        res.raise_for_status()
+        data = res.json()
+        docs = data.get("docs", [])
+        if docs:
+            yield docs
+        if len(docs) < page_size or not data.get("bookmark"):
+            return
+        bookmark = data["bookmark"]
+
+
+# The ``config`` document that records the last complete scan.
+MARKER_URL_PATH = "config/section_backfill"
+
+
+def _read_marker() -> int | None:
+    """The rules version of the last complete scan, or ``None`` if unknown."""
+    try:
+        res = requests.get(f"{get_couchdb_uri()}{MARKER_URL_PATH}", timeout=10)
+        if res.status_code == 200:
+            return res.json().get("rules_version")
+    except (requests.exceptions.RequestException, ValueError) as e:
+        logger.warning("Backfill: could not read the completion marker: %s", e)
+    return None
+
+
+def _write_marker() -> None:
+    """Record that every stored article was sectioned with the current rules.
+
+    Raises ``RuntimeError`` when the marker cannot be stored: a scan whose
+    completion is not on record would be repeated in full at the next start,
+    so the caller must treat that as a failed run.
+    """
+    url = f"{get_couchdb_uri()}{MARKER_URL_PATH}"
+    doc: dict[str, object] = {
+        "_id": "section_backfill",
+        "rules_version": SECTION_RULES_VERSION,
+        "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            doc["_rev"] = res.json()["_rev"]
+        res = requests.put(url, json=doc, timeout=10)
+    except (requests.exceptions.RequestException, ValueError) as e:
+        raise RuntimeError(f"could not write the completion marker: {e}") from e
+    if res.status_code not in (200, 201):
+        raise RuntimeError(
+            f"could not write the completion marker: {res.status_code} {res.text}"
+        )
 
 
 def load_feed_categories() -> dict[str, str]:
@@ -342,13 +416,35 @@ def _start_thread(name: str, target: Callable[[], None]) -> threading.Thread:
     return thread
 
 
+def run_startup() -> dict[str, int]:
+    """The worker's startup run: a full scan only when one is still owed.
+
+    Once a complete scan with the current sectioning rules is on record, a
+    start only picks up articles without any section (none in normal
+    operation, since ingestion always sets one). Otherwise it scans the whole
+    database and records the completion if nothing was left unwritten.
+
+    The owed scan recomputes every article, feed-decided ones included: a
+    rules change may be a change to the feed-category mapping. It still writes
+    only the articles whose section actually changes.
+    """
+    if _read_marker() == SECTION_RULES_VERSION:
+        return run(
+            recompute_all=False,
+            dry_run=False,
+            pages=_iter_unsectioned_article_pages(),
+        )
+    summary = run(recompute_all=True, dry_run=False)
+    if not summary["failed"]:
+        _write_marker()  # raises if it cannot be stored; the run is then retried
+    return summary
+
+
 def start_background() -> threading.Thread:
-    """Run the default-mode backfill in a daemon thread (worker startup)."""
+    """Run the startup backfill in a daemon thread (worker startup)."""
     return _start_thread(
         "section-backfill",
-        lambda: _run_with_retry(
-            "startup run", lambda: run(recompute_all=False, dry_run=False)
-        ),
+        lambda: _run_with_retry("startup run", run_startup),
     )
 
 
@@ -399,6 +495,14 @@ def main(argv: list[str] | None = None) -> int:
             summary["failed"],
         )
         return 1
+    if args.all and not args.dry_run:
+        # Only a full recompute settles the worker's startup scan: the default
+        # mode leaves feed-decided articles alone.
+        try:
+            _write_marker()
+        except RuntimeError as e:
+            logger.error("Backfill: %s", e)
+            return 1
     return 0
 
 
