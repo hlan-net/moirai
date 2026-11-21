@@ -5,6 +5,7 @@ import urllib.parse
 import re
 import logging
 from api.db_config import get_couchdb_uri
+from api.http_session import couchdb_session
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -39,7 +40,7 @@ def _request(method, url, **kwargs):
     if "timeout" not in kwargs:
         kwargs["timeout"] = 10
 
-    response = requests.request(method, url, **kwargs)
+    response = couchdb_session().request(method, url, **kwargs)
     return response
 
 
