@@ -4,7 +4,7 @@ import datetime
 import logging
 from api.db_config import get_couchdb_uri
 from api.db import _request, get_user_by_email, create_user
-from api.auth import hash_password
+from api.passwords import hash_password
 from .annotator import ANNOTATION_DESIGN_DOC, ANNOTATION_VIEWS
 from .cleanup_task import CleanupTask
 from tenacity import retry, stop_after_delay, wait_fixed, retry_if_exception_type
