@@ -115,16 +115,15 @@ const togglePublic = async (issue: Issue) => {
         :class="{ 'selected-event': filterStore.selectedIssueId === issue._id }"
       >
         <div class="card-header">
-          <h3
-            @click.stop="toggleExpand(issue._id)"
-            @keydown.enter.stop.prevent="toggleExpand(issue._id)"
-            @keydown.space.stop.prevent="toggleExpand(issue._id)"
-            tabindex="0"
-            role="button"
-            :aria-expanded="expandedIssues.has(issue._id)"
-            class="clickable"
-          >
-            {{ issue.logos }}
+          <h3>
+            <button
+              type="button"
+              class="plain-button clickable"
+              @click.stop="toggleExpand(issue._id)"
+              :aria-expanded="expandedIssues.has(issue._id)"
+            >
+              {{ issue.logos }}
+            </button>
           </h3>
           <div v-if="isAdmin" class="card-actions">
             <button
@@ -166,17 +165,14 @@ const togglePublic = async (issue: Issue) => {
             </li>
           </ul>
         </div>
-        <div
+        <button
           v-else
-          class="expand-hint"
+          type="button"
+          class="plain-button expand-hint"
           @click="toggleExpand(issue._id)"
-          @keydown.enter.stop.prevent="toggleExpand(issue._id)"
-          @keydown.space.stop.prevent="toggleExpand(issue._id)"
-          tabindex="0"
-          role="button"
         >
           {{ (issue.premises || []).length }} items (click to expand)
-        </div>
+        </button>
       </div>
     </div>
   </div>

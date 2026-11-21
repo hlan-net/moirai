@@ -635,16 +635,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3
-            @click="toggleSection('ollama')"
-            @keydown.enter.prevent="toggleSection('ollama')"
-            @keydown.space.prevent="toggleSection('ollama')"
-            tabindex="0"
-            role="button"
-            :aria-expanded="!collapsedSections.has('ollama')"
-          >
-            Ollama
-            <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('ollama')"
+              :aria-expanded="!collapsedSections.has('ollama')"
+            >
+              Ollama
+              <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('ollama')">
             <div class="form-group">
@@ -675,16 +675,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3
-            @click="toggleSection('openai')"
-            @keydown.enter.prevent="toggleSection('openai')"
-            @keydown.space.prevent="toggleSection('openai')"
-            tabindex="0"
-            role="button"
-            :aria-expanded="!collapsedSections.has('openai')"
-          >
-            OpenAI
-            <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('openai')"
+              :aria-expanded="!collapsedSections.has('openai')"
+            >
+              OpenAI
+              <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('openai')">
             <div class="form-group">
@@ -715,16 +715,16 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3
-            @click="toggleSection('gemini')"
-            @keydown.enter.prevent="toggleSection('gemini')"
-            @keydown.space.prevent="toggleSection('gemini')"
-            tabindex="0"
-            role="button"
-            :aria-expanded="!collapsedSections.has('gemini')"
-          >
-            Gemini
-            <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('gemini')"
+              :aria-expanded="!collapsedSections.has('gemini')"
+            >
+              Gemini
+              <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('gemini')">
             <div class="form-group">
@@ -755,16 +755,16 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3
-            @click="toggleSection('aisa')"
-            @keydown.enter.prevent="toggleSection('aisa')"
-            @keydown.space.prevent="toggleSection('aisa')"
-            tabindex="0"
-            role="button"
-            :aria-expanded="!collapsedSections.has('aisa')"
-          >
-            AISA (in-cluster inference proxy)
-            <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('aisa')"
+              :aria-expanded="!collapsedSections.has('aisa')"
+            >
+              AISA (in-cluster inference proxy)
+              <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('aisa')">
             <div class="form-group">
@@ -860,16 +860,18 @@ onMounted(() => {
       <ModelCatalogEditor />
 
       <div class="settings-section">
-        <h2
-          @click="toggleSection('authentication')"
-          @keydown.enter.prevent="toggleSection('authentication')"
-          @keydown.space.prevent="toggleSection('authentication')"
-          tabindex="0"
-          role="button"
-          :aria-expanded="!collapsedSections.has('authentication')"
-        >
-          Authentication Provider Configuration
-          <span class="toggle-icon">{{ collapsedSections.has('authentication') ? '▶' : '▼' }}</span>
+        <h2>
+          <button
+            type="button"
+            class="plain-button"
+            @click="toggleSection('authentication')"
+            :aria-expanded="!collapsedSections.has('authentication')"
+          >
+            Authentication Provider Configuration
+            <span class="toggle-icon">{{
+              collapsedSections.has('authentication') ? '▶' : '▼'
+            }}</span>
+          </button>
         </h2>
         <div v-if="!collapsedSections.has('authentication')">
           <p class="section-desc">
@@ -1126,6 +1128,12 @@ h3 {
   cursor: pointer;
   display: flex;
   justify-content: space-between;
+}
+h2 > .plain-button,
+h3 > .plain-button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
 }
 .toggle-icon {
   transition: transform 0.2s;
