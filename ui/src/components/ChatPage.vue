@@ -654,6 +654,7 @@ const renameSession = async (session: ChatSession) => {
           v-model="searchQuery"
           type="text"
           placeholder="Search chats by title, model, or provider..."
+          aria-label="Search chats"
           class="search-input"
         />
         <button
@@ -672,15 +673,24 @@ const renameSession = async (session: ChatSession) => {
           v-for="session in filteredSessions"
           :key="session._id"
           @click="loadSession(session)"
+          @keydown.enter.self="loadSession(session)"
+          @keydown.space.self.prevent="loadSession(session)"
+          tabindex="0"
           :class="['session-item', { active: sessionId === session._id }]"
         >
           <!-- Rename mode -->
-          <div v-if="renamingSessionId === session._id" class="rename-mode" @click.stop>
+          <div
+            v-if="renamingSessionId === session._id"
+            class="rename-mode"
+            @click.stop
+            @keydown.stop
+          >
             <input
               v-model="newSessionTitle"
               @keyup.enter="renameSession(session)"
               @keyup.esc="cancelRename"
               class="rename-input"
+              aria-label="Chat title"
               autofocus
             />
             <div class="rename-actions">
@@ -733,7 +743,12 @@ const renameSession = async (session: ChatSession) => {
           </div>
 
           <!-- Delete confirmation overlay -->
-          <div v-if="deleteConfirmId === session._id" class="delete-confirm" @click.stop>
+          <div
+            v-if="deleteConfirmId === session._id"
+            class="delete-confirm"
+            @click.stop
+            @keydown.stop
+          >
             <p>Delete this chat?</p>
             <div class="confirm-buttons">
               <button @click="deleteSession(session._id, $event)" class="confirm-yes">
@@ -895,6 +910,7 @@ const renameSession = async (session: ChatSession) => {
             v-model="input"
             @keyup.enter="sendMessage"
             placeholder="Ask Moirai..."
+            aria-label="Message to Moirai"
             :disabled="loading"
           />
           <button @click="sendMessage" :disabled="loading">Send</button>

@@ -101,6 +101,7 @@ const toggleSection = (key: string) => {
         v-model="searchQuery"
         type="text"
         placeholder="Search issues by name..."
+        aria-label="Search issues"
         class="search-input"
       />
       <button
@@ -121,6 +122,11 @@ const toggleSection = (key: string) => {
         <div
           class="tier-header"
           @click="toggleSection(group.tier)"
+          @keydown.enter.prevent="toggleSection(group.tier)"
+          @keydown.space.prevent="toggleSection(group.tier)"
+          tabindex="0"
+          role="button"
+          :aria-expanded="!collapsedSections.has(group.tier)"
           :style="{ borderLeftColor: group.color }"
         >
           <span class="tier-label" :style="{ color: group.color }">
@@ -142,9 +148,22 @@ const toggleSection = (key: string) => {
             :class="{ 'selected-issue': filterStore.selectedIssueId === issue._id }"
             :style="{ '--accent': group.color }"
             @click="selectIssue(issue._id)"
+            tabindex="0"
+            @keydown.enter.self="selectIssue(issue._id)"
+            @keydown.space.self.prevent="selectIssue(issue._id)"
           >
             <div class="card-header">
-              <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
+              <h3
+                @click.stop="toggleExpand(issue._id)"
+                @keydown.enter.stop.prevent="toggleExpand(issue._id)"
+                @keydown.space.stop.prevent="toggleExpand(issue._id)"
+                tabindex="0"
+                role="button"
+                :aria-expanded="expandedIssues.has(issue._id)"
+                class="clickable"
+              >
+                {{ issue.logos }}
+              </h3>
               <button
                 v-if="isAdmin"
                 @click.stop="deleteIssue(issue._id)"
@@ -174,7 +193,15 @@ const toggleSection = (key: string) => {
                 </li>
               </ul>
             </div>
-            <div v-else class="expand-hint" @click.stop="toggleExpand(issue._id)">
+            <div
+              v-else
+              class="expand-hint"
+              @click.stop="toggleExpand(issue._id)"
+              @keydown.enter.stop.prevent="toggleExpand(issue._id)"
+              @keydown.space.stop.prevent="toggleExpand(issue._id)"
+              tabindex="0"
+              role="button"
+            >
               {{ (issue.premises || []).length }} items (click to expand)
             </div>
           </div>
@@ -186,6 +213,11 @@ const toggleSection = (key: string) => {
         <div
           class="tier-header"
           @click="toggleSection('eternal')"
+          @keydown.enter.prevent="toggleSection('eternal')"
+          @keydown.space.prevent="toggleSection('eternal')"
+          tabindex="0"
+          role="button"
+          :aria-expanded="!collapsedSections.has('eternal')"
           :style="{ borderLeftColor: '#6c757d' }"
         >
           <span class="tier-label" style="color: #6c757d">
@@ -206,9 +238,22 @@ const toggleSection = (key: string) => {
             class="issue-card sealed-card"
             :class="{ 'selected-issue': filterStore.selectedIssueId === issue._id }"
             @click="selectIssue(issue._id)"
+            tabindex="0"
+            @keydown.enter.self="selectIssue(issue._id)"
+            @keydown.space.self.prevent="selectIssue(issue._id)"
           >
             <div class="card-header">
-              <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
+              <h3
+                @click.stop="toggleExpand(issue._id)"
+                @keydown.enter.stop.prevent="toggleExpand(issue._id)"
+                @keydown.space.stop.prevent="toggleExpand(issue._id)"
+                tabindex="0"
+                role="button"
+                :aria-expanded="expandedIssues.has(issue._id)"
+                class="clickable"
+              >
+                {{ issue.logos }}
+              </h3>
               <div class="card-meta">
                 <span :class="['longevity-tag', issue.longevity]">{{ issue.longevity }}</span>
                 <button
@@ -241,7 +286,15 @@ const toggleSection = (key: string) => {
                 </li>
               </ul>
             </div>
-            <div v-else class="expand-hint" @click.stop="toggleExpand(issue._id)">
+            <div
+              v-else
+              class="expand-hint"
+              @click.stop="toggleExpand(issue._id)"
+              @keydown.enter.stop.prevent="toggleExpand(issue._id)"
+              @keydown.space.stop.prevent="toggleExpand(issue._id)"
+              tabindex="0"
+              role="button"
+            >
               {{ (issue.premises || []).length }} items (click to expand)
             </div>
           </div>

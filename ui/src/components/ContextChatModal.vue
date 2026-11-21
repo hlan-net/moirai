@@ -564,14 +564,18 @@ const copyChat = async () => {
 </script>
 
 <template>
-  <div v-if="chatContextStore.isOpen" class="modal-overlay" @click="closeModal">
+  <div
+    v-if="chatContextStore.isOpen"
+    class="modal-overlay"
+    @mousedown.self="closeModal"
+    @keydown.esc="closeModal"
+  >
     <dialog
       ref="drawerRef"
       open
       class="context-chat-drawer"
       aria-labelledby="context-chat-title"
       :style="dragStyle"
-      @click.stop
     >
       <header class="drawer-header" v-bind="dragHandleProps">
         <div class="header-title-block">
@@ -660,8 +664,12 @@ const copyChat = async () => {
             :key="index"
             class="wizard-question"
           >
-            <label>{{ index + 1 }}. {{ question }}</label>
-            <textarea v-model="raiseWizardAnswers[index]" rows="2"></textarea>
+            <label :for="`raise-wizard-answer-${index}`">{{ index + 1 }}. {{ question }}</label>
+            <textarea
+              :id="`raise-wizard-answer-${index}`"
+              v-model="raiseWizardAnswers[index]"
+              rows="2"
+            ></textarea>
           </div>
           <div class="wizard-actions">
             <button class="quick-action-btn" @click="submitRaiseWizard">Create via Chat</button>
@@ -688,6 +696,7 @@ const copyChat = async () => {
           v-model="input"
           type="text"
           placeholder="Ask about this context..."
+          aria-label="Message about this context"
           @keyup.enter="sendMessage"
         />
         <button @click="sendMessage" :disabled="loading || !input.trim()">

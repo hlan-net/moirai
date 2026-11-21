@@ -103,6 +103,7 @@ onUnmounted(() => {
           },
         ]"
         @click="setFocus('feeds')"
+        @keyup="setFocus('feeds')"
       >
         <FeedColumn />
       </div>
@@ -115,6 +116,7 @@ onUnmounted(() => {
           },
         ]"
         @click="setFocus('articles')"
+        @keyup="setFocus('articles')"
       >
         <ArticleColumn />
       </div>
@@ -127,6 +129,7 @@ onUnmounted(() => {
           },
         ]"
         @click="setFocus('events')"
+        @keyup="setFocus('events')"
       >
         <EventColumn />
       </div>
@@ -139,6 +142,7 @@ onUnmounted(() => {
           },
         ]"
         @click="setFocus('trends')"
+        @keyup="setFocus('trends')"
       >
         <TrendColumn />
       </div>

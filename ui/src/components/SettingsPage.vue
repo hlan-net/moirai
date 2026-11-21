@@ -635,7 +635,14 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3 @click="toggleSection('ollama')">
+          <h3
+            @click="toggleSection('ollama')"
+            @keydown.enter.prevent="toggleSection('ollama')"
+            @keydown.space.prevent="toggleSection('ollama')"
+            tabindex="0"
+            role="button"
+            :aria-expanded="!collapsedSections.has('ollama')"
+          >
             Ollama
             <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
           </h3>
@@ -651,7 +658,12 @@ onMounted(() => {
                   {{ model }}
                 </option>
               </select>
-              <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
+              <input
+                v-else
+                v-model="modelName"
+                placeholder="e.g. gemma3:1b"
+                aria-label="Ollama model name"
+              />
               <small v-if="loadingModels">Loading available models...</small>
               <small v-else-if="availableModels.length"
                 >Select a model provided by your Ollama instance.</small
@@ -663,7 +675,14 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3 @click="toggleSection('openai')">
+          <h3
+            @click="toggleSection('openai')"
+            @keydown.enter.prevent="toggleSection('openai')"
+            @keydown.space.prevent="toggleSection('openai')"
+            tabindex="0"
+            role="button"
+            :aria-expanded="!collapsedSections.has('openai')"
+          >
             OpenAI
             <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
           </h3>
@@ -696,7 +715,14 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3 @click="toggleSection('gemini')">
+          <h3
+            @click="toggleSection('gemini')"
+            @keydown.enter.prevent="toggleSection('gemini')"
+            @keydown.space.prevent="toggleSection('gemini')"
+            tabindex="0"
+            role="button"
+            :aria-expanded="!collapsedSections.has('gemini')"
+          >
             Gemini
             <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
           </h3>
@@ -834,7 +860,14 @@ onMounted(() => {
       <ModelCatalogEditor />
 
       <div class="settings-section">
-        <h2 @click="toggleSection('authentication')">
+        <h2
+          @click="toggleSection('authentication')"
+          @keydown.enter.prevent="toggleSection('authentication')"
+          @keydown.space.prevent="toggleSection('authentication')"
+          tabindex="0"
+          role="button"
+          :aria-expanded="!collapsedSections.has('authentication')"
+        >
           Authentication Provider Configuration
           <span class="toggle-icon">{{ collapsedSections.has('authentication') ? '▶' : '▼' }}</span>
         </h2>
@@ -891,6 +924,7 @@ onMounted(() => {
               ref="fileInput"
               style="display: none"
               accept=".json"
+              aria-label="Settings file to import"
               @change="importSettings"
             />
           </div>
@@ -903,7 +937,12 @@ onMounted(() => {
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
     </div>
 
-    <div v-if="showSchedulerLogs" class="modal-backdrop" @click.self="closeSchedulerLogs">
+    <div
+      v-if="showSchedulerLogs"
+      class="modal-backdrop"
+      @mousedown.self="closeSchedulerLogs"
+      @keydown.esc="closeSchedulerLogs"
+    >
       <div class="modal-panel">
         <div class="modal-header">
           <h3>Scheduler Logs</h3>
