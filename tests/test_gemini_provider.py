@@ -10,15 +10,19 @@ class TestGeminiProvider(unittest.TestCase):
     @patch("api.llm.gemini.genai.Client")
     def test_list_models(self, mock_client_class):
         mock_client = mock_client_class.return_value
-        m1 = MagicMock()
-        m1.name = "models/gemini-pro"
-        m1.supported_generation_methods = ["generateContent"]
+        # Real SDK objects, not mocks: a mock accepts any attribute name, which
+        # is how a field that does not exist in google-genai went unnoticed.
+        from google.genai import types
 
-        m2 = MagicMock()
-        m2.name = "models/embedding-001"
-        m2.supported_generation_methods = ["embedContent"]
+        m1 = types.Model(
+            name="models/gemini-pro", supported_actions=["generateContent"]
+        )
+        m2 = types.Model(
+            name="models/embedding-001", supported_actions=["embedContent"]
+        )
+        m3 = types.Model(name="models/unknown")  # no supported_actions at all
 
-        mock_client.models.list.return_value = [m1, m2]
+        mock_client.models.list.return_value = [m1, m2, m3]
 
         provider = GeminiProvider(api_key="test")
         models = provider.list_models()

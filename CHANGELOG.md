@@ -12,6 +12,9 @@ The API and the MCP server send CouchDB requests through one pooled `requests.Se
 ### passlib replaced by bcrypt (#337)
 Password hashing moves from `passlib.hash.bcrypt` to the `bcrypt` package directly (`api/passwords.py`). passlib 1.7.4 is unmaintained, breaks with bcrypt 5 and imports the `crypt` module that Python 3.13 removed, which was the last blocker for 3.13. Stored hashes are the same `$2b$` format and keep verifying; passwords longer than 72 bytes are truncated as passlib did.
 
+### Gemini model list works (#357)
+`GeminiProvider.list_models()` read `supported_generation_methods`, a field of the older google-generativeai SDK that google-genai does not have (there it is `supported_actions`), so listing Gemini models raised for every model. The unit test used mocks that accept any attribute; it now builds real SDK objects.
+
 ### Dependency updates
 Supersedes Dependabot PRs #333–#338, #340–#342 and #348. Major versions: openai 3.53, google-genai 3.4 (with websockets 17.4, which google-genai 1.x capped), redis-py 8.1 and the Redis 8 image, gunicorn 27, structlog 26, python-dateutil 4, bcrypt 5. Minor and patch: pydantic 2.14, starlette 1.10, uvicorn 0.54 and others. `tenacity` stays at 9.1.4 because google-genai 3.4 requires `<9.2`. ruff moves to 0.17.5 with its rule selection pinned to the previous defaults (`E4`, `E7`, `E9`, `F`): 0.17 widened the defaults to several hundred rules. `mcp` stays on 1.30; the 2.x migration is tracked separately.
 
