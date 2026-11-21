@@ -17,11 +17,13 @@ class GeminiProvider(LLMProvider):
     def list_models(self):
         try:
             models = self.client.models.list()
-            # Filter for models that support generation
+            # Filter for models that support generation. google-genai names the
+            # field ``supported_actions`` (``supported_generation_methods`` was
+            # the older google-generativeai SDK and does not exist here).
             return [
                 m.name.replace("models/", "")
                 for m in models
-                if "generateContent" in m.supported_generation_methods
+                if "generateContent" in (m.supported_actions or [])
             ]
         except Exception as e:
             logger.error(f"Error listing Gemini models: {e}")

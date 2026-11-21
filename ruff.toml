@@ -14,3 +14,9 @@ exclude = [
 ]
 
 target-version = "py312"
+
+[lint]
+# The rule set ruff enabled by default up to 0.15, stated explicitly: ruff 0.17
+# widened its defaults to several hundred rules (593 findings on this codebase).
+# Add rule families here deliberately, one at a time.
+select = ["E4", "E7", "E9", "F"]

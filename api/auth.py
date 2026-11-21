@@ -4,7 +4,7 @@ import datetime
 import logging
 from functools import wraps
 from flask import Blueprint, request, jsonify, g
-from passlib.hash import bcrypt
+from api.passwords import hash_password, verify_password
 from api.db import (
     get_user_by_email,
     create_user,
@@ -190,14 +190,6 @@ def github_login():
     except Exception as e:
         logger.error(f"GitHub Auth Error: {e}")
         return jsonify({"message": "GitHub Authentication Failed"}), 500
-
-
-def hash_password(password):
-    return bcrypt.hash(password)
-
-
-def verify_password(plain_password, hashed_password):
-    return bcrypt.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: dict):

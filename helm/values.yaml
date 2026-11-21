@@ -275,7 +275,7 @@ redis:
   enabled: true
   image:
     repository: redis
-    tag: "7-alpine"
+    tag: "8-alpine"
     pullPolicy: IfNotPresent
   # -- Redis password (MUST be overridden in custom-values.yaml)
   password: ""

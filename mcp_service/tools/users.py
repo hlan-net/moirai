@@ -1,5 +1,5 @@
 from datetime import datetime
-from passlib.hash import bcrypt
+from api.passwords import hash_password
 from ..core import mcp, auth_required
 from ..db import db_request, update_doc, delete_doc, store_doc
 from ..responses import (
@@ -102,7 +102,7 @@ def add_user(email: str, password: str, role: str = "user") -> dict:
             message=f"Error checking for existing user: {str(e)}"
         ).to_dict()
 
-    hashed = bcrypt.hash(password)
+    hashed = hash_password(password)
     user_doc = {
         "email": email,
         "password_hash": hashed,
