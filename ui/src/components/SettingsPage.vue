@@ -21,7 +21,7 @@ const allowPublicRead = ref(false)
 const iterationInterval = ref(600)
 const schedulerEnabled = ref(true)
 const showSchedulerLogs = ref(false)
-const schedulerLogsPanel = ref<HTMLElement | null>(null)
+const schedulerLogsDialog = ref<HTMLDialogElement | null>(null)
 let schedulerLogsOpener: HTMLElement | null = null
 const schedulerLogs = ref<SchedulerLogEntry[]>([])
 const schedulerLogsLoading = ref(false)
@@ -221,13 +221,13 @@ const fetchSchedulerLogs = async () => {
 }
 
 const openSchedulerLogs = async () => {
-  // Focus moves into the panel so that Escape, handled on the backdrop, reaches it;
-  // closing gives focus back to the control that opened the panel.
+  // A native modal dialog keeps focus inside it and closes on Escape. It is removed
+  // from the page while still open, so focus is handed back to the opener here.
   schedulerLogsOpener =
     document.activeElement instanceof HTMLElement ? document.activeElement : null
   showSchedulerLogs.value = true
   await nextTick()
-  schedulerLogsPanel.value?.focus()
+  schedulerLogsDialog.value?.showModal()
   await fetchSchedulerLogs()
 }
 
@@ -949,19 +949,13 @@ onMounted(() => {
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
     </div>
 
-    <div
-      v-if="showSchedulerLogs"
-      class="modal-backdrop"
-      @mousedown.self="closeSchedulerLogs"
-      @keydown.esc="closeSchedulerLogs"
-    >
-      <div
-        ref="schedulerLogsPanel"
+    <div v-if="showSchedulerLogs" class="modal-backdrop">
+      <dialog
+        ref="schedulerLogsDialog"
         class="modal-panel"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="scheduler-logs-title"
-        tabindex="-1"
+        @close="closeSchedulerLogs"
+        @mousedown.self="closeSchedulerLogs"
       >
         <div class="modal-header">
           <h3 id="scheduler-logs-title">Scheduler Logs</h3>
@@ -993,7 +987,7 @@ onMounted(() => {
             Refresh
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   </div>
 </template>
@@ -1258,6 +1252,12 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+  padding: 0;
+  margin: auto;
+}
+
+.modal-panel::backdrop {
+  background: transparent; /* .modal-backdrop dims the page */
 }
 
 .modal-header {

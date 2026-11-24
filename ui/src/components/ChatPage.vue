@@ -675,9 +675,7 @@ const renameSession = async (session: ChatSession) => {
           @click="loadSession(session)"
           @keydown.enter.self="loadSession(session)"
           @keydown.space.self.prevent="loadSession(session)"
-          role="button"
           tabindex="0"
-          :aria-pressed="sessionId === session._id"
           :class="['session-item', { active: sessionId === session._id }]"
         >
           <!-- Rename mode -->

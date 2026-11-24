@@ -691,9 +691,7 @@ const activateFeed = (feedId: string) => {
         @click="activateFeed(feed._id)"
         @keydown.enter.self="activateFeed(feed._id)"
         @keydown.space.self.prevent="activateFeed(feed._id)"
-        role="button"
         tabindex="0"
-        :aria-pressed="filterStore.selectedFeedId === feed._id"
         :class="{ 'selected-feed': filterStore.selectedFeedId === feed._id }"
       >
         <div v-if="renamingFeedId === feed._id && isAdmin" class="feed-info">
