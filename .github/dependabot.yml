@@ -15,6 +15,12 @@ updates:
       - dependencies
       - python
     open-pull-requests-limit: 10
+    ignore:
+      # google-genai requires tenacity<9.2 (as of google-genai 3.6.1); a bump
+      # past it makes the requirements unresolvable (#363). Drop this when
+      # google-genai lifts the cap.
+      - dependency-name: tenacity
+        versions: [">=9.2"]
     # Group minor/patch updates into a single PR to reduce noise
     groups:
       opentelemetry:
