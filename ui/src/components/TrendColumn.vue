@@ -68,6 +68,7 @@ const {
         v-model="searchQuery"
         type="text"
         placeholder="Search trends by name..."
+        aria-label="Search trends"
         class="search-input"
       />
       <button
@@ -91,10 +92,22 @@ const {
         :key="issue._id"
         class="trend-card"
         @click="selectIssue(issue._id)"
+        tabindex="0"
+        @keydown.enter.self="selectIssue(issue._id)"
+        @keydown.space.self.prevent="selectIssue(issue._id)"
         :class="{ 'selected-trend': filterStore.selectedIssueId === issue._id }"
       >
         <div class="card-header">
-          <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
+          <h3>
+            <button
+              type="button"
+              class="plain-button clickable"
+              @click.stop="toggleExpand(issue._id)"
+              :aria-expanded="expandedIssues.has(issue._id)"
+            >
+              {{ issue.logos }}
+            </button>
+          </h3>
           <button
             v-if="isAdmin"
             @click="deleteIssue(issue._id)"
@@ -128,9 +141,14 @@ const {
             </li>
           </ul>
         </div>
-        <div v-else class="expand-hint" @click="toggleExpand(issue._id)">
+        <button
+          v-else
+          type="button"
+          class="plain-button expand-hint"
+          @click.stop="toggleExpand(issue._id)"
+        >
           {{ (issue.premises || []).length }} items (click to expand)
-        </div>
+        </button>
       </div>
     </div>
   </div>

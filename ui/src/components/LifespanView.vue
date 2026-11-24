@@ -101,6 +101,7 @@ const toggleSection = (key: string) => {
         v-model="searchQuery"
         type="text"
         placeholder="Search issues by name..."
+        aria-label="Search issues"
         class="search-input"
       />
       <button
@@ -118,16 +119,18 @@ const toggleSection = (key: string) => {
     <div v-else class="lifespan-content">
       <!-- Active section: issues grouped by longevity tier -->
       <section v-for="group in activeTiers" :key="group.tier" class="tier-section">
-        <div
-          class="tier-header"
+        <button
+          type="button"
+          class="plain-button tier-header"
           @click="toggleSection(group.tier)"
+          :aria-expanded="!collapsedSections.has(group.tier)"
           :style="{ borderLeftColor: group.color }"
         >
           <span class="tier-label" :style="{ color: group.color }">
             {{ group.label }} ({{ group.issues.length }})
           </span>
           <span class="collapse-icon">{{ collapsedSections.has(group.tier) ? '+' : '-' }}</span>
-        </div>
+        </button>
 
         <div v-if="!collapsedSections.has(group.tier)" class="tier-list">
           <div v-if="!group.issues.length" class="no-results">
@@ -142,9 +145,21 @@ const toggleSection = (key: string) => {
             :class="{ 'selected-issue': filterStore.selectedIssueId === issue._id }"
             :style="{ '--accent': group.color }"
             @click="selectIssue(issue._id)"
+            tabindex="0"
+            @keydown.enter.self="selectIssue(issue._id)"
+            @keydown.space.self.prevent="selectIssue(issue._id)"
           >
             <div class="card-header">
-              <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
+              <h3>
+                <button
+                  type="button"
+                  class="plain-button clickable"
+                  @click.stop="toggleExpand(issue._id)"
+                  :aria-expanded="expandedIssues.has(issue._id)"
+                >
+                  {{ issue.logos }}
+                </button>
+              </h3>
               <button
                 v-if="isAdmin"
                 @click.stop="deleteIssue(issue._id)"
@@ -174,25 +189,32 @@ const toggleSection = (key: string) => {
                 </li>
               </ul>
             </div>
-            <div v-else class="expand-hint" @click.stop="toggleExpand(issue._id)">
+            <button
+              v-else
+              type="button"
+              class="plain-button expand-hint"
+              @click.stop="toggleExpand(issue._id)"
+            >
               {{ (issue.premises || []).length }} items (click to expand)
-            </div>
+            </button>
           </div>
         </div>
       </section>
 
       <!-- Eternal section: sealed issues -->
       <section class="tier-section eternal-section">
-        <div
-          class="tier-header"
+        <button
+          type="button"
+          class="plain-button tier-header"
           @click="toggleSection('eternal')"
+          :aria-expanded="!collapsedSections.has('eternal')"
           :style="{ borderLeftColor: '#6c757d' }"
         >
           <span class="tier-label" style="color: #6c757d">
             Sealed ({{ eternalIssues.length }})
           </span>
           <span class="collapse-icon">{{ collapsedSections.has('eternal') ? '+' : '-' }}</span>
-        </div>
+        </button>
 
         <div v-if="!collapsedSections.has('eternal')" class="tier-list">
           <div v-if="!eternalIssues.length" class="no-results">
@@ -206,9 +228,21 @@ const toggleSection = (key: string) => {
             class="issue-card sealed-card"
             :class="{ 'selected-issue': filterStore.selectedIssueId === issue._id }"
             @click="selectIssue(issue._id)"
+            tabindex="0"
+            @keydown.enter.self="selectIssue(issue._id)"
+            @keydown.space.self.prevent="selectIssue(issue._id)"
           >
             <div class="card-header">
-              <h3 @click.stop="toggleExpand(issue._id)" class="clickable">{{ issue.logos }}</h3>
+              <h3>
+                <button
+                  type="button"
+                  class="plain-button clickable"
+                  @click.stop="toggleExpand(issue._id)"
+                  :aria-expanded="expandedIssues.has(issue._id)"
+                >
+                  {{ issue.logos }}
+                </button>
+              </h3>
               <div class="card-meta">
                 <span :class="['longevity-tag', issue.longevity]">{{ issue.longevity }}</span>
                 <button
@@ -241,9 +275,14 @@ const toggleSection = (key: string) => {
                 </li>
               </ul>
             </div>
-            <div v-else class="expand-hint" @click.stop="toggleExpand(issue._id)">
+            <button
+              v-else
+              type="button"
+              class="plain-button expand-hint"
+              @click.stop="toggleExpand(issue._id)"
+            >
               {{ (issue.premises || []).length }} items (click to expand)
-            </div>
+            </button>
           </div>
         </div>
       </section>
@@ -297,6 +336,7 @@ h2 {
 
 .tier-header {
   display: flex;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;

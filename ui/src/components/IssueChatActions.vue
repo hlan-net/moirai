@@ -58,7 +58,7 @@ const shareToBluesky = async () => {
 </script>
 
 <template>
-  <div class="card-actions" @click.stop>
+  <div class="card-actions" @click.stop @keydown.stop>
     <button class="mini-action" @click="openIssueChat">💬 Chat</button>
     <button class="mini-action" @click="openRefineIssueChat">✏️ Refine</button>
     <button
