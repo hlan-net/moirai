@@ -3,6 +3,7 @@ from starlette.requests import Request
 from starlette.routing import Route
 from starlette.applications import Starlette
 from .core import mcp
+from .local_client import InProcessMCPClient
 from api.telemetry import configure_telemetry
 from api.auth_utils import verify_auth_header
 from tasks.agent_orchestrator import AgentOrchestrator
@@ -63,8 +64,12 @@ class AuthMiddleware:
 logger.info(f"{get_version_string()} starting...")
 log_llm_startup_config(logger)
 
-# Get the ASGI app
-app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.asgi_app()
+# Get the ASGI app (SSE transport, endpoints /sse and /messages/).
+# sse_app() keeps the SDK's default DNS-rebinding protection: only requests
+# whose Host header is localhost are accepted, on mcp 2.x exactly as on 1.x.
+# In-cluster clients therefore send "Host: localhost:8090" (see
+# api/chat_routes.py).
+app = mcp.sse_app()
 
 # Add Auth Middleware
 app.add_middleware(AuthMiddleware)
@@ -144,12 +149,12 @@ except redis.exceptions.ConnectionError as e:
 # --- End Redis Client Setup ---
 
 # Initialize and start the Agent Orchestrator
-# Pass the mcp client so it can make tool calls
 try:
     agent_orchestrator = AgentOrchestrator(
         interval=60, redis_client=redis_client
     )  # Pass redis_client
-    agent_orchestrator.mcp_client = mcp  # Assign mcp client
+    # Agent logic calls tools synchronously with keyword arguments
+    agent_orchestrator.mcp_client = InProcessMCPClient(mcp)
     agent_orchestrator.daemon = (
         True  # Allow main program to exit even if thread is running
     )

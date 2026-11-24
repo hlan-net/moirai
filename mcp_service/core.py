@@ -1,12 +1,12 @@
 import os
 import functools
 import uuid
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from api.userspace_ops import get_default_userspace
 
-# Initialize FastMCP Server
-mcp = FastMCP("Moirai MCP Server", dependencies=["requests", "feedparser"])
+# Initialize the MCP server (mcp 2.x renamed FastMCP to MCPServer)
+mcp = MCPServer("Moirai MCP Server", dependencies=["requests", "feedparser"])
 
 # Auth Configuration
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")

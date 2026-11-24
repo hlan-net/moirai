@@ -12,7 +12,7 @@ Moirai is an MCP-powered press review platform with an agent-centric architectur
    - Routes: `api/routes.py` (admin), `api/chat_routes.py` (chat), `api/mcp_routes.py` (MCP proxy)
 
 2. **MCP Server** (port 8090)
-   - FastMCP SSE server providing agent tools (`mcp_server.py`)
+   - MCPServer SSE server providing agent tools (`mcp_server.py`)
    - Enforces userspace isolation (GUID required for all data operations)
    - Tools: `add_feed`, `list_feeds`, `read_feed`, `add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`
 
@@ -223,7 +223,7 @@ def my_new_tool(userspace: str, param: str) -> str:
     return result
 ```
 
-2. No registration needed - FastMCP auto-discovers `@mcp.tool()` decorated functions
+2. No registration needed - MCPServer auto-discovers `@mcp.tool()` decorated functions
 3. Test via MCP client or built-in chat interface
 
 ### Adding a New API Endpoint

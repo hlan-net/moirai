@@ -17,7 +17,7 @@ async def test_list_articles():
     print(f"Connecting to MCP server at {url}...")
 
     try:
-        # Force Host header to localhost to bypass TrustedHostMiddleware in FastMCP
+        # Force Host header to localhost to bypass the Host check (DNS-rebinding protection) of the MCP SDK
         headers = {"Host": "localhost:8090"}
         async with sse_client(url, headers=headers) as (read, write):
             async with ClientSession(read, write) as session:
