@@ -42,7 +42,7 @@ class TestChatRoutesRefactor(unittest.TestCase):
 
     def test_convert_to_openai_tools(self):
         mcp_tool = SimpleNamespace(
-            name="test", description="desc", inputSchema={"type": "object"}
+            name="test", description="desc", input_schema={"type": "object"}
         )
         mcp_tools = SimpleNamespace(tools=[mcp_tool])
 

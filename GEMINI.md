@@ -16,7 +16,7 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 -   **Backend (API):** Flask REST API on port `8088`.
 -   **Security:** Enforces HTTP Basic Auth (`ADMIN_USERNAME` / `ADMIN_PASSWORD`).
     -   **Responsibility:** Serves the UI and provides administrative CRUD operations.
--   **MCP Server:** FastMCP SSE server on port `8090`.
+-   **MCP Server:** MCPServer SSE server on port `8090`.
     -   **Security:** Enforces **Userspace isolation** (GUID required for all data tools).
     -   **Tools:** `add_feed`, `list_feeds`, `read_feed`, `forge_issue`, `list_issues`, `read_issue` plus event/trend aliases (`add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`).
 -   **Frontend:** Vue.js 3 + TypeScript.

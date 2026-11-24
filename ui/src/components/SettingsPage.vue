@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useTheme, type Theme } from '../composables/useTheme'
@@ -21,6 +21,8 @@ const allowPublicRead = ref(false)
 const iterationInterval = ref(600)
 const schedulerEnabled = ref(true)
 const showSchedulerLogs = ref(false)
+const schedulerLogsDialog = ref<HTMLDialogElement | null>(null)
+let schedulerLogsOpener: HTMLElement | null = null
 const schedulerLogs = ref<SchedulerLogEntry[]>([])
 const schedulerLogsLoading = ref(false)
 const schedulerLogsError = ref('')
@@ -219,12 +221,20 @@ const fetchSchedulerLogs = async () => {
 }
 
 const openSchedulerLogs = async () => {
+  // A native modal dialog keeps focus inside it and closes on Escape. It is removed
+  // from the page while still open, so focus is handed back to the opener here.
+  schedulerLogsOpener =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
   showSchedulerLogs.value = true
+  await nextTick()
+  schedulerLogsDialog.value?.showModal()
   await fetchSchedulerLogs()
 }
 
 const closeSchedulerLogs = () => {
   showSchedulerLogs.value = false
+  schedulerLogsOpener?.focus()
+  schedulerLogsOpener = null
 }
 
 const formatLogTimestamp = (timestamp: string) => {
@@ -635,9 +645,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3 @click="toggleSection('ollama')">
-            Ollama
-            <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('ollama')"
+              :aria-expanded="!collapsedSections.has('ollama')"
+            >
+              Ollama
+              <span class="toggle-icon">{{ collapsedSections.has('ollama') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('ollama')">
             <div class="form-group">
@@ -651,7 +668,12 @@ onMounted(() => {
                   {{ model }}
                 </option>
               </select>
-              <input v-else v-model="modelName" placeholder="e.g. gemma3:1b" />
+              <input
+                v-else
+                v-model="modelName"
+                placeholder="e.g. gemma3:1b"
+                aria-label="Ollama model name"
+              />
               <small v-if="loadingModels">Loading available models...</small>
               <small v-else-if="availableModels.length"
                 >Select a model provided by your Ollama instance.</small
@@ -663,9 +685,16 @@ onMounted(() => {
           </div>
         </div>
         <div class="sub-section">
-          <h3 @click="toggleSection('openai')">
-            OpenAI
-            <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('openai')"
+              :aria-expanded="!collapsedSections.has('openai')"
+            >
+              OpenAI
+              <span class="toggle-icon">{{ collapsedSections.has('openai') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('openai')">
             <div class="form-group">
@@ -696,9 +725,16 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3 @click="toggleSection('gemini')">
-            Gemini
-            <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('gemini')"
+              :aria-expanded="!collapsedSections.has('gemini')"
+            >
+              Gemini
+              <span class="toggle-icon">{{ collapsedSections.has('gemini') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('gemini')">
             <div class="form-group">
@@ -729,16 +765,16 @@ onMounted(() => {
         </div>
 
         <div class="sub-section">
-          <h3
-            @click="toggleSection('aisa')"
-            @keydown.enter.prevent="toggleSection('aisa')"
-            @keydown.space.prevent="toggleSection('aisa')"
-            tabindex="0"
-            role="button"
-            :aria-expanded="!collapsedSections.has('aisa')"
-          >
-            AISA (in-cluster inference proxy)
-            <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+          <h3>
+            <button
+              type="button"
+              class="plain-button"
+              @click="toggleSection('aisa')"
+              :aria-expanded="!collapsedSections.has('aisa')"
+            >
+              AISA (in-cluster inference proxy)
+              <span class="toggle-icon">{{ collapsedSections.has('aisa') ? '▶' : '▼' }}</span>
+            </button>
           </h3>
           <div v-if="!collapsedSections.has('aisa')">
             <div class="form-group">
@@ -834,9 +870,18 @@ onMounted(() => {
       <ModelCatalogEditor />
 
       <div class="settings-section">
-        <h2 @click="toggleSection('authentication')">
-          Authentication Provider Configuration
-          <span class="toggle-icon">{{ collapsedSections.has('authentication') ? '▶' : '▼' }}</span>
+        <h2>
+          <button
+            type="button"
+            class="plain-button"
+            @click="toggleSection('authentication')"
+            :aria-expanded="!collapsedSections.has('authentication')"
+          >
+            Authentication Provider Configuration
+            <span class="toggle-icon">{{
+              collapsedSections.has('authentication') ? '▶' : '▼'
+            }}</span>
+          </button>
         </h2>
         <div v-if="!collapsedSections.has('authentication')">
           <p class="section-desc">
@@ -891,6 +936,7 @@ onMounted(() => {
               ref="fileInput"
               style="display: none"
               accept=".json"
+              aria-label="Settings file to import"
               @change="importSettings"
             />
           </div>
@@ -903,10 +949,16 @@ onMounted(() => {
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
     </div>
 
-    <div v-if="showSchedulerLogs" class="modal-backdrop" @click.self="closeSchedulerLogs">
-      <div class="modal-panel">
+    <div v-if="showSchedulerLogs" class="modal-backdrop">
+      <dialog
+        ref="schedulerLogsDialog"
+        class="modal-panel"
+        aria-labelledby="scheduler-logs-title"
+        @close="closeSchedulerLogs"
+        @mousedown.self="closeSchedulerLogs"
+      >
         <div class="modal-header">
-          <h3>Scheduler Logs</h3>
+          <h3 id="scheduler-logs-title">Scheduler Logs</h3>
           <button class="secondary" @click="closeSchedulerLogs">Close</button>
         </div>
         <div class="modal-body">
@@ -935,7 +987,7 @@ onMounted(() => {
             Refresh
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   </div>
 </template>
@@ -1088,6 +1140,12 @@ h3 {
   display: flex;
   justify-content: space-between;
 }
+h2 > .plain-button,
+h3 > .plain-button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
 .toggle-icon {
   transition: transform 0.2s;
 }
@@ -1194,6 +1252,12 @@ button.secondary:hover {
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+  padding: 0;
+  margin: auto;
+}
+
+.modal-panel::backdrop {
+  background: transparent; /* .modal-backdrop dims the page */
 }
 
 .modal-header {

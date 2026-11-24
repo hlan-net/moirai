@@ -21,7 +21,7 @@ AI agents use MCP tools to aggregate RSS feeds, synthesize articles into Issues 
 Three main services:
 
 - **Flask REST API** (`main.py`, `api/`) — port 8088, serves UI and admin CRUD. Uses gunicorn in production, with worker/scheduler started separately via `run_worker.py`.
-- **MCP Server** (`mcp_server.py` → `mcp_service/`) — Starlette/FastMCP SSE server on port 8090. Tool modules live in `mcp_service/tools/` (feeds, issues, search, staleness, users, agent_configs, annotations). Includes Redis cache, **AgentOrchestrator** (distributed leader lock + changes feed for agent dispatch), **AnnotationWorker** (longpoll articles/_changes), and a dedicated Prometheus metrics server on port 9000.
+- **MCP Server** (`mcp_server.py` → `mcp_service/`) — Starlette/MCPServer SSE server on port 8090. Tool modules live in `mcp_service/tools/` (feeds, issues, search, staleness, users, agent_configs, annotations). Includes Redis cache, **AgentOrchestrator** (distributed leader lock + changes feed for agent dispatch), **AnnotationWorker** (longpoll articles/_changes), and a dedicated Prometheus metrics server on port 9000.
 - **Vue.js 3 UI** (`ui/`) — Vite + TypeScript + Pinia. 4-column admin layout (Feeds, Articles, Events, Trends) with chat interface.
 
 **Data storage:** CouchDB (databases: `feeds`, `articles`, `issues`/events/trends). Redis for caching (TTL 3600s, invalidated on ingestion/deletion).
@@ -143,7 +143,7 @@ def _process_changes(self) -> None:
 - State: Pinia stores in `ui/src/stores/`.
 
 ### Adding an MCP Tool
-Define in `mcp_service/tools/` with `@mcp.tool()`. Take an optional `userspace: str = ""`, then `userspace = resolve_userspace(userspace)` and `validate_userspace(userspace)` from `mcp_service/core.py`. FastMCP auto-discovers decorated functions — no registration needed.
+Define in `mcp_service/tools/` with `@mcp.tool()`. Take an optional `userspace: str = ""`, then `userspace = resolve_userspace(userspace)` and `validate_userspace(userspace)` from `mcp_service/core.py`. MCPServer auto-discovers decorated functions — no registration needed.
 
 ### Adding an API Endpoint
 1. Pydantic model in `api/validation.py` with `bleach.clean()` sanitization.
