@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useTheme, type Theme } from '../composables/useTheme'
@@ -21,6 +21,8 @@ const allowPublicRead = ref(false)
 const iterationInterval = ref(600)
 const schedulerEnabled = ref(true)
 const showSchedulerLogs = ref(false)
+const schedulerLogsPanel = ref<HTMLElement | null>(null)
+let schedulerLogsOpener: HTMLElement | null = null
 const schedulerLogs = ref<SchedulerLogEntry[]>([])
 const schedulerLogsLoading = ref(false)
 const schedulerLogsError = ref('')
@@ -219,12 +221,20 @@ const fetchSchedulerLogs = async () => {
 }
 
 const openSchedulerLogs = async () => {
+  // Focus moves into the panel so that Escape, handled on the backdrop, reaches it;
+  // closing gives focus back to the control that opened the panel.
+  schedulerLogsOpener =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
   showSchedulerLogs.value = true
+  await nextTick()
+  schedulerLogsPanel.value?.focus()
   await fetchSchedulerLogs()
 }
 
 const closeSchedulerLogs = () => {
   showSchedulerLogs.value = false
+  schedulerLogsOpener?.focus()
+  schedulerLogsOpener = null
 }
 
 const formatLogTimestamp = (timestamp: string) => {
@@ -945,9 +955,16 @@ onMounted(() => {
       @mousedown.self="closeSchedulerLogs"
       @keydown.esc="closeSchedulerLogs"
     >
-      <div class="modal-panel">
+      <div
+        ref="schedulerLogsPanel"
+        class="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scheduler-logs-title"
+        tabindex="-1"
+      >
         <div class="modal-header">
-          <h3>Scheduler Logs</h3>
+          <h3 id="scheduler-logs-title">Scheduler Logs</h3>
           <button class="secondary" @click="closeSchedulerLogs">Close</button>
         </div>
         <div class="modal-body">

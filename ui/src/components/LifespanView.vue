@@ -145,7 +145,9 @@ const toggleSection = (key: string) => {
             :class="{ 'selected-issue': filterStore.selectedIssueId === issue._id }"
             :style="{ '--accent': group.color }"
             @click="selectIssue(issue._id)"
+            role="button"
             tabindex="0"
+            :aria-pressed="filterStore.selectedIssueId === issue._id"
             @keydown.enter.self="selectIssue(issue._id)"
             @keydown.space.self.prevent="selectIssue(issue._id)"
           >
@@ -228,7 +230,9 @@ const toggleSection = (key: string) => {
             class="issue-card sealed-card"
             :class="{ 'selected-issue': filterStore.selectedIssueId === issue._id }"
             @click="selectIssue(issue._id)"
+            role="button"
             tabindex="0"
+            :aria-pressed="filterStore.selectedIssueId === issue._id"
             @keydown.enter.self="selectIssue(issue._id)"
             @keydown.space.self.prevent="selectIssue(issue._id)"
           >

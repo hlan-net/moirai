@@ -109,7 +109,9 @@ const togglePublic = async (issue: Issue) => {
         :key="issue._id"
         class="event-card"
         @click="selectIssue(issue._id)"
+        role="button"
         tabindex="0"
+        :aria-pressed="filterStore.selectedIssueId === issue._id"
         @keydown.enter.self="selectIssue(issue._id)"
         @keydown.space.self.prevent="selectIssue(issue._id)"
         :class="{ 'selected-event': filterStore.selectedIssueId === issue._id }"
@@ -169,7 +171,7 @@ const togglePublic = async (issue: Issue) => {
           v-else
           type="button"
           class="plain-button expand-hint"
-          @click="toggleExpand(issue._id)"
+          @click.stop="toggleExpand(issue._id)"
         >
           {{ (issue.premises || []).length }} items (click to expand)
         </button>

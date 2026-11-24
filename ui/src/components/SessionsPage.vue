@@ -80,6 +80,7 @@ onMounted(async () => {
             class="row"
             @click="openSession(session.session_id)"
             @keydown.enter="openSession(session.session_id)"
+            @keydown.space.prevent="openSession(session.session_id)"
             tabindex="0"
           >
             <td>{{ formatDate(session.started_at) }}</td>
