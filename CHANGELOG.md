@@ -4,24 +4,40 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.11.3] — 2026-11-24
 
-### CouchDB connections are reused (#353)
+### Agents can call tools (#361)
+The orchestrator gave agent logic the MCP server object itself, whose `call_tool` is a coroutine that takes the arguments as one dict and returns a protocol result. Agent logic calls `call_tool(name, **kwargs)` synchronously and reads the tool's `MCPResponse` dict, so every tool call from a scheduled or `ON_NEW_ARTICLE` agent raised a TypeError. This had been so since the orchestrator was introduced. `mcp_service/local_client.py` adds `InProcessMCPClient`, which runs the tool in the server's own process and returns the tool's own dict; failures the SDK raises (unknown tool, invalid arguments, an exception in the tool) come back as error envelopes. After the upgrade, agents that call tools start doing so: check the first run of each enabled agent in the session log.
+
+### MCP Python SDK 2.x (#339, #361)
+`mcp` moves from 1.30 to 2.3. The server class `FastMCP` is now `MCPServer`; the SSE transport, its `/sse` and `/messages/` endpoints, the tool decorator and the Host-header check behave as before. The chat client reads the renamed result fields (`input_schema`, `is_error`) and builds its HTTP client on `httpx2`, which the SDK's transports now use. A 1.x client can talk to the 2.x server and the reverse, so API and MCP pods can roll in either order.
+
+### Keyboard access and labels in the UI (#321, #360)
+Selectable rows and cards (issues, feeds, chat sessions, agent sessions) can be reached with Tab and activated with Enter or Space. Expand triggers and the Settings and Lifespan section headings are real buttons with `aria-expanded`. Inputs without a label have one. Modals close on Escape, and on a press that starts on the overlay rather than a click that ends there, so a text selection dragged out of an input no longer closes the modal. The scheduler log panel is a native `<dialog>`. The cards are focus stops without a role; a separate selection control is tracked in #364.
+
+### Section backfill runs only when owed (#324, #358)
+The worker ran the section backfill at every start, paging through every article with its body (about 30 000 documents) even when nothing needed changing. A `config/section_backfill` marker now records a complete scan together with `SECTION_RULES_VERSION` (`tasks/sections.py`); with a current marker a start makes three requests and files only articles that have no section. Bump the version when a sectioning rule changes. The first worker start after this upgrade scans once and writes the marker.
+
+### CouchDB connections are reused (#353, #354)
 The API and the MCP server send CouchDB requests through one pooled `requests.Session` per process instead of opening a connection per call. In production a hand-made, stale EndpointSlice had left three dead addresses behind the CouchDB service name, and with a new connection per request about half of all calls waited ~3 s on one of them; the slice has been removed, and connection reuse keeps a single bad address from taxing every request.
 
-### passlib replaced by bcrypt (#337)
+### passlib replaced by bcrypt (#337, #357)
 Password hashing moves from `passlib.hash.bcrypt` to the `bcrypt` package directly (`api/passwords.py`). passlib 1.7.4 is unmaintained, breaks with bcrypt 5 and imports the `crypt` module that Python 3.13 removed, which was the last blocker for 3.13. Stored hashes are the same `$2b$` format and keep verifying; passwords longer than 72 bytes are truncated as passlib did.
 
 ### Gemini model list works (#357)
 `GeminiProvider.list_models()` read `supported_generation_methods`, a field of the older google-generativeai SDK that google-genai does not have (there it is `supported_actions`), so listing Gemini models raised for every model. The unit test used mocks that accept any attribute; it now builds real SDK objects.
 
-### MCP Python SDK 2.x (#339)
-`mcp` moves from 1.30 to 2.3. The server class `FastMCP` is now `MCPServer`; the SSE transport, its `/sse` and `/messages/` endpoints, the tool decorator and the Host-header check behave as before. The chat client reads the renamed result fields (`input_schema`, `is_error`) and builds its HTTP client on `httpx2`, which the SDK's transports now use. A 1.x client can talk to the 2.x server and the reverse, so API and MCP pods can roll in either order.
+### Dependency updates (#357, #362, #332)
+Supersedes Dependabot PRs #333–#338, #340–#342 and #348. Major versions: openai 3.53, google-genai 3.6 (with websockets 17.4, which google-genai 1.x capped), redis-py 8.1 and the Redis 8 image, gunicorn 27, structlog 26, python-dateutil 4, bcrypt 5. Minor and patch: pydantic 2.14, starlette 1.10, uvicorn 0.54 and others. `tenacity` stays at 9.1.4 because google-genai requires `<9.2`. ruff moves to 0.17.5 with its rule selection pinned to the previous defaults (`E4`, `E7`, `E9`, `F`): 0.17 widened the defaults to several hundred rules. `mcp` 2.x is covered above. In the UI, `dompurify` 3.4.18.
 
-### Dependency updates
-Supersedes Dependabot PRs #333–#338, #340–#342 and #348. Major versions: openai 3.53, google-genai 3.4 (with websockets 17.4, which google-genai 1.x capped), redis-py 8.1 and the Redis 8 image, gunicorn 27, structlog 26, python-dateutil 4, bcrypt 5. Minor and patch: pydantic 2.14, starlette 1.10, uvicorn 0.54 and others. `tenacity` stays at 9.1.4 because google-genai 3.4 requires `<9.2`. ruff moves to 0.17.5 with its rule selection pinned to the previous defaults (`E4`, `E7`, `E9`, `F`): 0.17 widened the defaults to several hundred rules. `mcp` 2.x is covered above.
+### Pinned images and the CouchDB default (#318, #347, #355, #356)
+`docker-compose.yml`, CI and the Helm values no longer use floating image tags (nginx, MCP inspector, CouchDB), and the workflows take the Node version from `ui/.nvmrc` (26). The chart defaults CouchDB to 3.5.3, the version CI and compose test against. An existing release upgraded with `--reuse-values` keeps its CouchDB image; the production upgrade from 3.3.3 is a separate procedure in #355.
 
-The chart's default CouchDB image is 3.5.3 (#355); an existing deployment keeps its version until upgraded by the procedure in that issue.
+### UI internals (#319, #351, #352, #359)
+The Events, Trends and Lifespan views share their issue-list logic in `ui/src/composables/useIssueList.ts`. Deliberate fire-and-forget calls are marked `void`. No behaviour change intended.
+
+### Developer setup (#323, #350)
+`yarn install` in `ui/` installs the one git hook, `.husky/pre-commit` (prettier on staged UI files; black and ruff through `pre-commit` when Python or YAML is staged). `README.md` has the first-time setup steps. Do not run `pre-commit install`.
 
 ---
 
