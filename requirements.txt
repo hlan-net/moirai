@@ -12,11 +12,11 @@ python-dateutil==4.0.0
 mcp[cli]==2.3.0
 httpx[http2]==0.28.1
 httpx2==2.16.2
-openai==3.53.0
+openai==3.57.0
 uvicorn==0.54.0
 flask-limiter==4.1.1
 prometheus-flask-exporter==0.23.2
-pydantic==2.14.3
+pydantic==2.14.4
 validators==0.36.0
 bleach==6.4.0
 starlette==1.10.0
@@ -32,7 +32,7 @@ opentelemetry-instrumentation-fastapi==0.66b2
 opentelemetry-instrumentation-flask==0.66b2
 opentelemetry-instrumentation-requests==0.66b2
 structlog==26.1.0
-tenacity==9.1.4
+tenacity==9.2.1
 PyJWT==2.15.1
 bcrypt==5.0.0
 google-auth-oauthlib==1.5.0
