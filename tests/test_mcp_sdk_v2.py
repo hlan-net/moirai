@@ -77,3 +77,79 @@ def test_http_client_factory_returns_an_httpx2_client():
             await client.aclose()
 
     asyncio.run(make())
+
+
+def _server_with_sample_tools() -> MCPServer:
+    server = MCPServer("test")
+
+    @server.tool()
+    def echo(name: str, userspace: str = "") -> dict:
+        return {"status": "success", "data": {"name": name, "userspace": userspace}}
+
+    @server.tool()
+    def plain() -> str:
+        return "not json"
+
+    @server.tool()
+    def crash() -> dict:
+        raise RuntimeError("database on fire")
+
+    return server
+
+
+def test_in_process_client_returns_the_tools_own_dict():
+    from mcp_service.local_client import InProcessMCPClient
+
+    client = InProcessMCPClient(_server_with_sample_tools())
+    assert client.call_tool("echo", name="n", userspace="u") == {
+        "status": "success",
+        "data": {"name": "n", "userspace": "u"},
+    }
+    assert client.call_tool("plain") == "not json"
+
+
+def test_in_process_client_reports_sdk_failures_as_error_envelopes():
+    from mcp_service.local_client import InProcessMCPClient
+
+    client = InProcessMCPClient(_server_with_sample_tools())
+
+    unknown = client.call_tool("no_such_tool")
+    assert unknown["status"] == "error"
+    assert unknown["error_code"] == "VALIDATION_ERROR"
+    assert unknown["retryable"] is False
+
+    invalid = client.call_tool("echo")  # required 'name' missing
+    assert invalid["status"] == "error"
+    assert invalid["error_code"] == "VALIDATION_ERROR"
+
+    crashed = client.call_tool("crash")
+    assert crashed["status"] == "error"
+    assert crashed["error_code"] == "UNEXPECTED_ERROR"
+    assert "database on fire" in crashed["message"]
+
+
+def test_agent_tool_calls_reach_a_tool_through_the_tracing_client():
+    """The path agent logic uses: TracingMCPClient -> in-process client -> tool."""
+    from unittest.mock import MagicMock
+
+    from mcp_service.local_client import InProcessMCPClient
+    from tasks.tracing_mcp_client import TracingMCPClient
+
+    session_logger = MagicMock()
+    client = TracingMCPClient(
+        mcp_client=InProcessMCPClient(_server_with_sample_tools()),
+        session_logger=session_logger,
+        session_id="s-1",
+    )
+    result = client.call_tool("echo", name="n", userspace="u")
+    assert result["data"] == {"name": "n", "userspace": "u"}
+    step = session_logger.add_step.call_args.args[1]
+    assert step["tool_name"] == "echo"
+    assert step["status"] == "success"
+
+
+def test_orchestrator_is_given_the_in_process_client():
+    from mcp_service import main
+    from mcp_service.local_client import InProcessMCPClient
+
+    assert isinstance(main.agent_orchestrator.mcp_client, InProcessMCPClient)

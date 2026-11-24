@@ -3,6 +3,7 @@ from starlette.requests import Request
 from starlette.routing import Route
 from starlette.applications import Starlette
 from .core import mcp
+from .local_client import InProcessMCPClient
 from api.telemetry import configure_telemetry
 from api.auth_utils import verify_auth_header
 from tasks.agent_orchestrator import AgentOrchestrator
@@ -148,12 +149,12 @@ except redis.exceptions.ConnectionError as e:
 # --- End Redis Client Setup ---
 
 # Initialize and start the Agent Orchestrator
-# Pass the mcp client so it can make tool calls
 try:
     agent_orchestrator = AgentOrchestrator(
         interval=60, redis_client=redis_client
     )  # Pass redis_client
-    agent_orchestrator.mcp_client = mcp  # Assign mcp client
+    # Agent logic calls tools synchronously with keyword arguments
+    agent_orchestrator.mcp_client = InProcessMCPClient(mcp)
     agent_orchestrator.daemon = (
         True  # Allow main program to exit even if thread is running
     )

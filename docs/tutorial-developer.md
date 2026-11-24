@@ -833,7 +833,7 @@ docker compose exec redis redis-cli
 | Topic | Link |
 |-------|------|
 | **CouchDB Docs** | https://docs.couchdb.org |
-| **MCPServer** | https://github.com/anthropics/python-sdk (MCP section) |
+| **MCPServer** | https://github.com/modelcontextprotocol/python-sdk |
 | **Vue 3** | https://vuejs.org/guide |
 | **Flask** | https://flask.palletsprojects.com |
 | **Redis** | https://redis.io/commands |
