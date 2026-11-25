@@ -3,7 +3,8 @@
 The unit tests pin the shape of the request. These pin what CouchDB does with
 it: that it chooses the search index and loads no document, that a match in
 each text field is found newest first, and that a search still answers when
-the index is missing.
+the index is missing, and that an article without a text field is repaired
+at start-up and then found.
 
 Needs a throwaway CouchDB of the supported version, named by
 ``SEARCH_TEST_COUCHDB_URI`` (with credentials, ending in ``/``)::
@@ -31,6 +32,8 @@ import pytest  # noqa: E402
 import requests  # noqa: E402
 
 from api.db_constants import (  # noqa: E402
+    ARTICLE_SEARCH_GAPS_INDEX,
+    ARTICLE_SEARCH_GAPS_SELECTOR,
     ARTICLE_SEARCH_INDEX,
     ARTICLE_SEARCH_INDEX_FIELDS,
 )
@@ -81,10 +84,7 @@ def couchdb():
         pytest.skip("SEARCH_TEST_COUCHDB_URI is not set")
     # Naming a CouchDB is asking for these tests: from here on a problem is a
     # failure, not a skip that would pass unnoticed in CI.
-    try:
-        requests.get(f"{COUCHDB}_up", timeout=3).raise_for_status()
-    except requests.exceptions.RequestException as error:
-        pytest.fail(f"no CouchDB at SEARCH_TEST_COUCHDB_URI: {error}")
+    requests.get(f"{COUCHDB}_up", timeout=3).raise_for_status()
 
     for name in ("_users", "_replicator", "articles"):
         requests.put(f"{COUCHDB}{name}", timeout=10)
@@ -184,6 +184,60 @@ def test_couchdb_answers_from_the_search_index_without_loading_documents(client)
     ).json()
     assert [doc["_id"] for doc in found["docs"]] == ["s2", "s3", "s1"]
     assert found["execution_stats"]["total_docs_examined"] == 0
+
+
+def test_an_article_without_a_text_field_is_backfilled_and_found(client):
+    """An article outside the search index is listed, repaired and searchable.
+
+    A Mango index holds only documents that have every indexed field, so this
+    article cannot be found before the backfill, not even by its title.
+    """
+    from tasks import init
+
+    for doc_id in ("gap1", "gap2"):
+        existing = requests.get(f"{COUCHDB}articles/{doc_id}", timeout=10)
+        if existing.ok:
+            requests.delete(
+                f"{COUCHDB}articles/{doc_id}",
+                params={"rev": existing.json()["_rev"]},
+                timeout=10,
+            )
+    gaps = [
+        # No summary at all; a null content.
+        {"_id": "gap1", "published": "2026-11-06T10:00:00+00:00", "title": "Okapi"},
+        {
+            "_id": "gap2",
+            "published": "2026-11-07T10:00:00+00:00",
+            "title": "Plain",
+            "summary": "an okapi here",
+            "content": None,
+        },
+    ]
+    requests.post(
+        f"{COUCHDB}articles/_bulk_docs", json={"docs": gaps}, timeout=10
+    ).raise_for_status()
+    with patch("tasks.init.ensure_db"):
+        init.create_index(
+            "articles",
+            ["published"],
+            ARTICLE_SEARCH_GAPS_INDEX,
+            ddoc=ARTICLE_SEARCH_GAPS_INDEX,
+            partial_filter=ARTICLE_SEARCH_GAPS_SELECTOR,
+        )
+    assert _ids(client, "okapi") == []
+
+    assert init.backfill_search_text() == 2
+
+    assert _ids(client, "okapi") == ["gap2", "gap1"]
+    repaired = requests.get(f"{COUCHDB}articles/gap1", timeout=10).json()
+    assert (repaired["summary"], repaired["content"]) == ("", "")
+    # What was there is kept.
+    kept = requests.get(f"{COUCHDB}articles/gap2", timeout=10).json()
+    assert (kept["summary"], kept["content"]) == ("an okapi here", "")
+    # Nothing is left to do, and complete articles were not touched.
+    assert init.backfill_search_text() == 0
+    untouched = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()
+    assert untouched["_rev"].startswith("1-")
 
 
 def test_a_search_still_answers_when_the_index_is_missing(client):

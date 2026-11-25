@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 from api.db_config import get_couchdb_uri
+from api.db_constants import ARTICLE_SEARCH_BACKFILL_FIELDS
 from api.extensions import get_redis_client
 from api.userspace_ops import get_default_userspace
 from tasks.sections import STREAM_CACHE_KEYS, resolve_section
@@ -128,6 +129,12 @@ class ArticleProcessor:
             json.dumps(hash_payload, sort_keys=True).encode("utf-8")
         ).hexdigest()
         article["_id"] = article_hash
+
+        # The search index holds only articles that have every text field
+        # (#387): an absent or null one would hide the article from search.
+        for field in ARTICLE_SEARCH_BACKFILL_FIELDS:
+            if not isinstance(article.get(field), str):
+                article[field] = ""
 
         if "section" not in article:
             article["section"], article["section_source"] = resolve_section(

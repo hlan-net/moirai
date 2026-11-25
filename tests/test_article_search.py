@@ -270,7 +270,8 @@ def test_fetch_by_ids_keeps_the_order_and_skips_what_is_gone():
 
     assert docs == [{"_id": "a2"}, {"_id": "a1"}]
     args, kwargs = session.request.call_args
-    assert args[0] == "POST" and args[1].endswith("articles/_all_docs")
+    assert args[0] == "POST"
+    assert args[1].endswith("articles/_all_docs")
     assert kwargs["json"] == {"keys": ["a2", "gone", "dead", "a1"]}
     assert kwargs["params"] == {"include_docs": "true"}
 
@@ -301,3 +302,92 @@ def test_the_search_index_is_created_with_its_design_document():
     payload = request.call_args.kwargs["json"]
     assert payload["ddoc"] == "idx_search_text"
     assert payload["index"]["fields"] == ["published", "title", "summary", "content"]
+
+
+# --- Every article is in the search index (tasks/) ---------------------------
+
+
+@pytest.mark.parametrize(
+    "article,expected",
+    [
+        ({}, ("", "")),
+        ({"summary": None, "content": None}, ("", "")),
+        ({"summary": "S", "content": 7}, ("S", "")),
+        ({"summary": "S", "content": "C"}, ("S", "C")),
+    ],
+)
+def test_a_stored_article_always_has_its_text_fields(article, expected):
+    """The search index holds only articles with every text field."""
+    from tasks.article_processor import ArticleProcessor
+
+    processor = ArticleProcessor.__new__(ArticleProcessor)
+    processor.couchdb_url = "http://couchdb/articles"
+    doc = {"title": "T", "link": "https://e/1", "feed_url": "https://e/rss", **article}
+    with (
+        patch("tasks.article_processor.requests.head") as head,
+        patch("tasks.article_processor.requests.post") as post,
+        patch("tasks.article_processor.get_default_userspace", return_value=None),
+        patch("tasks.article_processor.get_redis_client", return_value=None),
+    ):
+        head.return_value.status_code = 404
+        post.return_value.status_code = 201
+        processor.store_article(doc)
+
+    assert post.call_args.kwargs["json"] is doc
+
+    assert (doc["summary"], doc["content"]) == expected
+
+
+def _backfill(find_pages: list[list[dict]], bulk_rows: list[list[dict]]):
+    """Run the backfill against canned `_find` pages and `_bulk_docs` answers."""
+    from tasks import init
+
+    finds, bulks, saved = iter(find_pages), iter(bulk_rows), []
+
+    def request(method, url, **kwargs):
+        if url.endswith("_find"):
+            return _couch_response({"docs": next(finds)})
+        saved.append(kwargs["json"]["docs"])
+        return _couch_response(next(bulks))
+
+    with patch("tasks.init._request", side_effect=request) as mocked:
+        changed = init.backfill_search_text()
+    return changed, saved, mocked
+
+
+def test_backfill_gives_missing_text_fields_an_empty_string():
+    gap = {"_id": "a1", "_rev": "1-x", "title": "T", "summary": "kept"}
+    changed, saved, mocked = _backfill([[gap], []], [[{"ok": True, "id": "a1"}]])
+
+    assert changed == 1
+    assert saved == [[{**gap, "content": ""}]]
+    find = mocked.call_args_list[0].kwargs["json"]
+    assert find["use_index"] == "idx_search_gaps"
+    assert {"summary": {"$exists": False}} in find["selector"]["$or"]
+    assert {"content": None} in find["selector"]["$or"]
+
+
+def test_backfill_with_nothing_to_do_writes_nothing():
+    changed, saved, _ = _backfill([[]], [])
+
+    assert changed == 0
+    assert saved == []
+
+
+def test_backfill_stops_when_the_articles_cannot_be_saved():
+    """Refused by validation: the same articles would come back for ever."""
+    gap = {"_id": "a1", "_rev": "1-x", "title": "T"}
+    refused = [{"id": "a1", "error": "forbidden"}]
+    changed, saved, _ = _backfill([[gap], [gap], [gap]], [refused, refused])
+
+    assert changed == 0
+    assert len(saved) == 1
+
+
+def test_backfill_never_fails_a_start():
+    from tasks import init
+
+    with patch(
+        "tasks.init._request", side_effect=requests.exceptions.ConnectionError("down")
+    ):
+        assert init.backfill_search_text() == 0

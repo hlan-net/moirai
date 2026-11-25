@@ -322,8 +322,8 @@ def fetch_docs_by_ids(
         response.raise_for_status()
         rows = response.json().get("rows", [])
         return [row["doc"] for row in rows if row.get("doc")]
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching documents from CouchDB: {e}")
+    except requests.exceptions.RequestException:
+        logger.exception("Error fetching documents from CouchDB")
         if raise_on_error:
             raise
         return []

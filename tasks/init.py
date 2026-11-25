@@ -4,7 +4,14 @@ import datetime
 import logging
 from api.db_config import get_couchdb_uri
 from api.db import _request, get_user_by_email, create_user
-from api.db_constants import ARTICLE_SEARCH_INDEX, ARTICLE_SEARCH_INDEX_FIELDS
+from api.db_constants import (
+    ARTICLE_SEARCH_BACKFILL_FIELDS,
+    ARTICLE_SEARCH_GAPS_INDEX,
+    ARTICLE_SEARCH_GAPS_SELECTOR,
+    ARTICLE_SEARCH_INDEX,
+    ARTICLE_SEARCH_INDEX_FIELDS,
+    MONGO_GT,
+)
 from api.passwords import hash_password
 from .annotator import ANNOTATION_DESIGN_DOC, ANNOTATION_VIEWS
 from .cleanup_task import CleanupTask
@@ -125,12 +132,15 @@ def ensure_db(db_name):
         logger.error(f"Error ensuring database '{db_name}': {e}")
 
 
-def create_index(db_name, fields, name, ddoc=None):
+def create_index(db_name, fields, name, ddoc=None, partial_filter=None):
     url = f"{get_couchdb_uri()}{db_name}/_index"
     payload = {"index": {"fields": fields}, "name": name, "type": "json"}
     if ddoc:
         # A named design document, so that a query can ask for this index.
         payload["ddoc"] = ddoc
+    if partial_filter:
+        # Only the documents that match are in the index.
+        payload["index"]["partial_filter_selector"] = partial_filter
     try:
         # Ensure DB exists before index creation
         ensure_db(db_name)
@@ -144,6 +154,59 @@ def create_index(db_name, fields, name, ddoc=None):
             )
     except Exception as e:
         logger.error(f"Error creating index on '{db_name}': {e}")
+
+
+SEARCH_BACKFILL_BATCH = 500
+SEARCH_BACKFILL_MAX_BATCHES = 200
+
+
+def backfill_search_text() -> int:
+    """Give articles that lack a `summary` or `content` an empty one (#387).
+
+    The search index holds only articles that have every text field, so one
+    without would never be found, not even by its title. The partial index
+    `ARTICLE_SEARCH_GAPS_INDEX` lists exactly those articles and is normally
+    empty, so this is one small request at every start. Returns the number
+    of articles changed. Never raises: a start must not fail on it.
+    """
+    base = f"{get_couchdb_uri()}articles/"
+    query = {
+        "selector": {"published": {MONGO_GT: None}, **ARTICLE_SEARCH_GAPS_SELECTOR},
+        "use_index": ARTICLE_SEARCH_GAPS_INDEX,
+        "limit": SEARCH_BACKFILL_BATCH,
+    }
+    changed = 0
+    try:
+        for _ in range(SEARCH_BACKFILL_MAX_BATCHES):
+            response = _request("POST", f"{base}_find", json=query, timeout=30)
+            response.raise_for_status()
+            docs = response.json().get("docs", [])
+            if not docs:
+                break
+            for doc in docs:
+                for field in ARTICLE_SEARCH_BACKFILL_FIELDS:
+                    if not isinstance(doc.get(field), str):
+                        doc[field] = ""
+            response = _request(
+                "POST", f"{base}_bulk_docs", json={"docs": docs}, timeout=30
+            )
+            response.raise_for_status()
+            saved = sum(1 for row in response.json() if row.get("ok"))
+            changed += saved
+            if not saved:
+                # Refused (validation) or changed by another process; the same
+                # articles would come back, so stop instead of looping.
+                logger.warning(
+                    "Search backfill: %d articles could not be updated and "
+                    "stay out of the search index",
+                    len(docs),
+                )
+                break
+    except Exception:
+        logger.exception("Search backfill failed")
+    if changed:
+        logger.info("Search backfill: %d articles given an empty text field", changed)
+    return changed
 
 
 def ensure_design_doc(db_name, design_doc_name, views=None, validate_doc_update=None):
@@ -224,6 +287,15 @@ def init_db():
         ARTICLE_SEARCH_INDEX,
         ddoc=ARTICLE_SEARCH_INDEX,
     )
+    # The articles the search index cannot hold, normally none (#387).
+    create_index(
+        "articles",
+        ["published"],
+        ARTICLE_SEARCH_GAPS_INDEX,
+        ddoc=ARTICLE_SEARCH_GAPS_INDEX,
+        partial_filter=ARTICLE_SEARCH_GAPS_SELECTOR,
+    )
+    backfill_search_text()
     create_index("users", ["email"], "users-email-index")
     create_index("userspaces", ["owner_user_id"], "userspaces-owner-index")
 
