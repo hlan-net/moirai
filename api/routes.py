@@ -46,8 +46,8 @@ from api.rss_ops import generate_rss_item_xml
 from tasks.sections import (
     SECTIONS,
     STREAM_CACHE_KEYS,
-    is_valid_section,
-    section_label,
+    parse_sections,
+    sections_label,
     stream_cache_key,
 )
 from scripts import backfill_sections
@@ -57,6 +57,7 @@ from api.db_constants import (
     MONGO_OR,
     MONGO_GT,
     MONGO_GTE,
+    MONGO_IN,
     MONGO_LTE,
 )
 
@@ -557,17 +558,25 @@ def rss_feed():
     limit = int(request.args.get("limit", 100))  # Default to 100 items for RSS
     limit = min(max(limit, 1), 500)  # Clamp between 1-500
 
-    # Stream section (#266). No parameter keeps the full stream so existing
+    # Stream sections (#266): one or several, comma-separated (#344). No
+    # parameter, or every section, is the full stream, so existing
     # subscribers are unaffected.
-    section = request.args.get("section") or None
-    if section is not None and not is_valid_section(section):
-        abort(400, description=f"section must be one of: {', '.join(SECTIONS)}")
+    try:
+        sections = parse_sections(request.args.get("section"))
+    except ValueError:
+        abort(
+            400,
+            description=(
+                "section must be one or more of: "
+                f"{', '.join(SECTIONS)} (comma-separated)"
+            ),
+        )
     # Caching: the RSS default limit and the Stream page's limit are cached,
     # per section (#308); any other limit is served uncached. Only the items
     # are cached: the channel header carries the request's own URL, so it is
     # built for every response instead of being served from whoever happened
     # to fill the cache.
-    cache_key = stream_cache_key(section, limit)
+    cache_key = stream_cache_key(sections, limit)
     redis_client = None
     items_xml = None
     if cache_key is not None:
@@ -582,8 +591,13 @@ def rss_feed():
         # Query CouchDB directly for RSS
         # Requires index on 'published' (or 'section', 'published') field
         selector = {"published": {MONGO_GT: None}}
-        if section:
-            selector = {"section": section, "published": {MONGO_GT: None}}
+        if len(sections) == 1:
+            selector = {"section": sections[0], "published": {MONGO_GT: None}}
+        elif sections:
+            selector = {
+                "section": {MONGO_IN: list(sections)},
+                "published": {MONGO_GT: None},
+            }
         rss_articles = query_couchdb(
             "articles",
             selector=selector,
@@ -616,11 +630,11 @@ def rss_feed():
 
     channel_title = "Moirai Aggregated Stream"
     channel_description = "Aggregated news stream with AI-synthesized Events and Trends"
-    if section:
-        channel_title = f"{channel_title} — {section_label(section)}"
-        channel_description = (
-            f"{channel_description} ({section_label(section)} section)"
-        )
+    if sections:
+        label = sections_label(sections)
+        noun = "section" if len(sections) == 1 else "sections"
+        channel_title = f"{channel_title} — {label}"
+        channel_description = f"{channel_description} ({label} {noun})"
 
     # Every interpolated value is escaped: request.url carries the query
     # string, and its "&" made the feed malformed for any request with two

@@ -85,6 +85,65 @@ def test_invalid_section_is_rejected(client):
     query.assert_not_called()
 
 
+# ── Several sections at once (#344) ───────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "value", ["culture,sports", "sports,culture", "sports, culture,"]
+)
+def test_several_sections_share_one_query_and_cache_key(client, value):
+    test_client, query, redis = client
+    res = test_client.get(f"/api/stream.rss?section={value}")
+
+    assert res.status_code == 200
+    selector = query.call_args.kwargs["selector"]
+    assert selector["section"] == {"$in": ["sports", "culture"]}
+    assert "published" in selector
+    assert redis.get.call_args.args[0] == "stream_rss_items:sports,culture"
+    assert redis.setex.call_args.args[0] == "stream_rss_items:sports,culture"
+    body = res.get_data(as_text=True)
+    assert "<title>Moirai Aggregated Stream — Sports, Culture</title>" in body
+    assert "(Sports, Culture sections)" in body
+
+
+def test_every_section_is_the_whole_stream(client):
+    test_client, query, redis = client
+    res = test_client.get("/api/stream.rss?section=business,main,culture,sports")
+
+    assert res.status_code == 200
+    assert "section" not in query.call_args.kwargs["selector"]
+    assert redis.setex.call_args.args[0] == "stream_rss_items"
+    assert "<title>Moirai Aggregated Stream</title>" in res.get_data(as_text=True)
+
+
+def test_empty_section_is_the_whole_stream(client):
+    test_client, query, _ = client
+    res = test_client.get("/api/stream.rss?section=")
+
+    assert res.status_code == 200
+    assert "section" not in query.call_args.kwargs["selector"]
+
+
+def test_one_unknown_section_among_several_is_rejected(client):
+    test_client, query, _ = client
+    res = test_client.get("/api/stream.rss?section=sports,news")
+    assert res.status_code == 400
+    query.assert_not_called()
+
+
+def test_parse_sections():
+    from tasks.sections import parse_sections
+
+    assert parse_sections(None) == ()
+    assert parse_sections("") == ()
+    assert parse_sections(" , ") == ()
+    assert parse_sections("business,main") == ("main", "business")
+    assert parse_sections("sports,sports") == ("sports",)
+    assert parse_sections("main,sports,culture,business") == ()
+    with pytest.raises(ValueError, match="news"):
+        parse_sections("news,sports")
+
+
 def test_feed_update_accepts_category():
     assert FeedUpdateRequest(title="HS", category="sports").category == "sports"
     assert FeedUpdateRequest(title="HS").category is None
@@ -226,6 +285,22 @@ def test_every_cached_stream_key_is_invalidated():
     assert stream_cache_key("sports", 100) == "stream_rss_items:sports"
     assert stream_cache_key(None, 100) == "stream_rss_items"
     assert stream_cache_key("sports", 50) is None
+
+    # Several sections (#344): every proper subset has one key, in SECTIONS
+    # order, and all sections are the whole stream.
+    from itertools import combinations
+
+    for size in range(1, len(SECTIONS)):
+        for choice in combinations(SECTIONS, size):
+            for limit in STREAM_CACHED_LIMITS:
+                key = stream_cache_key(choice, limit)
+                assert key in STREAM_CACHE_KEYS
+                assert key == stream_cache_key(tuple(reversed(choice)), limit)
+    assert stream_cache_key(("culture", "sports"), 200) == (
+        "stream_rss_items:sports,culture@200"
+    )
+    assert stream_cache_key(SECTIONS, 100) == "stream_rss_items"
+    assert len(STREAM_CACHE_KEYS) == len(set(STREAM_CACHE_KEYS))
 
 
 # ── The feed is well-formed XML for every query (#343) ────────────────────────
