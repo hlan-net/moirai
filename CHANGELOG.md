@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Documentation follows the Stream-only UI
+Documents about views that #375 removed are in `docs/archive/`: the Dashboard UX plan and its deployment notes, the two issue wizard documents and the pointer interaction design for the draggable chat. `AGENTS.md` no longer carries the mythology tables (Olympians, Titans, Zeitgeist); it states what Moirai is, the state of the UI and the rules that must not be missed, and points to `CLAUDE.md`, which is now the one place where conventions are written. `GEMINI.md` and `.github/copilot-instructions.md` point to the same two files instead of repeating them in older versions. The tutorials, `docs/architecture.md` and `docs/readme.md` describe the UI as it is (Stream, Login, Settings; the UI on port 8088; feeds in Settings), and `docs/observability-intervention-ui.md` says that its page design predates this UI.
+
 ### Stream: a side column for conversation, events and trends (#376)
 A logged-in reader can open one subject beside the stream: an article ("Discuss" on its row) or an event or trend (the event and trend dots, or the list on an article). The column shows the subject, with the conversation about it below. Changing the subject or closing the column (the button, Escape or Back) neither reloads the page nor refetches the stream. The subject is in the address (`?open=issue:<id>`), the column follows the text direction, and on a narrow screen it covers the stream. A conversation is stored in the chat history and continues when its subject is opened again. Without a login the page offers none of this and makes no request beyond the stream's.
 

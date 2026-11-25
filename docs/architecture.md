@@ -41,10 +41,10 @@ The core abstraction is the **Hourglass**: articles are grains of sand (raw sign
   - `list_issues` — query active or eternal issues by longevity
 
 ### 2.5 Frontend (Vue.js 3)
-- **Role:** Administrative dashboard for human operators.
-- **Features:** Feeds, articles, issues management; aggregated stream view; chat interface; namespace filtering.
-- **Contextual chat:** Dashboard cards can open contextual chat (article/issue/feed), persisted to `chat_history` and resumable from `/chat`.
-- **Issue raise wizard:** Article contextual chat includes a guided issue-raise flow with clarifying questions for generic/reusable issue framing.
+- **Role:** The reader. Three views: Stream, Login and Settings. The Dashboard, Lifespan, Chat, Agents, Sessions and Mythology views were removed in v0.12.0 (#375); their backend remains, and functions return as parts of the Stream page.
+- **Stream:** The aggregated article flow by section, read from `/api/stream.rss`. Public when `ALLOW_PUBLIC_READ=true`.
+- **Side column:** For a logged-in reader, one subject beside the stream: an article, an event or a trend, with a conversation about it persisted to `chat_history` (#376).
+- **Settings:** User settings, feed management (the Feeds tab) and, for an admin, system settings with the model catalog.
 - **Technology:** Vue 3, TypeScript, Pinia, Vite.
 
 ### 2.6 Nginx (Reverse Proxy)
@@ -58,7 +58,7 @@ The core abstraction is the **Hourglass**: articles are grains of sand (raw sign
 - **`issues`** — emergent issues (unified store, replaces legacy `events` and `trends`).
 - **`config`** — system configuration and worker state (e.g., `enrichment_last_seq`).
 - **`chat_history`** — agent conversation history.
-  - Includes contextual session metadata for dashboard-origin chats.
+  - A session names its subject (`context_type`, `entity_id`), so a conversation continues when the subject is opened again.
 - **`users`** — user accounts.
 
 ---
@@ -112,8 +112,8 @@ LLM Agent (via MCP)
   → writes/updates issues DB
 
 UI / API
-  → human operator reviews feeds, articles, issues
-  → interacts with agent via chat
+  → reader follows the Stream (/api/stream.rss)
+  → logged in: opens an article, event or trend beside it and talks about it
 ```
 
 ---

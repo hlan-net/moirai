@@ -1,5 +1,7 @@
 # Observability & Intervention UI
 
+> **Status (2026-11):** the backend described here exists. The UI does not: a sessions list and a session detail shipped in v0.8.2 and were removed with the other views in v0.12.0 (#375), and the approvals inbox was never built. The separate pages and the top navigation described below no longer fit a UI that is Stream, Login and Settings. The concepts (sessions, approvals, cancellation) stand; where they appear has to be decided again. See `ROADMAP.md`, "Visible Agents".
+
 ## Overview
 Moirai's `AgentOrchestrator` dispatches scheduled and event-driven agents on behalf of the human in a userspace. As soon as agents act autonomously — annotating articles, raising issues, deleting stale entities, posting to social — a human needs two things they did not need when the platform was purely passive: **visibility** into what the agent did, and **control** when something looks wrong.
 
