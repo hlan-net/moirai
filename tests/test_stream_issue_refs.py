@@ -228,6 +228,71 @@ def test_issue_detail_is_served_to_a_reader_who_may_read(public_read, logged_in)
     assert res.get_json() == {"_id": "ev-1"}
 
 
+# ── An issue of another userspace ─────────────────────────────────────────────
+
+OTHER = {"_id": "ev-9", "logos": "Elsewhere", "userspace": "other-space"}
+DEFAULT = {"_id": "ev-1", "logos": "Here", "userspace": "default-space"}
+
+
+def _get_issue(issue_id, *, logged_in, may_access, path_suffix=""):
+    def fake_verify():
+        if logged_in:
+            g.user_id = "u1"
+            g.user_role = "user"
+        return logged_in, ""
+
+    docs = {
+        "ev-9": OTHER,
+        "ev-1": DEFAULT,
+        "tr-1": {
+            "_id": "tr-1",
+            "userspace": "default-space",
+            "premises": [
+                {"type": "issue", "id": "ev-1"},
+                {"type": "issue", "id": "ev-9"},
+            ],
+        },
+    }
+    with (
+        patch("api.routes.get_public_read_setting", return_value=True),
+        patch("api.routes.verify_jwt_in_request", side_effect=fake_verify),
+        patch("api.routes.get_default_userspace", return_value="default-space"),
+        patch("api.routes.can_access_userspace", return_value=may_access) as access,
+        patch("api.routes.fetch_from_couchdb", side_effect=lambda db, i: docs.get(i)),
+    ):
+        res = app.test_client().get(f"/api/issues/{issue_id}{path_suffix}")
+    return res, access
+
+
+def test_issue_of_the_default_userspace_is_readable_without_an_ownership_check():
+    res, access = _get_issue("ev-1", logged_in=False, may_access=False)
+    assert res.status_code == 200
+    access.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "logged_in,may_access,status",
+    [(False, True, 404), (True, False, 404), (True, True, 200)],
+)
+def test_issue_of_another_userspace_needs_a_caller_who_may_use_it(
+    logged_in, may_access, status
+):
+    res, access = _get_issue("ev-9", logged_in=logged_in, may_access=may_access)
+
+    assert res.status_code == status
+    if logged_in:
+        assert access.call_args.args == ("other-space", "u1", "user")
+
+
+def test_nested_issues_of_another_userspace_are_left_out():
+    res, _ = _get_issue(
+        "tr-1", logged_in=True, may_access=False, path_suffix="?expand=issues"
+    )
+
+    assert res.status_code == 200
+    assert [n["id"] for n in res.get_json()["nested_issues"]] == ["ev-1"]
+
+
 # ── Chat sessions of one subject ──────────────────────────────────────────────
 
 

@@ -23,7 +23,12 @@ from .db import (
     count_docs,
 )
 from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
-from .userspace_ops import get_userspace, resolve_llm_config
+from .userspace_ops import (
+    can_access_userspace,
+    get_default_userspace,
+    get_userspace,
+    resolve_llm_config,
+)
 from .llm.aisa import aisa_status
 from .llm import catalog as llm_catalog
 from .llm.catalog import PURPOSE_SOCIAL_EXPORT
@@ -788,11 +793,28 @@ def get_issue(issue_id):
         return response
 
     issue = fetch_from_couchdb("issues", issue_id)
-    if not issue:
+    # An issue of a userspace the caller may not use is reported as missing.
+    if not issue or not _may_read_issue(issue):
         abort(404, description=ERROR_ISSUE_NOT_FOUND)
     if request.args.get("expand") == "issues":
         issue["nested_issues"] = _nested_issue_summaries(issue)
     return jsonify(issue)
+
+
+def _may_read_issue(issue: dict) -> bool:
+    """Whether the caller may read this issue, by its userspace.
+
+    Issues of the deployment's default userspace are readable by whoever may
+    read at all. An issue of another (legacy) userspace needs a logged-in
+    caller who owns that userspace or is an admin (``can_access_userspace``).
+    """
+    userspace = issue.get("userspace")
+    if not userspace or userspace == get_default_userspace():
+        return True
+    success, _ = verify_jwt_in_request()
+    return success and can_access_userspace(
+        userspace, getattr(g, "user_id", None), getattr(g, "user_role", None)
+    )
 
 
 # Upper bound on the nested issues one GET /api/issues/<id>?expand=issues resolves.
@@ -815,7 +837,7 @@ def _nested_issue_summaries(issue: dict) -> list[dict]:
         if not re.match(r"^[A-Za-z0-9\-_]+$", str(premise["id"])):
             continue
         child = fetch_from_couchdb("issues", premise["id"])
-        if not child:
+        if not child or not _may_read_issue(child):
             continue
         summaries.append(
             {
