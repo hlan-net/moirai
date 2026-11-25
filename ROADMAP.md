@@ -20,7 +20,7 @@ Three principles flow from that vision:
 
 | Version | Highlights |
 |---|---|
-| **v0.12.0** | The UI is the Stream page, Login and Settings (#375): the Dashboard, Lifespan, Chat, Agents, Sessions and Mythology views are removed from the frontend, their backend stays. Feed management moves to a Feeds tab in Settings. |
+| **v0.12.x** | The UI is the Stream page, Login and Settings (#375): the Dashboard, Lifespan, Chat, Agents, Sessions and Mythology views are removed from the frontend, their backend stays. Feed management moves to a Feeds tab in Settings. In v0.12.1 the first functions return to the Stream page: a side column for a conversation about an article, an event or a trend (#376), and search (#377). |
 | **v0.11.x** | Stream sections: Top stories, Sports, Culture, Business, several at once from one menu. Stream page served from the `stream.rss` cache. Python 3.12. MCP Python SDK 2.x; agents can call tools. Pooled CouchDB connections; bounded whole-database reads. Formatting enforced in CI; Python pins visible to Dependabot. |
 | **v0.10.x** | Single implicit userspace (MCP, REST API, UI). Model catalog for annotation, chat, agents and social export, editable in the admin UI. Bounded feed-fetch pool. Security and dependency updates. |
 | **v0.9.x** | AISA in-cluster inference proxy as an LLM provider. Closed annotation topic vocabulary and re-annotation at backlog scale. Scheduler and worker split from the API. Issues model ("The Fates", 2nd iteration). |
@@ -51,8 +51,8 @@ Since v0.12.0 the UI is the Stream page, Login and Settings (#375). The views th
 
 | Issue | What | Status |
 |---|---|---|
-| #376 | **Side column** for a conversation about an article, or for an event or a trend, beside the stream | Merged, unreleased |
-| #377 | **Search** from the Stream page, for a logged-in reader | Merged, unreleased |
+| #376 | **Side column** for a conversation about an article, or for an event or a trend, beside the stream | Shipped in v0.12.1 |
+| #377 | **Search** from the Stream page, for a logged-in reader | Shipped in v0.12.1 |
 | #378 | **One row for a story covered by several sources** | Open |
 | #379 | **Share an article to Bluesky**, with the post text reviewed before sending | Open |
 | #309 | **Convergence feed**: an RSS output of subjects several sources pick up, alongside `stream.rss` | Idea, not scheduled |
