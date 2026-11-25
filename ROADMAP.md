@@ -20,7 +20,8 @@ Three principles flow from that vision:
 
 | Version | Highlights |
 |---|---|
-| **v0.11.x** | Stream sections: Top stories, Sports, Culture, Business. Stream page served from the `stream.rss` cache. Python 3.12. Formatting enforced in CI; Python pins visible to Dependabot. |
+| **v0.12.0** | The UI is the Stream page, Login and Settings (#375): the Dashboard, Lifespan, Chat, Agents, Sessions and Mythology views are removed from the frontend, their backend stays. Feed management moves to a Feeds tab in Settings. |
+| **v0.11.x** | Stream sections: Top stories, Sports, Culture, Business, several at once from one menu. Stream page served from the `stream.rss` cache. Python 3.12. MCP Python SDK 2.x; agents can call tools. Pooled CouchDB connections; bounded whole-database reads. Formatting enforced in CI; Python pins visible to Dependabot. |
 | **v0.10.x** | Single implicit userspace (MCP, REST API, UI). Model catalog for annotation, chat, agents and social export, editable in the admin UI. Bounded feed-fetch pool. Security and dependency updates. |
 | **v0.9.x** | AISA in-cluster inference proxy as an LLM provider. Closed annotation topic vocabulary and re-annotation at backlog scale. Scheduler and worker split from the API. Issues model ("The Fates", 2nd iteration). |
 | **v0.8.1** | Hotfix: worker memory bump (OOMKill), Gemini chat context preamble + copy/download fix. |
@@ -35,27 +36,43 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the latest release and the full history.
 
 ## 🎯 Current priorities
 
-After the v0.8.x agent-observability arc and with the Stream page in good shape, the work order is **"finish what we started, fix the boring stuff, defer the moonshots"**:
+Since v0.12.0 the UI is the Stream page, Login and Settings (#375). The views that were removed keep their backend, and their functions return selectively as parts of the Stream page. The work order is **"bring functions back to the Stream, finish what we started, fix the boring stuff, defer the moonshots"**:
 
-1. **Finish observability & intervention** — wire the dashboard to the v0.8.0 backend, ship operational metrics + alerts.
-2. **Reader polish** — opportunistic, small. No headline work; only when real friction emerges.
+1. **The Stream as the whole UI** — return the functions of the removed views as parts of the Stream page (#376 to #379).
+2. **Finish observability & intervention** — give the v0.8.0 backend a place in the reduced UI, ship operational metrics + alerts.
 3. **Foundation** — security hardening and deployment UX. Overdue.
 4. **Agentic autonomy (deferred)** — Plan-Execute-Reflect, persistent agent memory. Last.
 
 ---
 
-## 🚀 Next up: Visible Agents
+## 🚀 Next up: The Stream as the whole UI
 
-> This was planned as v0.9.0. The v0.9–v0.11 releases shipped other work (see "What's shipped"), so it is not yet assigned to a version.
+**Focus:** What the removed views did comes back where the reader already is, one function at a time, each when it has a place on the Stream page.
+
+| Issue | What | Status |
+|---|---|---|
+| #376 | **Side column** for a conversation about an article, or for an event or a trend, beside the stream | Merged, unreleased |
+| #377 | **Search** from the Stream page, for a logged-in reader | In review (PR #385) |
+| #378 | **One row for a story covered by several sources** | Open |
+| #379 | **Share an article to Bluesky**, with the post text reviewed before sending | Open |
+| #309 | **Convergence feed**: an RSS output of subjects several sources pick up, alongside `stream.rss` | Idea, not scheduled |
+
+#378 and #309 need the same answer to "are these two articles the same story"; whatever decides it should serve both.
+
+---
+
+## 🔭 After that: Visible Agents
+
+> This was planned as v0.9.0. The v0.9–v0.12 releases shipped other work (see "What's shipped"), so it is not yet assigned to a version.
 
 **Focus:** Make the v0.8.0 agent observability/intervention work usable by the human in the loop, and surface platform health to the operator.
 
 ### Track 1 — Observability & Intervention UI
-See [`docs/observability-intervention-ui.md`](docs/observability-intervention-ui.md) for full conceptual treatment.
+See [`docs/observability-intervention-ui.md`](docs/observability-intervention-ui.md) for the conceptual treatment. That document describes separate `/sessions` and `/approvals` pages. A Sessions list and session detail shipped in v0.8.2 and were removed with the other views in #375, so the shape below has to be decided again as parts of the Stream page or Settings before it is built.
 
-- **Sessions list** (`/sessions`) — first-class navigation destination listing recent agent and chat sessions for the active userspace.
-- **Session detail** (`/sessions/:id`) — timeline of steps (LLM calls, tool calls, approval gates) for a single run, with a Cancel action while running.
-- **Approvals inbox** (`/approvals`) — pending approval requests across the user's userspaces, with a count badge on the nav link. Approve / Deny posts to the existing backend.
+- **Sessions list** — recent agent and chat sessions for the active userspace.
+- **Session detail** — timeline of steps (LLM calls, tool calls, approval gates) for a single run, with a Cancel action while running.
+- **Approvals inbox** — pending approval requests with a count badge. Approve / Deny posts to the existing backend.
 
 No backend changes — every endpoint is already in place from v0.8.0.
 
@@ -101,23 +118,25 @@ See [`docs/metrics-and-alerting.md`](docs/metrics-and-alerting.md) for full conc
 These are not version-pinned; they accumulate as the platform grows.
 
 ### Reader Experience
-The Stream page is the product's primary surface. It is **explicitly not** a database to be queried (no in-stream search/filter, no keyboard navigation) and **explicitly not** an inbox (no read/unread, no save/archive). Improvements should sharpen the flow itself: feed health, deduplication, image rendering, mobile layout, density.
+The Stream page is the product's primary surface, and since v0.12.0 the only reading UI. It is **explicitly not** an inbox (no read/unread, no save/archive). The earlier rule that it is not a database to be queried has been relaxed: the section menu (#344) chooses what flows, and search (#377) lets a logged-in reader find an article, with the stream kept loaded underneath. Keyboard shortcuts for moving through the stream remain out of scope. Improvements should sharpen the flow itself: feed health, deduplication (#378), image rendering, mobile layout, density.
 
-- **[Stream Sections](docs/stream-sections.md):** Four newspaper-style tabs — Top stories (default), Sports, Culture, Business. A fixed editorial split of the flow, assigned at ingestion from feed category and link path (annotation topic as fallback), not a reader-composed filter. Implemented for #266 (unreleased); the closed topic vocabulary (#249) serves the fallback.
+- **[Stream Sections](docs/stream-sections.md):** Four newspaper-style tabs — Top stories (default), Sports, Culture, Business. A fixed editorial split of the flow, assigned at ingestion from feed category and link path (annotation topic as fallback), not a reader-composed filter. Shipped in v0.11.x (#266); since v0.11.5 several sections can be chosen at once from one menu (#344). The closed topic vocabulary (#249) serves the fallback.
 
 ### Input Diversity & Precision
-- **[Pointer Interaction Support](docs/pointer-interaction-wacom-touch.md):** Continued work on Wacom, touch, and mouse parity across the interactive dashboard.
+- **[Pointer Interaction Support](docs/pointer-interaction-wacom-touch.md):** Wacom, touch, and mouse parity. Written for the Dashboard, which #375 removed; it now applies to the Stream page and its side column.
 
 ### Architectural Foundations
 - **MCP Tool Standardization** — shipped in v0.8.0 (standardized `MCPResponse` envelope across all tools).
 - **[Configuration Management](docs/settings-store-refactoring.md):** Centralized settings.
 
 ### Wizard & Capture
+Issue creation had its UI in the views #375 removed; the backend remains. Both items wait for a place on the Stream page (the side column, #376, is the likely one).
+
 - **[Form-Based Issue Wizard](docs/proposal-form-wizard.md):** Traditional UI alternative for structured issue creation.
 - **[Issue Raise Wizard Refinement](docs/issue-raise-wizard.md):** Continued tuning of the LLM-driven path.
 
 ### Social
-- **[Social Export (Bluesky)](docs/social-export-bluesky.md):** Shipped in v0.7.0; reframed as "share something from the reader / from an issue," not "publish agent output."
+- **[Social Export (Bluesky)](docs/social-export-bluesky.md):** Shipped in v0.7.0 for issues; reframed as "share something from the reader / from an issue," not "publish agent output." The issue share lost its UI in #375; sharing an article from the Stream page is #379.
 
 ---
 
