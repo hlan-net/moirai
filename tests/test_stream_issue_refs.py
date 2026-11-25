@@ -181,13 +181,24 @@ def test_issue_detail_expands_its_nested_issues_on_request():
             ],
         },
     }
+
+    def find(db, selector, limit=None):
+        return [docs[i] for i in selector["_id"]["$in"] if i in docs]
+
     with (
         patch("api.routes.get_public_read_setting", return_value=True),
         patch("api.routes.fetch_from_couchdb", side_effect=lambda db, i: docs.get(i)),
+        patch("api.routes.query_couchdb", side_effect=find) as query,
     ):
         plain = app.test_client().get("/api/issues/tr-1")
+        query.assert_not_called()
         expanded = app.test_client().get("/api/issues/tr-1?expand=issues")
 
+    # All nested issues come from one query, whatever their number.
+    query.assert_called_once()
+    assert query.call_args.kwargs["selector"] == {
+        "_id": {"$in": ["ev-1", "gone", "../bad id"]}
+    }
     assert "nested_issues" not in plain.get_json()
     assert expanded.status_code == 200
     assert expanded.get_json()["nested_issues"] == [
@@ -259,6 +270,12 @@ def _get_issue(issue_id, *, logged_in, may_access, path_suffix=""):
         patch("api.routes.get_default_userspace", return_value="default-space"),
         patch("api.routes.can_access_userspace", return_value=may_access) as access,
         patch("api.routes.fetch_from_couchdb", side_effect=lambda db, i: docs.get(i)),
+        patch(
+            "api.routes.query_couchdb",
+            side_effect=lambda db, selector, limit=None: [
+                docs[i] for i in selector["_id"]["$in"] if i in docs
+            ],
+        ),
     ):
         res = app.test_client().get(f"/api/issues/{issue_id}{path_suffix}")
     return res, access

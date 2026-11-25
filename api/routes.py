@@ -827,16 +827,23 @@ def _nested_issue_summaries(issue: dict) -> list[dict]:
     A trend's articles are those of its events; the Stream page's side column
     asks for them with ``?expand=issues`` (#376). One level is resolved.
     """
+    held_ids = [
+        str(premise["id"])
+        for premise in issue.get("premises") or []
+        if premise.get("type") == "issue" and premise.get("id")
+    ][:NESTED_ISSUES_LIMIT]
+    if not held_ids:
+        return []
+
+    # One query for all of them, then back into the order of the premises.
+    children = query_couchdb(
+        "issues", selector={"_id": {MONGO_IN: held_ids}}, limit=len(held_ids)
+    )
+    children_by_id = {child.get("_id"): child for child in children}
+
     summaries = []
-    for premise in issue.get("premises") or []:
-        if premise.get("type") != "issue" or not premise.get("id"):
-            continue
-        if len(summaries) >= NESTED_ISSUES_LIMIT:
-            break
-        # fetch_from_couchdb() aborts the request on an id it does not accept.
-        if not re.match(r"^[A-Za-z0-9\-_]+$", str(premise["id"])):
-            continue
-        child = fetch_from_couchdb("issues", premise["id"])
+    for held_id in held_ids:
+        child = children_by_id.get(held_id)
         if not child or not _may_read_issue(child):
             continue
         summaries.append(
@@ -1276,8 +1283,6 @@ def search_articles_endpoint():
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
 
-    import re
-
     safe_query = re.escape(query)
 
     date_from = request.args.get("from", "")
@@ -1432,8 +1437,6 @@ def search_issues_endpoint():
     query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
-
-    import re
 
     safe_query = re.escape(query)
 
