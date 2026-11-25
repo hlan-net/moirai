@@ -552,6 +552,52 @@ def _cache_articles_view(response_data):
         logger.error(f"Redis cache set error: {e}")
 
 
+def _feed_title_map() -> dict:
+    """Feed URL -> feed title, for the <source> of an RSS item."""
+    return {
+        feed.get("url"): feed.get("title")
+        for feed in fetch_from_couchdb("feeds")
+        if feed.get("url")
+    }
+
+
+def _rss_items_xml(rss_articles: list) -> str:
+    """The <item> elements of the articles, with their issues attached."""
+    enrich_articles_with_issues(rss_articles)
+    feed_title_map = _feed_title_map()
+    return "\n".join(
+        generate_rss_item_xml(article, feed_title_map, parse_datetime_safe)
+        for article in rss_articles
+    )
+
+
+def _rss_response(
+    items_xml: str, channel_title: str, channel_description: str
+) -> Response:
+    """An RSS 2.0 document around the given items.
+
+    Every interpolated value is escaped: request.url carries the query
+    string, and its "&" made the feed malformed for any request with two
+    parameters, which is every request of the Stream page (#343).
+    """
+    build_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")
+    rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:moirai="{MOIRAI_RSS_NS}">
+  <channel>
+    <title>{xml_escape(channel_title)}</title>
+    <link>{xml_escape(request.host_url)}</link>
+    <description>{xml_escape(channel_description)}</description>
+    <language>en</language>
+    <lastBuildDate>{build_date}</lastBuildDate>
+    <atom:link href={xml_quoteattr(request.url)} rel="self" type="application/rss+xml" />
+
+{items_xml}
+
+  </channel>
+</rss>"""
+    return Response(rss_xml, mimetype="application/rss+xml")
+
+
 @api_blueprint.route("/stream.rss", methods=["GET"])
 def rss_feed():
     """Generate RSS 2.0 feed for the aggregated article stream. Public endpoint (no auth required)."""
@@ -611,28 +657,13 @@ def rss_feed():
             sort=[{"published": "desc"}],
         )
 
-        # Enrichment
-        enrich_articles_with_issues(rss_articles)
-
-        # Pre-fetch feed info for title mapping
-        feeds = fetch_from_couchdb("feeds")
-        feed_title_map = {
-            feed.get("url"): feed.get("title") for feed in feeds if feed.get("url")
-        }
-
-        items_xml = "\n".join(
-            generate_rss_item_xml(article, feed_title_map, parse_datetime_safe)
-            for article in rss_articles
-        )
+        items_xml = _rss_items_xml(rss_articles)
 
         if redis_client:
             try:
                 redis_client.setex(cache_key, 3600, items_xml)
             except Exception as e:
                 logger.error(f"Redis cache set error: {e}")
-
-    # Get current datetime for feed metadata
-    build_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S %z")
 
     channel_title = "Moirai Aggregated Stream"
     channel_description = "Aggregated news stream with AI-synthesized Events and Trends"
@@ -642,25 +673,7 @@ def rss_feed():
         channel_title = f"{channel_title} — {label}"
         channel_description = f"{channel_description} ({label} {noun})"
 
-    # Every interpolated value is escaped: request.url carries the query
-    # string, and its "&" made the feed malformed for any request with two
-    # parameters, which is every request of the Stream page (#343).
-    rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:moirai="{MOIRAI_RSS_NS}">
-  <channel>
-    <title>{xml_escape(channel_title)}</title>
-    <link>{xml_escape(request.host_url)}</link>
-    <description>{xml_escape(channel_description)}</description>
-    <language>en</language>
-    <lastBuildDate>{build_date}</lastBuildDate>
-    <atom:link href={xml_quoteattr(request.url)} rel="self" type="application/rss+xml" />
-
-{items_xml}
-
-  </channel>
-</rss>"""
-
-    return Response(rss_xml, mimetype="application/rss+xml")
+    return _rss_response(items_xml, channel_title, channel_description)
 
 
 @api_blueprint.route("/articles/<article_id>", methods=["DELETE"])
@@ -1274,86 +1287,95 @@ def get_stats():
 # --- Search Endpoints ---
 
 
+SEARCH_RESULT_LIMIT = 200
+SEARCH_FIELDS = ("title", "summary", "content")
+ERROR_SEARCH_FORMAT = "format must be json or rss"
+ERROR_SEARCH_DATE = (
+    "Invalid {name} format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
+)
+
+
+def _search_date(name: str) -> str | None:
+    """The ISO form of the `from` or `to` parameter, or None when it is absent."""
+    value = request.args.get(name, "")
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).isoformat()
+    except ValueError:
+        abort(400, description=ERROR_SEARCH_DATE.format(name=f"date_{name}"))
+
+
+def _search_selector(query: str) -> dict:
+    """Articles whose title, summary or content holds the text, newest first.
+
+    The text is matched literally and without regard to case. `published`
+    is always part of the selector, so the sort can use its index.
+    """
+    pattern = f"(?i){re.escape(query)}"
+    published = {MONGO_GT: None}
+    date_from = _search_date("from")
+    date_to = _search_date("to")
+    if date_from:
+        published = {MONGO_GTE: date_from}
+    if date_to:
+        published[MONGO_LTE] = date_to
+    return {
+        "published": published,
+        MONGO_OR: [{field: {MONGO_REGEX: pattern}} for field in SEARCH_FIELDS],
+    }
+
+
 @api_blueprint.route("/articles/search", methods=["GET"])
 @jwt_required
 @limiter.limit("20 per minute")
 def search_articles_endpoint():
-    """Search articles by keyword with optional date filters"""
+    """Search articles by keyword with optional date filters, newest first.
+
+    `format=rss` answers with the items of /api/stream.rss (section,
+    annotations, events and trends), so the Stream page shows the results as
+    its own rows (#377); the default is a JSON summary.
+    """
     query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
 
-    safe_query = re.escape(query)
-
-    date_from = request.args.get("from", "")
-    date_to = request.args.get("to", "")
+    result_format = request.args.get("format", "json")
+    if result_format not in ("json", "rss"):
+        abort(400, description=ERROR_SEARCH_FORMAT)
 
     try:
         limit = int(request.args.get("limit", 50))
     except ValueError:
         abort(400, description=ERROR_LIMIT_INTEGER)
+    limit = min(max(limit, 1), SEARCH_RESULT_LIMIT)
 
-    if limit > 200:
-        limit = 200
+    articles = query_couchdb(
+        "articles",
+        selector=_search_selector(query),
+        limit=limit,
+        sort=[{"published": "desc"}],
+    )
 
-    # Build Mango selector for efficient querying
-    selector = {
-        MONGO_OR: [
-            {"title": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"description": {MONGO_REGEX: f"(?i){safe_query}"}},
-            {"content": {MONGO_REGEX: f"(?i){safe_query}"}},
-        ]
-    }
-
-    # Add date range filters if provided
-    if date_from:
-        try:
-            from_dt = datetime.fromisoformat(date_from)
-            selector["published"] = {MONGO_GTE: from_dt.isoformat()}
-        except ValueError:
-            return (
-                jsonify(
-                    {
-                        "error": "Invalid date_from format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
-                    }
-                ),
-                400,
-            )
-
-    if date_to:
-        try:
-            to_dt = datetime.fromisoformat(date_to)
-            # Combine with existing published filter if from_dt exists
-            if "published" in selector:
-                selector["published"][MONGO_LTE] = to_dt.isoformat()
-            else:
-                selector["published"] = {MONGO_LTE: to_dt.isoformat()}
-        except ValueError:
-            return (
-                jsonify(
-                    {
-                        "error": "Invalid date_to format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
-                    }
-                ),
-                400,
-            )
-
-    # Query CouchDB with selector
-    articles = query_couchdb("articles", selector=selector, limit=limit)
-
-    results = []
-    for article in articles:
-        results.append(
-            {
-                "_id": article.get("_id"),
-                "title": article.get("title", "Untitled"),
-                "link": article.get("link", ""),
-                "published": article.get("published", ""),
-                "feed_url": article.get("feed_url", ""),
-                "feed_title": article.get("feed_title", "Unknown"),
-                "description": article.get("description", "")[:200],
-            }
+    if result_format == "rss":
+        return _rss_response(
+            _rss_items_xml(articles),
+            f"Moirai Search — {query}",
+            f"Articles that mention {query}",
         )
+
+    results = [
+        {
+            "_id": article.get("_id"),
+            "title": article.get("title", "Untitled"),
+            "link": article.get("link", ""),
+            "published": article.get("published", ""),
+            "feed_url": article.get("feed_url", ""),
+            "feed_title": article.get("feed_title", "Unknown"),
+            "description": (article.get("summary") or "")[:200],
+        }
+        for article in articles
+    ]
 
     return jsonify({"total": len(results), "query": query, "results": results})
 

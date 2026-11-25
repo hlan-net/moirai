@@ -8,8 +8,10 @@ import { useAuthStore } from '../stores/auth'
 import StreamViewMenu from './StreamViewMenu.vue'
 import StreamSidePanel from './StreamSidePanel.vue'
 import { type SubjectRef, formatSubject, parseSubject, sameSubject } from '../utils/streamSubject'
+import { SEARCH_LIMIT, SEARCH_MAX_LENGTH, parseSearchQuery, searchUrl } from '../utils/streamSearch'
 import {
   DEFAULT_SECTIONS,
+  SECTIONS,
   type SectionKey,
   formatSectionsValue,
   isWholeStream,
@@ -44,8 +46,24 @@ const selectedSectionsModel = computed({
   set: (keys: SectionKey[]) => selectSections(keys),
 })
 
-const articles = ref<Article[]>([])
+const authStore = useAuthStore()
+const isAuthenticated = computed(() => authStore.isAuthenticated)
+
+// Search (#377): the `q` query parameter replaces the list with the articles
+// that mention it, from every section and beyond the newest of the stream.
+// Logged-in users only, like every request other than the stream's (#376).
+// The stream stays loaded underneath, so clearing the search shows it as it
+// was, without a request.
+const searchQuery = computed(() => (isAuthenticated.value ? parseSearchQuery(route.query.q) : ''))
+const searchInput = ref(searchQuery.value)
+const searchResults = ref<Article[]>([])
+const searchLoading = ref(false)
+const searchError = ref('')
+
+const streamArticles = ref<Article[]>([])
+const articles = computed(() => (searchQuery.value ? searchResults.value : streamArticles.value))
 const loading = ref(true)
+const viewLoading = computed(() => (searchQuery.value ? searchLoading.value : loading.value))
 const fetchingUpdates = ref(false)
 const totalCount = ref(0)
 const expandedArticles = ref<Set<string>>(new Set())
@@ -53,8 +71,6 @@ const isHighDensity = ref(true)
 const groupMode = ref<GroupMode>('feed')
 const newArticleCount = ref(0)
 const { resolveTheme, setTheme } = useTheme()
-const authStore = useAuthStore()
-const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 let refreshInterval: number | null = null
 
@@ -250,6 +266,9 @@ const rssSubscribeUrl = computed(() =>
   sectionQuery.value ? `/api/stream.rss?${sectionQuery.value}` : '/api/stream.rss'
 )
 const emptyMessage = computed(() => {
+  if (searchQuery.value) {
+    return searchError.value || `No articles mention “${searchQuery.value}”.`
+  }
   if (isWholeStream(selectedSections.value)) return 'No articles found in the stream.'
   return selectedSections.value.length === 1
     ? 'No articles in this section yet.'
@@ -267,7 +286,7 @@ const fetchStream = async (isManual = false) => {
   const isCurrent = () => requestId === latestRequest
   // Only a first load or a tab switch shows the loading state: a background
   // poll of an empty section must not flash it over the empty-state message.
-  if (isManual && articles.value.length === 0) {
+  if (isManual && streamArticles.value.length === 0) {
     loading.value = true
   }
   fetchingUpdates.value = true
@@ -280,13 +299,13 @@ const fetchStream = async (isManual = false) => {
     if (!isCurrent()) return
     const parsed = parseRssFeed(xmlText)
 
-    if (articles.value.length === 0 || isManual) {
+    if (streamArticles.value.length === 0 || isManual) {
       // Initial load or manual refresh: replace entirely
-      articles.value = parsed
+      streamArticles.value = parsed
       totalCount.value = parsed.length
     } else {
       // Auto-refresh: count new articles silently without changing the display
-      const existingIds = new Set(articles.value.map((a) => a._id))
+      const existingIds = new Set(streamArticles.value.map((a) => a._id))
       const newItems = parsed.filter((a) => !existingIds.has(a._id))
 
       if (newItems.length > 0) {
@@ -309,7 +328,11 @@ const fetchStream = async (isManual = false) => {
 const openSubject = computed<SubjectRef | null>(() =>
   isAuthenticated.value ? parseSubject(route.query.open) : null
 )
-const articlesByLink = computed(() => new Map(articles.value.map((a) => [a.link, a])))
+// The stream and the search results together: an open article stays known
+// when the list under it changes from one to the other.
+const articlesByLink = computed(
+  () => new Map([...streamArticles.value, ...searchResults.value].map((a) => [a.link, a]))
+)
 const subjectArticle = computed(() => {
   const subject = openSubject.value
   return subject?.type === 'article' ? (articlesByLink.value.get(subject.link) ?? null) : null
@@ -317,7 +340,7 @@ const subjectArticle = computed(() => {
 // An article subject waits for the first load, so that a shared link does
 // not flash "no longer in the stream" before the stream has arrived.
 const showSidePanel = computed(
-  () => openSubject.value !== null && !(openSubject.value.type === 'article' && loading.value)
+  () => openSubject.value !== null && !(openSubject.value.type === 'article' && viewLoading.value)
 )
 
 // The control of the stream that last opened the column gets the focus back
@@ -369,7 +392,80 @@ const openFromDot = (article: Article, kind: IssueRef['kind'], event: Event) => 
   )
 }
 
+// Like the stream's requests, only the latest search may write its result.
+let latestSearch = 0
+
+const runSearch = async () => {
+  const query = searchQuery.value
+  const requestId = ++latestSearch
+  const isCurrent = () => requestId === latestSearch
+  searchError.value = ''
+  if (!query) {
+    searchResults.value = []
+    searchLoading.value = false
+    return
+  }
+  searchLoading.value = true
+  try {
+    const response = await authFetch(searchUrl(query))
+    if (!response.ok) {
+      throw new Error(`Search failed: ${response.status}`)
+    }
+    const xmlText = await response.text()
+    if (!isCurrent()) return
+    searchResults.value = parseRssFeed(xmlText)
+  } catch (error) {
+    if (!isCurrent()) return
+    console.error('Error searching articles:', error)
+    searchResults.value = []
+    searchError.value = 'The search failed. Try again in a moment.'
+  } finally {
+    if (isCurrent()) searchLoading.value = false
+  }
+}
+
+// The URL is the state: the field, Back and a shared link all end up here.
+watch(searchQuery, (query) => {
+  searchInput.value = query
+  expandedArticles.value = new Set()
+  hideDotDetails()
+  void runSearch()
+})
+
+const submitSearch = () => {
+  const query = parseSearchQuery(searchInput.value)
+  if (query === searchQuery.value) {
+    // The same search again is a refresh of its results.
+    if (query) void runSearch()
+    return
+  }
+  const rest = { ...route.query }
+  delete rest.q
+  void router.push({ query: query ? { ...rest, q: query } : rest })
+}
+
+const clearSearch = () => {
+  searchInput.value = ''
+  submitSearch()
+}
+
+// "12 results · Search: “derby”"; a full page of results may not be all of them.
+const searchSummary = computed(() => {
+  const name = `Search: “${searchQuery.value}”`
+  if (searchLoading.value) return name
+  const count = searchResults.value.length
+  const more = count >= SEARCH_LIMIT ? '+' : ''
+  return `${count}${more} ${count === 1 ? 'result' : 'results'} · ${name}`
+})
+
+const sectionLabel = (article: Article) =>
+  SECTIONS.find((section) => section.key === article.section)?.label
+
 const refreshAndReset = () => {
+  if (searchQuery.value) {
+    void runSearch()
+    return
+  }
   newArticleCount.value = 0
   void fetchStream(true)
 }
@@ -384,7 +480,7 @@ const selectSections = (keys: SectionKey[]) => {
   const value = formatSectionsValue(keys)
   storeSections(keys)
   void router.replace({ query: { ...route.query, sections: value } })
-  articles.value = []
+  streamArticles.value = []
   totalCount.value = 0
   newArticleCount.value = 0
   expandedArticles.value = new Set()
@@ -393,8 +489,11 @@ const selectSections = (keys: SectionKey[]) => {
 }
 
 onMounted(async () => {
+  if (searchQuery.value) void runSearch()
   await fetchStream(true)
   refreshInterval = globalThis.setInterval(() => {
+    // The background check and its badge pause while search results are shown.
+    if (searchQuery.value) return
     // Skip a tick while a fetch is in flight rather than supersede it.
     if (!fetchingUpdates.value) void fetchStream(false)
   }, RSS_REFRESH_MS)
@@ -484,7 +583,10 @@ const toggleTheme = () => {
       <header class="page-header">
         <div class="header-left">
           <h2>Aggregated Stream</h2>
-          <span class="count">
+          <span v-if="searchQuery" class="count" data-testid="search-summary">{{
+            searchSummary
+          }}</span>
+          <span v-else class="count">
             <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
             <span v-else-if="!loading">{{ articles.length }}</span>
             Articles
@@ -492,12 +594,37 @@ const toggleTheme = () => {
               >· {{ sectionSummary }}</span
             >
           </span>
-          <span v-if="fetchingUpdates" class="update-badge">↻</span>
+          <span v-if="fetchingUpdates || searchLoading" class="update-badge">↻</span>
         </div>
         <div class="header-actions">
+          <form
+            v-if="isAuthenticated"
+            class="search-form"
+            role="search"
+            @submit.prevent="submitSearch"
+          >
+            <input
+              v-model="searchInput"
+              type="search"
+              class="search-input"
+              placeholder="Search articles"
+              aria-label="Search articles"
+              :maxlength="SEARCH_MAX_LENGTH"
+            />
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="search-clear"
+              aria-label="Clear the search"
+              title="Clear the search"
+              @click="clearSearch"
+            >
+              ×
+            </button>
+          </form>
           <button
             @click="refreshAndReset"
-            :disabled="fetchingUpdates"
+            :disabled="fetchingUpdates || searchLoading"
             class="refresh-btn"
             :class="{ 'has-new': newArticleCount > 0 }"
             title="Refresh stream"
@@ -517,7 +644,9 @@ const toggleTheme = () => {
         </div>
       </header>
 
-      <div v-if="loading" class="loading">Loading stream...</div>
+      <div v-if="viewLoading" class="loading">
+        {{ searchQuery ? 'Searching...' : 'Loading stream...' }}
+      </div>
 
       <div
         v-else-if="articles.length"
@@ -582,6 +711,12 @@ const toggleTheme = () => {
                   />
                   {{ article.feed_title || getHostname(article.feed_url) }}
                 </span>
+                <!-- A search covers every section, so each result names its own. -->
+                <span
+                  v-if="searchQuery && sectionLabel(article)"
+                  class="inline-source row-section"
+                  >{{ sectionLabel(article) }}</span
+                >
                 <h4 class="item-title compact-title">
                   <a :href="article.link" target="_blank">{{ article.title }}</a>
                 </h4>
@@ -717,6 +852,9 @@ const toggleTheme = () => {
               </div>
               <div class="item-meta">
                 <span class="date">{{ formatDate(article.published) }}</span>
+                <span v-if="searchQuery && sectionLabel(article)" class="row-section">{{
+                  sectionLabel(article)
+                }}</span>
                 <button
                   v-if="isAuthenticated"
                   type="button"
@@ -732,7 +870,7 @@ const toggleTheme = () => {
         </div>
       </div>
 
-      <div v-else class="empty-state">
+      <div v-else class="empty-state" :role="searchError ? 'alert' : undefined">
         {{ emptyMessage }}
       </div>
 
@@ -892,6 +1030,59 @@ const toggleTheme = () => {
 
 .section-summary {
   margin-left: 4px;
+}
+
+.search-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 180px;
+  padding: 6px 26px 6px 10px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.search-input:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 35%, transparent);
+}
+
+/* The page has its own clear button, which also ends the search. */
+.search-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-clear {
+  position: absolute;
+  inset-inline-end: 2px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--text-color);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.search-clear:hover,
+.search-clear:focus-visible {
+  opacity: 1;
+}
+
+.row-section {
+  font-size: 0.75rem;
+  opacity: 0.8;
 }
 
 .update-badge {
@@ -1414,6 +1605,15 @@ const toggleTheme = () => {
   .refresh-btn {
     font-size: 0.8rem;
     padding: 5px 8px;
+  }
+
+  .search-form {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .search-input {
+    width: 100%;
   }
 
   .inline-source {
