@@ -225,6 +225,7 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
             partial_filter=ARTICLE_SEARCH_GAPS_SELECTOR,
         )
     assert _ids(client, "okapi") == []
+    complete_before = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()["_rev"]
 
     assert init.backfill_search_text() == 2
 
@@ -236,8 +237,8 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
     assert (kept["summary"], kept["content"]) == ("an okapi here", "")
     # Nothing is left to do, and complete articles were not touched.
     assert init.backfill_search_text() == 0
-    untouched = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()
-    assert untouched["_rev"].startswith("1-")
+    complete_after = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()["_rev"]
+    assert complete_after == complete_before
 
 
 def test_a_search_still_answers_when_the_index_is_missing(client):
