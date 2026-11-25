@@ -842,8 +842,23 @@ def chat():
 @chat_blueprint.route("/chat/history", methods=["GET"])
 @jwt_required
 def list_chat_history():
-    # Filter by user_id
-    history = query_couchdb("chat_history", {"user_id": g.user_id})
+    """The caller's chat sessions.
+
+    With ``context_type`` and ``entity_id`` only the sessions about that
+    subject, newest first: the Stream page's side column uses this to continue
+    the conversation of an article or an issue (#376).
+    """
+    selector = {"user_id": g.user_id}
+    context_type = request.args.get("context_type")
+    entity_id = request.args.get("entity_id")
+    if context_type or entity_id:
+        if not context_type or not entity_id:
+            abort(400, description="context_type and entity_id go together.")
+        selector["context.type"] = context_type
+        selector["context.entity_id"] = entity_id
+    history = query_couchdb("chat_history", selector)
+    if context_type:
+        history.sort(key=lambda session: session.get("created_at") or "", reverse=True)
     return jsonify(history)
 
 

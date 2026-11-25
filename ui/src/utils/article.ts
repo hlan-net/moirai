@@ -1,5 +1,11 @@
 // An article as the Stream page shows it, parsed from /api/stream.rss.
 
+export interface IssueRef {
+  kind: 'event' | 'trend'
+  name: string
+  id?: string
+}
+
 export interface Article {
   _id: string
   title: string
@@ -14,6 +20,8 @@ export interface Article {
     status: string
   }[]
   events?: string[]
+  // The events and trends with their issue ids, when the feed carries them (#376).
+  issueRefs?: IssueRef[]
   trends?: string[]
   annotations?: {
     topics: string[]

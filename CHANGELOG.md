@@ -6,6 +6,11 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Stream: a side column for conversation, events and trends (#376)
+A logged-in reader can open one subject beside the stream: an article ("Discuss" on its row) or an event or trend (the event and trend dots, or the list on an article). The column shows the subject, with the conversation about it below. Changing the subject or closing the column (the button, Escape or Back) neither reloads the page nor refetches the stream. The subject is in the address (`?open=issue:<id>`), the column follows the text direction, and on a narrow screen it covers the stream. A conversation is stored in the chat history and continues when its subject is opened again. Without a login the page offers none of this and makes no request beyond the stream's.
+
+Backend: `/api/stream.rss` items name the article's events and trends from its issues, each with the issue id in a `moirai:id` attribute. Until now the feed read two fields nothing set, so the event and trend dots never appeared. `GET /api/chat/history` takes `context_type` and `entity_id` to return the sessions of one subject. `GET /api/issues/<id>` now follows `ALLOW_PUBLIC_READ` like the issue list; it had no check.
+
 ### CI: the test stack runs once per commit (#382)
 A push to `main` started the Docker Compose stack and the Playwright suite twice (CI and Docker Dev Build), and a release tag a third time. The tests now run in `ci.yml` only, including the security API tests that the image workflows used to run. The development images are built by a `dev-images` job in `ci.yml` after the tests of the same run pass, and `docker-dev.yml` is gone. `docker-release.yml` waits for a successful CI run of the tagged commit instead of testing it again, and its build reads the registry build cache.
 

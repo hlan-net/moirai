@@ -376,6 +376,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/trusted-types@npm:^2.0.7":
+  version: 2.0.7
+  resolution: "@types/trusted-types@npm:2.0.7"
+  checksum: 10/8e4202766a65877efcf5d5a41b7dd458480b36195e580a3b1085ad21e948bc417d55d6f8af1fd2a7ad008015d4117d5fdfe432731157da3c68678487174e4ba3
+  languageName: node
+  linkType: hard
+
 "@vitejs/plugin-vue@npm:^6.0.11":
   version: 6.0.11
   resolution: "@vitejs/plugin-vue@npm:6.0.11"
@@ -865,6 +872,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dompurify@npm:^3.4.18":
+  version: 3.5.0
+  resolution: "dompurify@npm:3.5.0"
+  dependencies:
+    "@types/trusted-types": "npm:^2.0.7"
+  dependenciesMeta:
+    "@types/trusted-types":
+      optional: true
+  checksum: 10/958811c76d518c10683b78c06701552f3dd5fbc3b2de0070de5ebaa14bfd7587e1e6953e8c60852b87e02ae8e84174666f165849f6940b48efc913379e856423
+  languageName: node
+  linkType: hard
+
 "dunder-proto@npm:^1.0.1":
   version: 1.0.1
   resolution: "dunder-proto@npm:1.0.1"
@@ -1315,6 +1334,15 @@ __metadata:
   dependencies:
     "@jridgewell/sourcemap-codec": "npm:^1.6.0"
   checksum: 10/b5639b23f91f3c683e8cfeedee9933538c19ef63ecd2818285fe47524f831e2643fce5cd6ef0b4093e33505026e671daec14040dafba7d0b781c0b69abb277ac
+  languageName: node
+  linkType: hard
+
+"marked@npm:^18.2.0":
+  version: 18.3.0
+  resolution: "marked@npm:18.3.0"
+  bin:
+    marked: bin/marked.js
+  checksum: 10/d29f3a248b19b2e54334dbdf530709a6de0467b690482ec64079ca6299bcf8fe2c5dde78ada8f36034cda68497283c0e5b38b86e727dcf4c6312d8129909ebaf
   languageName: node
   linkType: hard
 
@@ -1798,8 +1826,10 @@ __metadata:
     "@vitejs/plugin-vue": "npm:^6.0.11"
     "@vue/tsconfig": "npm:^0.9.1"
     axios: "npm:^1.21.1"
+    dompurify: "npm:^3.4.18"
     husky: "npm:^9.0.11"
     lint-staged: "npm:^17.6.1"
+    marked: "npm:^18.2.0"
     pinia: "npm:^4.1.0"
     prettier: "npm:^3.10.1"
     typescript: "npm:~6.0.3"

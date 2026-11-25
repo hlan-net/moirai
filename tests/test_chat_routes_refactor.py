@@ -39,6 +39,14 @@ class TestChatRoutesRefactor(unittest.TestCase):
 
     def tearDown(self):
         self.modules_patcher.stop()
+        # setUp reloaded api.chat_routes with flask, api.db and api.auth
+        # mocked, which left the mocks in the module's namespace: the views
+        # the app serves read their globals from it, so every later test of a
+        # chat route saw a MagicMock for ``request`` and ``g``. Reload once
+        # more against the real modules.
+        import importlib
+
+        importlib.reload(self.chat_routes)
 
     def test_convert_to_openai_tools(self):
         mcp_tool = SimpleNamespace(

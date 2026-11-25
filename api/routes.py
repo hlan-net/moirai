@@ -42,7 +42,7 @@ import uuid  # Import uuid
 
 from api.enrichment import enrich_articles_with_issues, invalidate_feed_mappings_cache
 from api.feed_ops import process_bulk_import_url
-from api.rss_ops import generate_rss_item_xml
+from api.rss_ops import MOIRAI_RSS_NS, generate_rss_item_xml
 from tasks.sections import (
     SECTIONS,
     STREAM_CACHE_KEYS,
@@ -640,7 +640,7 @@ def rss_feed():
     # string, and its "&" made the feed malformed for any request with two
     # parameters, which is every request of the Stream page (#343).
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:moirai="{MOIRAI_RSS_NS}">
   <channel>
     <title>{xml_escape(channel_title)}</title>
     <link>{xml_escape(request.host_url)}</link>
@@ -779,6 +779,13 @@ def create_issue():
 
 @api_blueprint.route("/issues/<issue_id>", methods=["GET"])
 def get_issue(issue_id):
+    # Same rule as the list above. The route had no check at all, and the
+    # stream feed now carries issue ids (#376).
+    if not check_public_read_access():
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        return response
+
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
         abort(404, description=ERROR_ISSUE_NOT_FOUND)
