@@ -87,12 +87,12 @@ jobs:
           -f api/Dockerfile .
         rm -rf /tmp/.buildx-cache
         mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-  
+
   ui-test:
     runs-on: ubuntu-latest
     # A stalled apt mirror once held "Install Playwright Browsers" for 40 minutes.
     timeout-minutes: 30
-    
+
     steps:
     - uses: actions/checkout@v7
 
@@ -106,7 +106,7 @@ jobs:
         key: buildx-${{ runner.os }}-${{ hashFiles('api/Dockerfile', 'environment.yml', 'environment-prod.yml', 'requirements*.txt', 'ui/Dockerfile', 'ui/package.json', 'ui/yarn.lock') }}
         restore-keys: |
           buildx-${{ runner.os }}-
-    
+
     - name: Enable Corepack (Yarn 4)
       # Installed explicitly (pinned, no lifecycle scripts, as in ui/Dockerfile):
       # Node 25+ no longer bundles Corepack, and setup-node's Yarn cache step
@@ -202,3 +202,81 @@ jobs:
         done
         docker compose logs mcp-server
         exit 1
+
+    - name: Run security API tests against the stack
+      # Moved here from the image workflows (#382), which each started this
+      # stack again for them. The tests need only pytest and requests, so a
+      # venv replaces the conda environment; --noconftest skips
+      # tests/conftest.py, which imports the application.
+      env:
+        ADMIN_USERNAME: testuser
+        ADMIN_PASSWORD: testpassword
+        # docker-compose.yml starts the API with rate limiting off.
+        DISABLE_RATE_LIMIT: true
+      run: |
+        python3 -m venv /tmp/security-venv
+        /tmp/security-venv/bin/pip install --quiet \
+          "$(grep '^pytest==' requirements-dev.txt)" \
+          "$(grep '^requests==' requirements.txt)"
+        /tmp/security-venv/bin/pytest --noconftest -m integration tests/test_security_api.py
+
+  # Development images (:main and :sha-<hash>), built once the tests of this
+  # same run have passed. This was the separate "Docker Dev Build" workflow,
+  # which repeated the whole test stack before building (#382).
+  dev-images:
+    needs: [test, ui-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: ghcr.io/${{ github.repository }}
+            context: .
+            file: api/Dockerfile
+          - image: ghcr.io/${{ github.repository }}-ui
+            context: ui
+            file: ui/Dockerfile
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Docker Metadata
+      uses: docker/metadata-action@v6
+      id: docker_meta
+      with:
+        images: ${{ matrix.image }}
+        tags: |
+          type=ref,event=branch
+          type=sha
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v7
+      with:
+        context: ${{ matrix.context }}
+        file: ${{ matrix.file }}
+        push: true
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=registry,ref=${{ matrix.image }}:buildcache
+        cache-to: type=registry,ref=${{ matrix.image }}:buildcache,mode=max
+        tags: ${{ steps.docker_meta.outputs.tags }}
+        labels: ${{ steps.docker_meta.outputs.labels }}
+        build-args: |
+          APP_VERSION=dev
+          BUILD_NUMBER=${{ github.run_number }}
