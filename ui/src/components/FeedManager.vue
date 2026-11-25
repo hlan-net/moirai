@@ -2,8 +2,6 @@
 import { onMounted, ref, computed, watch, nextTick } from 'vue'
 import { getHostname, isValidUrl } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
-import { useFilterStore } from '../stores/filter' // Import the new filter store
-import { useChatContextStore } from '../stores/chatContext'
 import { authFetch } from '../utils/authFetch'
 
 interface Feed {
@@ -30,16 +28,7 @@ const searchQuery = ref('')
 const bulkDeleteMode = ref(false)
 const selectedFeedIds = ref<Set<string>>(new Set())
 
-// Inject feed selection from parent (used in template) - NO LONGER USED, replaced by filterStore
-// const selectedFeedUrl = inject<Ref<string | null>>('selectedFeedUrl', ref(null))
-// const selectFeed = inject<(url: string | null) => void>('selectFeed', () => {})
-// Prevent TS warnings - these are used in template
-// void selectedFeedUrl
-// void selectFeed
-
 const authStore = useAuthStore()
-const filterStore = useFilterStore() // Initialize the filter store
-const chatContextStore = useChatContextStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // Refs for modal accessibility
@@ -81,12 +70,6 @@ const filteredFeeds = computed(() => {
     const category = toSearchable(feed.category)
     return title.includes(query) || url.includes(query) || category.includes(query)
   })
-})
-
-// Computed: Feeds filtered by contextual selection (articles from selected event)
-const contextuallyFilteredFeeds = computed(() => {
-  if (!filterStore.contextualFeedUrls) return filteredFeeds.value
-  return filteredFeeds.value.filter((feed) => filterStore.contextualFeedUrls!.includes(feed.url))
 })
 
 const showNotification = (message: string, type: 'error' | 'success' | 'warning') => {
@@ -136,10 +119,6 @@ const deleteFeed = async (id: string) => {
     const res = await authFetch(`/api/feeds/${id}`, { method: 'DELETE' })
     if (res.ok) {
       feeds.value = feeds.value.filter((f) => f._id !== id)
-      // If the deleted feed was selected, clear the selection
-      if (filterStore.selectedFeedId === id) {
-        filterStore.setSelectedFeedId(null)
-      }
       showNotification('Feed deleted successfully.', 'success')
     } else {
       showNotification('Failed to delete feed', 'error')
@@ -166,7 +145,7 @@ const toggleFeedSelection = (feedId: string) => {
 }
 
 const selectAllFeeds = () => {
-  contextuallyFilteredFeeds.value.forEach((feed) => {
+  filteredFeeds.value.forEach((feed) => {
     selectedFeedIds.value.add(feed._id)
   })
 }
@@ -180,9 +159,6 @@ const deleteSingleFeed = async (feedId: string): Promise<boolean> => {
     const res = await authFetch(`/api/feeds/${feedId}`, { method: 'DELETE' })
     if (!res.ok) return false
     feeds.value = feeds.value.filter((f) => f._id !== feedId)
-    if (filterStore.selectedFeedId === feedId) {
-      filterStore.setSelectedFeedId(null)
-    }
     return true
   } catch (e) {
     console.error(e)
@@ -321,15 +297,6 @@ onMounted(() => {
 
 const openFeedInNewTab = (url: string) => {
   globalThis.open(url, '_blank')
-}
-
-const openFeedChat = (feed: Feed) => {
-  chatContextStore.open(
-    'feed',
-    feed._id,
-    feed as unknown as Record<string, unknown>,
-    'What has this feed been covering recently?'
-  )
 }
 
 const handleFaviconError = (event: Event) => {
@@ -570,30 +537,14 @@ const bulkImportFeeds = async () => {
     bulkImporting.value = false
   }
 }
-
-// Click or Enter/Space on a feed row: select it for bulk deletion in that
-// mode, otherwise toggle it as the active feed filter.
-const activateFeed = (feedId: string) => {
-  if (bulkDeleteMode.value) {
-    toggleFeedSelection(feedId)
-  } else {
-    filterStore.setSelectedFeedId(filterStore.selectedFeedId === feedId ? null : feedId)
-  }
-}
 </script>
 
 <template>
-  <div class="column-container">
+  <div class="feed-manager">
     <div class="column-header">
       <h2>
-        Feeds ({{ contextuallyFilteredFeeds.length
-        }}<span
-          v-if="
-            filterStore.contextualFeedUrls &&
-            contextuallyFilteredFeeds.length !== filteredFeeds.length
-          "
-        >
-          &nbsp;/ {{ filteredFeeds.length }}</span
+        Feeds ({{ filteredFeeds.length
+        }}<span v-if="filteredFeeds.length !== feeds.length">&nbsp;/ {{ feeds.length }}</span
         >)
       </h2>
       <div class="header-actions" v-if="isAdmin">
@@ -656,10 +607,6 @@ const activateFeed = (feedId: string) => {
       </button>
     </div>
 
-    <div v-if="filterStore.contextualFeedUrls" class="context-filter-hint">
-      Showing feeds from selected event
-    </div>
-
     <!-- Bulk Delete Controls -->
     <div v-if="bulkDeleteMode" class="bulk-delete-controls">
       <div class="bulk-select-actions">
@@ -680,19 +627,15 @@ const activateFeed = (feedId: string) => {
     </div>
 
     <div v-if="loading">Loading...</div>
-    <div v-else-if="!contextuallyFilteredFeeds.length && searchQuery" class="no-results">
+    <div v-else-if="!filteredFeeds.length && searchQuery" class="no-results">
       No feeds match "{{ searchQuery }}"
     </div>
-    <ul v-else-if="contextuallyFilteredFeeds.length" class="feed-list">
+    <ul v-else-if="filteredFeeds.length" class="feed-list">
       <li
-        v-for="feed in contextuallyFilteredFeeds"
+        v-for="feed in filteredFeeds"
         :key="feed._id"
         class="feed-item"
-        @click="activateFeed(feed._id)"
-        @keydown.enter.self="activateFeed(feed._id)"
-        @keydown.space.self.prevent="activateFeed(feed._id)"
-        tabindex="0"
-        :class="{ 'selected-feed': filterStore.selectedFeedId === feed._id }"
+        :class="{ 'selected-feed': bulkDeleteMode && selectedFeedIds.has(feed._id) }"
       >
         <div v-if="renamingFeedId === feed._id && isAdmin" class="feed-info">
           <input
@@ -726,17 +669,9 @@ const activateFeed = (feedId: string) => {
               @error="handleFaviconError"
             />
             <span v-else class="feed-favicon-placeholder" aria-label="No icon">📰</span>
-            <button
-              class="feed-name-btn"
-              @click.stop="
-                filterStore.setSelectedFeedId(
-                  filterStore.selectedFeedId === feed._id ? null : feed._id
-                )
-              "
-              :title="feed.url"
-            >
+            <span class="feed-name" :title="feed.url">
               {{ feed.title || getHostname(feed.url) }}
-            </button>
+            </span>
             <a
               :href="feed.url"
               target="_blank"
@@ -786,14 +721,6 @@ const activateFeed = (feedId: string) => {
                 d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"
               />
             </svg>
-          </button>
-          <button
-            v-if="authStore.isAuthenticated"
-            @click="openFeedChat(feed)"
-            class="icon-btn"
-            title="Chat about feed"
-          >
-            💬
           </button>
           <button v-if="isAdmin" @click="startRename(feed)" class="icon-btn" title="Rename Feed">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -923,23 +850,27 @@ const activateFeed = (feedId: string) => {
 </template>
 
 <style scoped>
-.column-container {
-  flex: 1;
+.feed-manager {
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
 h2 {
   margin: 0;
-  color: #42b983;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .feed-list {
   list-style-type: none;
   padding: 0;
+  margin: 0;
   overflow-y: auto;
-  flex: 1;
+  max-height: 60vh;
 }
 
 .no-results {
@@ -956,7 +887,6 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  cursor: pointer;
   transition:
     background-color 0.2s,
     border-left 0.2s;
@@ -989,22 +919,12 @@ h2 {
   flex: 1;
 }
 
-.feed-name-btn {
+.feed-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #42b983;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  padding: 0;
-  font-size: inherit;
-  font-family: inherit;
-}
-.feed-name-btn:hover {
-  text-decoration: underline;
 }
 
 .feed-link-icon {
@@ -1310,14 +1230,6 @@ h2 {
   background: #fff3cd;
   color: #856404;
   border-left: 4px solid #ffc107;
-}
-
-.context-filter-hint {
-  font-size: 0.75rem;
-  opacity: 0.65;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border-color);
-  font-style: italic;
 }
 
 /* Bulk Delete Styles */

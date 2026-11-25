@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
 
-// Feeds column section dropdown (#266): a section change sends only the
+// Feed section dropdown (#266), in Settings > Feeds since #375: a section change sends only the
 // category, and a failed save puts the stored value back in the dropdown.
 
 const feed = {
@@ -10,7 +10,7 @@ const feed = {
   category: 'general',
 }
 
-const mockDashboard = async (page: Page, onPut: (route: Route) => Promise<void>) => {
+const mockSettings = async (page: Page, onPut: (route: Route) => Promise<void>) => {
   await page.addInitScript(() => window.localStorage.setItem('token', 'test-token'))
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url())
@@ -28,12 +28,13 @@ const mockDashboard = async (page: Page, onPut: (route: Route) => Promise<void>)
 
 test('changing a feed section sends only the category', async ({ page }) => {
   let body: Record<string, unknown> | null = null
-  await mockDashboard(page, async (route) => {
+  await mockSettings(page, async (route) => {
     body = route.request().postDataJSON()
     await route.fulfill({ json: { ...feed, category: 'culture' } })
   })
 
-  await page.goto('/#/dashboard')
+  await page.goto('/#/settings')
+  await page.getByRole('button', { name: 'Feeds', exact: true }).click()
   const select = page.locator('.section-select').first()
   await expect(select).toHaveValue('general')
 
@@ -44,9 +45,10 @@ test('changing a feed section sends only the category', async ({ page }) => {
 })
 
 test('a failed section save reverts the dropdown', async ({ page }) => {
-  await mockDashboard(page, (route) => route.fulfill({ status: 500, json: {} }))
+  await mockSettings(page, (route) => route.fulfill({ status: 500, json: {} }))
 
-  await page.goto('/#/dashboard')
+  await page.goto('/#/settings')
+  await page.getByRole('button', { name: 'Feeds', exact: true }).click()
   const select = page.locator('.section-select').first()
   await expect(select).toHaveValue('general')
 

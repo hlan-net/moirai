@@ -14,7 +14,7 @@ Moirai is a GenAI-native press review platform built on the Model Context Protoc
 
 **Issues are the central unit of meaning.** An issue defines its own evaluation cadence: when it should be re-evaluated, what articles are relevant, and how long it remains active. Articles flow into issues; agents act on issues; userspaces provide the capability. Rather than routing every article to every agent, each issue owns its own logic and schedule — making the system issue-centric rather than article-centric.
 
-AI agents use MCP tools to aggregate RSS feeds, synthesize articles into Issues (Events/Trends), and maintain them — all within isolated userspaces (UUID-scoped). A Vue.js dashboard lets humans review the agent's work. A public Mythology page exposes the platform's living structure to unauthenticated visitors using public issues.
+AI agents use MCP tools to aggregate RSS feeds, synthesize articles into Issues (Events/Trends), and maintain them — all within isolated userspaces (UUID-scoped). The Vue.js UI is the Stream page (the aggregated article flow, by section), Login and Settings (#375). The earlier views (Dashboard, Lifespan, Chat, Agents, Sessions, Mythology) were removed from the frontend; their backend (issues, chat, agents, MCP tools) remains, and functions return as parts of the Stream page.
 
 ## Architecture
 
@@ -22,7 +22,7 @@ Three main services:
 
 - **Flask REST API** (`main.py`, `api/`) — port 8088, serves UI and admin CRUD. Uses gunicorn in production, with worker/scheduler started separately via `run_worker.py`.
 - **MCP Server** (`mcp_server.py` → `mcp_service/`) — Starlette/MCPServer SSE server on port 8090. Tool modules live in `mcp_service/tools/` (feeds, issues, search, staleness, users, agent_configs, annotations). Includes Redis cache, **AgentOrchestrator** (distributed leader lock + changes feed for agent dispatch), **AnnotationWorker** (longpoll articles/_changes), and a dedicated Prometheus metrics server on port 9000.
-- **Vue.js 3 UI** (`ui/`) — Vite + TypeScript + Pinia. 4-column admin layout (Feeds, Articles, Events, Trends) with chat interface.
+- **Vue.js 3 UI** (`ui/`) — Vite + TypeScript + Pinia. Three views: Stream (`StreamPage.vue`, public when `ALLOW_PUBLIC_READ=true`), Login, and Settings, which also holds feed management (`FeedManager.vue`). Paths of removed views redirect to the stream.
 
 **Data storage:** CouchDB (databases: `feeds`, `articles`, `issues`/events/trends). Redis for caching (TTL 3600s, invalidated on ingestion/deletion).
 

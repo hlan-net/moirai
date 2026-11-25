@@ -7,8 +7,9 @@ test('has title', async ({ page }) => {
   await expect(page).toHaveTitle(/Moirai/)
 })
 
-test('feeds column loads', async ({ page }) => {
-  await page.goto('/#/dashboard')
+test('feeds load in Settings', async ({ page }) => {
+  await page.goto('/#/settings')
+  await page.getByRole('button', { name: 'Feeds', exact: true }).click()
 
   // Check if the Feeds header exists (with count)
   await expect(page.getByRole('heading', { name: /Feeds \(\d+\)/ })).toBeVisible()

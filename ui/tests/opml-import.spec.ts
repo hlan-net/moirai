@@ -4,7 +4,8 @@ import * as fs from 'fs'
 
 test.describe('OPML Import Functionality', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/#/dashboard')
+    await page.goto('/#/settings')
+    await page.getByRole('button', { name: 'Feeds', exact: true }).click()
     await page.waitForTimeout(1000)
   })
 
