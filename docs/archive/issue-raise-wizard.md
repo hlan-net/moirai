@@ -38,6 +38,6 @@ To ensure reliability, we use simplified tool aliases like `add_event` for agent
 The system message for the chat agent is dynamically updated based on the context. If an article is present, the agent is explicitly told how to handle it, reducing "hallucinations" in tool selection.
 
 ## Future Enhancements
-- **Hybrid Support:** Integrating the [Form-Based Wizard](PROPOSAL_FORM_WIZARD.md) as an alternative for power users.
+- **Hybrid Support:** Integrating the [Form-Based Wizard](proposal-form-wizard.md) as an alternative for power users.
 - **Multi-Source Synthesis:** Expanding the wizard to allow raising issues from multiple articles simultaneously.
 - **Feedback Loops:** Allowing the agent to suggest refinements to the issue title or description based on the user's initial answers.
