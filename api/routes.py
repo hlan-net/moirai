@@ -19,6 +19,7 @@ from .db import (
     update_couchdb_doc_safe,
     query_couchdb,
     store_to_couchdb,
+    count_docs,
 )
 from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
 from .userspace_ops import get_userspace, resolve_llm_config
@@ -74,7 +75,8 @@ ERROR_FEED_NOT_FOUND = "Feed not found"
 ERROR_ISSUE_NOT_FOUND = "Issue not found"
 ERROR_LIMIT_INTEGER = "limit must be an integer"
 ERROR_QUERY_REQUIRED = "Query parameter 'q' is required"
-DESIGN_DOC_PREFIX = "_design/"
+# Upper bound on the public issues the Mythology page lists in one response.
+MYTHOLOGY_PUBLIC_ISSUES_LIMIT = 1000
 
 # Mongo Constants are now imported from api.db_constants
 
@@ -824,10 +826,25 @@ def patch_issue(issue_id):
 @api_blueprint.route("/mythology", methods=["GET"])
 @limiter.limit("60 per minute")
 def get_mythology():
-    """Public endpoint returning platform stats and public issues for the Mythology page."""
-    feeds = fetch_from_couchdb("feeds") or []
-    articles = fetch_from_couchdb("articles") or []
-    all_issues = fetch_from_couchdb("issues") or []
+    """Public endpoint returning platform stats and public issues for the Mythology page.
+
+    The stats are document counts and the issue list is a query for public
+    issues only: the handler never loads whole databases (#369).
+    """
+    public = query_couchdb(
+        "issues",
+        selector={"public": True},
+        limit=MYTHOLOGY_PUBLIC_ISSUES_LIMIT,
+        fields=[
+            "_id",
+            "logos",
+            "description",
+            "longevity",
+            "status",
+            "born_at",
+            "premises",
+        ],
+    )
 
     public_issues = [
         {
@@ -837,28 +854,17 @@ def get_mythology():
             "longevity": i.get("longevity", "transient"),
             "status": i.get("status", "active"),
             "born_at": i.get("born_at"),
-            "premises_count": len(i.get("premises", [])),
+            "premises_count": len(i.get("premises") or []),
         }
-        for i in all_issues
-        if i.get("public") and not i["_id"].startswith(DESIGN_DOC_PREFIX)
+        for i in public
     ]
 
     return jsonify(
         {
             "stats": {
-                "feeds": len(
-                    [f for f in feeds if not f["_id"].startswith(DESIGN_DOC_PREFIX)]
-                ),
-                "articles": len(
-                    [a for a in articles if not a["_id"].startswith(DESIGN_DOC_PREFIX)]
-                ),
-                "issues": len(
-                    [
-                        i
-                        for i in all_issues
-                        if not i["_id"].startswith(DESIGN_DOC_PREFIX)
-                    ]
-                ),
+                "feeds": count_docs("feeds") or 0,
+                "articles": count_docs("articles") or 0,
+                "issues": count_docs("issues") or 0,
             },
             "public_issues": public_issues,
         }

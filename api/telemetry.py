@@ -1,4 +1,5 @@
 import logging
+import os
 import structlog
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -15,6 +16,33 @@ except ModuleNotFoundError:
     FastAPIInstrumentor = None
 
 
+def _span_exporter():
+    """The span exporter chosen by OTEL_TRACES_EXPORTER: none (default), console or otlp.
+
+    Spans used to go to stdout unconditionally, one multi-line JSON object per
+    span including every health probe, which buried the application log (#369).
+    ``otlp`` sends them over OTLP/HTTP; the exporter reads
+    OTEL_EXPORTER_OTLP_ENDPOINT (default http://localhost:4318) itself.
+    """
+    choice = os.environ.get("OTEL_TRACES_EXPORTER", "none").strip().lower()
+    if choice in ("", "none"):
+        return None
+    if choice == "console":
+        return ConsoleSpanExporter()
+    if choice == "otlp":
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+
+        return OTLPSpanExporter()
+    logging.warning(
+        "Unknown OTEL_TRACES_EXPORTER %r; spans are not exported. "
+        "Use none, console or otlp.",
+        choice,
+    )
+    return None
+
+
 def configure_telemetry(app=None, service_name="moirai"):
     """
     Configures OpenTelemetry and Structlog.
@@ -23,8 +51,9 @@ def configure_telemetry(app=None, service_name="moirai"):
 
     # 1. Configure OpenTelemetry
     provider = TracerProvider()
-    processor = BatchSpanProcessor(ConsoleSpanExporter())
-    provider.add_span_processor(processor)
+    exporter = _span_exporter()
+    if exporter is not None:
+        provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
 
     # Instrument requests library (common to both)

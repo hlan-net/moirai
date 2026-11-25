@@ -1,9 +1,12 @@
-from flask import Blueprint, jsonify, request, abort
+from flask import Blueprint, abort, g, jsonify, request
 from datetime import datetime, timezone
 import hashlib
 import json
+from api.auth import verify_request_auth
 from api.db import fetch_from_couchdb, store_to_couchdb, query_couchdb
+from api.db_constants import MONGO_GT, MONGO_GTE
 from api.enrichment import enrich_issues_with_constituents
+from api.extensions import limiter
 from api.validation import (
     EventCreateRequest,
     TrendCreateRequest,
@@ -12,6 +15,27 @@ from api.validation import (
 from pydantic import ValidationError
 
 mcp_blueprint = Blueprint("mcp", __name__)
+
+# Default and maximum number of articles one GET /mcp/articles returns.
+ARTICLES_DEFAULT_LIMIT = 100
+ARTICLES_MAX_LIMIT = 1000
+
+
+@mcp_blueprint.before_request
+def _require_admin():
+    """Every /mcp route needs admin credentials (JWT or Basic) (#369).
+
+    These legacy routes take any userspace from the caller and do no per-userspace
+    ownership check, so they are limited to admins, who may act on every
+    userspace (``can_access_userspace``).
+    """
+    success, message = verify_request_auth()
+    if not success:
+        return jsonify({"message": message}), 401
+    if getattr(g, "user_role", None) != "admin":
+        return jsonify({"message": "Admin privilege required"}), 403
+    return None
+
 
 # Constants for repeated literals
 ERROR_USERSPACE_REQUIRED = "'userspace' query parameter is required"
@@ -123,45 +147,54 @@ def _trend_payload_from_issue(issue):
     return payload
 
 
-def _filter_articles_by_date(articles: list, since_str: str) -> list:
-    """Filter articles by 'since' ISO 8601 timestamp."""
+def _since_utc_iso(since_str: str) -> str:
+    """The 'since' parameter as a UTC ISO 8601 string, comparable with 'published'.
+
+    Articles store ``published`` as ``datetime.isoformat()`` in UTC
+    (``tasks/article_processor.py``), so a string comparison in the Mango
+    selector orders them correctly.
+    """
     try:
         since_dt = datetime.fromisoformat(since_str.replace("Z", "+00:00"))
     except ValueError:
         abort(400, description="Invalid 'since' parameter. Use ISO 8601 format.")
+    if since_dt.tzinfo is None:
+        since_dt = since_dt.replace(tzinfo=timezone.utc)
+    return since_dt.astimezone(timezone.utc).isoformat()
 
-    filtered = []
-    for article in articles:
-        if "published" not in article:
-            continue
-        try:
-            article_dt = datetime.fromisoformat(
-                article["published"].replace("Z", "+00:00")
-            )
-            if article_dt >= since_dt:
-                filtered.append(article)
-        except (ValueError, AttributeError):
-            continue  # Skip articles with invalid date format
-    return filtered
+
+def _articles_limit(limit_str: str | None) -> int:
+    if limit_str is None:
+        return ARTICLES_DEFAULT_LIMIT
+    try:
+        limit = int(limit_str)
+    except ValueError:
+        abort(400, description="'limit' must be an integer.")
+    if not 1 <= limit <= ARTICLES_MAX_LIMIT:
+        abort(400, description=f"'limit' must be between 1 and {ARTICLES_MAX_LIMIT}.")
+    return limit
 
 
 # Articles Endpoints
 
 
 @mcp_blueprint.route("/articles", methods=["GET"])
+@limiter.limit("30 per minute")
 def retrieve_articles():
     """
-    Retrieve articles with optional filtering by date.
+    Retrieve the newest articles, optionally only those published since a date.
     Query Parameters:
-        - since: ISO 8601 timestamp to retrieve articles published after a certain date
+        - since: ISO 8601 timestamp; only articles published at or after it
+        - limit: number of articles, 1 to ARTICLES_MAX_LIMIT (default ARTICLES_DEFAULT_LIMIT)
     """
-    articles = fetch_from_couchdb("articles")
-
-    # Filter by 'since' parameter if provided
     since = request.args.get("since")
-    if since:
-        articles = _filter_articles_by_date(articles, since)
-
+    published = {MONGO_GTE: _since_utc_iso(since)} if since else {MONGO_GT: None}
+    articles = query_couchdb(
+        "articles",
+        selector={"published": published},
+        limit=_articles_limit(request.args.get("limit")),
+        sort=[{"published": "desc"}],
+    )
     return jsonify(articles)
 
 

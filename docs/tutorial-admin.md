@@ -49,6 +49,10 @@ ALLOW_PUBLIC_READ=false
 
 # Optional: Article Retention
 ARTICLE_EXPIRATION_DAYS=30
+
+# Optional: OpenTelemetry spans (none, console or otlp; default none)
+OTEL_TRACES_EXPORTER=none
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318  # for otlp
 ```
 
 #### 3. Start the Stack

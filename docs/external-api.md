@@ -1,7 +1,7 @@
 # External REST API Documentation
 
 ## Note
-This documentation describes the **REST API endpoints** served by the Flask backend (Port 8088) under the `/mcp` prefix. 
+This documentation describes the **REST API endpoints** served by the Flask backend (Port 8088) under the `/mcp` prefix.
 
 **This is NOT the Model Context Protocol (MCP) Server.**
 The actual MCP Server runs on Port 8090 via SSE (Server-Sent Events) and is designed for direct connection with MCP clients (like Claude Desktop or the Moirai Chat Agent).
@@ -12,6 +12,10 @@ These REST endpoints are provided for external non-MCP services or legacy integr
 
 The External API provides a set of RESTful endpoints...
 
+## Authentication
+
+Every `/mcp` endpoint requires admin credentials: a JWT of an admin user in `Authorization: Bearer <token>` (from `POST /api/auth/login`) or HTTP Basic with the admin credentials. Requests without credentials get `401`, and non-admin users get `403`. The endpoints take a `userspace` from the caller without an ownership check, which is why they are admin-only. The Helm chart's nginx forwards only `/api` to the backend, so these endpoints are reachable only inside the cluster.
+
 ## Endpoints
 
 ### Articles
@@ -20,9 +24,10 @@ The External API provides a set of RESTful endpoints...
 
 -   **Method:** `GET`
 -   **Path:** `/mcp/articles`
--   **Description:** Retrieves a list of articles.
+-   **Description:** Retrieves the newest articles, newest first. Rate-limited to 30 requests per minute.
 -   **Query Parameters:**
-    -   `since`: (Optional) A timestamp in ISO 8601 format to retrieve articles published after a certain date.
+    -   `since`: (Optional) An ISO 8601 timestamp; only articles published at or after it. A timestamp without an offset is read as UTC.
+    -   `limit`: (Optional) Number of articles, 1–1000. Default 100.
 -   **Example Response:**
     ```json
     [

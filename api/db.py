@@ -56,6 +56,11 @@ ALLOWED_DBS = {
     "userspaces",
 }
 
+# Databases too large to read whole with document bodies: a full read of
+# ``articles`` (~30 000 documents) took an API pod past its memory limit (#369).
+# Query them with ``query_couchdb`` and a limit, or count with ``count_docs``.
+NO_FULL_READ_DBS = {"articles"}
+
 # Error messages
 ERROR_INVALID_DB_NAME = "Invalid database name."
 
@@ -68,6 +73,12 @@ def fetch_from_couchdb(db_name, doc_id=None):
     # Validate doc_id format if provided
     if doc_id and not re.match(r"^[A-Za-z0-9\-_]+$", doc_id):
         abort(400, description="Invalid document id.")
+
+    if not doc_id and db_name in NO_FULL_READ_DBS:
+        raise ValueError(
+            f"Refusing to read every document of '{db_name}'; "
+            "use query_couchdb() with a limit or count_docs()."
+        )
 
     try:
         if doc_id:
@@ -256,6 +267,32 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
     except requests.exceptions.RequestException as e:
         logger.error(f"Error querying CouchDB: {e}")
         return []
+
+
+def count_docs(db_name: str) -> int | None:
+    """Number of documents in a database, design documents excluded.
+
+    Reads the database info and the design-document index, never the
+    documents themselves. Returns None when CouchDB cannot be reached; a
+    missing database counts as 0.
+    """
+    if db_name not in ALLOWED_DBS:
+        abort(400, description=ERROR_INVALID_DB_NAME)
+
+    db_url = f"{get_couchdb_uri()}{urllib.parse.quote(db_name, safe='')}"
+    try:
+        info = _request("GET", db_url)
+        if info.status_code == 404:
+            return 0
+        info.raise_for_status()
+
+        design = _request("GET", f"{db_url}/_design_docs")
+        design.raise_for_status()
+
+        return info.json().get("doc_count", 0) - len(design.json().get("rows", []))
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error counting documents in {db_name}: {e}")
+        return None
 
 
 def get_user_by_email(email):
