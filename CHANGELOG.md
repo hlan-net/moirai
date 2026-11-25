@@ -27,9 +27,6 @@ The API and the MCP server exported every OpenTelemetry span, health probes incl
 ### Dependency updates (#366, #367, #368)
 openai 3.57, pydantic 2.14.4, ruff 0.17.6 (the pre-commit hook follows), google-auth 2.63 and, in the UI, vue 3.5.46. `tenacity` stays at 9.1.4: google-genai, up to 3.6.1, requires `<9.2`. A Dependabot ignore rule keeps `tenacity >= 9.2` out of its PRs until that cap is lifted.
 
-### Production CouchDB 3.5.3 (#355)
-Not part of the image, recorded here for the deployment history: production CouchDB was upgraded from 3.3.3 to 3.5.3 on 2026-11-24 with the two rollback overrides from #355 (`write_xxhash_checksums=false`, `upgrade_hash_on_auth=false`). Their removal after the soak is tracked in #355. Until then, upgrade the release with `--reuse-values`, which keeps them.
-
 ---
 
 ## [v0.11.3] — 2026-11-24
