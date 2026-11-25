@@ -4,7 +4,7 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.11.5] — 2026-11-25
 
 ### Stream: several sections at once, in one menu (#344)
 The Stream page's header row had five buttons (density, grouping, theme, RSS, refresh) and a row of single-choice section tabs below it. The row now holds Refresh and one menu button. The menu has the sections as checkboxes, the view choices, the theme and *RSS for this view*. The sections in effect are named next to the article count. The choice is kept in the page's URL (`#/stream?sections=sports,culture`) and in the browser, so it survives a reload and a view can be shared. Decisions taken on the issue: a first visit opens on Top stories only, unticking the last section shows the whole stream, and Refresh stays on the row.
