@@ -22,7 +22,7 @@ Three main services:
 
 - **Flask REST API** (`main.py`, `api/`) — port 8088, serves UI and admin CRUD. Uses gunicorn in production, with worker/scheduler started separately via `run_worker.py`.
 - **MCP Server** (`mcp_server.py` → `mcp_service/`) — Starlette/MCPServer SSE server on port 8090. Tool modules live in `mcp_service/tools/` (feeds, issues, search, staleness, users, agent_configs, annotations). Includes Redis cache, **AgentOrchestrator** (distributed leader lock + changes feed for agent dispatch), **AnnotationWorker** (longpoll articles/_changes), and a dedicated Prometheus metrics server on port 9000.
-- **Vue.js 3 UI** (`ui/`) — Vite + TypeScript + Pinia. Three views: Stream (`StreamPage.vue`, public when `ALLOW_PUBLIC_READ=true`; for a logged-in user a side column, `StreamSidePanel.vue` with `SubjectChat.vue`, opens on an article or an issue), Login, and Settings, which also holds feed management (`FeedManager.vue`). Paths of removed views redirect to the stream.
+- **Vue.js 3 UI** (`ui/`) — Vite + TypeScript + Pinia. Three views: Stream (`StreamPage.vue`, public when `ALLOW_PUBLIC_READ=true`; for a logged-in user a side column, `StreamSidePanel.vue` with `SubjectChat.vue`, opens on an article or an issue, and a search field replaces the list with the results of `/api/articles/search?format=rss`), Login, and Settings, which also holds feed management (`FeedManager.vue`). Paths of removed views redirect to the stream.
 
 **Data storage:** CouchDB (databases: `feeds`, `articles`, `issues`/events/trends). Redis for caching (TTL 3600s, invalidated on ingestion/deletion).
 
