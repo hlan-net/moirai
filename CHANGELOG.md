@@ -4,7 +4,7 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.12.1] — 2026-11-25
 
 ### Stream: search (#377)
 A logged-in reader can search from the Stream page's header. The results replace the list as the same rows, newest first, from every section and beyond the newest 200 of the stream; each row names its section, and its dots and "Discuss" work as in the stream. The query is in the address (`?q=`). Clearing it shows the stream as it was, without a reload or a request, and the background check for new articles and its badge pause while results are shown. An article opened in the side column stays open, with the message being written in it, when the search is changed, repeated or cleared. Without a login there is no search field and the query is ignored.

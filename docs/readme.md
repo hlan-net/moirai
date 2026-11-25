@@ -52,6 +52,8 @@ Feeds → Articles → Annotations (LLM) → Stream page (/api/stream.rss)
 
 What is planned, and in what order, is in [`ROADMAP.md`](../ROADMAP.md); what changed is in [`CHANGELOG.md`](../CHANGELOG.md).
 
+**Latest Version:** v0.12.1
+
 ## Archive
 
 [`archive/`](./archive/) holds documents about things that no longer exist, kept for their reasoning: the Dashboard, the issue wizards, the draggable chat, and older architecture plans. Nothing in it describes the current code.
