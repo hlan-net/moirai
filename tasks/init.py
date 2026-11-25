@@ -4,6 +4,7 @@ import datetime
 import logging
 from api.db_config import get_couchdb_uri
 from api.db import _request, get_user_by_email, create_user
+from api.db_constants import ARTICLE_SEARCH_INDEX, ARTICLE_SEARCH_INDEX_FIELDS
 from api.passwords import hash_password
 from .annotator import ANNOTATION_DESIGN_DOC, ANNOTATION_VIEWS
 from .cleanup_task import CleanupTask
@@ -124,9 +125,12 @@ def ensure_db(db_name):
         logger.error(f"Error ensuring database '{db_name}': {e}")
 
 
-def create_index(db_name, fields, name):
+def create_index(db_name, fields, name, ddoc=None):
     url = f"{get_couchdb_uri()}{db_name}/_index"
     payload = {"index": {"fields": fields}, "name": name, "type": "json"}
+    if ddoc:
+        # A named design document, so that a query can ask for this index.
+        payload["ddoc"] = ddoc
     try:
         # Ensure DB exists before index creation
         ensure_db(db_name)
@@ -213,6 +217,13 @@ def init_db():
     create_index("articles", ["published"], "published-index")
     create_index("articles", ["feed_url"], "feed-url-index")
     create_index("articles", ["section", "published"], "section-published-index")
+    # Article search reads this index instead of the documents (#387).
+    create_index(
+        "articles",
+        ARTICLE_SEARCH_INDEX_FIELDS,
+        ARTICLE_SEARCH_INDEX,
+        ddoc=ARTICLE_SEARCH_INDEX,
+    )
     create_index("users", ["email"], "users-email-index")
     create_index("userspaces", ["owner_user_id"], "userspaces-owner-index")
 

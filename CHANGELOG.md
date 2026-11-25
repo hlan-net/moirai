@@ -4,6 +4,17 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [Unreleased / In Development]
+
+### Article search is answered from an index (#387)
+Search (#377) tested every article by loading it. In production (30 000 articles) a search took 19 to 30 seconds, longer than the 10 second request timeout, and the request was then repeated up to three times: a search for a word that matched nothing never completed. Narrowing it would not have helped, since articles expire after 30 days and nearly all of them are inside any useful time window.
+
+The search now reads a Mango index that holds `published`, `title`, `summary` and `content` (`idx_search_text`), so CouchDB tests the text against the index and loads no document. It asks for the ids of the matches only, then fetches those documents in one request (`fetch_docs_by_ids`). Measured on the production database before release: 4 to 6 seconds for a rare word, a common word and a word that matches nothing. The search makes one attempt with a 20 second timeout (`query_couchdb` takes `use_index`, `timeout` and `retry`). What a search finds is unchanged; an article without a `title`, `summary` or `content` field is not in the index, and ingestion always writes all three.
+
+The index is created at start-up (`tasks/init.py`) and by `api/db_indexes.py`. After deploy: CouchDB builds it on the first search, which took about 35 seconds in production, so the first search after the upgrade may fail once. Without the index a search still works, at the old speed.
+
+---
+
 ## [v0.12.1] — 2026-11-25
 
 ### Stream: search (#377)

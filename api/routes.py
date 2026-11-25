@@ -19,6 +19,7 @@ from .db import (
     update_couchdb_doc,
     update_couchdb_doc_safe,
     query_couchdb,
+    fetch_docs_by_ids,
     store_to_couchdb,
     count_docs,
 )
@@ -59,6 +60,8 @@ from tasks.sections import (
 from scripts import backfill_sections
 from api.article_ops import build_article_selector, paginate_results
 from api.db_constants import (
+    ARTICLE_SEARCH_INDEX,
+    ARTICLE_SEARCH_TEXT_FIELDS,
     MONGO_REGEX,
     MONGO_OR,
     MONGO_GT,
@@ -1288,7 +1291,10 @@ def get_stats():
 
 
 SEARCH_RESULT_LIMIT = 200
-SEARCH_FIELDS = ("title", "summary", "content")
+SEARCH_FIELDS = ARTICLE_SEARCH_TEXT_FIELDS
+# A search reads the whole index. One attempt with room to finish: a retry of
+# a slow search only adds a second scan.
+SEARCH_TIMEOUT_SECONDS = 20
 ERROR_SEARCH_FORMAT = "format must be json or rss"
 ERROR_SEARCH_UNAVAILABLE = "The search could not be completed. Try again."
 ERROR_SEARCH_DATE = (
@@ -1312,6 +1318,9 @@ def _search_selector(query: str) -> dict:
 
     The text is matched literally and without regard to case. `published`
     is always part of the selector, so the sort can use its index.
+
+    The selector reads only fields of the search index (#387), so CouchDB
+    answers from the index and loads no document.
     """
     pattern = f"(?i){re.escape(query)}"
     published = {MONGO_GT: None}
@@ -1321,10 +1330,15 @@ def _search_selector(query: str) -> dict:
         published = {MONGO_GTE: date_from}
     if date_to:
         published[MONGO_LTE] = date_to
-    return {
+    selector = {
         "published": published,
         MONGO_OR: [{field: {MONGO_REGEX: pattern}} for field in SEARCH_FIELDS],
     }
+    # Naming every indexed field lets CouchDB choose the search index, which
+    # holds only the documents that have them all.
+    for field in SEARCH_FIELDS:
+        selector[field] = {MONGO_GT: None}
+    return selector
 
 
 @api_blueprint.route("/articles/search", methods=["GET"])
@@ -1351,15 +1365,24 @@ def search_articles_endpoint():
         abort(400, description=ERROR_LIMIT_INTEGER)
     limit = min(max(limit, 1), SEARCH_RESULT_LIMIT)
 
-    # The text match has no index, so a search can time out. That must not
-    # read as "nothing mentions this".
+    # A failed or timed-out search must not read as "nothing mentions this".
+    # Two steps (#387): the ids of the matches from the search index, then
+    # those documents by id. Asking for the documents in the first step would
+    # make CouchDB load every article to test it.
     try:
-        articles = query_couchdb(
+        hits = query_couchdb(
             "articles",
             selector=_search_selector(query),
             limit=limit,
             sort=[{"published": "desc"}],
+            fields=["_id", "published"],
+            use_index=ARTICLE_SEARCH_INDEX,
+            timeout=SEARCH_TIMEOUT_SECONDS,
+            retry=False,
             raise_on_error=True,
+        )
+        articles = fetch_docs_by_ids(
+            "articles", [hit["_id"] for hit in hits], raise_on_error=True
         )
     except requests.exceptions.RequestException:
         abort(503, description=ERROR_SEARCH_UNAVAILABLE)

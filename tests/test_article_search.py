@@ -6,7 +6,7 @@ The route answers with the items of ``/api/stream.rss`` when asked for
 
 import os
 import xml.etree.ElementTree as ET
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault(
     "JWT_SECRET_KEY", "super_secret_test_key_that_is_at_least_32_chars_long"
@@ -17,6 +17,7 @@ os.environ.setdefault("ADMIN_PASSWORD", "test_password_123")
 import pytest  # noqa: E402
 import requests  # noqa: E402
 
+from api import db  # noqa: E402
 from main import app  # noqa: E402
 
 ARTICLE = {
@@ -32,10 +33,16 @@ ARTICLE = {
 
 @pytest.fixture
 def search():
-    """A logged-in client and the mocked article query."""
+    """A logged-in client and the mocked article query.
+
+    The search is two requests (#387): the ids of the matches from the search
+    index (`query`), then those documents (`api.routes.fetch_docs_by_ids`).
+    """
+    hit = {"_id": ARTICLE["_id"], "published": ARTICLE["published"]}
     with (
         patch("api.auth.verify_request_auth", return_value=(True, "")),
-        patch("api.routes.query_couchdb", return_value=[dict(ARTICLE)]) as query,
+        patch("api.routes.query_couchdb", return_value=[hit]) as query,
+        patch("api.routes.fetch_docs_by_ids", return_value=[dict(ARTICLE)]),
         patch(
             "api.routes.fetch_from_couchdb",
             return_value=[{"url": "https://example.com/rss", "title": "Example"}],
@@ -69,6 +76,51 @@ def test_search_matches_title_summary_and_content_newest_first(search):
         {"summary": {"$regex": "(?i)derby"}},
         {"content": {"$regex": "(?i)derby"}},
     ]
+
+
+def test_search_is_answered_from_the_index_then_fetches_the_matches(search):
+    """No document is loaded to test it: ids from the index, then those documents."""
+    client, query, _ = search
+    query.return_value = [
+        {"_id": "a2", "published": "2024-01-02T10:00:00+00:00"},
+        {"_id": "a1", "published": "2024-01-01T10:00:00+00:00"},
+    ]
+    with patch("api.routes.fetch_docs_by_ids", return_value=[dict(ARTICLE)]) as fetch:
+        res = client.get("/api/articles/search?q=derby")
+
+    assert res.status_code == 200
+    kwargs = query.call_args.kwargs
+    assert kwargs["use_index"] == "idx_search_text"
+    # Only fields the index holds may be asked for, or documents are loaded.
+    assert kwargs["fields"] == ["_id", "published"]
+    selector = kwargs["selector"]
+    # Every indexed field is named, or CouchDB will not choose the index.
+    for field in ("title", "summary", "content"):
+        assert selector[field] == {"$gt": None}
+    assert set(selector) == {"published", "title", "summary", "content", "$or"}
+    # Newest first, as the index returned them.
+    fetch.assert_called_once_with("articles", ["a2", "a1"], raise_on_error=True)
+
+
+def test_a_slow_search_is_not_repeated(search):
+    """A timeout means the scan is slow; a retry would start a second one."""
+    client, query, _ = search
+    client.get("/api/articles/search?q=derby")
+
+    kwargs = query.call_args.kwargs
+    assert kwargs["retry"] is False
+    assert kwargs["timeout"] == 20
+
+
+def test_search_fails_when_the_matches_cannot_be_fetched(search):
+    client, _, _ = search
+    with patch(
+        "api.routes.fetch_docs_by_ids",
+        side_effect=requests.exceptions.ConnectionError("down"),
+    ):
+        res = client.get("/api/articles/search?q=derby")
+
+    assert res.status_code == 503
 
 
 def test_search_text_is_matched_literally(search):
@@ -161,3 +213,91 @@ def test_search_failure_is_not_an_empty_result(search, result_format):
 
     assert res.status_code == 503
     assert query.call_args.kwargs["raise_on_error"] is True
+
+
+# --- The CouchDB helpers the search uses (api/db.py) -------------------------
+
+
+def _couch_response(payload: dict) -> MagicMock:
+    res = MagicMock()
+    res.status_code = 200
+    res.json.return_value = payload
+    return res
+
+
+def test_query_names_the_index_and_the_timeout():
+    session = MagicMock()
+    session.request.return_value = _couch_response({"docs": [{"_id": "a1"}]})
+    with patch("api.db.couchdb_session", return_value=session):
+        docs = db.query_couchdb(
+            "articles", {"published": {"$gt": None}}, use_index="idx", timeout=20
+        )
+
+    assert docs == [{"_id": "a1"}]
+    kwargs = session.request.call_args.kwargs
+    assert kwargs["json"]["use_index"] == "idx"
+    assert kwargs["timeout"] == 20
+
+
+@pytest.mark.parametrize("retry,attempts", [(False, 1), (True, 3)])
+def test_query_without_retry_makes_one_attempt(retry, attempts):
+    session = MagicMock()
+    session.request.side_effect = requests.exceptions.Timeout("read timed out")
+    with (
+        patch("api.db.couchdb_session", return_value=session),
+        patch("tenacity.nap.time.sleep"),
+        pytest.raises(requests.exceptions.Timeout),
+    ):
+        db.query_couchdb("articles", {}, retry=retry, raise_on_error=True)
+
+    assert session.request.call_count == attempts
+
+
+def test_fetch_by_ids_keeps_the_order_and_skips_what_is_gone():
+    session = MagicMock()
+    session.request.return_value = _couch_response(
+        {
+            "rows": [
+                {"id": "a2", "doc": {"_id": "a2"}},
+                {"key": "gone", "error": "not_found"},
+                {"id": "dead", "value": {"deleted": True}, "doc": None},
+                {"id": "a1", "doc": {"_id": "a1"}},
+            ]
+        }
+    )
+    with patch("api.db.couchdb_session", return_value=session):
+        docs = db.fetch_docs_by_ids("articles", ["a2", "gone", "dead", "a1"])
+
+    assert docs == [{"_id": "a2"}, {"_id": "a1"}]
+    args, kwargs = session.request.call_args
+    assert args[0] == "POST" and args[1].endswith("articles/_all_docs")
+    assert kwargs["json"] == {"keys": ["a2", "gone", "dead", "a1"]}
+    assert kwargs["params"] == {"include_docs": "true"}
+
+
+def test_fetch_by_ids_makes_no_request_for_no_ids():
+    session = MagicMock()
+    with patch("api.db.couchdb_session", return_value=session):
+        assert db.fetch_docs_by_ids("articles", []) == []
+
+    session.request.assert_not_called()
+
+
+def test_the_search_index_is_created_with_its_design_document():
+    """`use_index` names the design document, so the index needs a fixed one."""
+    from tasks import init
+
+    with (
+        patch("tasks.init.ensure_db"),
+        patch("tasks.init._request", return_value=_couch_response({})) as request,
+    ):
+        init.create_index(
+            "articles",
+            ["published", "title", "summary", "content"],
+            "idx_search_text",
+            ddoc="idx_search_text",
+        )
+
+    payload = request.call_args.kwargs["json"]
+    assert payload["ddoc"] == "idx_search_text"
+    assert payload["index"]["fields"] == ["published", "title", "summary", "content"]
