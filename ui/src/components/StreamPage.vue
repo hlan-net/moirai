@@ -1,9 +1,22 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { type Article } from '../utils/articleCache'
 import { authFetch } from '../utils/authFetch'
 import { useTheme } from '../composables/useTheme'
 import { useAuthStore } from '../stores/auth'
+import StreamViewMenu from './StreamViewMenu.vue'
+import {
+  DEFAULT_SECTIONS,
+  type SectionKey,
+  formatSectionsValue,
+  isWholeStream,
+  parseSectionsValue,
+  readStoredSections,
+  sectionsParam,
+  sectionsSummary,
+  storeSections,
+} from '../utils/streamSections'
 
 interface ArticleGroup {
   title: string
@@ -13,23 +26,21 @@ interface ArticleGroup {
 
 type GroupMode = 'feed' | 'time'
 
-// Stream sections (#266): a fixed editorial split of the flow, not a filter.
-// The page always opens on Top stories; the choice is not remembered.
-type SectionKey = 'main' | 'sports' | 'culture' | 'business'
+// Stream sections (#266, #344): one or several at once, chosen in the menu.
+// The choice comes from the page's URL (?sections=sports,culture or =all),
+// else from the browser, else Top stories; every change is written to both,
+// so it survives a reload and a view can be shared as a link.
+const route = useRoute()
+const router = useRouter()
 
-interface Section {
-  key: SectionKey
-  label: string
-}
-
-const SECTIONS: Section[] = [
-  { key: 'main', label: 'Top stories' },
-  { key: 'sports', label: 'Sports' },
-  { key: 'culture', label: 'Culture' },
-  { key: 'business', label: 'Business' },
-]
-
-const activeSection = ref<SectionKey>('main')
+const selectedSections = ref<SectionKey[]>(
+  parseSectionsValue(route.query.sections) ?? readStoredSections() ?? [...DEFAULT_SECTIONS]
+)
+const sectionSummary = computed(() => sectionsSummary(selectedSections.value))
+const selectedSectionsModel = computed({
+  get: () => selectedSections.value,
+  set: (keys: SectionKey[]) => selectSections(keys),
+})
 
 const articles = ref<Article[]>([])
 const loading = ref(true)
@@ -127,9 +138,6 @@ const groupedArticles = computed(() => {
 
 const resolvedTheme = computed(() => resolveTheme())
 const themeLabel = computed(() => (resolvedTheme.value === 'dark' ? 'Dark' : 'Light'))
-const themeTitle = computed(() =>
-  resolvedTheme.value === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'
-)
 
 const _extractCategories = (item: Element) => {
   const events: string[] = []
@@ -221,10 +229,24 @@ const parseRssFeed = (xmlText: string): Article[] => {
   return Array.from(doc.querySelectorAll('item')).map((item, index) => _parseFeedItem(item, index))
 }
 
-const streamUrl = computed(
-  () => `/api/stream.rss?limit=${RSS_LIMIT}&section=${activeSection.value}`
+const sectionQuery = computed(() => {
+  const param = sectionsParam(selectedSections.value)
+  return param ? `section=${encodeURIComponent(param)}` : ''
+})
+const streamUrl = computed(() =>
+  sectionQuery.value
+    ? `/api/stream.rss?limit=${RSS_LIMIT}&${sectionQuery.value}`
+    : `/api/stream.rss?limit=${RSS_LIMIT}`
 )
-const rssSubscribeUrl = computed(() => `/api/stream.rss?section=${activeSection.value}`)
+const rssSubscribeUrl = computed(() =>
+  sectionQuery.value ? `/api/stream.rss?${sectionQuery.value}` : '/api/stream.rss'
+)
+const emptyMessage = computed(() => {
+  if (isWholeStream(selectedSections.value)) return 'No articles found in the stream.'
+  return selectedSections.value.length === 1
+    ? 'No articles in this section yet.'
+    : 'No articles in these sections yet.'
+})
 
 // Every fetch takes a sequence number; only the latest one may write the
 // list or clear the loading flags, so a superseded request (e.g. after a tab
@@ -278,9 +300,16 @@ const refreshAndReset = () => {
   void fetchStream(true)
 }
 
-const selectSection = (key: SectionKey) => {
-  if (key === activeSection.value) return
-  activeSection.value = key
+const selectSections = (keys: SectionKey[]) => {
+  if (sectionsParam(keys) === sectionsParam(selectedSections.value)) {
+    // Same stream (e.g. all ticked vs. none ticked): keep the ticks, no refetch.
+    selectedSections.value = keys
+    return
+  }
+  selectedSections.value = keys
+  const value = formatSectionsValue(keys)
+  storeSections(keys)
+  void router.replace({ query: { ...route.query, sections: value } })
   articles.value = []
   totalCount.value = 0
   newArticleCount.value = 0
@@ -382,75 +411,11 @@ const toggleTheme = () => {
           <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
           <span v-else-if="!loading">{{ articles.length }}</span>
           Articles
+          <span class="section-summary" data-testid="section-summary">· {{ sectionSummary }}</span>
         </span>
         <span v-if="fetchingUpdates" class="update-badge">↻</span>
       </div>
       <div class="header-actions">
-        <!-- Login Button for Public View -->
-        <button
-          @click="isHighDensity = !isHighDensity"
-          class="density-btn"
-          :title="isHighDensity ? 'Switch to Expanded View' : 'Switch to High Density View'"
-        >
-          <svg v-if="isHighDensity" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z" />
-          </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 4h18v4H3V4zm0 7h18v4H3v-4zm0 7h18v4H3v-4z" />
-          </svg>
-          {{ isHighDensity ? 'Compact' : 'Expanded' }}
-        </button>
-
-        <button
-          @click="groupMode = groupMode === 'feed' ? 'time' : 'feed'"
-          class="density-btn"
-          :title="groupMode === 'feed' ? 'Switch to Time-Blocked' : 'Switch to Feed-Grouped'"
-        >
-          <svg
-            v-if="groupMode === 'feed'"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path
-              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"
-            />
-          </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"
-            />
-          </svg>
-          {{ groupMode === 'feed' ? 'By Feed' : 'By Time' }}
-        </button>
-
-        <button v-if="!isAuthenticated" @click="toggleTheme" class="theme-btn" :title="themeTitle">
-          <svg
-            v-if="resolvedTheme === 'dark'"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M21.64 13.65a9 9 0 0 1-11.29-11.3A9 9 0 1 0 21.64 13.65z" />
-          </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 0 1-2 0V5.5a1 1 0 0 1 1-1zm0 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm0 5.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm7.5-7.5a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H18.5a1 1 0 0 1 1 1zm-14 0a1 1 0 0 1-1-1h-1.5a1 1 0 1 1 0-2H4.5a1 1 0 0 1 1 1zm11.86-5.86a1 1 0 0 1 0-1.41l1.06-1.06a1 1 0 1 1 1.41 1.41l-1.06 1.06a1 1 0 0 1-1.41 0zm-11.31 0a1 1 0 0 1-1.41 0L3.58 5.23a1 1 0 1 1 1.41-1.41l1.06 1.06a1 1 0 0 1 0 1.41zm11.31 11.31a1 1 0 0 1 1.41 0l1.06 1.06a1 1 0 1 1-1.41 1.41l-1.06-1.06a1 1 0 0 1 0-1.41zm-11.31 0a1 1 0 0 1 0 1.41L5 20.27a1 1 0 1 1-1.41-1.41l1.06-1.06a1 1 0 0 1 1.41 0z"
-            />
-          </svg>
-          {{ themeLabel }}
-        </button>
-
-        <a :href="rssSubscribeUrl" class="rss-link" title="Subscribe to RSS feed" target="_blank">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20A2.18 2.18 0 0 1 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"
-            />
-          </svg>
-          RSS
-        </a>
         <button
           @click="refreshAndReset"
           :disabled="fetchingUpdates"
@@ -461,24 +426,17 @@ const toggleTheme = () => {
           {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
           <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
         </button>
+        <StreamViewMenu
+          v-model:sections="selectedSectionsModel"
+          v-model:high-density="isHighDensity"
+          v-model:group-mode="groupMode"
+          :show-theme="!isAuthenticated"
+          :theme-label="themeLabel"
+          :rss-url="rssSubscribeUrl"
+          @toggle-theme="toggleTheme"
+        />
       </div>
     </header>
-
-    <nav class="section-tabs" role="tablist" aria-label="Stream sections">
-      <button
-        v-for="section in SECTIONS"
-        :key="section.key"
-        type="button"
-        role="tab"
-        class="section-tab"
-        :class="{ active: section.key === activeSection }"
-        :aria-selected="section.key === activeSection"
-        :data-section="section.key"
-        @click="selectSection(section.key)"
-      >
-        {{ section.label }}
-      </button>
-    </nav>
 
     <div v-if="loading" class="loading">Loading stream...</div>
 
@@ -652,11 +610,7 @@ const toggleTheme = () => {
     </div>
 
     <div v-else class="empty-state">
-      {{
-        activeSection === 'main'
-          ? 'No articles found in the stream.'
-          : 'No articles in this section yet.'
-      }}
+      {{ emptyMessage }}
     </div>
 
     <Teleport to="body">
@@ -736,6 +690,7 @@ const toggleTheme = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   border-bottom: 2px solid #eee;
   margin-bottom: 20px;
   padding-bottom: 10px;
@@ -743,37 +698,17 @@ const toggleTheme = () => {
 
 .header-left {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 15px;
+  gap: 4px 15px;
+  min-width: 0;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.rss-link {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-color);
-  text-decoration: none;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-.rss-link:hover {
-  background: var(--button-bg);
-  border-color: #ee802f;
-  color: #ee802f;
-}
-
-.rss-link svg {
-  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .page-header h2 {
@@ -785,6 +720,10 @@ const toggleTheme = () => {
   color: var(--text-color);
   opacity: 0.8;
   font-size: 0.9rem;
+}
+
+.section-summary {
+  margin-left: 4px;
 }
 
 .update-badge {
@@ -845,83 +784,6 @@ const toggleTheme = () => {
 .refresh-btn:disabled {
   opacity: 0.6;
   cursor: wait;
-}
-
-.density-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-
-.density-btn:hover,
-.theme-btn:hover {
-  background: var(--button-bg);
-  border-color: var(--primary-color);
-}
-
-.theme-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-
-/* Section tabs (#266): newspaper sections, not a filter */
-.section-tabs {
-  display: flex;
-  gap: 4px;
-  margin: -10px 0 16px;
-  border-bottom: 2px solid var(--border-color);
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex-shrink: 0;
-}
-
-.section-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.section-tab {
-  background: transparent;
-  color: var(--text-color);
-  border: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  padding: 8px 16px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  border-radius: 0;
-  opacity: 0.7;
-  transition: all 0.2s;
-}
-
-.section-tab:hover {
-  background: var(--button-bg);
-  opacity: 1;
-}
-
-.section-tab.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-  opacity: 1;
-  font-weight: 700;
 }
 
 .stream-container {
@@ -1330,14 +1192,12 @@ const toggleTheme = () => {
 
   .header-actions {
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 6px;
     width: 100%;
   }
 
-  .density-btn,
-  .theme-btn,
-  .refresh-btn,
-  .rss-link {
+  .refresh-btn {
     font-size: 0.8rem;
     padding: 5px 8px;
   }

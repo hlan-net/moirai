@@ -22,6 +22,7 @@ and the backfill script can share it.
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import Iterable, Optional
 from urllib.parse import urlsplit
 
@@ -117,22 +118,53 @@ STREAM_DEFAULT_LIMIT = 100
 STREAM_CACHED_LIMITS: tuple[int, ...] = (STREAM_DEFAULT_LIMIT, 200)
 
 
-def stream_cache_key(section: Optional[str], limit: int) -> Optional[str]:
+def parse_sections(value: Optional[str]) -> tuple[str, ...]:
+    """The sections named by ``/api/stream.rss?section=``, in ``SECTIONS`` order.
+
+    ``value`` is a comma-separated list (``sports,culture``, #344). Duplicates
+    and blanks are dropped. An empty value, or every section, is the whole
+    stream and returns ``()``: the sections are a partition, so their union is
+    everything. An unknown name raises ``ValueError``.
+    """
+    names = {part.strip() for part in (value or "").split(",") if part.strip()}
+    unknown = sorted(names - set(SECTIONS))
+    if unknown:
+        raise ValueError(f"unknown section(s): {', '.join(unknown)}")
+    chosen = tuple(section for section in SECTIONS if section in names)
+    return () if len(chosen) == len(SECTIONS) else chosen
+
+
+def stream_cache_key(sections: str | Iterable[str] | None, limit: int) -> Optional[str]:
     """Redis key for the rendered stream items, or ``None`` when ``limit`` is not cached.
 
-    The key space is closed (sections x cached limits) so every key can be
-    listed in ``STREAM_CACHE_KEYS`` and invalidated with one ``DEL``.
+    ``sections`` is one section, several, or none for the whole stream. The key
+    is built from them in ``SECTIONS`` order, so one choice has one key
+    whatever order it was made in. The key space is closed (combinations of
+    sections x cached limits) so every key can be listed in
+    ``STREAM_CACHE_KEYS`` and invalidated with one ``DEL``.
     """
     if limit not in STREAM_CACHED_LIMITS:
         return None
-    key = f"stream_rss_items:{section}" if section else "stream_rss_items"
+    if isinstance(sections, str):
+        sections = (sections,)
+    names = set(sections or ())
+    chosen = [section for section in SECTIONS if section in names]
+    if len(chosen) == len(SECTIONS):
+        chosen = []
+    key = f"stream_rss_items:{','.join(chosen)}" if chosen else "stream_rss_items"
     return key if limit == STREAM_DEFAULT_LIMIT else f"{key}@{limit}"
 
 
+# Every choice of sections that has its own cache entry: the whole stream
+# (``()``) and each proper, non-empty subset of ``SECTIONS``.
+_SECTION_CHOICES: tuple[tuple[str, ...], ...] = tuple(
+    choice for size in range(len(SECTIONS)) for choice in combinations(SECTIONS, size)
+)
+
 STREAM_CACHE_KEYS: tuple[str, ...] = (
     *(
-        stream_cache_key(section, limit)
-        for section in (None, *SECTIONS)
+        stream_cache_key(choice, limit)
+        for choice in _SECTION_CHOICES
         for limit in STREAM_CACHED_LIMITS
     ),
     "articles_default_json",
@@ -286,3 +318,8 @@ def section_label(section: str) -> str:
         SECTION_CULTURE: "Culture",
         SECTION_BUSINESS: "Business",
     }.get(section, section)
+
+
+def sections_label(sections: Iterable[str]) -> str:
+    """Labels of several sections for RSS channel titles: ``Sports, Culture``."""
+    return ", ".join(section_label(section) for section in sections)
