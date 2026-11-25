@@ -141,25 +141,41 @@ def _issue_summary(issue):
     }
 
 
-def _add_parent_issues(article_issue_map, issues, parent_issues):
-    """Attach each parent issue to the articles of the issues it holds."""
+def _article_links_by_issue(issues):
+    """Issue id -> the article links among its premises."""
     links_by_issue = {}
     for issue in issues:
-        for premise in issue.get("premises", []):
-            if premise.get("type") == "message" and premise.get("id"):
-                links_by_issue.setdefault(issue.get("_id"), []).append(premise["id"])
+        links = [
+            premise["id"]
+            for premise in issue.get("premises", [])
+            if premise.get("type") == "message" and premise.get("id")
+        ]
+        if links:
+            links_by_issue[issue.get("_id")] = links
+    return links_by_issue
 
+
+def _add_issue_once(article_issue_map, link, summary):
+    linked = article_issue_map.setdefault(link, [])
+    if all(entry["id"] != summary["id"] for entry in linked):
+        linked.append(summary)
+
+
+def _add_parent_issues(article_issue_map, issues, parent_issues):
+    """Attach each parent issue to the articles of the issues it holds."""
+    links_by_issue = _article_links_by_issue(issues)
     for parent in parent_issues:
         if not parent.get("logos"):
             continue
         summary = _issue_summary(parent)
-        for premise in parent.get("premises", []):
-            if premise.get("type") != "issue":
-                continue
-            for link in links_by_issue.get(premise.get("id"), []):
-                linked = article_issue_map.setdefault(link, [])
-                if all(entry["id"] != summary["id"] for entry in linked):
-                    linked.append(summary)
+        held_ids = [
+            premise.get("id")
+            for premise in parent.get("premises", [])
+            if premise.get("type") == "issue"
+        ]
+        for held_id in held_ids:
+            for link in links_by_issue.get(held_id, []):
+                _add_issue_once(article_issue_map, link, summary)
 
 
 def _build_article_issue_map(issues, parent_issues=()):

@@ -350,10 +350,16 @@ test('a message is not sent to another subject chosen while its session is creat
 
   await discuss(page, 'Opera Premiere').click()
   await expect(panel(page).getByRole('heading', { name: 'Opera Premiere' })).toBeVisible()
+  const created = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/chat/history') && response.request().method() === 'POST'
+  )
   release()
+  await created
+  // Any request the late session might still have set off has gone out by now.
+  await page.waitForLoadState('networkidle')
 
   await expect(panel(page).getByText('Ask about this article…').first()).toBeVisible()
-  await page.waitForTimeout(300)
   expect(calls.chatBodies).toEqual([])
   expect(calls.saved).toEqual([])
   await expect(panel(page).getByText('About the derby')).toHaveCount(0)
