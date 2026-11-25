@@ -7,7 +7,7 @@ Moirai is a GenAI-native press review platform designed for the Model Context Pr
 Moirai acts as a synthesis engine that LLM agents use to analyze news. It consists of:
 
 * **MCP Server (Port 8090):** The primary interface for AI agents. Provides tools to fetch news, create events, and track trends via Server-Sent Events (SSE).
-* **Admin UI (Port 8088):** A Vue.js dashboard for humans to review the agent's work, manage feeds, and visualize the data.
+* **UI (Port 8088):** A Vue.js frontend with the Stream page (the aggregated article flow, by section), Login and Settings, where feeds are managed.
 * **REST API (Port 8088):** The backend for the UI and external integrations.
 
 **Architecture Details:** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -42,31 +42,19 @@ To run the feed scheduler manually (one cycle, then exit):
 docker compose run --rm api python run_scheduler.py
 ```
 
-### 2. Configure Chat
+### 2. Configure the LLM
 
-The UI includes a Chat interface to interact with the Agent.
+Annotation (topics, priority, sentiment) uses an LLM.
 
-1. Go to **Chat** in the UI.
-2. Open **Settings**.
-3. Configure your LLM endpoint (e.g., Ollama at `http://host.docker.internal:11434/v1`) and model (e.g., `llama3.1`).
+1. Log in and open **Settings**.
+2. Configure your LLM endpoint (e.g., Ollama at `http://host.docker.internal:11434/v1`) and model (e.g., `llama3.1`).
 
-Dashboard contextual chat is also available directly from cards:
+### 3. Add feeds and read
 
-- Articles: open chat with article context, and use **Raise as Issue**
-- Issues/Trends: open chat with issue context, and use **Refine Description**
-- Feeds: open chat with feed context
+1. **Add feeds:** Settings → **Feeds**. Add one by one, or import a list or an OPML file. Each feed can be filed under a section (General, Sports, Culture, Business).
+2. **Read:** the **Stream** page shows the articles as they arrive. Its menu chooses the sections, the density and the grouping, and gives an RSS link for the current view.
 
-Contextual chat sessions are persisted and can be resumed from the `/chat` page.
-
-For article issue creation, the dashboard supports a guided **Raise Issue wizard** that asks clarifying questions before submitting a structured issue-creation prompt.
-
-Chat responses expose timing metadata, and the UI shows per-response duration to help identify slow requests.
-
-### 3. Agent Workflow
-
-1. **Add Feeds:** Ask the agent to "Add the RSS feed for Hacker News".
-2. **Synthesize:** Ask the agent to "Check recent articles and create events for major stories".
-3. **Review:** Use the dashboard to see the Events and Trends created by the agent.
+The UI was reduced to these views in 0.12.0. The chat, issue (Events and Trends) and agent functions still exist in the API and the MCP server, and return to the UI as parts of the Stream page.
 
 ## Development
 

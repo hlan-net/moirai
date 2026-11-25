@@ -5,6 +5,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useTheme, type Theme } from '../composables/useTheme'
 import { authFetch } from '../utils/authFetch'
 import ModelCatalogEditor from './ModelCatalogEditor.vue'
+import FeedManager from './FeedManager.vue'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
@@ -589,12 +590,22 @@ onMounted(() => {
       <button :class="['tab-btn', { active: activeTab === 'user' }]" @click="activeTab = 'user'">
         User Settings
       </button>
+      <button :class="['tab-btn', { active: activeTab === 'feeds' }]" @click="activeTab = 'feeds'">
+        Feeds
+      </button>
       <button
         :class="['tab-btn', { active: activeTab === 'system' }]"
         @click="activeTab = 'system'"
       >
         System Settings
       </button>
+    </div>
+
+    <!-- Feeds Tab: feed management, moved here from the Dashboard (#375) -->
+    <div v-if="activeTab === 'feeds'" class="tab-content">
+      <div class="settings-section">
+        <FeedManager />
+      </div>
     </div>
 
     <!-- User Settings Tab -->
@@ -945,7 +956,7 @@ onMounted(() => {
     </div>
     <!-- End System Tab -->
 
-    <div class="actions-bar">
+    <div v-if="activeTab !== 'feeds'" class="actions-bar">
       <button @click="saveSettings" class="save-all-btn">Save All Settings</button>
     </div>
 

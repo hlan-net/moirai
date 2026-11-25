@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { type Article } from '../utils/articleCache'
+import { type Article } from '../utils/article'
 import { authFetch } from '../utils/authFetch'
 import { useTheme } from '../composables/useTheme'
 import { useAuthStore } from '../stores/auth'

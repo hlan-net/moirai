@@ -58,7 +58,7 @@ Moirai is a **GenAI-native press review platform** with three main layers:
 ```
 ┌─────────────────────────────────────────────┐
 │        Vue.js 3 Frontend (port 3000)       │
-│  (Dashboard, feeds, chat, trends)           │
+│  (Stream, Settings with feeds, Login)       │
 └─────────────────────────────────────────────┘
                         ↕
 ┌─────────────────────────────────────────────┐
@@ -140,10 +140,8 @@ Moirai is a **GenAI-native press review platform** with three main layers:
 
 ### For Users
 1. [User Guide](./tutorial-user.md) (15 min)
-2. Create your first issue (5 min)
-3. Ask the chat a question (5 min)
-4. Explore the Lifespan view (5 min)
-5. **Done!** You're ready to use Moirai
+2. Choose your sections in the Stream menu (2 min)
+3. **Done!** You're ready to use Moirai
 
 ### For Admins
 1. [Admin Guide](./tutorial-admin.md) Part 1 (Deployment) (15 min)

@@ -3,7 +3,6 @@ import { onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from './stores/auth'
-import ContextChatModal from './components/ContextChatModal.vue'
 
 const { initTheme } = useTheme()
 const authStore = useAuthStore()
@@ -27,14 +26,8 @@ onMounted(() => {
       <a href="https://github.com/hlan-net/moirai" target="_blank" class="brand">Moirai</a>
       <div class="links">
         <router-link to="/stream" class="nav-link">Stream</router-link>
-        <router-link to="/mythology" class="nav-link">Mythology</router-link>
         <template v-if="isAuthenticated">
-          <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
-          <router-link to="/lifespan" class="nav-link">Lifespan</router-link>
-          <router-link to="/chat" class="nav-link">Chat</router-link>
           <router-link to="/settings" class="nav-link">Settings</router-link>
-          <router-link to="/agents" class="nav-link">Agents</router-link>
-          <router-link to="/sessions" class="nav-link">Sessions</router-link>
           <a href="#" @click.prevent="handleLogout" class="nav-link logout-link">Logout</a>
         </template>
         <template v-else>
@@ -46,12 +39,10 @@ onMounted(() => {
     <div class="content">
       <router-view v-slot="{ Component }">
         <keep-alive>
-          <component :is="Component" msg="Moirai Dashboard" />
+          <component :is="Component" />
         </keep-alive>
       </router-view>
     </div>
-
-    <ContextChatModal />
   </div>
 </template>
 

@@ -1,38 +1,29 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from './stores/auth'
-import MainPage from './components/MainPage.vue'
 import SettingsPage from './components/SettingsPage.vue'
-import ChatPage from './components/ChatPage.vue'
 import StreamPage from './components/StreamPage.vue'
 import LoginPage from './components/LoginPage.vue'
-import AgentManagementPage from './components/AgentManagementPage.vue'
-import LifespanView from './components/LifespanView.vue'
-import MythologyPage from './components/MythologyPage.vue'
-import SessionsPage from './components/SessionsPage.vue'
-import SessionDetailPage from './components/SessionDetailPage.vue'
+
+// The UI is the Stream page, Login and Settings (#375). The views that were
+// removed keep their paths as redirects, so old bookmarks and links land on
+// the stream instead of an empty page.
+const REMOVED_PATHS = [
+  '/dashboard',
+  '/lifespan',
+  '/chat',
+  '/agents',
+  '/sessions',
+  '/sessions/:id',
+  '/mythology',
+]
 
 const routes = [
   { path: '/', component: StreamPage, name: 'Stream' }, // Stream is public-ish (or handled by guard)
-  { path: '/mythology', component: MythologyPage, name: 'Mythology' },
   { path: '/stream', component: StreamPage, name: 'StreamExplicit' }, // Explicit /stream route for navigation
   { path: '/login', component: LoginPage, name: 'Login' },
-  { path: '/dashboard', component: MainPage, name: 'Dashboard', meta: { requiresAuth: true } },
-  { path: '/lifespan', component: LifespanView, name: 'Lifespan', meta: { requiresAuth: true } },
-  { path: '/chat', component: ChatPage, name: 'Chat', meta: { requiresAuth: true } },
   { path: '/settings', component: SettingsPage, name: 'Settings', meta: { requiresAuth: true } },
-  {
-    path: '/agents',
-    component: AgentManagementPage,
-    name: 'AgentManagement',
-    meta: { requiresAuth: true },
-  },
-  { path: '/sessions', component: SessionsPage, name: 'Sessions', meta: { requiresAuth: true } },
-  {
-    path: '/sessions/:id',
-    component: SessionDetailPage,
-    name: 'SessionDetail',
-    meta: { requiresAuth: true },
-  },
+  ...REMOVED_PATHS.map((path) => ({ path, redirect: '/' })),
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({

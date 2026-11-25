@@ -4,6 +4,15 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [Unreleased / In Development]
+
+### The UI is the Stream page, Login and Settings (#375)
+The Stream page is the part of Moirai that is in use. The Dashboard (Feeds, Articles, Events and Trends columns), Lifespan, Chat and the contextual chat, Agents, Sessions and Mythology views are removed from the frontend, with their components, stores and tests. Their paths redirect to the stream. The backend is unchanged: the API routes, the MCP server, issues, chat history and agents remain, and functions return as parts of the Stream page (#376 to #379).
+
+Feed management moves to a **Feeds** tab in Settings (`FeedManager.vue`): list and search, add by bulk or OPML import, rename, delete, refresh, and the section select. Choosing a feed to filter the article column, and chat about a feed, went with the Dashboard.
+
+---
+
 ## [v0.11.5] — 2026-11-25
 
 ### Stream: several sections at once, in one menu (#344)

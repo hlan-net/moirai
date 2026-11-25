@@ -4,7 +4,8 @@ import * as fs from 'fs'
 
 test.describe('OPML Import Functionality', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/#/dashboard')
+    await page.goto('/#/settings')
+    await page.getByRole('button', { name: 'Feeds', exact: true }).click()
     await page.waitForTimeout(1000)
   })
 
@@ -35,7 +36,7 @@ test.describe('OPML Import Functionality', () => {
     await page.waitForSelector('.modal-overlay', { state: 'visible' })
 
     // Upload OPML file
-    const fileInput = page.locator('input[type="file"]')
+    const fileInput = page.locator('.file-upload-section input[type="file"]')
     await fileInput.setInputFiles(testOpmlPath)
 
     // Wait a bit for the file to be processed
@@ -73,7 +74,7 @@ https://example.com/feed3.xml`
     await page.waitForSelector('.modal-overlay', { state: 'visible' })
 
     // Upload text file
-    const fileInput = page.locator('input[type="file"]')
+    const fileInput = page.locator('.file-upload-section input[type="file"]')
     await fileInput.setInputFiles(testTextPath)
 
     // Wait a bit for the file to be processed
@@ -99,7 +100,7 @@ https://example.com/feed3.xml`
     await page.waitForSelector('.modal-overlay', { state: 'visible' })
 
     // Upload invalid file
-    const fileInput = page.locator('input[type="file"]')
+    const fileInput = page.locator('.file-upload-section input[type="file"]')
     await fileInput.setInputFiles(testInvalidPath)
 
     // Wait a bit for the file to be processed
@@ -136,7 +137,7 @@ https://example.com/feed3.xml`
     await page.waitForSelector('.modal-overlay', { state: 'visible' })
 
     // Upload OPML file
-    const fileInput = page.locator('input[type="file"]')
+    const fileInput = page.locator('.file-upload-section input[type="file"]')
     await fileInput.setInputFiles(testEmptyPath)
 
     // Wait a bit for the file to be processed
