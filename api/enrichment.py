@@ -26,7 +26,7 @@ def enrich_articles_with_issues(articles):
 
     issues, (feed_title_map, feed_favicon_map) = _fetch_related_data(article_links)
 
-    article_issue_map = _build_article_issue_map(issues)
+    article_issue_map = _build_article_issue_map(issues, _fetch_parent_issues(issues))
 
     _apply_enrichment(
         articles,
@@ -112,12 +112,65 @@ def _fetch_related_data(article_links):
     return issues, (feed_title_map, feed_favicon_map)
 
 
-def _build_article_issue_map(issues):
-    """Builds article link to issue logos and IDs mapping."""
+def _fetch_parent_issues(issues):
+    """Issues that have one of ``issues`` as a premise: the trends of events.
+
+    A trend usually holds events, not articles, so it is found through the
+    events its articles belong to. One level up is resolved.
+    """
+    issue_ids = [issue["_id"] for issue in issues if issue.get("_id")]
+    if not issue_ids:
+        return []
+    return query_couchdb(
+        "issues",
+        selector={
+            "premises": {
+                MONGO_ELEM_MATCH: {"type": "issue", "id": {MONGO_IN: issue_ids}}
+            }
+        },
+        limit=1000,
+    )
+
+
+def _issue_summary(issue):
+    return {
+        "id": issue.get("_id"),
+        "logos": issue.get("logos"),
+        "longevity": issue.get("longevity"),
+        "status": issue.get("status"),
+    }
+
+
+def _add_parent_issues(article_issue_map, issues, parent_issues):
+    """Attach each parent issue to the articles of the issues it holds."""
+    links_by_issue = {}
+    for issue in issues:
+        for premise in issue.get("premises", []):
+            if premise.get("type") == "message" and premise.get("id"):
+                links_by_issue.setdefault(issue.get("_id"), []).append(premise["id"])
+
+    for parent in parent_issues:
+        if not parent.get("logos"):
+            continue
+        summary = _issue_summary(parent)
+        for premise in parent.get("premises", []):
+            if premise.get("type") != "issue":
+                continue
+            for link in links_by_issue.get(premise.get("id"), []):
+                linked = article_issue_map.setdefault(link, [])
+                if all(entry["id"] != summary["id"] for entry in linked):
+                    linked.append(summary)
+
+
+def _build_article_issue_map(issues, parent_issues=()):
+    """Builds article link to issue logos and IDs mapping.
+
+    ``parent_issues`` are issues that hold some of ``issues`` as premises;
+    they are attached to the articles of those issues.
+    """
     article_issue_map = {}
 
     for issue in issues:
-        issue_id = issue.get("_id")
         issue_logos = issue.get("logos")
         if not issue_logos:
             continue
@@ -127,15 +180,9 @@ def _build_article_issue_map(issues):
                 link = premise.get("id")
                 if link:
                     # Map link -> issue summary info
-                    article_issue_map.setdefault(link, []).append(
-                        {
-                            "id": issue_id,
-                            "logos": issue_logos,
-                            "longevity": issue.get("longevity"),
-                            "status": issue.get("status"),
-                        }
-                    )
+                    article_issue_map.setdefault(link, []).append(_issue_summary(issue))
 
+    _add_parent_issues(article_issue_map, issues, parent_issues)
     return article_issue_map
 
 

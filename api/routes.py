@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, abort, request, Response, g
 import os
+import re
 import json
 import version
 import requests
@@ -789,7 +790,46 @@ def get_issue(issue_id):
     issue = fetch_from_couchdb("issues", issue_id)
     if not issue:
         abort(404, description=ERROR_ISSUE_NOT_FOUND)
+    if request.args.get("expand") == "issues":
+        issue["nested_issues"] = _nested_issue_summaries(issue)
     return jsonify(issue)
+
+
+# Upper bound on the nested issues one GET /api/issues/<id>?expand=issues resolves.
+NESTED_ISSUES_LIMIT = 50
+
+
+def _nested_issue_summaries(issue: dict) -> list[dict]:
+    """The issues an issue holds as premises, each with its article links.
+
+    A trend's articles are those of its events; the Stream page's side column
+    asks for them with ``?expand=issues`` (#376). One level is resolved.
+    """
+    summaries = []
+    for premise in issue.get("premises") or []:
+        if premise.get("type") != "issue" or not premise.get("id"):
+            continue
+        if len(summaries) >= NESTED_ISSUES_LIMIT:
+            break
+        # fetch_from_couchdb() aborts the request on an id it does not accept.
+        if not re.match(r"^[A-Za-z0-9\-_]+$", str(premise["id"])):
+            continue
+        child = fetch_from_couchdb("issues", premise["id"])
+        if not child:
+            continue
+        summaries.append(
+            {
+                "id": child.get("_id"),
+                "logos": child.get("logos"),
+                "longevity": child.get("longevity"),
+                "article_links": [
+                    p["id"]
+                    for p in child.get("premises") or []
+                    if p.get("type") == "message" and p.get("id")
+                ],
+            }
+        )
+    return summaries
 
 
 @api_blueprint.route("/issues/<issue_id>", methods=["DELETE"])

@@ -53,13 +53,22 @@ const ISSUES: Record<string, object> = {
       { type: 'message', id: 'https://elsewhere.example/report' },
     ],
   },
+  // A trend holds events, not articles: its articles come through them.
   'tr-1': {
     _id: 'tr-1',
     logos: 'League finances',
     description: '',
     longevity: 'temporal',
     status: 'active',
-    premises: [],
+    premises: [{ type: 'issue', id: 'ev-1' }],
+    nested_issues: [
+      {
+        id: 'ev-1',
+        logos: 'Derby aftermath',
+        longevity: 'transient',
+        article_links: ['https://example.com/derby', 'https://elsewhere.example/report'],
+      },
+    ],
   },
 }
 
@@ -236,6 +245,11 @@ test('an event opens from its dot, and from the article that lists it', async ({
   await expect(panel(page).getByRole('heading', { name: 'League finances' })).toBeVisible()
   await expect(panel(page).getByText('Trend', { exact: true })).toBeVisible()
   await expect(panel(page).getByText('No description yet.')).toBeVisible()
+  // The trend's articles are those of the event it holds.
+  await expect(panel(page).getByText('2 articles')).toBeVisible()
+  await expect(panel(page).getByRole('link', { name: 'Derby Result' })).toBeVisible()
+  await panel(page).getByRole('button', { name: 'Derby aftermath' }).click()
+  await expect(panel(page).getByRole('heading', { name: 'Derby aftermath' })).toBeVisible()
 })
 
 test('the subject is read from the URL, and Back and Escape close the column', async ({ page }) => {
@@ -249,6 +263,7 @@ test('the subject is read from the URL, and Back and Escape close the column', a
 
   await page.goBack()
   await expect(panel(page).getByRole('heading', { name: 'Derby aftermath' })).toBeVisible()
+  expect(calls.api.some((c) => c === 'GET /api/issues/ev-1?expand=issues')).toBe(true)
 
   await page.keyboard.press('Escape')
   await expect(panel(page)).toHaveCount(0)
@@ -301,4 +316,45 @@ test('in right-to-left text the column is on the left', async ({ page }) => {
   const column = await panel(page).boundingBox()
   const stream = await page.locator('.stream-page').boundingBox()
   expect(column!.x).toBeLessThan(stream!.x)
+})
+
+test('Back returns the focus to the control that opened the column', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/#/stream')
+  await discuss(page, 'Opera Premiere').click()
+  await expect(page.getByRole('button', { name: 'Close the side column' })).toBeFocused()
+
+  await page.goBack()
+
+  await expect(panel(page)).toHaveCount(0)
+  await expect(discuss(page, 'Opera Premiere')).toBeFocused()
+})
+
+test('a message is not sent to another subject chosen while its session is created', async ({
+  page,
+}) => {
+  const calls = await mockApi(page)
+  // Hold the session creation until the reader has moved on.
+  let release: () => void = () => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route('**/api/chat/history', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    await held
+    return route.fulfill({ json: { _id: 'session-late', messages: [] } })
+  })
+
+  await page.goto('/#/stream')
+  await discuss(page, 'Derby Result').click()
+  await panel(page).getByRole('textbox', { name: 'Message' }).fill('About the derby')
+  await panel(page).getByRole('button', { name: 'Send' }).click()
+
+  await discuss(page, 'Opera Premiere').click()
+  await expect(panel(page).getByRole('heading', { name: 'Opera Premiere' })).toBeVisible()
+  release()
+
+  await expect(panel(page).getByText('Ask about this article…').first()).toBeVisible()
+  await page.waitForTimeout(300)
+  expect(calls.chatBodies).toEqual([])
+  expect(calls.saved).toEqual([])
+  await expect(panel(page).getByText('About the derby')).toHaveCount(0)
 })

@@ -15,6 +15,8 @@ interface Issue {
   longevity?: string
   status?: string
   premises?: { type?: string; id?: string }[]
+  // With ?expand=issues: the issues this one holds, e.g. the events of a trend.
+  nested_issues?: { id: string; logos?: string; longevity?: string; article_links: string[] }[]
 }
 
 const props = defineProps<{
@@ -49,7 +51,7 @@ const loadIssue = async () => {
     issueState.value = 'loading'
   }
   try {
-    const response = await authFetch(`/api/issues/${props.subject.id}`)
+    const response = await authFetch(`/api/issues/${props.subject.id}?expand=issues`)
     if (mine !== issueRequest) return
     if (response.ok) {
       issue.value = await response.json()
@@ -85,14 +87,20 @@ const kindLabel = computed(() => {
   return issue.value ? issueKind.value : 'Event or trend'
 })
 
-const issueArticles = computed(() =>
-  (issue.value?.premises || [])
+const nestedIssues = computed(() => issue.value?.nested_issues || [])
+
+// The issue's own articles and those of the issues it holds: a trend's
+// articles are mostly those of its events.
+const issueArticles = computed(() => {
+  const own = (issue.value?.premises || [])
     .filter((premise) => premise.type === 'message' && premise.id)
-    .map((premise) => {
-      const link = premise.id as string
-      return { link, title: props.articlesByLink.get(link)?.title || link }
-    })
-)
+    .map((premise) => premise.id as string)
+  const nested = nestedIssues.value.flatMap((child) => child.article_links)
+  return [...new Set([...own, ...nested])].map((link) => ({
+    link,
+    title: props.articlesByLink.get(link)?.title || link,
+  }))
+})
 
 const articleIssues = computed<IssueRef[]>(() => props.article?.issueRefs || [])
 
@@ -182,6 +190,19 @@ onMounted(() => closeButton.value?.focus())
       <div class="side-body">
         <p v-if="issue.description" class="side-text">{{ issue.description }}</p>
         <p v-else class="side-text muted">No description yet.</p>
+        <div v-if="nestedIssues.length" class="side-refs">
+          <span class="side-label">Holds</span>
+          <button
+            v-for="child in nestedIssues"
+            :key="child.id"
+            type="button"
+            class="ref-btn"
+            :title="`Open ${child.logos || 'this issue'}`"
+            @click="emit('open', { type: 'issue', id: child.id })"
+          >
+            {{ child.logos || 'Untitled' }}
+          </button>
+        </div>
         <div class="side-articles">
           <span class="side-label"
             >{{ issueArticles.length }} article{{ issueArticles.length === 1 ? '' : 's' }}</span
@@ -314,6 +335,7 @@ onMounted(() => closeButton.value?.focus())
 }
 
 .side-refs {
+  margin-bottom: 8px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

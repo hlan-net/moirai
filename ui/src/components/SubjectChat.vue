@@ -83,23 +83,26 @@ const restore = async () => {
   }
 }
 
-const ensureSession = async (firstMessage: string) => {
+const ensureSession = async (firstMessage: string, context: object, mine: number) => {
   if (sessionId.value) return
   const response = await authFetch('/api/chat/history', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: firstMessage.slice(0, 60), context: contextPayload() }),
+    body: JSON.stringify({ title: firstMessage.slice(0, 60), context }),
   })
-  if (response.ok) sessionId.value = (await response.json())._id
+  if (!response.ok) return
+  const created = await response.json()
+  // The session belongs to the subject it was created for.
+  if (mine === generation) sessionId.value = created._id
 }
 
-const persist = async () => {
+const persist = async (context: object) => {
   if (!sessionId.value) return
   try {
     await authFetch(`/api/chat/history/${sessionId.value}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: messages.value, context: contextPayload() }),
+      body: JSON.stringify({ messages: messages.value, context }),
     })
   } catch (error) {
     console.error('Failed to save the conversation:', error)
@@ -109,7 +112,10 @@ const persist = async () => {
 const send = async () => {
   const text = input.value.trim()
   if (!text || loading.value || restoring.value) return
+  // The subject of this message is fixed here: every request below uses this
+  // context, and stops if the reader has moved to another subject meanwhile.
   const mine = generation
+  const context = contextPayload()
   const history = messages.value.map(({ role, content }) => ({ role, content }))
   input.value = ''
   messages.value.push({ role: 'user', content: text })
@@ -118,12 +124,13 @@ const send = async () => {
 
   let usedTools = false
   try {
-    await ensureSession(text)
+    await ensureSession(text, context, mine)
+    if (mine !== generation) return
     // No model or provider is sent: the server uses the deployment's chat model.
     const response = await authFetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history, context: contextPayload() }),
+      body: JSON.stringify({ message: text, history, context }),
     })
     if (mine !== generation) return
     if (response.ok) {
@@ -147,7 +154,7 @@ const send = async () => {
   } finally {
     if (mine === generation) {
       loading.value = false
-      await persist()
+      await persist(context)
       void scrollToEnd()
       if (usedTools) emit('toolsUsed')
     }

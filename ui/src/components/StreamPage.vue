@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { type Article, type IssueRef } from '../utils/article'
 import { authFetch } from '../utils/authFetch'
@@ -333,21 +333,27 @@ const openSubjectRef = (subject: SubjectRef, event?: Event) => {
   void router.push({ query: { ...route.query, open: formatSubject(subject) } })
 }
 
-const closeSubject = async () => {
+const closeSubject = () => {
   if (!openSubject.value) return
   const query = { ...route.query }
   delete query.open
-  await router.push({ query })
+  void router.push({ query })
+}
+
+// However the column closes (its button, Escape, or the browser's Back),
+// the control that opened it gets the focus back.
+watch(openSubject, async (now, before) => {
+  if (now || !before) return
   await nextTick()
   if (subjectOpener?.isConnected) subjectOpener.focus()
   subjectOpener = null
-}
+})
 
 const onEscape = (event: KeyboardEvent) => {
   // The menu handles its own Escape first.
   if (event.defaultPrevented || !openSubject.value) return
   event.preventDefault()
-  void closeSubject()
+  closeSubject()
 }
 
 // A dot of an event or a trend: straight to the issue when the article has

@@ -103,6 +103,103 @@ def test_feed_with_issue_ids_is_well_formed_and_declares_the_namespace():
     assert ("event", "Derby & aftermath", "ev-1") in _refs(item)
 
 
+# ── A trend reaches an article through its events ─────────────────────────────
+
+
+def test_parent_issues_are_attached_to_the_articles_of_their_events():
+    from api.enrichment import _build_article_issue_map
+
+    event = {
+        "_id": "ev-1",
+        "logos": "Derby aftermath",
+        "longevity": "transient",
+        "premises": [
+            {"type": "message", "id": "https://example.com/a"},
+            {"type": "message", "id": "https://example.com/b"},
+        ],
+    }
+    other_event = {
+        "_id": "ev-2",
+        "logos": "Transfer window",
+        "longevity": "transient",
+        "premises": [{"type": "message", "id": "https://example.com/c"}],
+    }
+    trend = {
+        "_id": "tr-1",
+        "logos": "League finances",
+        "longevity": "temporal",
+        # Holds the event twice over (as a premise, and one article directly):
+        # the article must list the trend once.
+        "premises": [
+            {"type": "issue", "id": "ev-1"},
+            {"type": "message", "id": "https://example.com/a"},
+        ],
+    }
+
+    mapping = _build_article_issue_map([event, other_event, trend], [trend])
+
+    assert [i["id"] for i in mapping["https://example.com/a"]] == ["ev-1", "tr-1"]
+    assert [i["id"] for i in mapping["https://example.com/b"]] == ["ev-1", "tr-1"]
+    assert [i["id"] for i in mapping["https://example.com/c"]] == ["ev-2"]
+
+
+def test_parent_issues_are_queried_by_the_ids_of_the_direct_issues():
+    from api.enrichment import _fetch_parent_issues
+
+    with patch("api.enrichment.query_couchdb", return_value=[]) as query:
+        assert _fetch_parent_issues([]) == []
+        query.assert_not_called()
+
+        _fetch_parent_issues([{"_id": "ev-1"}, {"_id": "ev-2"}])
+
+    selector = query.call_args.kwargs["selector"]
+    assert selector == {
+        "premises": {"$elemMatch": {"type": "issue", "id": {"$in": ["ev-1", "ev-2"]}}}
+    }
+
+
+def test_issue_detail_expands_its_nested_issues_on_request():
+    docs = {
+        "tr-1": {
+            "_id": "tr-1",
+            "logos": "League finances",
+            "longevity": "temporal",
+            "premises": [
+                {"type": "issue", "id": "ev-1"},
+                {"type": "issue", "id": "gone"},
+                {"type": "issue", "id": "../bad id"},
+                {"type": "message", "id": "https://example.com/direct"},
+            ],
+        },
+        "ev-1": {
+            "_id": "ev-1",
+            "logos": "Derby aftermath",
+            "longevity": "transient",
+            "premises": [
+                {"type": "message", "id": "https://example.com/a"},
+                {"type": "issue", "id": "deeper"},
+            ],
+        },
+    }
+    with (
+        patch("api.routes.get_public_read_setting", return_value=True),
+        patch("api.routes.fetch_from_couchdb", side_effect=lambda db, i: docs.get(i)),
+    ):
+        plain = app.test_client().get("/api/issues/tr-1")
+        expanded = app.test_client().get("/api/issues/tr-1?expand=issues")
+
+    assert "nested_issues" not in plain.get_json()
+    assert expanded.status_code == 200
+    assert expanded.get_json()["nested_issues"] == [
+        {
+            "id": "ev-1",
+            "logos": "Derby aftermath",
+            "longevity": "transient",
+            "article_links": ["https://example.com/a"],
+        }
+    ]
+
+
 # ── Reading one issue follows the public-read setting ─────────────────────────
 
 
