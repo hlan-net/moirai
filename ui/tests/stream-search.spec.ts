@@ -206,3 +206,41 @@ test('without a login there is no search field and the query is ignored', async 
   await expect(summary(page)).toHaveCount(0)
   expect(calls.searches).toEqual([])
 })
+
+// The side column (#376) beside search results.
+const panel = (page: Page) => page.getByRole('complementary')
+const draft = (page: Page) => panel(page).getByRole('textbox', { name: 'Message' })
+
+test('an article opened from the results stays open when the search is cleared', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.goto('/#/stream?q=derby')
+  await page.getByRole('button', { name: 'Discuss Old Derby Report', exact: true }).click()
+  await expect(panel(page).getByRole('heading', { name: 'Old Derby Report' })).toBeVisible()
+
+  // The article is not among the stream's own, only among the results.
+  await clear(page).click()
+  await expect(page.getByRole('link', { name: 'Parliament Vote' })).toBeVisible()
+  await expect(panel(page).getByRole('heading', { name: 'Old Derby Report' })).toBeVisible()
+  await expect(panel(page).getByText('no longer in the stream')).toHaveCount(0)
+})
+
+test('a new search or Refresh keeps the open column and the message in it', async ({ page }) => {
+  await mockApi(page, { delayMs: { opera: 200, derby: 200 } })
+  await page.goto('/#/stream?q=derby')
+  await page.getByRole('button', { name: 'Discuss Old Derby Report', exact: true }).click()
+  await draft(page).fill('Half a thought')
+
+  await page.getByRole('button', { name: /Refresh/ }).click()
+  await expect(draft(page)).toHaveValue('Half a thought')
+  await expect(summary(page)).toContainText('2 results')
+  await expect(draft(page)).toHaveValue('Half a thought')
+
+  await field(page).fill('opera')
+  await field(page).press('Enter')
+  await expect(draft(page)).toHaveValue('Half a thought')
+  await expect(summary(page)).toContainText('1 result')
+  await expect(draft(page)).toHaveValue('Half a thought')
+  await expect(panel(page).getByRole('heading', { name: 'Old Derby Report' })).toBeVisible()
+})

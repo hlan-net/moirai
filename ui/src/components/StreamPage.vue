@@ -70,6 +70,9 @@ const expandedArticles = ref<Set<string>>(new Set())
 const isHighDensity = ref(true)
 const groupMode = ref<GroupMode>('feed')
 const newArticleCount = ref(0)
+// In search mode Refresh repeats the search, so it does not announce new
+// stream articles; the count is back when the search is cleared.
+const newStreamArticles = computed(() => (searchQuery.value ? 0 : newArticleCount.value))
 const { resolveTheme, setTheme } = useTheme()
 
 let refreshInterval: number | null = null
@@ -333,15 +336,48 @@ const openSubject = computed<SubjectRef | null>(() =>
 const articlesByLink = computed(
   () => new Map([...streamArticles.value, ...searchResults.value].map((a) => [a.link, a]))
 )
-const subjectArticle = computed(() => {
+const listedSubjectArticle = computed(() => {
   const subject = openSubject.value
   return subject?.type === 'article' ? (articlesByLink.value.get(subject.link) ?? null) : null
 })
-// An article subject waits for the first load, so that a shared link does
-// not flash "no longer in the stream" before the stream has arrived.
-const showSidePanel = computed(
-  () => openSubject.value !== null && !(openSubject.value.type === 'article' && viewLoading.value)
+// A request that may still bring the open article: the stream's first load,
+// or a search in flight.
+const listsPending = computed(
+  () => loading.value || (searchQuery.value !== '' && searchLoading.value)
 )
+// The open article is held for as long as it is the subject: clearing or
+// changing the search that listed it must not empty the column.
+const heldArticle = ref<Article | null>(null)
+// An article subject waits until it is found or nothing more is on its way,
+// so that a shared link does not flash "no longer in the stream". Once shown
+// the column stays: a later search or Refresh must not rebuild it, and lose
+// the message being written in it.
+const settledArticleLink = ref<string | null>(null)
+watch(
+  [openSubject, listedSubjectArticle, listsPending],
+  ([subject, listed, pending]) => {
+    if (subject?.type !== 'article') {
+      heldArticle.value = null
+      settledArticleLink.value = null
+      return
+    }
+    if (listed) heldArticle.value = listed
+    else if (heldArticle.value?.link !== subject.link) heldArticle.value = null
+    if (listed || !pending) settledArticleLink.value = subject.link
+  },
+  { immediate: true }
+)
+const subjectArticle = computed(() => {
+  const subject = openSubject.value
+  if (subject?.type !== 'article') return null
+  if (listedSubjectArticle.value) return listedSubjectArticle.value
+  return heldArticle.value?.link === subject.link ? heldArticle.value : null
+})
+const showSidePanel = computed(() => {
+  const subject = openSubject.value
+  if (subject === null) return false
+  return subject.type !== 'article' || settledArticleLink.value === subject.link
+})
 
 // The control of the stream that last opened the column gets the focus back
 // when it closes. The column's own controls come without an event, so moving
@@ -626,11 +662,13 @@ const toggleTheme = () => {
             @click="refreshAndReset"
             :disabled="fetchingUpdates || searchLoading"
             class="refresh-btn"
-            :class="{ 'has-new': newArticleCount > 0 }"
-            title="Refresh stream"
+            :class="{ 'has-new': newStreamArticles > 0 }"
+            :title="searchQuery ? 'Search again' : 'Refresh stream'"
           >
             {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
-            <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
+            <span v-if="newStreamArticles > 0" class="new-count-badge">{{
+              newStreamArticles
+            }}</span>
           </button>
           <StreamViewMenu
             v-model:sections="selectedSectionsModel"

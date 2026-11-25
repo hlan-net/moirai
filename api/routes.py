@@ -1290,6 +1290,7 @@ def get_stats():
 SEARCH_RESULT_LIMIT = 200
 SEARCH_FIELDS = ("title", "summary", "content")
 ERROR_SEARCH_FORMAT = "format must be json or rss"
+ERROR_SEARCH_UNAVAILABLE = "The search could not be completed. Try again."
 ERROR_SEARCH_DATE = (
     "Invalid {name} format. Use ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 )
@@ -1350,12 +1351,18 @@ def search_articles_endpoint():
         abort(400, description=ERROR_LIMIT_INTEGER)
     limit = min(max(limit, 1), SEARCH_RESULT_LIMIT)
 
-    articles = query_couchdb(
-        "articles",
-        selector=_search_selector(query),
-        limit=limit,
-        sort=[{"published": "desc"}],
-    )
+    # The text match has no index, so a search can time out. That must not
+    # read as "nothing mentions this".
+    try:
+        articles = query_couchdb(
+            "articles",
+            selector=_search_selector(query),
+            limit=limit,
+            sort=[{"published": "desc"}],
+            raise_on_error=True,
+        )
+    except requests.exceptions.RequestException:
+        abort(503, description=ERROR_SEARCH_UNAVAILABLE)
 
     if result_format == "rss":
         return _rss_response(

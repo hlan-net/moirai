@@ -15,6 +15,7 @@ os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "test_password_123")
 
 import pytest  # noqa: E402
+import requests  # noqa: E402
 
 from main import app  # noqa: E402
 
@@ -148,3 +149,15 @@ def test_search_rejects_bad_parameters(search, query_string):
 
     assert res.status_code == 400
     query.assert_not_called()
+
+
+@pytest.mark.parametrize("result_format", ["json", "rss"])
+def test_search_failure_is_not_an_empty_result(search, result_format):
+    """A CouchDB error or timeout must not read as "nothing mentions this"."""
+    client, query, _ = search
+    query.side_effect = requests.exceptions.Timeout("read timed out")
+
+    res = client.get(f"/api/articles/search?q=derby&format={result_format}")
+
+    assert res.status_code == 503
+    assert query.call_args.kwargs["raise_on_error"] is True
