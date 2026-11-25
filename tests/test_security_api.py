@@ -25,6 +25,10 @@ MAX_RATE_LIMIT_WAIT = 65  # seconds
 def wait_for_rate_limit():
     """Helper to wait for rate limit before making bulk API calls (5 per minute)"""
     global _rate_limit_window_start, _bulk_call_count
+    # Nothing to wait for when the stack runs with rate limiting off, as the
+    # compose stack in CI does; the wait cost a minute on every run.
+    if os.environ.get("DISABLE_RATE_LIMIT", "false").lower() == "true":
+        return
     current_time = time.time()
 
     # If this is the first call or window has expired, start new window

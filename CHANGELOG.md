@@ -4,6 +4,13 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
+## [Unreleased / In Development]
+
+### CI: the test stack runs once per commit (#382)
+A push to `main` started the Docker Compose stack and the Playwright suite twice (CI and Docker Dev Build), and a release tag a third time. The tests now run in `ci.yml` only, including the security API tests that the image workflows used to run. The development images are built by a `dev-images` job in `ci.yml` after the tests of the same run pass, and `docker-dev.yml` is gone. `docker-release.yml` waits for a successful CI run of the tagged commit instead of testing it again, and its build reads the registry build cache.
+
+---
+
 ## [v0.12.0] — 2026-11-25
 
 ### The UI is the Stream page, Login and Settings (#375)

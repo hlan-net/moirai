@@ -96,7 +96,7 @@ cd ui && npx prettier --write . # Frontend format
 ```
 
 ### CI
-GitHub Actions (`ci.yml`): two jobs — `test` (conda env + ruff + pytest + Docker build) and `ui-test` (yarn + Playwright against docker-compose stack).
+GitHub Actions (`ci.yml`): `test` (conda env + ruff + pytest + Docker build), `ui-test` (yarn + Playwright and the security API tests against the docker-compose stack) and, on a push to `main` after both pass, `dev-images` (build and push the `:main` images). The tests run in CI only: the release workflow checks that CI passed for the tagged commit instead of running them again.
 
 ## Key Conventions
 
@@ -202,8 +202,8 @@ AISA (in-cluster OpenAI-compatible proxy, additive to the direct providers): `AI
 - **BUILD_NUMBER**: GitHub Actions run number in CI (e.g., `123`). For local dev builds, use a timestamp (e.g., `"2026-03-13 14:30:45"`) to identify when the build was created.
 
 **Build workflows:**
-- **docker-dev.yml** (pushed to `main` branch): Tags images as `:main` and `:sha-<hash>`. Sets `APP_VERSION=dev` at build time (default fallback).
-- **docker-release.yml** (pushed to `v*.*.*` tags): Tags images with semantic versions (`:0.6.1`, `:0.6`, `:0`, `:latest`). Extracts clean version from git tag and injects via `APP_VERSION=<version>`.
+- **ci.yml**, job `dev-images` (pushed to `main` branch, after the tests of the same run pass): Tags images as `:main` and `:sha-<hash>`. Sets `APP_VERSION=dev` at build time (default fallback).
+- **docker-release.yml** (pushed to `v*.*.*` tags): Waits for a successful CI run of the tagged commit, then tags images with semantic versions (`:0.6.1`, `:0.6`, `:0`, `:latest`). Extracts clean version from git tag and injects via `APP_VERSION=<version>`.
 
 **Kubernetes deployment:**
 - Helm `values.yaml` specifies `api.image.tag` and `ui.image.tag` (default: `"main"`). These tag values are passed to containers as `APP_VERSION` environment variable.

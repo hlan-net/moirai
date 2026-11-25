@@ -62,7 +62,7 @@ The tag must point at the squash-merged release commit on `main`.
 
 ### 3. Wait for the image build
 
-The `docker-release.yml` workflow triggers on `v*.*.*` tags, runs the tests, and builds and pushes `ghcr.io/hlan-net/moirai` and `ghcr.io/hlan-net/moirai-ui` tagged `X.Y.Z`, `X.Y`, `X` and `latest`.
+The `docker-release.yml` workflow triggers on `v*.*.*` tags. It first waits for the CI run of the tagged commit (the push to `main`) and stops if that run did not succeed; it does not run the tests again. Then it builds and pushes `ghcr.io/hlan-net/moirai` and `ghcr.io/hlan-net/moirai-ui` tagged `X.Y.Z`, `X.Y`, `X` and `latest`.
 
 ```bash
 # The run for the tag appears a few seconds after the push; wait for it,
@@ -133,9 +133,11 @@ After it is merged, cut `X.Y.Z+1` as described under "Creating a Release".
 
 | Event | Branches | Jobs run |
 |-------|----------|----------|
-| Push / PR | `main`, `release/**` | pytest, ui-test (Playwright), formatting checks, SonarCloud, CodeQL |
-| Push | `main` | docker-dev (build + push `:main` and `:sha-<hash>` images) |
-| Tag push `v*.*.*` | any | docker-release (tests, build + push release images) |
+| Push / PR | `main`, `release/**` | CI: pytest, ui-test (Playwright and the security API tests), formatting checks; SonarCloud, CodeQL |
+| Push | `main` | CI job `dev-images`, after the tests pass (build + push `:main` and `:sha-<hash>` images) |
+| Tag push `v*.*.*` | any | docker-release (check that CI passed for the commit, build + push release images) |
+
+If CI for the tagged commit was cancelled (a later push to `main` cancels a run in progress) or failed, the release workflow stops. Re-run that CI run, then re-run the release workflow.
 
 ---
 

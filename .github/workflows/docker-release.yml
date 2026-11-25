@@ -6,156 +6,45 @@ on:
       - 'v*.*.*'
 
 jobs:
-  test:
-    name: Run Tests
+  # The tagged commit was tested by CI when it was pushed to main (or to a
+  # release/** branch). This job does not test it again (#382): it waits for
+  # that CI run and lets the build start only if it succeeded.
+  verify-ci:
+    name: Verify CI passed for the tagged commit
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      ADMIN_USERNAME: testuser
-      ADMIN_PASSWORD: testpassword
-      COUCHDB_PASSWORD: testpassword
-      REDIS_PASSWORD: testpassword
-      JWT_SECRET_KEY: super_secret_test_key_that_is_at_least_32_chars_long
-      DEFAULT_LLM_PROVIDER: gemini
-      MODEL_NAME: gemini-3-flash
-      DISABLE_RATE_LIMIT: true
-      DISABLE_CSRF: true
-      TEST_TARGET: docker
+    timeout-minutes: 45
+    permissions:
+      actions: read
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Set up Miniforge
-        uses: conda-incubator/setup-miniconda@v4
-        with:
-          miniforge-variant: Miniforge3
-          miniforge-version: latest
-          environment-file: environment.yml
-          activate-environment: moirai
-          auto-activate: false
-          use-mamba: true
-
-      - name: Run unit tests (no services required)
-        run: |
-          conda run -n moirai pytest tests/test_article_processor.py tests/test_live_lwn.py
-
-      - name: Enable Corepack (Yarn 4)
-        # Installed explicitly (pinned, no lifecycle scripts, as in ui/Dockerfile):
-        # Node 25+ no longer bundles Corepack, and setup-node's Yarn cache step
-        # below needs the Yarn 4 shim to exist before it runs.
-        run: npm install -g --ignore-scripts corepack@0.35.0 && corepack enable
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: ui/.nvmrc
-          cache: 'yarn'
-          cache-dependency-path: ui/yarn.lock
-
-      - name: Install Frontend dependencies
-        working-directory: ui
+      - name: Wait for a successful CI run of the push of this commit
         env:
-          YARN_ENABLE_SCRIPTS: false
-        run: yarn install --immutable
-
-      - name: Build UI
-        working-directory: ui
-        run: yarn build
-
-      - name: Install Playwright Browsers
-        working-directory: ui
-        env:
-          YARN_ENABLE_SCRIPTS: false
-        run: yarn playwright install --with-deps chromium
-
-      - name: Build service images (no cache)
+          GH_TOKEN: ${{ github.token }}
         run: |
-          docker buildx build --load \
-            -t moirai-app:ci \
-            -f api/Dockerfile .
-          docker buildx build --load \
-            -t moirai-ui:ci \
-            -f ui/Dockerfile ui
-
-      - name: Start backend services
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --no-build
-
-      - name: Wait for services to be ready
-        run: |
-          set -x  # Enable debug output
-          echo "Waiting for services to start..."
-          echo "Checking running containers:"
-          docker compose ps
-
-          # Wait for main API
-          echo "=== Checking Backend API ==="
-          API_READY=false
-          for i in {1..60}; do
-            if curl -f http://localhost:8088/api/health > /dev/null 2>&1; then
-              echo "✓ Backend API is ready!"
-              API_READY=true
-              break
+          # A tag pushed right after the merge finds CI still running, so poll.
+          # Only a run for the push of this commit counts, not a pull_request
+          # run that happened to test the same SHA.
+          for attempt in $(seq 1 120); do
+            runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+              --commit "$GITHUB_SHA" --event push --json status,conclusion,url \
+              || echo '[]')  # a failed API call is retried on the next round
+            if echo "$runs" | jq -e 'any(.[]; .conclusion == "success")' > /dev/null; then
+              echo "CI succeeded for $GITHUB_SHA:"
+              echo "$runs" | jq -r '.[] | select(.conclusion == "success") | .url'
+              exit 0
             fi
-            echo "Waiting for API... ($i/60)"
-            sleep 2
-          done
-
-          if [ "$API_READY" = false ]; then
-            echo "❌ Backend API failed to become ready"
-            docker compose logs api
-            exit 1
-          fi
-
-          echo "=== Checking MCP Server ==="
-          # Wait for MCP server
-          MCP_READY=false
-          for i in {1..30}; do
-            if curl -f http://localhost:8090/health > /dev/null 2>&1; then
-              echo "✓ MCP Server is ready!"
-              MCP_READY=true
-              break
+            if echo "$runs" | jq -e 'length > 0 and all(.[]; .status == "completed")' > /dev/null; then
+              echo "::error::CI did not succeed for $GITHUB_SHA. Re-run it, then re-run this workflow."
+              echo "$runs" | jq -r '.[] | "\(.conclusion) \(.url)"'
+              exit 1
             fi
-            echo "Waiting for MCP server... ($i/30)"
-            sleep 2
+            echo "Waiting for CI on $GITHUB_SHA ($attempt/120)"
+            sleep 20
           done
-
-          if [ "$MCP_READY" = false ]; then
-            echo "❌ MCP Server failed to become ready"
-            echo "Container status:"
-            docker compose ps mcp-server
-            echo "MCP Server logs:"
-            docker compose logs mcp-server
-            exit 1
-          fi
-
-          echo "=== All services ready ==="
-          sleep 5
-
-      - name: Run integration tests (requires services)
-        env:
-          DISABLE_RATE_LIMIT: true
-        run: |
-          # Run security API tests (should all pass)
-          conda run -n moirai pytest -m integration tests/test_security_api.py
-
-          # Skip MCP test for now - it requires complex SSE connection setup
-          # PYTHONPATH=. pytest tests/test_mcp_crud.py
-
-      - name: Run Playwright tests
-        working-directory: ui
-        env:
-          ADMIN_USERNAME: testuser
-          ADMIN_PASSWORD: testpassword
-          TEST_TARGET: docker
-        run: yarn playwright test --workers=2 --reporter=github --quiet
-
-      - name: Stop backend services
-        run: docker compose down
+          echo "::error::No successful CI run for $GITHUB_SHA within 40 minutes."
+          exit 1
 
   build:
-    needs: test
+    needs: verify-ci
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -178,7 +67,7 @@ jobs:
         run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
       - name: Docker Metadata
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: docker_meta
         with:
           images: ${{ matrix.image }}
@@ -189,25 +78,29 @@ jobs:
             type=raw,value=latest
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image (no cache)
-        uses: docker/build-push-action@v7
+      - name: Build and push Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: true
           platforms: linux/amd64,linux/arm64
+          # Read-only: the cache is written by the dev-images job in ci.yml
+          # for the same commit, so the layers before the version build args
+          # (the conda environment, yarn install) are reused.
+          cache-from: type=registry,ref=${{ matrix.image }}:buildcache
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           build-args: |
