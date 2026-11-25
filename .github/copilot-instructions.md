@@ -17,9 +17,9 @@ Moirai is an MCP-powered press review platform with an agent-centric architectur
    - Tools: `add_feed`, `list_feeds`, `read_feed`, `add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`
 
 3. **Vue.js 3 + TypeScript UI** (in `ui/`)
-   - 4-column layout: Feeds, Articles, Events, Trends
-   - Cross-userspace review with userspace selector
-   - Chat interface with built-in agent (uses MCP tools)
+   - Three views: Stream (the aggregated article flow, by section), Login and Settings
+   - Feed management is the Feeds tab of Settings (`FeedManager.vue`)
+   - The dashboard, chat, agent and mythology views were removed from the UI (#375); their backend remains
 
 ### Data Model
 
@@ -166,13 +166,12 @@ def some_tool(userspace: str, other_params: str):
 ### Frontend Conventions
 
 **Component structure:**
-- `ui/src/components/` - Reusable components
-- `ui/src/views/` - Route-level views (AdminView.vue, ChatView.vue, SettingsView.vue)
-- `ui/src/router/` - Vue Router config
+- `ui/src/components/` - Components, including the route-level ones (`StreamPage.vue`, `SettingsPage.vue`, `LoginPage.vue`)
+- `ui/src/router.ts` - Vue Router config; paths of removed views redirect to the stream
 
 **State management:**
-- No Vuex/Pinia - uses `localStorage` for chat history and settings
-- Userspace selected via dropdown persisted in `sessionStorage`
+- Pinia stores in `ui/src/stores/` (`auth`, `settings`)
+- The Stream page keeps its section choice in the URL and in `localStorage`
 
 **API calls:**
 - Use native `fetch()` with Basic Auth headers
@@ -267,12 +266,14 @@ curl -X PUT -u username:password http://localhost:5984/_users
 curl -X PUT -u username:password http://localhost:5984/_replicator
 ```
 
-### Testing the Chat Interface
+### Testing the Chat API
+
+The UI has no chat view (#375); the chat API remains.
 
 1. Ensure Ollama is running: `ollama serve`
 2. Pull a model with tool support: `ollama pull llama3.1`
-3. Access chat at: `http://localhost:8088/chat`
-4. Go to Settings if you need to change model or endpoint
+3. Configure the model and endpoint in Settings
+4. Call `POST /api/chat` with a logged-in user's token
 
 ## Architecture Evolution Notes
 

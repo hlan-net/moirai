@@ -26,7 +26,7 @@ Three main services:
 
 **Data storage:** CouchDB (databases: `feeds`, `articles`, `issues`/events/trends). Redis for caching (TTL 3600s, invalidated on ingestion/deletion).
 
-**Data model:** Userspace (UUID) → Feeds → Articles → Issues (longevity: transient=Events, temporal=Trends, epic=Epics). All MCP tools and API queries must filter by userspace. Issues carry a `public` boolean: public issues appear on the Mythology page without authentication.
+**Data model:** Userspace (UUID) → Feeds → Articles → Issues (longevity: transient=Events, temporal=Trends, epic=Epics). All MCP tools and API queries must filter by userspace. Issues carry a `public` boolean; `GET /api/mythology` serves public issues without authentication (its page was removed from the UI in #375).
 
 ## Build & Run Commands
 

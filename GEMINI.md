@@ -10,7 +10,7 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
 2.  **Collection:** The agent triggers `read_feed` to pull live articles.
 3.  **Synthesis (Layer 1 - Events):** The agent analyzes raw articles and calls `add_event` to group related links into a named **Event** with a description (stored as a transient Issue).
 4.  **Synthesis (Layer 2 - Trends):** The agent identifies patterns across events and calls `add_trend` to group events into a high-level **Trend** (stored as a temporal Issue).
-5.  **Review & Administration:** A human user accesses the Vue.js dashboard to review the agent's work, delete noisy data, or refine the groupings (removing specific links or events).
+5.  **Review & Administration:** A human user reads the result on the Stream page. The dashboard for reviewing and refining the agent's groupings was removed from the UI (#375); the API for it remains.
 
 ## Current Architecture
 -   **Backend (API):** Flask REST API on port `8088`.
@@ -20,8 +20,8 @@ Instead of autonomous fetching, Moirai acts as a sophisticated data lake and syn
     -   **Security:** Enforces **Userspace isolation** (GUID required for all data tools).
     -   **Tools:** `add_feed`, `list_feeds`, `read_feed`, `forge_issue`, `list_issues`, `read_issue` plus event/trend aliases (`add_event`, `list_events`, `read_event`, `add_trend`, `list_trends`, `read_trend`).
 -   **Frontend:** Vue.js 3 + TypeScript.
-    -   **Layout:** 4-column admin view (Feeds, Articles, Events, Trends).
-    -   **Features:** Cross-userspace review and item-level cleanup.
+    -   **Views:** Stream (the aggregated article flow, by section), Login and Settings.
+    -   **Features:** Feed management in Settings; section choice, density and grouping in the Stream menu.
 -   **Data Storage:** Apache CouchDB. Databases: `feeds`, `articles`, `issues`.
 
 ## Documentation Architecture
