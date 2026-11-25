@@ -4,7 +4,7 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ---
 
-## [Unreleased / In Development]
+## [v0.11.4] — 2026-11-25
 
 ### The Mythology page no longer loads every article (#369)
 `GET /api/mythology` read the `articles`, `feeds` and `issues` databases whole, with document bodies, to count them and pick out the public issues. With about 30 000 articles one request took an API pod past its 512Mi limit, and the pod was OOMKilled in production on 2026-11-25. The stats now come from `count_docs()` (`api/db.py`), which reads the database info and the design-document index, and the public issues from a `_find` on `public: true`. `fetch_from_couchdb()` now refuses a whole-database read of `articles`.
@@ -14,6 +14,12 @@ The `/mcp` blueprint (articles, events, trends) had no authentication. Every rou
 
 ### Spans are no longer printed to stdout by default (#369)
 The API and the MCP server exported every OpenTelemetry span, health probes included, to stdout as multi-line JSON. `OTEL_TRACES_EXPORTER` now chooses the exporter: `none` (default), `console`, or `otlp` (OTLP/HTTP to `OTEL_EXPORTER_OTLP_ENDPOINT`). Instrumentation still runs, so turning the exporter on needs only the variable.
+
+### Dependency updates (#366, #367, #368)
+openai 3.57, pydantic 2.14.4, ruff 0.17.6 (the pre-commit hook follows), google-auth 2.63 and, in the UI, vue 3.5.46. `tenacity` stays at 9.1.4: google-genai, up to 3.6.1, requires `<9.2`. A Dependabot ignore rule keeps `tenacity >= 9.2` out of its PRs until that cap is lifted.
+
+### Production CouchDB 3.5.3 (#355)
+Not part of the image, recorded here for the deployment history: production CouchDB was upgraded from 3.3.3 to 3.5.3 on 2026-11-24 with the two rollback overrides from #355 (`write_xxhash_checksums=false`, `upgrade_hash_on_auth=false`). Their removal after the soak is tracked in #355. Until then, upgrade the release with `--reuse-values`, which keeps them.
 
 ---
 
