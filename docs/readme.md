@@ -6,7 +6,7 @@ Moirai is an aggregated RSS reader with an analytical layer on top. The UI is th
 
 | You are | Read | It covers |
 |---|---|---|
-| A reader | [User Guide](./tutorial-user.md) | The Stream page, its sections and menu, the side column |
+| A reader | [User Guide](./tutorial-user.md) | The Stream page, its sections and menu, search, the side column |
 | An operator | [Admin Guide](./tutorial-admin.md) | Deployment, users, feeds, agents, monitoring, backup |
 | A developer | [Developer Guide](./tutorial-developer.md) and [`CLAUDE.md`](../CLAUDE.md) | Setup, architecture, adding endpoints, MCP tools and agent logic |
 

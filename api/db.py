@@ -233,8 +233,21 @@ def update_couchdb_doc_safe(
     return False
 
 
-def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None):
-    """Query CouchDB using Mango query syntax for efficient filtering."""
+def query_couchdb(
+    db_name,
+    selector,
+    limit=None,
+    skip=0,
+    sort=None,
+    fields=None,
+    raise_on_error: bool = False,
+):
+    """Query CouchDB using Mango query syntax for efficient filtering.
+
+    A failed request is logged and answered with an empty list, which a
+    caller cannot tell from "nothing matched". With `raise_on_error` the
+    `requests` exception is raised instead.
+    """
     if db_name not in ALLOWED_DBS:
         abort(400, description=ERROR_INVALID_DB_NAME)
 
@@ -266,6 +279,8 @@ def query_couchdb(db_name, selector, limit=None, skip=0, sort=None, fields=None)
         return response.json().get("docs", [])
     except requests.exceptions.RequestException as e:
         logger.error(f"Error querying CouchDB: {e}")
+        if raise_on_error:
+            raise
         return []
 
 

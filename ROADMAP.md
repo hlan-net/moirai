@@ -52,7 +52,7 @@ Since v0.12.0 the UI is the Stream page, Login and Settings (#375). The views th
 | Issue | What | Status |
 |---|---|---|
 | #376 | **Side column** for a conversation about an article, or for an event or a trend, beside the stream | Merged, unreleased |
-| #377 | **Search** from the Stream page, for a logged-in reader | In review (PR #385) |
+| #377 | **Search** from the Stream page, for a logged-in reader | Merged, unreleased |
 | #378 | **One row for a story covered by several sources** | Open |
 | #379 | **Share an article to Bluesky**, with the post text reviewed before sending | Open |
 | #309 | **Convergence feed**: an RSS output of subjects several sources pick up, alongside `stream.rss` | Idea, not scheduled |

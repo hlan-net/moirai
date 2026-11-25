@@ -6,6 +6,11 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Stream: search (#377)
+A logged-in reader can search from the Stream page's header. The results replace the list as the same rows, newest first, from every section and beyond the newest 200 of the stream; each row names its section, and its dots and "Discuss" work as in the stream. The query is in the address (`?q=`). Clearing it shows the stream as it was, without a reload or a request, and the background check for new articles and its badge pause while results are shown. An article opened in the side column stays open, with the message being written in it, when the search is changed, repeated or cleared. Without a login there is no search field and the query is ignored.
+
+Backend: `GET /api/articles/search` takes `format=rss` and then answers with the items of `/api/stream.rss`. It searches the title, summary and content (it named a `description` field that articles do not have, so summaries were never searched) and returns the newest matches first; the order was undefined. A CouchDB error or timeout answers 503 instead of an empty result, so the page says that the search failed rather than that nothing matched (`query_couchdb` takes `raise_on_error` for this).
+
 ### Documentation follows the Stream-only UI
 Documents about views that #375 removed are in `docs/archive/`: the Dashboard UX plan and its deployment notes, the two issue wizard documents and the pointer interaction design for the draggable chat. `AGENTS.md` no longer carries the mythology tables (Olympians, Titans, Zeitgeist); it states what Moirai is, the state of the UI and the rules that must not be missed, and points to `CLAUDE.md`, which is now the one place where conventions are written. `GEMINI.md` and `.github/copilot-instructions.md` point to the same two files instead of repeating them in older versions. The tutorials, `docs/architecture.md` and `docs/readme.md` describe the UI as it is (Stream, Login, Settings; the UI on port 8088; feeds in Settings), and `docs/observability-intervention-ui.md` says that its page design predates this UI.
 
