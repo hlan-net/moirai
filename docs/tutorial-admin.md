@@ -61,8 +61,7 @@ docker compose up -d
 ```
 
 This starts:
-- 🔵 **Moirai API** on `http://localhost:8088`
-- 🔵 **Moirai UI** on `http://localhost:3000`
+- 🔵 **Moirai UI and API** on `http://localhost:8088` (nginx serves the UI and forwards `/api`)
 - 🟢 **MCP Server** on `http://localhost:8090` (internal)
 - 🟡 **CouchDB** on `http://localhost:5984` (with admin UI)
 - 🟠 **Redis** on `http://localhost:6379` (internal)
@@ -79,7 +78,7 @@ docker compose exec api python -c "from api.db import init_dbs; init_dbs()"
 docker compose ps
 
 # Access the UI
-open http://localhost:3000
+open http://localhost:8088
 # Login with username: admin, password: (from .env)
 
 # Check CouchDB admin
@@ -179,12 +178,11 @@ create_user('username', 'password', is_admin=False)
 
 ### Add RSS Feeds
 
-#### Via Admin UI (Easiest)
-1. Login to `http://localhost:3000` as admin
-2. **Click "Feeds" column header** → "Add Feed"
-3. **Enter RSS URL:** `https://example.com/feed.xml`
-4. **Enter Feed Name:** "Tech News"
-5. **Click Add**
+#### Via the UI (Easiest)
+1. Log in at `http://localhost:8088` as admin
+2. Open **Settings** and its **Feeds** tab
+3. Choose **Bulk Import Feeds** and paste the feed addresses, one per line, or import an OPML file
+4. Rename a feed, set its section, refresh or delete it from the same list
 
 #### Via API (Programmatic)
 ```bash
@@ -242,10 +240,8 @@ Agents are AI workers that automatically synthesize articles into Events and det
 
 Moirai comes with pre-configured agents. To view/edit:
 
-#### 1. Via Admin UI
-```
-Coming soon in v0.7 — for now use CouchDB admin UI
-```
+#### 1. Via the API
+The UI has no agent page: it was removed with the other views in v0.12.0. The agent routes remain: `GET`, `POST` on `/api/agents` and `GET`, `PUT`, `DELETE` on `/api/agents/<agent_id>`.
 
 #### 2. Via CouchDB Admin
 1. Open `http://localhost:5984/_utils` (Fauxton UI)
@@ -508,9 +504,7 @@ docker compose exec api python -c "from api.db import init_dbs; init_dbs()"
 
 ### Version History
 
-- **v0.6.0** (latest) — Agent orchestrator, issue-raise wizard, lifespan view
-- **v0.5.x** — Basic feed aggregation & article synthesis
-- **v0.4.x** — Alpha release
+See [`CHANGELOG.md`](../CHANGELOG.md) for what each version changed.
 
 ---
 
@@ -521,10 +515,10 @@ docker compose exec api python -c "from api.db import init_dbs; init_dbs()"
 | Start services | `docker compose up -d` |
 | Stop services | `docker compose down` |
 | View logs | `docker compose logs -f api` |
-| Access UI | `http://localhost:3000` |
+| Access UI | `http://localhost:8088` |
 | Access CouchDB admin | `http://localhost:5984/_utils` |
 | Create user | `docker compose exec api python -c "from api.auth import create_user; create_user(...)"` |
-| Add feed | Use Admin UI → Feeds → Add |
+| Add feed | Settings → Feeds → Bulk Import Feeds |
 | Check health | `docker compose ps` or `http://localhost:9000` |
 | Backup | `docker cp moirai-couchdb:/opt/couchdb/data ./backup/` |
 

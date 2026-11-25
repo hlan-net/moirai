@@ -10,7 +10,7 @@ Social export is the final step in the "Information -> Action" pipeline. It brid
 
 Key goals include:
 1. **Context Preservation:** Ensuring that exported posts retain links to their original articles or Moirai issues.
-2. **Seamless Workflow:** Allowing analysts to share findings with a single click from the dashboard.
+2. **Seamless Workflow:** Allowing analysts to share findings with a single click from the UI. (The share action lost its place when the Dashboard was removed in v0.12.0; sharing an article from the Stream page is #379.)
 3. **Agentic Automation:** Enabling LLM agents to draft and schedule social media digests based on synthesized trends.
 
 ## Technical Architecture

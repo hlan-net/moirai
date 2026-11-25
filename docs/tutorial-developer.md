@@ -151,25 +151,23 @@ moirai/
 │   ├── src/
 │   │   ├── main.ts               # Entry point
 │   │   ├── App.vue               # Root component
-│   │   ├── components/           # Reusable components
-│   │   │   ├── AdminDashboard.vue
-│   │   │   ├── ArticleList.vue
-│   │   │   ├── EventList.vue
-│   │   │   ├── TrendList.vue
-│   │   │   ├── ChatInterface.vue
-│   │   │   └── ContextChatModal.vue
+│   │   ├── router.ts             # Stream, Login, Settings; removed paths redirect to the stream
+│   │   ├── components/
+│   │   │   ├── StreamPage.vue        # The article flow, by section
+│   │   │   ├── StreamViewMenu.vue    # Sections, density, grouping, theme, RSS
+│   │   │   ├── StreamSidePanel.vue   # Side column: an article, event or trend
+│   │   │   ├── SubjectChat.vue       # Conversation about the open subject
+│   │   │   ├── SettingsPage.vue      # User, Feeds and System tabs
+│   │   │   ├── FeedManager.vue       # Feed management (the Feeds tab)
+│   │   │   ├── ModelCatalogEditor.vue
+│   │   │   ├── LoginPage.vue
+│   │   │   └── LoginForm.vue
 │   │   ├── stores/               # Pinia state management
-│   │   │   ├── articles.ts
-│   │   │   ├── issues.ts
-│   │   │   ├── chat.ts
-│   │   │   └── auth.ts
-│   │   ├── views/                # Page components
-│   │   │   ├── AdminView.vue
-│   │   │   ├── ChatPage.vue
-│   │   │   ├── LifespanView.vue
-│   │   │   └── RiverView.vue
-│   │   └── styles/               # Global CSS
-│   │       └── variables.css
+│   │   │   ├── auth.ts
+│   │   │   └── settings.ts
+│   │   ├── composables/          # useTheme.ts
+│   │   ├── utils/                # Article parsing, sections, subjects, authFetch
+│   │   └── style.css             # Global CSS and theme variables
 │   └── package.json
 │
 ├── tests/                        # Test suite
@@ -217,20 +215,20 @@ Every document in CouchDB includes `userspace` for isolation.
 2. **Annotation** → `AnnotationWorker` longpolls `articles/_changes`, adds `annotations` field
 3. **Grouping** → `AgentOrchestrator` (ON_NEW_ARTICLE trigger) calls `create_event_from_articles` agent logic
 4. **Trends** → `AgentOrchestrator` (SCHEDULED trigger) calls trend detection agent logic
-5. **UI Display** → React queries `/api/articles`, `/api/issues`, `/api/trends`
-6. **Chat** → User asks questions via `/api/chat` endpoint
+5. **UI Display** → the Stream page reads `/api/stream.rss`, whose items carry each article's section, annotations, events and trends
+6. **Chat** → a logged-in reader opens an article, event or trend in the side column and talks about it via `/api/chat`
 
 ### Component Interaction
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                    Vue.js UI (3000)                        │
-│  (AdminDashboard, ArticleList, Chat, etc.)                │
+│              Vue.js UI (5173 in dev)                       │
+│  (StreamPage, StreamSidePanel, SettingsPage)              │
 └────────────────────────────────────────────────────────────┘
                               ↕ HTTP/JSON
 ┌────────────────────────────────────────────────────────────┐
 │              Flask REST API (8088)                         │
-│  /api/articles, /api/issues, /api/chat, etc.             │
+│  /api/stream.rss, /api/issues, /api/chat, etc.           │
 └────────────────────────────────────────────────────────────┘
                               ↕
 ┌────────────────────────────────────────────────────────────┐

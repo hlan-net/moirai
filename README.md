@@ -10,7 +10,7 @@ Moirai acts as a synthesis engine that LLM agents use to analyze news. It consis
 * **UI (Port 8088):** A Vue.js frontend with the Stream page (the aggregated article flow, by section), Login and Settings, where feeds are managed.
 * **REST API (Port 8088):** The backend for the UI and external integrations.
 
-**Architecture Details:** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Architecture Details:** See [docs/architecture.md](docs/architecture.md).
 
 ## Quick Start
 
@@ -131,10 +131,10 @@ Before committing and pushing changes, run relevant local tests for the area you
 
 ## Documentation
 
-* [Architecture](docs/ARCHITECTURE.md)
+* [Architecture](docs/architecture.md)
 * [LLM Configuration](docs/llm-configuration.md) - How to configure Ollama, OpenAI, Gemini, and the in-cluster AISA proxy.
-* [External REST API](docs/EXTERNAL_API.md) - Documentation for `/mcp` endpoints on the REST API.
-* [Release Process](docs/RELEASE.md) - Release and RC checklist.
+* [External REST API](docs/external-api.md) - Documentation for `/mcp` endpoints on the REST API.
+* [Release Process](docs/releasing.md) - Release and RC checklist.
 * [Example Usage](EXAMPLES.md)
 
 ## License

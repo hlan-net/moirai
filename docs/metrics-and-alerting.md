@@ -14,7 +14,7 @@ Moirai uses two distinct observability layers, intentionally separate:
 
 | Layer | Audience | Granularity | Retention | Surface |
 |---|---|---|---|---|
-| **Sessions / approvals** (see [Observability & Intervention UI](./observability-intervention-ui.md)) | Operator using the dashboard | Per agent run, per step | 7 days (Redis) | `/sessions`, `/approvals` |
+| **Sessions / approvals** (see [Observability & Intervention UI](./observability-intervention-ui.md)) | Operator using the UI | Per agent run, per step | 7 days (Redis) | The sessions and approvals API; no UI at present |
 | **Metrics & alerts** (this doc) | Operator with kubectl/Grafana access | Aggregate (counters, histograms) | Months (Prometheus) | Grafana + Alertmanager |
 
 The session UI answers "what did this specific run do?" The metrics layer answers "what is the platform doing in aggregate, and is anything trending toward failure?"
@@ -114,5 +114,4 @@ topk(5, histogram_quantile(0.95,
 - **Per-userspace dashboards.** The starter dashboard is platform-wide. Multi-tenant dashboard variants can be derived from it.
 
 ## See also
-- [Observability & Intervention UI](./observability-intervention-ui.md) — the dashboard-side observability surface.
-- [Deploy UX Improvements](./deploy-ux-improvements.md) — related operational ergonomics.
+- [Observability & Intervention UI](./observability-intervention-ui.md) — the UI-side observability surface (its design predates the Stream-only UI).

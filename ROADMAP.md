@@ -52,7 +52,7 @@ Since v0.12.0 the UI is the Stream page, Login and Settings (#375). The views th
 | Issue | What | Status |
 |---|---|---|
 | #376 | **Side column** for a conversation about an article, or for an event or a trend, beside the stream | Merged, unreleased |
-| #377 | **Search** from the Stream page, for a logged-in reader | In review (PR #385) |
+| #377 | **Search** from the Stream page, for a logged-in reader | Merged, unreleased |
 | #378 | **One row for a story covered by several sources** | Open |
 | #379 | **Share an article to Bluesky**, with the post text reviewed before sending | Open |
 | #309 | **Convergence feed**: an RSS output of subjects several sources pick up, alongside `stream.rss` | Idea, not scheduled |
@@ -93,7 +93,7 @@ See [`docs/metrics-and-alerting.md`](docs/metrics-and-alerting.md) for full conc
 **Focus:** Security and deployment ergonomics. Not glamorous, overdue.
 
 - **[Security Hardening](docs/security-enhancements.md):** JWT session model, Role-Based Access Control (RBAC), server-side userspace isolation.
-- **[Deployment UX](docs/deploy-ux-improvements.md):** Reduce the operator overhead of running Moirai in varied environments.
+- **Deployment UX:** Reduce the operator overhead of running Moirai in varied environments. No design document yet.
 
 ### v1.0.0 (deferred): Agent Autonomy
 **Focus:** The speculative agentic bets — explicitly last in the priority order.
@@ -123,7 +123,7 @@ The Stream page is the product's primary surface, and since v0.12.0 the only rea
 - **[Stream Sections](docs/stream-sections.md):** Four newspaper-style tabs — Top stories (default), Sports, Culture, Business. A fixed editorial split of the flow, assigned at ingestion from feed category and link path (annotation topic as fallback), not a reader-composed filter. Shipped in v0.11.x (#266); since v0.11.5 several sections can be chosen at once from one menu (#344). The closed topic vocabulary (#249) serves the fallback.
 
 ### Input Diversity & Precision
-- **[Pointer Interaction Support](docs/pointer-interaction-wacom-touch.md):** Wacom, touch, and mouse parity. Written for the Dashboard, which #375 removed; it now applies to the Stream page and its side column.
+- **Pointer interaction:** Wacom, touch, and mouse parity on the Stream page and its side column. The earlier design, written for the Dashboard's draggable chat, is [archived](docs/archive/pointer-interaction-wacom-touch.md).
 
 ### Architectural Foundations
 - **MCP Tool Standardization** — shipped in v0.8.0 (standardized `MCPResponse` envelope across all tools).
@@ -132,8 +132,8 @@ The Stream page is the product's primary surface, and since v0.12.0 the only rea
 ### Wizard & Capture
 Issue creation had its UI in the views #375 removed; the backend remains. Both items wait for a place on the Stream page (the side column, #376, is the likely one).
 
-- **[Form-Based Issue Wizard](docs/proposal-form-wizard.md):** Traditional UI alternative for structured issue creation.
-- **[Issue Raise Wizard Refinement](docs/issue-raise-wizard.md):** Continued tuning of the LLM-driven path.
+- **Form-based issue creation:** a traditional form as an alternative to the conversation. Earlier proposal: [archived](docs/archive/proposal-form-wizard.md).
+- **LLM-driven issue creation:** the conversation that raises an issue from an article. Earlier design: [archived](docs/archive/issue-raise-wizard.md).
 
 ### Social
 - **[Social Export (Bluesky)](docs/social-export-bluesky.md):** Shipped in v0.7.0 for issues; reframed as "share something from the reader / from an issue," not "publish agent output." The issue share lost its UI in #375; sharing an article from the Stream page is #379.
@@ -143,7 +143,7 @@ Issue creation had its UI in the views #375 removed; the backend remains. Both i
 ## 📚 Reference Documentation
 
 - **[Architecture Overview](docs/architecture.md):** The high-level system design.
-- **[Observability & Intervention UI](docs/observability-intervention-ui.md):** Sessions, approvals, cancellation — the dashboard surfaces for agent activity.
+- **[Observability & Intervention UI](docs/observability-intervention-ui.md):** Sessions, approvals, cancellation. The backend exists; the UI design predates the Stream-only UI.
 - **[Metrics & Alerting](docs/metrics-and-alerting.md):** Prometheus instrumentation, alerts, and Grafana dashboards.
 - **[External API Guide](docs/external-api.md):** How to integrate with Moirai from outside.
 - **[Tutorials](docs/readme.md):** User, Admin, and Developer guides.

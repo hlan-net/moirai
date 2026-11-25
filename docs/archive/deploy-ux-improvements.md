@@ -300,13 +300,13 @@ If the improvements work well and you want to go further:
 2. **Differential Updates** - Only fetch changed data
 3. **WebSocket Support** - Bidirectional communication
 
-See `docs/DASHBOARD_UX_IMPROVEMENTS.md` for full Tier 3 specifications.
+See [`dashboard-ux.md`](dashboard-ux.md) for full Tier 3 specifications.
 
 ## Contact
 
 For questions or issues with this deployment:
-- Check `docs/DASHBOARD_UX_IMPROVEMENTS.md` for technical details
-- Review `docs/DASHBOARD_IMPROVEMENTS_QUICKREF.md` for quick reference
+- Check [`dashboard-ux.md`](dashboard-ux.md) for technical details
+- The quick reference is the first section of [`dashboard-ux.md`](dashboard-ux.md)
 - Test locally with Docker first to isolate Kubernetes-specific issues
 
 ---

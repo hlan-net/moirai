@@ -1745,7 +1745,7 @@ docker exec -it moirai-redis-1 redis-cli
 For questions about this improvement plan:
 - Review the detailed exploration report in task session `ses_2f51ef3c0ffejzj367NHu5SWK0`
 - Check implementation progress in git commit history
-- Refer to `docs/RELEASE.md` for deployment procedures
+- Refer to `docs/releasing.md` for deployment procedures
 
 **Implementation Status:** 🟡 READY FOR IMPLEMENTATION
 
