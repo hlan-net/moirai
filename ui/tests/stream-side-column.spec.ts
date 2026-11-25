@@ -167,7 +167,7 @@ test('a conversation is sent with its subject, shown and saved', async ({ page }
   expect(body).not.toHaveProperty('llm_endpoint')
 
   await expect.poll(() => calls.saved.length).toBe(1)
-  expect((calls.saved[0].messages as unknown[]).length).toBe(2)
+  expect(calls.saved[0].messages as unknown[]).toHaveLength(2)
 })
 
 test('an earlier conversation about the same subject continues', async ({ page }) => {
