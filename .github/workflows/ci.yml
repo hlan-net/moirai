@@ -78,6 +78,20 @@ jobs:
       run: |
         conda run --name moirai pytest # Use conda run
 
+    - name: Run the search tests against CouchDB
+      # What CouchDB does with the search query (#387): chooses the search
+      # index, loads no document, falls back without the index.
+      env:
+        SEARCH_TEST_COUCHDB_URI: http://admin:password@localhost:5984/
+        ADMIN_USERNAME: testuser
+        ADMIN_PASSWORD: testpassword
+        FLASK_ENV: test
+        TESTING: true
+        DISABLE_CSRF: true
+        DISABLE_RATE_LIMIT: true
+      run: |
+        conda run --name moirai pytest -m integration tests/test_article_search_integration.py
+
     - name: Build API image (cached)
       run: |
         docker buildx build --load \

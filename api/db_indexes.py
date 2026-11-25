@@ -15,6 +15,7 @@ import logging
 import requests
 from typing import Dict
 from api.db_config import get_couchdb_uri
+from api.db_constants import ARTICLE_SEARCH_INDEX, ARTICLE_SEARCH_INDEX_FIELDS
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,13 @@ def create_articles_indexes() -> int:
         {
             "index": {"fields": ["section", "published"]},
             "name": "idx_section_published",
+            "type": "json",
+        },
+        # Article search reads this index instead of the documents (#387).
+        {
+            "index": {"fields": ARTICLE_SEARCH_INDEX_FIELDS},
+            "name": ARTICLE_SEARCH_INDEX,
+            "ddoc": ARTICLE_SEARCH_INDEX,
             "type": "json",
         },
     ]

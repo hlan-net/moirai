@@ -44,6 +44,10 @@ def _request(method, url, **kwargs):
     return response
 
 
+# One attempt, for a query whose timeout means "too slow", not "try again".
+_request_once = _request.retry_with(stop=stop_after_attempt(1))
+
+
 # Allowed database names for security validation
 ALLOWED_DBS = {
     "feeds",
@@ -241,12 +245,19 @@ def query_couchdb(
     sort=None,
     fields=None,
     raise_on_error: bool = False,
+    use_index: str | None = None,
+    timeout: float | None = None,
+    retry: bool = True,
 ):
     """Query CouchDB using Mango query syntax for efficient filtering.
 
     A failed request is logged and answered with an empty list, which a
     caller cannot tell from "nothing matched". With `raise_on_error` the
     `requests` exception is raised instead.
+
+    `use_index` names the design document of the index to use. `timeout`
+    replaces the default request timeout. `retry=False` makes one attempt:
+    a query that timed out because it is slow only adds load when repeated.
     """
     if db_name not in ALLOWED_DBS:
         abort(400, description=ERROR_INVALID_DB_NAME)
@@ -264,13 +275,14 @@ def query_couchdb(
             query["sort"] = sort
         if fields:
             query["fields"] = fields
+        if use_index:
+            query["use_index"] = use_index
 
-        response = _request(
-            "POST",
-            f"{get_couchdb_uri()}{safe_db_name}/_find",
-            json=query,
-            headers={"Content-Type": "application/json"},
-        )
+        kwargs = {"json": query, "headers": {"Content-Type": "application/json"}}
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        send = _request if retry else _request_once
+        response = send("POST", f"{get_couchdb_uri()}{safe_db_name}/_find", **kwargs)
 
         if response.status_code == 404:
             return []
@@ -279,6 +291,39 @@ def query_couchdb(
         return response.json().get("docs", [])
     except requests.exceptions.RequestException as e:
         logger.error(f"Error querying CouchDB: {e}")
+        if raise_on_error:
+            raise
+        return []
+
+
+def fetch_docs_by_ids(
+    db_name: str, doc_ids: list[str], raise_on_error: bool = False
+) -> list[dict]:
+    """The documents with these ids, in the order of the ids.
+
+    One request for all of them. An id that no longer exists is left out.
+    A failed request is answered with an empty list, or raised with
+    `raise_on_error`.
+    """
+    if db_name not in ALLOWED_DBS:
+        abort(400, description=ERROR_INVALID_DB_NAME)
+    if not doc_ids:
+        return []
+
+    safe_db_name = urllib.parse.quote(db_name, safe="")
+    try:
+        response = _request(
+            "POST",
+            f"{get_couchdb_uri()}{safe_db_name}/_all_docs",
+            params={"include_docs": "true"},
+            json={"keys": doc_ids},
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        rows = response.json().get("rows", [])
+        return [row["doc"] for row in rows if row.get("doc")]
+    except requests.exceptions.RequestException:
+        logger.exception("Error fetching documents from CouchDB")
         if raise_on_error:
             raise
         return []
