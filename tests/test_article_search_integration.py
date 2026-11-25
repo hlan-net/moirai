@@ -187,14 +187,15 @@ def test_couchdb_answers_from_the_search_index_without_loading_documents(client)
 
 
 def test_an_article_without_a_text_field_is_backfilled_and_found(client):
-    """An article outside the search index is listed, repaired and searchable.
+    """An article the search cannot use is listed, repaired and searchable.
 
-    A Mango index holds only documents that have every indexed field, so this
-    article cannot be found before the backfill, not even by its title.
+    A Mango index holds only documents that have every indexed field, so an
+    article without one cannot be found before the backfill, not even by its
+    title. One whose field is not text is in the index but cannot be rendered.
     """
     from tasks import init
 
-    for doc_id in ("gap1", "gap2"):
+    for doc_id in ("gap1", "gap2", "gap3"):
         existing = requests.get(f"{COUCHDB}articles/{doc_id}", timeout=10)
         if existing.ok:
             requests.delete(
@@ -212,6 +213,14 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
             "summary": "an okapi here",
             "content": None,
         },
+        # Neither is text: a number and a list.
+        {
+            "_id": "gap3",
+            "published": "2026-11-08T10:00:00+00:00",
+            "title": "Heron",
+            "summary": 7,
+            "content": ["heron"],
+        },
     ]
     requests.post(
         f"{COUCHDB}articles/_bulk_docs", json={"docs": gaps}, timeout=10
@@ -227,7 +236,7 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
     assert _ids(client, "okapi") == []
     complete_before = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()["_rev"]
 
-    assert init.backfill_search_text() == 2
+    assert init.backfill_search_text() == 3
 
     assert _ids(client, "okapi") == ["gap2", "gap1"]
     repaired = requests.get(f"{COUCHDB}articles/gap1", timeout=10).json()
@@ -235,6 +244,11 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
     # What was there is kept.
     kept = requests.get(f"{COUCHDB}articles/gap2", timeout=10).json()
     assert (kept["summary"], kept["content"]) == ("an okapi here", "")
+    # A value that was not text is replaced, and its article is found and
+    # rendered by its title.
+    assert _ids(client, "heron") == ["gap3"]
+    replaced = requests.get(f"{COUCHDB}articles/gap3", timeout=10).json()
+    assert (replaced["summary"], replaced["content"]) == ("", "")
     # Nothing is left to do, and complete articles were not touched.
     assert init.backfill_search_text() == 0
     complete_after = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()["_rev"]

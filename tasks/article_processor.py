@@ -20,6 +20,17 @@ DetectorFactory.seed = 0
 logger = logging.getLogger(__name__)
 
 
+def _ensure_text_fields(article: dict) -> None:
+    """Write an empty string for a text field that is absent or not a string.
+
+    The search index holds only articles that have every text field (#387):
+    an absent or null one would hide the article from search altogether.
+    """
+    for field in ARTICLE_SEARCH_BACKFILL_FIELDS:
+        if not isinstance(article.get(field), str):
+            article[field] = ""
+
+
 class ArticleProcessor:
     def __init__(self):
         self.couchdb_url = get_couchdb_uri() + "articles"
@@ -130,11 +141,7 @@ class ArticleProcessor:
         ).hexdigest()
         article["_id"] = article_hash
 
-        # The search index holds only articles that have every text field
-        # (#387): an absent or null one would hide the article from search.
-        for field in ARTICLE_SEARCH_BACKFILL_FIELDS:
-            if not isinstance(article.get(field), str):
-                article[field] = ""
+        _ensure_text_fields(article)
 
         if "section" not in article:
             article["section"], article["section_source"] = resolve_section(
