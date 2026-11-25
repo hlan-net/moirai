@@ -25,7 +25,8 @@ jobs:
           # run that happened to test the same SHA.
           for attempt in $(seq 1 120); do
             runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
-              --commit "$GITHUB_SHA" --event push --json status,conclusion,url)
+              --commit "$GITHUB_SHA" --event push --json status,conclusion,url \
+              || echo '[]')  # a failed API call is retried on the next round
             if echo "$runs" | jq -e 'any(.[]; .conclusion == "success")' > /dev/null; then
               echo "CI succeeded for $GITHUB_SHA:"
               echo "$runs" | jq -r '.[] | select(.conclusion == "success") | .url'
