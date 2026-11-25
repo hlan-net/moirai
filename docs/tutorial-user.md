@@ -16,6 +16,7 @@ Open Moirai. The Stream page is the front page.
 - **Sections:** the page opens on Top stories. The menu button (☰) next to Refresh chooses the sections: Top stories, Sports, Culture, Business, one or several at once. With none ticked you get the whole stream. The sections in effect are named next to the article count.
 - **View:** in the same menu, Compact or Expanded rows, and grouping By feed or By time.
 - **Dots** at the end of a compact row show an article's priority and sentiment, and the events and trends it belongs to. Hover or focus them for details.
+- **Side column** (logged in): the speech-bubble button on a row opens the article beside the stream, with a conversation about it. An event or trend dot opens that event or trend: its description, its articles and a conversation in which you can also ask to change it. Close the column with its button, Escape or the browser's Back. A conversation continues when you open the same subject again.
 - **Refresh:** the page checks for new articles every two minutes and shows their number on the Refresh button. The list changes only when you press it.
 - **RSS:** "RSS for this view" in the menu is a feed of the sections you have chosen, for any RSS reader.
 - **Your choice of sections** is kept in the page's address and in your browser, so it survives a reload, and the address can be shared.

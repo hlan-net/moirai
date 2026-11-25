@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { type Article } from '../utils/article'
+import { type Article, type IssueRef } from '../utils/article'
 import { authFetch } from '../utils/authFetch'
 import { useTheme } from '../composables/useTheme'
 import { useAuthStore } from '../stores/auth'
 import StreamViewMenu from './StreamViewMenu.vue'
+import StreamSidePanel from './StreamSidePanel.vue'
+import { type SubjectRef, formatSubject, parseSubject, sameSubject } from '../utils/streamSubject'
 import {
   DEFAULT_SECTIONS,
   type SectionKey,
@@ -139,9 +141,13 @@ const groupedArticles = computed(() => {
 const resolvedTheme = computed(() => resolveTheme())
 const themeLabel = computed(() => (resolvedTheme.value === 'dark' ? 'Dark' : 'Light'))
 
+// Namespace of the feed's own attributes (MOIRAI_RSS_NS in api/rss_ops.py).
+const MOIRAI_RSS_NS = 'https://github.com/hlan-net/moirai/ns/rss'
+
 const _extractCategories = (item: Element) => {
   const events: string[] = []
   const trends: string[] = []
+  const issueRefs: IssueRef[] = []
   const topics: string[] = []
   let priority: 'low' | 'medium' | 'high' | undefined
   let sentiment: 'positive' | 'neutral' | 'negative' | undefined
@@ -153,10 +159,10 @@ const _extractCategories = (item: Element) => {
     const domain = category.getAttribute('domain')
     if (domain === 'section') {
       section = label
-    } else if (domain === 'event') {
-      events.push(label)
-    } else if (domain === 'trend') {
-      trends.push(label)
+    } else if (domain === 'event' || domain === 'trend') {
+      ;(domain === 'event' ? events : trends).push(label)
+      const id = category.getAttributeNS(MOIRAI_RSS_NS, 'id') || undefined
+      issueRefs.push({ kind: domain, name: label, id })
     } else if (domain === 'topic') {
       topics.push(label)
     } else if (domain === 'priority') {
@@ -165,7 +171,7 @@ const _extractCategories = (item: Element) => {
       sentiment = label as 'positive' | 'neutral' | 'negative'
     }
   }
-  return { events, trends, topics, priority, sentiment, section }
+  return { events, trends, issueRefs, topics, priority, sentiment, section }
 }
 
 const _parseFeedItem = (item: Element, index: number): Article => {
@@ -194,7 +200,8 @@ const _parseFeedItem = (item: Element, index: number): Article => {
     feedUrl = link
   }
 
-  const { events, trends, topics, priority, sentiment, section } = _extractCategories(item)
+  const { events, trends, issueRefs, topics, priority, sentiment, section } =
+    _extractCategories(item)
 
   const annotations =
     topics.length || priority || sentiment
@@ -215,6 +222,7 @@ const _parseFeedItem = (item: Element, index: number): Article => {
     feed_title: sourceTitle || getHostname(feedUrl),
     events: events.length ? events : undefined,
     trends: trends.length ? trends : undefined,
+    issueRefs: issueRefs.length ? issueRefs : undefined,
     annotations,
     section,
   }
@@ -295,6 +303,72 @@ const fetchStream = async (isManual = false) => {
   }
 }
 
+// The side column (#376): one subject, an article or an issue, named by the
+// `open` query parameter. Logged-in users only: without a login the page
+// makes no request other than the stream's, and the parameter is ignored.
+const openSubject = computed<SubjectRef | null>(() =>
+  isAuthenticated.value ? parseSubject(route.query.open) : null
+)
+const articlesByLink = computed(() => new Map(articles.value.map((a) => [a.link, a])))
+const subjectArticle = computed(() => {
+  const subject = openSubject.value
+  return subject?.type === 'article' ? (articlesByLink.value.get(subject.link) ?? null) : null
+})
+// An article subject waits for the first load, so that a shared link does
+// not flash "no longer in the stream" before the stream has arrived.
+const showSidePanel = computed(
+  () => openSubject.value !== null && !(openSubject.value.type === 'article' && loading.value)
+)
+
+// The control of the stream that last opened the column gets the focus back
+// when it closes. The column's own controls come without an event, so moving
+// on inside the column keeps the row it was opened from.
+let subjectOpener: HTMLElement | null = null
+
+const openSubjectRef = (subject: SubjectRef, event?: Event) => {
+  if (!isAuthenticated.value) return
+  if (event?.currentTarget instanceof HTMLElement) {
+    subjectOpener = event.currentTarget
+  }
+  hideDotDetails()
+  if (sameSubject(subject, openSubject.value)) return
+  void router.push({ query: { ...route.query, open: formatSubject(subject) } })
+}
+
+const closeSubject = () => {
+  if (!openSubject.value) return
+  const query = { ...route.query }
+  delete query.open
+  void router.push({ query })
+}
+
+// However the column closes (its button, Escape, or the browser's Back),
+// the control that opened it gets the focus back.
+watch(openSubject, async (now, before) => {
+  if (now || !before) return
+  await nextTick()
+  if (subjectOpener?.isConnected) subjectOpener.focus()
+  subjectOpener = null
+})
+
+const onEscape = (event: KeyboardEvent) => {
+  // The menu handles its own Escape first.
+  if (event.defaultPrevented || !openSubject.value) return
+  event.preventDefault()
+  closeSubject()
+}
+
+// A dot of an event or a trend: straight to the issue when the article has
+// exactly one of that kind, otherwise to the article, which lists them.
+const openFromDot = (article: Article, kind: IssueRef['kind'], event: Event) => {
+  const refs = (article.issueRefs || []).filter((ref) => ref.kind === kind)
+  const only = refs.length === 1 ? refs[0] : undefined
+  openSubjectRef(
+    only?.id ? { type: 'issue', id: only.id } : { type: 'article', link: article.link },
+    event
+  )
+}
+
 const refreshAndReset = () => {
   newArticleCount.value = 0
   void fetchStream(true)
@@ -373,6 +447,8 @@ const DOT_POPOVER_GAP = 6
 const hoveredArticle = ref<Article | null>(null)
 const popoverPos = ref({ top: 0, right: 0, placeAbove: false })
 
+const ISSUE_KINDS = ['event', 'trend'] as const
+
 const hasDots = (article: Article) =>
   article.annotations?.priority === 'high' ||
   article.annotations?.priority === 'medium' ||
@@ -403,95 +479,180 @@ const toggleTheme = () => {
 </script>
 
 <template>
-  <div class="stream-page">
-    <header class="page-header">
-      <div class="header-left">
-        <h2>Aggregated Stream</h2>
-        <span class="count">
-          <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
-          <span v-else-if="!loading">{{ articles.length }}</span>
-          Articles
-          <span class="section-summary" data-testid="section-summary">· {{ sectionSummary }}</span>
-        </span>
-        <span v-if="fetchingUpdates" class="update-badge">↻</span>
-      </div>
-      <div class="header-actions">
-        <button
-          @click="refreshAndReset"
-          :disabled="fetchingUpdates"
-          class="refresh-btn"
-          :class="{ 'has-new': newArticleCount > 0 }"
-          title="Refresh stream"
-        >
-          {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
-          <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
-        </button>
-        <StreamViewMenu
-          v-model:sections="selectedSectionsModel"
-          v-model:high-density="isHighDensity"
-          v-model:group-mode="groupMode"
-          :show-theme="!isAuthenticated"
-          :theme-label="themeLabel"
-          :rss-url="rssSubscribeUrl"
-          @toggle-theme="toggleTheme"
-        />
-      </div>
-    </header>
+  <div class="stream-layout" :class="{ 'has-panel': showSidePanel }" @keydown.esc="onEscape">
+    <div class="stream-page">
+      <header class="page-header">
+        <div class="header-left">
+          <h2>Aggregated Stream</h2>
+          <span class="count">
+            <span v-if="totalCount > 0">{{ articles.length }}/{{ totalCount }}</span>
+            <span v-else-if="!loading">{{ articles.length }}</span>
+            Articles
+            <span class="section-summary" data-testid="section-summary"
+              >· {{ sectionSummary }}</span
+            >
+          </span>
+          <span v-if="fetchingUpdates" class="update-badge">↻</span>
+        </div>
+        <div class="header-actions">
+          <button
+            @click="refreshAndReset"
+            :disabled="fetchingUpdates"
+            class="refresh-btn"
+            :class="{ 'has-new': newArticleCount > 0 }"
+            title="Refresh stream"
+          >
+            {{ fetchingUpdates ? 'Checking...' : '↻ Refresh' }}
+            <span v-if="newArticleCount > 0" class="new-count-badge">{{ newArticleCount }}</span>
+          </button>
+          <StreamViewMenu
+            v-model:sections="selectedSectionsModel"
+            v-model:high-density="isHighDensity"
+            v-model:group-mode="groupMode"
+            :show-theme="!isAuthenticated"
+            :theme-label="themeLabel"
+            :rss-url="rssSubscribeUrl"
+            @toggle-theme="toggleTheme"
+          />
+        </div>
+      </header>
 
-    <div v-if="loading" class="loading">Loading stream...</div>
+      <div v-if="loading" class="loading">Loading stream...</div>
 
-    <div
-      v-else-if="articles.length"
-      ref="streamContainer"
-      class="stream-container"
-      :class="{ 'high-density': isHighDensity }"
-      @scroll.passive="hideDotDetails"
-    >
       <div
-        v-for="(group, index) in groupedArticles"
-        :key="group.title + '-' + index"
-        class="feed-group"
+        v-else-if="articles.length"
+        ref="streamContainer"
+        class="stream-container"
+        :class="{ 'high-density': isHighDensity }"
+        @scroll.passive="hideDotDetails"
       >
-        <h3 class="group-title">
-          <template v-if="groupMode === 'feed'">
-            <img
-              v-if="group.favicon"
-              :src="group.favicon"
-              class="group-favicon"
-              :alt="`${group.title} icon`"
-              @error="handleFaviconError"
-            />
-            <img
-              v-else
-              class="group-favicon-placeholder"
-              src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E📰%3C/text%3E%3C/svg%3E"
-              alt="Default news icon"
-            />
-          </template>
-          {{ group.title }}
-          <span v-if="groupMode === 'time'" class="group-count">({{ group.articles.length }})</span>
-        </h3>
-
         <div
-          v-for="article in group.articles"
-          :key="article._id"
-          :class="['stream-item', { 'compact-item': isHighDensity }]"
+          v-for="(group, index) in groupedArticles"
+          :key="group.title + '-' + index"
+          class="feed-group"
         >
-          <!-- High Density (River) View -->
-          <template v-if="isHighDensity">
-            <div class="compact-row">
-              <span class="compact-time">{{
-                new Date(article.published).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              }}</span>
-              <!-- Inline source tag for time-blocked mode -->
-              <span
-                v-if="groupMode === 'time'"
-                class="inline-source"
-                :title="article.feed_title || getHostname(article.feed_url)"
-              >
+          <h3 class="group-title">
+            <template v-if="groupMode === 'feed'">
+              <img
+                v-if="group.favicon"
+                :src="group.favicon"
+                class="group-favicon"
+                :alt="`${group.title} icon`"
+                @error="handleFaviconError"
+              />
+              <img
+                v-else
+                class="group-favicon-placeholder"
+                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E📰%3C/text%3E%3C/svg%3E"
+                alt="Default news icon"
+              />
+            </template>
+            {{ group.title }}
+            <span v-if="groupMode === 'time'" class="group-count"
+              >({{ group.articles.length }})</span
+            >
+          </h3>
+
+          <div
+            v-for="article in group.articles"
+            :key="article._id"
+            :class="['stream-item', { 'compact-item': isHighDensity }]"
+          >
+            <!-- High Density (River) View -->
+            <template v-if="isHighDensity">
+              <div class="compact-row">
+                <span class="compact-time">{{
+                  new Date(article.published).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                }}</span>
+                <!-- Inline source tag for time-blocked mode -->
+                <span
+                  v-if="groupMode === 'time'"
+                  class="inline-source"
+                  :title="article.feed_title || getHostname(article.feed_url)"
+                >
+                  <img
+                    v-if="article.feed_favicon"
+                    :src="article.feed_favicon"
+                    class="inline-favicon"
+                    alt="Feed icon"
+                    @error="handleFaviconError"
+                  />
+                  {{ article.feed_title || getHostname(article.feed_url) }}
+                </span>
+                <h4 class="item-title compact-title">
+                  <a :href="article.link" target="_blank">{{ article.title }}</a>
+                </h4>
+                <div
+                  v-if="hasDots(article)"
+                  class="compact-tags"
+                  tabindex="0"
+                  aria-describedby="dot-details-popover"
+                  @mouseenter="showDotDetails(article, $event)"
+                  @mouseleave="hideDotDetails"
+                  @focus="showDotDetails(article, $event)"
+                  @blur="hideDotDetails"
+                >
+                  <span
+                    v-if="article.annotations?.priority === 'high'"
+                    class="dot-tag priority-high-dot"
+                  ></span>
+                  <span
+                    v-if="article.annotations?.priority === 'medium'"
+                    class="dot-tag priority-medium-dot"
+                  ></span>
+                  <span
+                    v-if="article.annotations?.sentiment === 'positive'"
+                    class="dot-tag sentiment-positive-dot"
+                  ></span>
+                  <span
+                    v-if="article.annotations?.sentiment === 'negative'"
+                    class="dot-tag sentiment-negative-dot"
+                  ></span>
+                  <template v-for="kind in ISSUE_KINDS" :key="kind">
+                    <template v-if="article[`${kind}s`]?.length">
+                      <button
+                        v-if="isAuthenticated"
+                        type="button"
+                        class="dot-tag dot-btn"
+                        :class="`${kind}-dot`"
+                        :aria-label="`Open the ${kind} of ${article.title}`"
+                        @click.stop="openFromDot(article, kind, $event)"
+                      ></button>
+                      <span v-else class="dot-tag" :class="`${kind}-dot`"></span>
+                    </template>
+                  </template>
+                </div>
+                <button
+                  v-if="isAuthenticated"
+                  type="button"
+                  class="discuss-btn"
+                  :class="{ 'no-dots': !hasDots(article) }"
+                  :aria-label="`Discuss ${article.title}`"
+                  title="Discuss"
+                  @click="openSubjectRef({ type: 'article', link: article.link }, $event)"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm0 14H5.17L4 17.17V4h16v12z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </template>
+
+            <!-- Expanded View -->
+            <template v-else>
+              <!-- Inline source for time-blocked expanded view -->
+              <div v-if="groupMode === 'time'" class="inline-source-expanded">
                 <img
                   v-if="article.feed_favicon"
                   :src="article.feed_favicon"
@@ -499,191 +660,198 @@ const toggleTheme = () => {
                   alt="Feed icon"
                   @error="handleFaviconError"
                 />
-                {{ article.feed_title || getHostname(article.feed_url) }}
-              </span>
-              <h4 class="item-title compact-title">
+                <span>{{ article.feed_title || getHostname(article.feed_url) }}</span>
+              </div>
+              <h4 class="item-title">
                 <a :href="article.link" target="_blank">{{ article.title }}</a>
               </h4>
-              <div
-                v-if="hasDots(article)"
-                class="compact-tags"
-                tabindex="0"
-                aria-describedby="dot-details-popover"
-                @mouseenter="showDotDetails(article, $event)"
-                @mouseleave="hideDotDetails"
-                @focus="showDotDetails(article, $event)"
-                @blur="hideDotDetails"
-              >
-                <span
-                  v-if="article.annotations?.priority === 'high'"
-                  class="dot-tag priority-high-dot"
-                ></span>
-                <span
-                  v-if="article.annotations?.priority === 'medium'"
-                  class="dot-tag priority-medium-dot"
-                ></span>
-                <span
-                  v-if="article.annotations?.sentiment === 'positive'"
-                  class="dot-tag sentiment-positive-dot"
-                ></span>
-                <span
-                  v-if="article.annotations?.sentiment === 'negative'"
-                  class="dot-tag sentiment-negative-dot"
-                ></span>
-                <span v-if="article.events?.length" class="dot-tag event-dot"></span>
-                <span v-if="article.trends?.length" class="dot-tag trend-dot"></span>
+              <div class="item-summary">
+                <span v-if="!expandedArticles.has(article._id)">
+                  {{ stripHtml(article.summary).substring(0, 300) }}
+                  <button
+                    v-if="stripHtml(article.summary).length > 300"
+                    @click="toggleExpand(article._id)"
+                    class="read-more-btn"
+                  >
+                    ... Read More
+                  </button>
+                </span>
+                <span v-else>
+                  {{ stripHtml(article.summary) }}
+                  <button @click="toggleExpand(article._id)" class="read-more-btn">
+                    Show Less
+                  </button>
+                </span>
               </div>
-            </div>
-          </template>
-
-          <!-- Expanded View -->
-          <template v-else>
-            <!-- Inline source for time-blocked expanded view -->
-            <div v-if="groupMode === 'time'" class="inline-source-expanded">
-              <img
-                v-if="article.feed_favicon"
-                :src="article.feed_favicon"
-                class="inline-favicon"
-                alt="Feed icon"
-                @error="handleFaviconError"
-              />
-              <span>{{ article.feed_title || getHostname(article.feed_url) }}</span>
-            </div>
-            <h4 class="item-title">
-              <a :href="article.link" target="_blank">{{ article.title }}</a>
-            </h4>
-            <div class="item-summary">
-              <span v-if="!expandedArticles.has(article._id)">
-                {{ stripHtml(article.summary).substring(0, 300) }}
+              <div v-if="article.events || article.trends || article.annotations" class="item-tags">
+                <div v-if="article.events && article.events.length > 0" class="tag-group">
+                  <span v-for="event in article.events" :key="event" class="tag tag-event">{{
+                    event
+                  }}</span>
+                </div>
+                <div v-if="article.trends && article.trends.length > 0" class="tag-group">
+                  <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{
+                    trend
+                  }}</span>
+                </div>
+                <div v-if="article.annotations" class="tag-group">
+                  <span
+                    v-for="topic in article.annotations.topics"
+                    :key="topic"
+                    class="tag tag-topic"
+                    >{{ topic }}</span
+                  >
+                  <span
+                    :class="['tag', 'tag-priority', `tag-priority-${article.annotations.priority}`]"
+                    >{{ article.annotations.priority }}</span
+                  >
+                  <span
+                    :class="[
+                      'tag',
+                      'tag-sentiment',
+                      `tag-sentiment-${article.annotations.sentiment}`,
+                    ]"
+                    >{{ article.annotations.sentiment }}</span
+                  >
+                </div>
+              </div>
+              <div class="item-meta">
+                <span class="date">{{ formatDate(article.published) }}</span>
                 <button
-                  v-if="stripHtml(article.summary).length > 300"
-                  @click="toggleExpand(article._id)"
+                  v-if="isAuthenticated"
+                  type="button"
                   class="read-more-btn"
+                  @click="openSubjectRef({ type: 'article', link: article.link }, $event)"
                 >
-                  ... Read More
+                  Discuss
                 </button>
-              </span>
-              <span v-else>
-                {{ stripHtml(article.summary) }}
-                <button @click="toggleExpand(article._id)" class="read-more-btn">Show Less</button>
-              </span>
-            </div>
-            <div v-if="article.events || article.trends || article.annotations" class="item-tags">
-              <div v-if="article.events && article.events.length > 0" class="tag-group">
-                <span v-for="event in article.events" :key="event" class="tag tag-event">{{
-                  event
-                }}</span>
               </div>
-              <div v-if="article.trends && article.trends.length > 0" class="tag-group">
-                <span v-for="trend in article.trends" :key="trend" class="tag tag-trend">{{
-                  trend
-                }}</span>
-              </div>
-              <div v-if="article.annotations" class="tag-group">
-                <span
-                  v-for="topic in article.annotations.topics"
-                  :key="topic"
-                  class="tag tag-topic"
-                  >{{ topic }}</span
-                >
-                <span
-                  :class="['tag', 'tag-priority', `tag-priority-${article.annotations.priority}`]"
-                  >{{ article.annotations.priority }}</span
-                >
-                <span
-                  :class="[
-                    'tag',
-                    'tag-sentiment',
-                    `tag-sentiment-${article.annotations.sentiment}`,
-                  ]"
-                  >{{ article.annotations.sentiment }}</span
-                >
-              </div>
-            </div>
-            <div class="item-meta">
-              <span class="date">{{ formatDate(article.published) }}</span>
-            </div>
-          </template>
+            </template>
+          </div>
+          <hr v-if="index < groupedArticles.length - 1 && !isHighDensity" class="group-divider" />
         </div>
-        <hr v-if="index < groupedArticles.length - 1 && !isHighDensity" class="group-divider" />
       </div>
-    </div>
 
-    <div v-else class="empty-state">
-      {{ emptyMessage }}
-    </div>
+      <div v-else class="empty-state">
+        {{ emptyMessage }}
+      </div>
 
-    <Teleport to="body">
-      <div
-        v-if="hoveredArticle"
-        id="dot-details-popover"
-        role="tooltip"
-        class="dot-popover"
-        :class="{ 'place-above': popoverPos.placeAbove }"
-        :style="{ top: `${popoverPos.top}px`, right: `${popoverPos.right}px` }"
-      >
-        <div v-if="hoveredArticle.annotations?.priority === 'high'" class="dot-popover-row">
-          <span class="dot-tag priority-high-dot"></span>
-          <span>High priority</span>
-        </div>
-        <div v-else-if="hoveredArticle.annotations?.priority === 'medium'" class="dot-popover-row">
-          <span class="dot-tag priority-medium-dot"></span>
-          <span>Medium priority</span>
-        </div>
-        <div v-if="hoveredArticle.annotations?.sentiment === 'positive'" class="dot-popover-row">
-          <span class="dot-tag sentiment-positive-dot"></span>
-          <span>Positive sentiment</span>
-        </div>
+      <Teleport to="body">
         <div
-          v-else-if="hoveredArticle.annotations?.sentiment === 'negative'"
-          class="dot-popover-row"
+          v-if="hoveredArticle"
+          id="dot-details-popover"
+          role="tooltip"
+          class="dot-popover"
+          :class="{ 'place-above': popoverPos.placeAbove }"
+          :style="{ top: `${popoverPos.top}px`, right: `${popoverPos.right}px` }"
         >
-          <span class="dot-tag sentiment-negative-dot"></span>
-          <span>Negative sentiment</span>
+          <div v-if="hoveredArticle.annotations?.priority === 'high'" class="dot-popover-row">
+            <span class="dot-tag priority-high-dot"></span>
+            <span>High priority</span>
+          </div>
+          <div
+            v-else-if="hoveredArticle.annotations?.priority === 'medium'"
+            class="dot-popover-row"
+          >
+            <span class="dot-tag priority-medium-dot"></span>
+            <span>Medium priority</span>
+          </div>
+          <div v-if="hoveredArticle.annotations?.sentiment === 'positive'" class="dot-popover-row">
+            <span class="dot-tag sentiment-positive-dot"></span>
+            <span>Positive sentiment</span>
+          </div>
+          <div
+            v-else-if="hoveredArticle.annotations?.sentiment === 'negative'"
+            class="dot-popover-row"
+          >
+            <span class="dot-tag sentiment-negative-dot"></span>
+            <span>Negative sentiment</span>
+          </div>
+          <div v-if="hoveredArticle.events?.length" class="dot-popover-row">
+            <span class="dot-tag event-dot"></span>
+            <span class="dot-popover-label">Events</span>
+            <span class="dot-popover-tags">
+              <span v-for="event in hoveredArticle.events" :key="event" class="tag tag-event">{{
+                event
+              }}</span>
+            </span>
+          </div>
+          <div v-if="hoveredArticle.trends?.length" class="dot-popover-row">
+            <span class="dot-tag trend-dot"></span>
+            <span class="dot-popover-label">Trends</span>
+            <span class="dot-popover-tags">
+              <span v-for="trend in hoveredArticle.trends" :key="trend" class="tag tag-trend">{{
+                trend
+              }}</span>
+            </span>
+          </div>
+          <div v-if="hoveredArticle.annotations?.topics?.length" class="dot-popover-row">
+            <span class="dot-tag dot-placeholder"></span>
+            <span class="dot-popover-label">Topics</span>
+            <span class="dot-popover-tags">
+              <span
+                v-for="topic in hoveredArticle.annotations.topics"
+                :key="topic"
+                class="tag tag-topic"
+                >{{ topic }}</span
+              >
+            </span>
+          </div>
         </div>
-        <div v-if="hoveredArticle.events?.length" class="dot-popover-row">
-          <span class="dot-tag event-dot"></span>
-          <span class="dot-popover-label">Events</span>
-          <span class="dot-popover-tags">
-            <span v-for="event in hoveredArticle.events" :key="event" class="tag tag-event">{{
-              event
-            }}</span>
-          </span>
-        </div>
-        <div v-if="hoveredArticle.trends?.length" class="dot-popover-row">
-          <span class="dot-tag trend-dot"></span>
-          <span class="dot-popover-label">Trends</span>
-          <span class="dot-popover-tags">
-            <span v-for="trend in hoveredArticle.trends" :key="trend" class="tag tag-trend">{{
-              trend
-            }}</span>
-          </span>
-        </div>
-        <div v-if="hoveredArticle.annotations?.topics?.length" class="dot-popover-row">
-          <span class="dot-tag dot-placeholder"></span>
-          <span class="dot-popover-label">Topics</span>
-          <span class="dot-popover-tags">
-            <span
-              v-for="topic in hoveredArticle.annotations.topics"
-              :key="topic"
-              class="tag tag-topic"
-              >{{ topic }}</span
-            >
-          </span>
-        </div>
-      </div>
-    </Teleport>
+      </Teleport>
+    </div>
+    <StreamSidePanel
+      v-if="showSidePanel && openSubject"
+      class="stream-side"
+      :subject="openSubject"
+      :article="subjectArticle"
+      :articles-by-link="articlesByLink"
+      @close="closeSubject"
+      @open="openSubjectRef"
+    />
   </div>
 </template>
 
 <style scoped>
-.stream-page {
-  padding: 20px;
+/* The stream, and beside it the side column when one is open (#376). */
+.stream-layout {
+  display: flex;
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   height: 100%;
+  min-height: 0;
+}
+
+.stream-layout.has-panel {
+  max-width: 1400px;
+}
+
+.stream-page {
+  padding: 20px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.stream-side {
+  flex: 0 0 clamp(320px, 38%, 480px);
+  padding-block: 20px;
+  padding-inline-end: 20px;
+}
+
+/* No room for two columns: the side column covers the stream. */
+@media (max-width: 899px) {
+  .stream-side {
+    position: fixed;
+    inset: 0;
+    z-index: 1800;
+    padding: 16px;
+    border: none;
+    background: var(--bg-color);
+  }
 }
 
 .page-header {
@@ -906,6 +1074,52 @@ const toggleTheme = () => {
 }
 .sentiment-negative-dot {
   background-color: #d32f2f;
+}
+
+.dot-btn {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  position: relative;
+}
+
+/* A hit area larger than the 8px dot. */
+.dot-btn::after {
+  content: '';
+  position: absolute;
+  inset: -6px -3px;
+}
+
+.dot-btn:hover,
+.dot-btn:focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.discuss-btn {
+  align-self: center;
+  display: inline-flex;
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--text-color);
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.discuss-btn.no-dots {
+  margin-left: auto;
+}
+
+.discuss-btn:hover,
+.discuss-btn:focus-visible {
+  background: var(--button-bg);
+  box-shadow: none;
+  opacity: 1;
 }
 
 .compact-tags:focus-visible {

@@ -1,4 +1,7 @@
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
+
+# Namespace of Moirai's own attributes in /api/stream.rss (prefix ``moirai``).
+MOIRAI_RSS_NS = "https://github.com/hlan-net/moirai/ns/rss"
 
 
 def _generate_category_tags(article):
@@ -12,18 +15,21 @@ def _generate_category_tags(article):
             f'    <category domain="section">{escape(str(section))}</category>'
         )
 
-    # Events and Trends
-    if "events" in article:
-        for event_name in article["events"]:
-            categories.append(
-                f'    <category domain="event">{escape(event_name)}</category>'
-            )
-
-    if "trends" in article:
-        for trend_name in article["trends"]:
-            categories.append(
-                f'    <category domain="trend">{escape(trend_name)}</category>'
-            )
+    # Events and Trends: the issues the article is a premise of, attached by
+    # enrich_articles_with_issues(). Each carries the issue id in a namespaced
+    # attribute, so the Stream page can open the issue (#376).
+    for issue in article.get("issues") or []:
+        logos = issue.get("logos")
+        if not logos:
+            continue
+        domain = (
+            "event" if issue.get("longevity", "transient") == "transient" else "trend"
+        )
+        issue_id = issue.get("id")
+        id_attr = f" moirai:id={quoteattr(str(issue_id))}" if issue_id else ""
+        categories.append(
+            f'    <category domain="{domain}"{id_attr}>{escape(str(logos))}</category>'
+        )
 
     # AI annotations
     annotations = article.get("annotations")

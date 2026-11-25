@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, abort, request, Response, g
 import os
+import re
 import json
 import version
 import requests
@@ -22,7 +23,12 @@ from .db import (
     count_docs,
 )
 from .bluesky_ops import bluesky_uri_to_url, generate_bluesky_post_text, post_to_bluesky
-from .userspace_ops import get_userspace, resolve_llm_config
+from .userspace_ops import (
+    can_access_userspace,
+    get_default_userspace,
+    get_userspace,
+    resolve_llm_config,
+)
 from .llm.aisa import aisa_status
 from .llm import catalog as llm_catalog
 from .llm.catalog import PURPOSE_SOCIAL_EXPORT
@@ -42,7 +48,7 @@ import uuid  # Import uuid
 
 from api.enrichment import enrich_articles_with_issues, invalidate_feed_mappings_cache
 from api.feed_ops import process_bulk_import_url
-from api.rss_ops import generate_rss_item_xml
+from api.rss_ops import MOIRAI_RSS_NS, generate_rss_item_xml
 from tasks.sections import (
     SECTIONS,
     STREAM_CACHE_KEYS,
@@ -640,7 +646,7 @@ def rss_feed():
     # string, and its "&" made the feed malformed for any request with two
     # parameters, which is every request of the Stream page (#343).
     rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:moirai="{MOIRAI_RSS_NS}">
   <channel>
     <title>{xml_escape(channel_title)}</title>
     <link>{xml_escape(request.host_url)}</link>
@@ -779,10 +785,80 @@ def create_issue():
 
 @api_blueprint.route("/issues/<issue_id>", methods=["GET"])
 def get_issue(issue_id):
+    # Same rule as the list above. The route had no check at all, and the
+    # stream feed now carries issue ids (#376).
+    if not check_public_read_access():
+        response = jsonify({"message": "Unauthorized"})
+        response.status_code = 401
+        return response
+
     issue = fetch_from_couchdb("issues", issue_id)
-    if not issue:
+    # An issue of a userspace the caller may not use is reported as missing.
+    if not issue or not _may_read_issue(issue):
         abort(404, description=ERROR_ISSUE_NOT_FOUND)
+    if request.args.get("expand") == "issues":
+        issue["nested_issues"] = _nested_issue_summaries(issue)
     return jsonify(issue)
+
+
+def _may_read_issue(issue: dict) -> bool:
+    """Whether the caller may read this issue, by its userspace.
+
+    Issues of the deployment's default userspace are readable by whoever may
+    read at all. An issue of another (legacy) userspace needs a logged-in
+    caller who owns that userspace or is an admin (``can_access_userspace``).
+    """
+    userspace = issue.get("userspace")
+    if not userspace or userspace == get_default_userspace():
+        return True
+    success, _ = verify_jwt_in_request()
+    return success and can_access_userspace(
+        userspace, getattr(g, "user_id", None), getattr(g, "user_role", None)
+    )
+
+
+# Upper bound on the nested issues one GET /api/issues/<id>?expand=issues resolves.
+NESTED_ISSUES_LIMIT = 50
+
+
+def _nested_issue_summaries(issue: dict) -> list[dict]:
+    """The issues an issue holds as premises, each with its article links.
+
+    A trend's articles are those of its events; the Stream page's side column
+    asks for them with ``?expand=issues`` (#376). One level is resolved.
+    """
+    held_ids = [
+        str(premise["id"])
+        for premise in issue.get("premises") or []
+        if premise.get("type") == "issue" and premise.get("id")
+    ][:NESTED_ISSUES_LIMIT]
+    if not held_ids:
+        return []
+
+    # One query for all of them, then back into the order of the premises.
+    children = query_couchdb(
+        "issues", selector={"_id": {MONGO_IN: held_ids}}, limit=len(held_ids)
+    )
+    children_by_id = {child.get("_id"): child for child in children}
+
+    summaries = []
+    for held_id in held_ids:
+        child = children_by_id.get(held_id)
+        if not child or not _may_read_issue(child):
+            continue
+        summaries.append(
+            {
+                "id": child.get("_id"),
+                "logos": child.get("logos"),
+                "longevity": child.get("longevity"),
+                "article_links": [
+                    p["id"]
+                    for p in child.get("premises") or []
+                    if p.get("type") == "message" and p.get("id")
+                ],
+            }
+        )
+    return summaries
 
 
 @api_blueprint.route("/issues/<issue_id>", methods=["DELETE"])
@@ -1207,8 +1283,6 @@ def search_articles_endpoint():
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
 
-    import re
-
     safe_query = re.escape(query)
 
     date_from = request.args.get("from", "")
@@ -1363,8 +1437,6 @@ def search_issues_endpoint():
     query = request.args.get("q", "").strip()
     if not query:
         abort(400, description=ERROR_QUERY_REQUIRED)
-
-    import re
 
     safe_query = re.escape(query)
 
