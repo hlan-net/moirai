@@ -14,7 +14,7 @@ The External API provides a set of RESTful endpoints...
 
 ## Authentication
 
-Every `/mcp` endpoint requires credentials, as the `/api` endpoints do: a JWT in `Authorization: Bearer <token>` (from `POST /api/auth/login`) or HTTP Basic with the admin credentials. Requests without them get `401`. The Helm chart's nginx forwards only `/api` to the backend, so these endpoints are reachable only inside the cluster.
+Every `/mcp` endpoint requires admin credentials: a JWT of an admin user in `Authorization: Bearer <token>` (from `POST /api/auth/login`) or HTTP Basic with the admin credentials. Requests without credentials get `401`, and non-admin users get `403`. The endpoints take a `userspace` from the caller without an ownership check, which is why they are admin-only. The Helm chart's nginx forwards only `/api` to the backend, so these endpoints are reachable only inside the cluster.
 
 ## Endpoints
 

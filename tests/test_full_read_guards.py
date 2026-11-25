@@ -3,7 +3,7 @@
 ``/api/mythology`` loaded every article with its body to count them, which took
 an API pod past its memory limit. These tests pin the replacements: document
 counts, a query for public issues, a bounded ``/mcp/articles`` query behind
-auth, and the guard in ``fetch_from_couchdb``.
+admin auth, and the guard in ``fetch_from_couchdb``.
 """
 
 import os
@@ -16,6 +16,7 @@ os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "test_password_123")
 
 import pytest  # noqa: E402
+from flask import g  # noqa: E402
 
 from api import db  # noqa: E402
 from api.telemetry import _span_exporter  # noqa: E402
@@ -180,10 +181,35 @@ def test_mcp_routes_require_auth(method, path):
     store.assert_not_called()
 
 
+def _authenticated_as(role: str):
+    def fake_verify():
+        g.user_id = "u1"
+        g.user_role = role
+        return True, ""
+
+    return fake_verify
+
+
+@pytest.mark.parametrize("path", ["/mcp/articles", "/mcp/events?userspace=x"])
+def test_mcp_routes_require_admin(path):
+    with (
+        patch(
+            "api.mcp_routes.verify_request_auth", side_effect=_authenticated_as("user")
+        ),
+        patch("api.mcp_routes.query_couchdb") as query,
+    ):
+        res = app.test_client().get(path)
+
+    assert res.status_code == 403
+    query.assert_not_called()
+
+
 @pytest.fixture
 def authed_articles():
     with (
-        patch("api.mcp_routes.verify_request_auth", return_value=(True, "")),
+        patch(
+            "api.mcp_routes.verify_request_auth", side_effect=_authenticated_as("admin")
+        ),
         patch("api.mcp_routes.query_couchdb", return_value=[{"_id": "a1"}]) as query,
     ):
         yield app.test_client(), query

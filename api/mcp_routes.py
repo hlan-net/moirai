@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, abort
+from flask import Blueprint, abort, g, jsonify, request
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -22,11 +22,18 @@ ARTICLES_MAX_LIMIT = 1000
 
 
 @mcp_blueprint.before_request
-def _require_auth():
-    """Every /mcp route needs a JWT or Basic credentials, as /api routes do (#369)."""
+def _require_admin():
+    """Every /mcp route needs admin credentials (JWT or Basic) (#369).
+
+    These legacy routes take any userspace from the caller and do no per-userspace
+    ownership check, so they are limited to admins, who may act on every
+    userspace (``can_access_userspace``).
+    """
     success, message = verify_request_auth()
     if not success:
         return jsonify({"message": message}), 401
+    if getattr(g, "user_role", None) != "admin":
+        return jsonify({"message": "Admin privilege required"}), 403
     return None
 
 
