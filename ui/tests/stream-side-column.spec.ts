@@ -53,6 +53,18 @@ const ISSUES: Record<string, object> = {
       { type: 'message', id: 'https://elsewhere.example/report' },
     ],
   },
+  // A premise that is not a web address must not become a link.
+  'ev-odd': {
+    _id: 'ev-odd',
+    logos: 'Odd premises',
+    description: '',
+    longevity: 'transient',
+    status: 'active',
+    premises: [
+      { type: 'message', id: 'https://example.com/derby' },
+      { type: 'message', id: 'javascript:alert(1)' },
+    ],
+  },
   // A trend holds events, not articles: its articles come through them.
   'tr-1': {
     _id: 'tr-1',
@@ -316,6 +328,34 @@ test('in right-to-left text the column is on the left', async ({ page }) => {
   const column = await panel(page).boundingBox()
   const stream = await page.locator('.stream-page').boundingBox()
   expect(column!.x).toBeLessThan(stream!.x)
+})
+
+test('a premise that is not a web address is shown as text, not as a link', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/#/stream?open=issue:ev-odd')
+
+  await expect(panel(page).getByRole('heading', { name: 'Odd premises' })).toBeVisible()
+  await expect(panel(page).getByText('2 articles')).toBeVisible()
+  await expect(panel(page).getByRole('link', { name: 'Derby Result' })).toBeVisible()
+  await expect(panel(page).getByText('javascript:alert(1)')).toBeVisible()
+  await expect(panel(page).getByRole('link', { name: /javascript/ })).toHaveCount(0)
+})
+
+test('closing returns the focus to the row the column was last opened from', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/#/stream')
+  await discuss(page, 'Opera Premiere').click()
+  await discuss(page, 'Derby Result').click()
+  await expect(panel(page).getByRole('heading', { name: 'Derby Result' })).toBeVisible()
+
+  // Moving on inside the column keeps the row.
+  await panel(page).getByRole('button', { name: 'League finances' }).click()
+  await expect(panel(page).getByRole('heading', { name: 'League finances' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Close the side column' }).click()
+
+  await expect(panel(page)).toHaveCount(0)
+  await expect(discuss(page, 'Derby Result')).toBeFocused()
 })
 
 test('Back returns the focus to the control that opened the column', async ({ page }) => {

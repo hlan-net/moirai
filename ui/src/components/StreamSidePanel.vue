@@ -6,6 +6,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import SubjectChat from './SubjectChat.vue'
 import { authFetch } from '../utils/authFetch'
 import type { Article, IssueRef } from '../utils/article'
+import { isValidUrl } from '../utils/formatters'
 import type { SubjectRef } from '../utils/streamSubject'
 
 interface Issue {
@@ -90,7 +91,8 @@ const kindLabel = computed(() => {
 const nestedIssues = computed(() => issue.value?.nested_issues || [])
 
 // The issue's own articles and those of the issues it holds: a trend's
-// articles are mostly those of its events.
+// articles are mostly those of its events. Premises are written by tool
+// calls, so only an http(s) address becomes a link; anything else is text.
 const issueArticles = computed(() => {
   const own = (issue.value?.premises || [])
     .filter((premise) => premise.type === 'message' && premise.id)
@@ -99,6 +101,7 @@ const issueArticles = computed(() => {
   return [...new Set([...own, ...nested])].map((link) => ({
     link,
     title: props.articlesByLink.get(link)?.title || link,
+    isLink: isValidUrl(link),
   }))
 })
 
@@ -209,7 +212,10 @@ onMounted(() => closeButton.value?.focus())
           >
           <ul v-if="issueArticles.length">
             <li v-for="item in issueArticles" :key="item.link">
-              <a :href="item.link" target="_blank" rel="noopener">{{ item.title }}</a>
+              <a v-if="item.isLink" :href="item.link" target="_blank" rel="noopener">{{
+                item.title
+              }}</a>
+              <span v-else>{{ item.title }}</span>
             </li>
           </ul>
         </div>

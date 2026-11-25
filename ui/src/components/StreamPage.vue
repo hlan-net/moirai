@@ -320,12 +320,14 @@ const showSidePanel = computed(
   () => openSubject.value !== null && !(openSubject.value.type === 'article' && loading.value)
 )
 
-// The control that opened the column gets the focus back when it closes.
+// The control of the stream that last opened the column gets the focus back
+// when it closes. The column's own controls come without an event, so moving
+// on inside the column keeps the row it was opened from.
 let subjectOpener: HTMLElement | null = null
 
 const openSubjectRef = (subject: SubjectRef, event?: Event) => {
   if (!isAuthenticated.value) return
-  if (event?.currentTarget instanceof HTMLElement && !openSubject.value) {
+  if (event?.currentTarget instanceof HTMLElement) {
     subjectOpener = event.currentTarget
   }
   hideDotDetails()
