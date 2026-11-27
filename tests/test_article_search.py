@@ -335,7 +335,9 @@ def test_a_stored_article_always_has_its_text_fields(article, expected):
 
     assert post.call_args.kwargs["json"] is doc
 
-    assert (doc["summary"], doc["content"]) == expected
+    summary, content = expected
+    assert doc["summary"] == summary
+    assert doc["content"] == content
 
 
 def _backfill(find_pages: list[list[dict]], bulk_rows: list[list[dict]]):
@@ -364,7 +366,7 @@ def test_backfill_gives_missing_text_fields_an_empty_string():
     find = mocked.call_args_list[0].kwargs["json"]
     assert find["use_index"] == "idx_search_gaps"
     assert {"summary": {"$exists": False}} in find["selector"]["$or"]
-    assert {"content": None} in find["selector"]["$or"]
+    assert {"content": {"$exists": False}} in find["selector"]["$or"]
 
 
 def test_backfill_with_nothing_to_do_writes_nothing():
@@ -391,3 +393,14 @@ def test_backfill_never_fails_a_start():
         "tasks.init._request", side_effect=requests.exceptions.ConnectionError("down")
     ):
         assert init.backfill_search_text() == 0
+
+
+def test_backfill_replaces_a_value_that_is_not_text():
+    """A number or a list cannot be searched and breaks the rendering."""
+    gap = {"_id": "a1", "_rev": "1-x", "title": "T", "summary": 7, "content": ["x"]}
+    changed, saved, mocked = _backfill([[gap], []], [[{"ok": True, "id": "a1"}]])
+
+    assert changed == 1
+    assert saved == [[{**gap, "summary": "", "content": ""}]]
+    selector = mocked.call_args_list[0].kwargs["json"]["selector"]
+    assert {"summary": {"$not": {"$type": "string"}}} in selector["$or"]

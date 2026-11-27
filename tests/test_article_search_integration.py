@@ -3,8 +3,9 @@
 The unit tests pin the shape of the request. These pin what CouchDB does with
 it: that it chooses the search index and loads no document, that a match in
 each text field is found newest first, and that a search still answers when
-the index is missing, and that an article without a text field is repaired
-at start-up and then found.
+the index is missing, that an article without a text field is repaired
+at start-up and then found, and that the start-up of a new release replaces
+the gaps index that the previous release created.
 
 Needs a throwaway CouchDB of the supported version, named by
 ``SEARCH_TEST_COUCHDB_URI`` (with credentials, ending in ``/``)::
@@ -75,6 +76,42 @@ def _create_index() -> None:
             ARTICLE_SEARCH_INDEX,
             ddoc=ARTICLE_SEARCH_INDEX,
         )
+
+
+# What `idx_search_gaps` listed when #389 created it: an absent or null field,
+# but not a value of another type.
+GAPS_SELECTOR_OF_389 = {
+    "$or": [
+        {"summary": {"$exists": False}},
+        {"summary": None},
+        {"content": {"$exists": False}},
+        {"content": None},
+    ]
+}
+
+
+def _create_gaps_index(selector: dict = ARTICLE_SEARCH_GAPS_SELECTOR) -> None:
+    """What start-up does, or did in an earlier release with its `selector`."""
+    from tasks import init
+
+    with patch("tasks.init.ensure_db"):
+        init.create_index(
+            "articles",
+            ["published"],
+            ARTICLE_SEARCH_GAPS_INDEX,
+            ddoc=ARTICLE_SEARCH_GAPS_INDEX,
+            partial_filter=selector,
+        )
+
+
+def _delete_doc(doc_id: str) -> None:
+    existing = requests.get(f"{COUCHDB}articles/{doc_id}", timeout=10)
+    if existing.ok:
+        requests.delete(
+            f"{COUCHDB}articles/{doc_id}",
+            params={"rev": existing.json()["_rev"]},
+            timeout=10,
+        ).raise_for_status()
 
 
 @pytest.fixture(scope="module")
@@ -187,21 +224,16 @@ def test_couchdb_answers_from_the_search_index_without_loading_documents(client)
 
 
 def test_an_article_without_a_text_field_is_backfilled_and_found(client):
-    """An article outside the search index is listed, repaired and searchable.
+    """An article the search cannot use is listed, repaired and searchable.
 
-    A Mango index holds only documents that have every indexed field, so this
-    article cannot be found before the backfill, not even by its title.
+    A Mango index holds only documents that have every indexed field, so an
+    article without one cannot be found before the backfill, not even by its
+    title. One whose field is not text is in the index but cannot be rendered.
     """
     from tasks import init
 
-    for doc_id in ("gap1", "gap2"):
-        existing = requests.get(f"{COUCHDB}articles/{doc_id}", timeout=10)
-        if existing.ok:
-            requests.delete(
-                f"{COUCHDB}articles/{doc_id}",
-                params={"rev": existing.json()["_rev"]},
-                timeout=10,
-            )
+    for doc_id in ("gap1", "gap2", "gap3"):
+        _delete_doc(doc_id)
     gaps = [
         # No summary at all; a null content.
         {"_id": "gap1", "published": "2026-11-06T10:00:00+00:00", "title": "Okapi"},
@@ -212,22 +244,23 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
             "summary": "an okapi here",
             "content": None,
         },
+        # Neither is text: a number and a list.
+        {
+            "_id": "gap3",
+            "published": "2026-11-08T10:00:00+00:00",
+            "title": "Heron",
+            "summary": 7,
+            "content": ["heron"],
+        },
     ]
     requests.post(
         f"{COUCHDB}articles/_bulk_docs", json={"docs": gaps}, timeout=10
     ).raise_for_status()
-    with patch("tasks.init.ensure_db"):
-        init.create_index(
-            "articles",
-            ["published"],
-            ARTICLE_SEARCH_GAPS_INDEX,
-            ddoc=ARTICLE_SEARCH_GAPS_INDEX,
-            partial_filter=ARTICLE_SEARCH_GAPS_SELECTOR,
-        )
+    _create_gaps_index()
     assert _ids(client, "okapi") == []
     complete_before = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()["_rev"]
 
-    assert init.backfill_search_text() == 2
+    assert init.backfill_search_text() == 3
 
     assert _ids(client, "okapi") == ["gap2", "gap1"]
     repaired = requests.get(f"{COUCHDB}articles/gap1", timeout=10).json()
@@ -235,10 +268,54 @@ def test_an_article_without_a_text_field_is_backfilled_and_found(client):
     # What was there is kept.
     kept = requests.get(f"{COUCHDB}articles/gap2", timeout=10).json()
     assert (kept["summary"], kept["content"]) == ("an okapi here", "")
+    # A value that was not text is replaced, and its article is found and
+    # rendered by its title.
+    assert _ids(client, "heron") == ["gap3"]
+    replaced = requests.get(f"{COUCHDB}articles/gap3", timeout=10).json()
+    assert (replaced["summary"], replaced["content"]) == ("", "")
     # Nothing is left to do, and complete articles were not touched.
     assert init.backfill_search_text() == 0
     complete_after = requests.get(f"{COUCHDB}articles/s1", timeout=10).json()["_rev"]
     assert complete_after == complete_before
+
+
+def test_the_gaps_index_of_the_previous_release_is_replaced(client):
+    """An upgrade from #389 gets the new selector under the same index name.
+
+    The index keeps its name and its design document while its partial
+    selector changes. CouchDB must replace the definition, not answer that the
+    index exists: with the old one a value that is not text is never listed,
+    and so never repaired.
+    """
+    from tasks import init
+
+    _delete_doc("gap4")
+    _delete_doc(f"_design/{ARTICLE_SEARCH_GAPS_INDEX}")
+    _create_gaps_index(GAPS_SELECTOR_OF_389)
+    requests.put(
+        f"{COUCHDB}articles/gap4",
+        json={
+            "published": "2026-11-09T10:00:00+00:00",
+            "title": "Ibis",
+            "summary": 7,
+            "content": ["ibis"],
+        },
+        timeout=10,
+    ).raise_for_status()
+    # The index of the previous release does not list the article.
+    assert init.backfill_search_text() == 0
+
+    _create_gaps_index()
+
+    indexes = requests.get(f"{COUCHDB}articles/_index", timeout=10).json()["indexes"]
+    named = [index for index in indexes if index["name"] == ARTICLE_SEARCH_GAPS_INDEX]
+    assert [index["ddoc"] for index in named] == [
+        f"_design/{ARTICLE_SEARCH_GAPS_INDEX}"
+    ]
+    assert init.backfill_search_text() == 1
+    repaired = requests.get(f"{COUCHDB}articles/gap4", timeout=10).json()
+    assert (repaired["summary"], repaired["content"]) == ("", "")
+    assert _ids(client, "ibis") == ["gap4"]
 
 
 def test_a_search_still_answers_when_the_index_is_missing(client):

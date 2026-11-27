@@ -160,48 +160,66 @@ SEARCH_BACKFILL_BATCH = 500
 SEARCH_BACKFILL_MAX_BATCHES = 200
 
 
-def backfill_search_text() -> int:
-    """Give articles that lack a `summary` or `content` an empty one (#387).
-
-    The search index holds only articles that have every text field, so one
-    without would never be found, not even by its title. The partial index
-    `ARTICLE_SEARCH_GAPS_INDEX` lists exactly those articles and is normally
-    empty, so this is one small request at every start. Returns the number
-    of articles changed. Never raises: a start must not fail on it.
-    """
-    base = f"{get_couchdb_uri()}articles/"
+def _search_gap_batch(base: str) -> list[dict]:
+    """The next articles that the search index cannot hold."""
     query = {
         "selector": {"published": {MONGO_GT: None}, **ARTICLE_SEARCH_GAPS_SELECTOR},
         "use_index": ARTICLE_SEARCH_GAPS_INDEX,
         "limit": SEARCH_BACKFILL_BATCH,
     }
+    response = _request("POST", f"{base}_find", json=query, timeout=30)
+    response.raise_for_status()
+    return response.json().get("docs", [])
+
+
+def _save_search_gaps(base: str, docs: list[dict]) -> int:
+    """Give each article its text fields as strings; the number that was saved."""
+    for doc in docs:
+        for field in ARTICLE_SEARCH_BACKFILL_FIELDS:
+            if not isinstance(doc.get(field), str):
+                doc[field] = ""
+    response = _request("POST", f"{base}_bulk_docs", json={"docs": docs}, timeout=30)
+    response.raise_for_status()
+    return sum(1 for row in response.json() if row.get("ok"))
+
+
+def _backfill_search_gaps(base: str) -> int:
+    changed = 0
+    for _ in range(SEARCH_BACKFILL_MAX_BATCHES):
+        docs = _search_gap_batch(base)
+        if not docs:
+            break
+        saved = _save_search_gaps(base, docs)
+        changed += saved
+        if not saved:
+            # Refused (validation) or changed by another process; the same
+            # articles would come back, so stop instead of looping.
+            logger.warning(
+                "Search backfill: %d articles could not be updated and "
+                "stay out of the search index",
+                len(docs),
+            )
+            break
+    return changed
+
+
+def backfill_search_text() -> int:
+    """Give articles without a text `summary` or `content` an empty one (#387).
+
+    The search index holds only articles that have every text field, so one
+    where a field is absent or null would never be found, not even by its
+    title; a value that is not a string cannot be searched and breaks the
+    rendering of the result. The partial index `ARTICLE_SEARCH_GAPS_INDEX`
+    lists exactly those articles and is normally empty, so this is one small
+    request at every start. A value that is not a string is replaced, not
+    converted: ingestion never writes one.
+
+    Returns the number of articles changed. Never raises: a start must not
+    fail on it.
+    """
     changed = 0
     try:
-        for _ in range(SEARCH_BACKFILL_MAX_BATCHES):
-            response = _request("POST", f"{base}_find", json=query, timeout=30)
-            response.raise_for_status()
-            docs = response.json().get("docs", [])
-            if not docs:
-                break
-            for doc in docs:
-                for field in ARTICLE_SEARCH_BACKFILL_FIELDS:
-                    if not isinstance(doc.get(field), str):
-                        doc[field] = ""
-            response = _request(
-                "POST", f"{base}_bulk_docs", json={"docs": docs}, timeout=30
-            )
-            response.raise_for_status()
-            saved = sum(1 for row in response.json() if row.get("ok"))
-            changed += saved
-            if not saved:
-                # Refused (validation) or changed by another process; the same
-                # articles would come back, so stop instead of looping.
-                logger.warning(
-                    "Search backfill: %d articles could not be updated and "
-                    "stay out of the search index",
-                    len(docs),
-                )
-                break
+        changed = _backfill_search_gaps(f"{get_couchdb_uri()}articles/")
     except Exception:
         logger.exception("Search backfill failed")
     if changed:
