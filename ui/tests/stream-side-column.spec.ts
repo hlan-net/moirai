@@ -227,6 +227,42 @@ test('an earlier conversation about the same subject continues', async ({ page }
   expect(calls.api.some((c) => c === 'POST /api/chat/history')).toBe(false)
 })
 
+test('the summary scrolls with the conversation, as its beginning', async ({ page }) => {
+  await mockApi(page, {
+    stored: [
+      {
+        _id: 'session-9',
+        messages: Array.from({ length: 40 }, (_, index) => ({
+          role: index % 2 ? 'assistant' : 'user',
+          content: `Message ${index + 1}`,
+        })),
+      },
+    ],
+  })
+  await page.goto('/#/stream')
+  await discuss(page, 'Derby Result').click()
+
+  const summary = panel(page).getByText('Derby Result summary')
+  const scroller = panel(page).locator('.chat-scroll')
+  // One scrolling area holds both; only the conversation is the live log.
+  await expect(scroller.getByText('Derby Result summary')).toHaveCount(1)
+  await expect(panel(page).getByRole('log').getByText('Derby Result summary')).toHaveCount(0)
+
+  // A stored conversation opens at its end: the summary is scrolled away.
+  await expect(panel(page).getByText('Message 40', { exact: true })).toBeInViewport()
+  await expect(summary).not.toBeInViewport()
+  // The heading and the message field stay in place.
+  await expect(panel(page).getByRole('heading', { name: 'Derby Result' })).toBeInViewport()
+  await expect(panel(page).getByRole('textbox', { name: 'Message' })).toBeInViewport()
+
+  await scroller.evaluate((element) => (element.scrollTop = 0))
+  await expect(summary).toBeInViewport()
+
+  // Another subject starts from its own text, at the top.
+  await discuss(page, 'Opera Premiere').click()
+  await expect(panel(page).getByText('Opera Premiere summary')).toBeInViewport()
+})
+
 test('an event opens from its dot, and from the article that lists it', async ({ page }) => {
   await mockApi(page)
   await page.goto('/#/stream')

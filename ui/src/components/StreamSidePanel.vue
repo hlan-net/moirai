@@ -157,76 +157,78 @@ onMounted(() => closeButton.value?.focus())
 
     <!-- An article of the stream -->
     <template v-if="subject.type === 'article' && article">
-      <div class="side-body">
-        <p class="side-meta">
-          {{ article.feed_title }} · {{ formatTime(article.published) }} ·
-          <a :href="article.link" target="_blank" rel="noopener">Open the article</a>
-        </p>
-        <p v-if="plainSummary" class="side-text">{{ plainSummary }}</p>
-        <div v-if="articleIssues.length" class="side-refs">
-          <span class="side-label">In</span>
-          <template v-for="ref in articleIssues" :key="`${ref.kind}:${ref.id || ref.name}`">
-            <button
-              v-if="ref.id"
-              type="button"
-              class="ref-btn"
-              :class="ref.kind"
-              :title="`Open the ${ref.kind}`"
-              @click="emit('open', { type: 'issue', id: ref.id })"
-            >
-              {{ ref.name }}
-            </button>
-            <span v-else class="ref-btn static" :class="ref.kind">{{ ref.name }}</span>
-          </template>
-        </div>
-      </div>
       <SubjectChat
         context-type="article"
         :entity-id="article.link"
         :entity-data="articleContext"
         placeholder="Ask about this article…"
-      />
+      >
+        <div class="side-body side-intro">
+          <p class="side-meta">
+            {{ article.feed_title }} · {{ formatTime(article.published) }} ·
+            <a :href="article.link" target="_blank" rel="noopener">Open the article</a>
+          </p>
+          <p v-if="plainSummary" class="side-text">{{ plainSummary }}</p>
+          <div v-if="articleIssues.length" class="side-refs">
+            <span class="side-label">In</span>
+            <template v-for="ref in articleIssues" :key="`${ref.kind}:${ref.id || ref.name}`">
+              <button
+                v-if="ref.id"
+                type="button"
+                class="ref-btn"
+                :class="ref.kind"
+                :title="`Open the ${ref.kind}`"
+                @click="emit('open', { type: 'issue', id: ref.id })"
+              >
+                {{ ref.name }}
+              </button>
+              <span v-else class="ref-btn static" :class="ref.kind">{{ ref.name }}</span>
+            </template>
+          </div>
+        </div>
+      </SubjectChat>
     </template>
 
     <!-- An event or a trend -->
     <template v-else-if="subject.type === 'issue' && issue">
-      <div class="side-body">
-        <p v-if="issue.description" class="side-text">{{ issue.description }}</p>
-        <p v-else class="side-text muted">No description yet.</p>
-        <div v-if="nestedIssues.length" class="side-refs">
-          <span class="side-label">Holds</span>
-          <button
-            v-for="child in nestedIssues"
-            :key="child.id"
-            type="button"
-            class="ref-btn"
-            :title="`Open ${child.logos || 'this issue'}`"
-            @click="emit('open', { type: 'issue', id: child.id })"
-          >
-            {{ child.logos || 'Untitled' }}
-          </button>
-        </div>
-        <div class="side-articles">
-          <span class="side-label"
-            >{{ issueArticles.length }} article{{ issueArticles.length === 1 ? '' : 's' }}</span
-          >
-          <ul v-if="issueArticles.length">
-            <li v-for="item in issueArticles" :key="item.link">
-              <a v-if="item.isLink" :href="item.link" target="_blank" rel="noopener">{{
-                item.title
-              }}</a>
-              <span v-else>{{ item.title }}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
       <SubjectChat
         context-type="issue"
         :entity-id="issue._id"
         :entity-data="issue as unknown as Record<string, unknown>"
         :placeholder="`Ask about this ${issueKind.toLowerCase()}, or say how to change it…`"
         @tools-used="loadIssue"
-      />
+      >
+        <div class="side-body side-intro">
+          <p v-if="issue.description" class="side-text">{{ issue.description }}</p>
+          <p v-else class="side-text muted">No description yet.</p>
+          <div v-if="nestedIssues.length" class="side-refs">
+            <span class="side-label">Holds</span>
+            <button
+              v-for="child in nestedIssues"
+              :key="child.id"
+              type="button"
+              class="ref-btn"
+              :title="`Open ${child.logos || 'this issue'}`"
+              @click="emit('open', { type: 'issue', id: child.id })"
+            >
+              {{ child.logos || 'Untitled' }}
+            </button>
+          </div>
+          <div class="side-articles">
+            <span class="side-label"
+              >{{ issueArticles.length }} article{{ issueArticles.length === 1 ? '' : 's' }}</span
+            >
+            <ul v-if="issueArticles.length">
+              <li v-for="item in issueArticles" :key="item.link">
+                <a v-if="item.isLink" :href="item.link" target="_blank" rel="noopener">{{
+                  item.title
+                }}</a>
+                <span v-else>{{ item.title }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </SubjectChat>
     </template>
 
     <div v-else class="side-body">
@@ -309,9 +311,12 @@ onMounted(() => closeButton.value?.focus())
 
 .side-body {
   padding: 10px 0;
-  max-height: 45%;
-  overflow-y: auto;
-  flex-shrink: 0;
+}
+
+/* The subject's text at the top of the conversation's scrolling area. */
+.side-intro {
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .side-meta {
