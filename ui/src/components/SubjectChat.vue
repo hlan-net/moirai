@@ -280,9 +280,11 @@ watch(() => `${props.contextType}:${props.entityId}`, restore, { immediate: true
 .chat-text.markdown :deep(h1),
 .chat-text.markdown :deep(h2),
 .chat-text.markdown :deep(h3),
-.chat-text.markdown :deep(h4) {
+.chat-text.markdown :deep(h4),
+.chat-text.markdown :deep(h5),
+.chat-text.markdown :deep(h6) {
   margin: 0.8em 0 0.3em;
-  font-size: 1rem;
+  font-size: inherit;
   line-height: 1.3;
 }
 
