@@ -6,6 +6,9 @@ Notable design decisions and significant changes to the Moirai project, in rever
 
 ## [Unreleased / In Development]
 
+### Stream: the side column scrolls as one
+In the side column an article's summary, or an issue's description and articles, had its own area above the conversation, up to 45 % of the column's height, and the conversation scrolled in what was left. The text now opens the conversation and the two scroll as one area, from the column's header down to the message field, as the stream does beside it (`SubjectChat.vue` takes the text as its slot). Only the conversation is the live region. A stored conversation opens at its end, as before, so the summary is then above it; a new subject starts from the top. Headings in an answer are the size of the column's text.
+
 ### Article search is answered from an index (#387)
 Search (#377) tested every article by loading it. In production (30 000 articles) a search took 19 to 30 seconds, longer than the 10 second request timeout, and the request was then repeated up to three times: a search for a word that matched nothing never completed. Narrowing it would not have helped, since articles expire after 30 days and nearly all of them are inside any useful time window.
 

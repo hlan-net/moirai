@@ -31,7 +31,8 @@ const input = ref('')
 const loading = ref(false)
 const restoring = ref(false)
 const sessionId = ref<string | null>(null)
-const log = ref<HTMLElement | null>(null)
+// The scrolling area: the subject's own text (the slot) and the messages.
+const scroller = ref<HTMLElement | null>(null)
 
 // Every load and send belongs to the subject it started on. If the reader
 // has moved to another subject meanwhile, its result is dropped.
@@ -51,7 +52,12 @@ const renderMarkdown = (content: string) =>
 
 const scrollToEnd = async () => {
   await nextTick()
-  if (log.value) log.value.scrollTop = log.value.scrollHeight
+  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
+}
+
+// A new subject starts from its own text, at the top.
+const scrollToStart = () => {
+  if (scroller.value) scroller.value.scrollTop = 0
 }
 
 const restore = async () => {
@@ -61,6 +67,7 @@ const restore = async () => {
   input.value = ''
   loading.value = false
   restoring.value = true
+  scrollToStart()
   try {
     const params = new URLSearchParams({
       context_type: props.contextType,
@@ -173,26 +180,31 @@ watch(() => `${props.contextType}:${props.entityId}`, restore, { immediate: true
 
 <template>
   <section class="subject-chat" aria-label="Conversation">
-    <div ref="log" class="chat-log" role="log" aria-live="polite">
-      <p v-if="restoring" class="chat-hint">Loading the conversation…</p>
-      <p v-else-if="messages.length === 0" class="chat-hint">{{ placeholder }}</p>
-      <div
-        v-for="(message, index) in messages"
-        :key="index"
-        class="chat-message"
-        :class="message.role"
-      >
-        <div class="chat-role">{{ message.role === 'user' ? 'You' : 'Moirai' }}</div>
-        <div v-if="message.role === 'user'" class="chat-text">{{ message.content }}</div>
-        <div v-else class="chat-text markdown" v-html="renderMarkdown(message.content)"></div>
-        <div v-if="message.tool_calls?.length" class="chat-meta">
-          {{ message.tool_calls.length }} tool call{{ message.tool_calls.length === 1 ? '' : 's'
-          }}<span v-if="message.tool_execution_errors">
-            , {{ message.tool_execution_errors }} failed</span
-          >
+    <!-- One scrolling area from the header down: what the subject is, then
+         the conversation about it. Only the conversation is a live region. -->
+    <div ref="scroller" class="chat-scroll">
+      <slot />
+      <div class="chat-log" role="log" aria-live="polite">
+        <p v-if="restoring" class="chat-hint">Loading the conversation…</p>
+        <p v-else-if="messages.length === 0" class="chat-hint">{{ placeholder }}</p>
+        <div
+          v-for="(message, index) in messages"
+          :key="index"
+          class="chat-message"
+          :class="message.role"
+        >
+          <div class="chat-role">{{ message.role === 'user' ? 'You' : 'Moirai' }}</div>
+          <div v-if="message.role === 'user'" class="chat-text">{{ message.content }}</div>
+          <div v-else class="chat-text markdown" v-html="renderMarkdown(message.content)"></div>
+          <div v-if="message.tool_calls?.length" class="chat-meta">
+            {{ message.tool_calls.length }} tool call{{ message.tool_calls.length === 1 ? '' : 's'
+            }}<span v-if="message.tool_execution_errors">
+              , {{ message.tool_execution_errors }} failed</span
+            >
+          </div>
         </div>
+        <p v-if="loading" class="chat-hint">Thinking…</p>
       </div>
-      <p v-if="loading" class="chat-hint">Thinking…</p>
     </div>
 
     <form class="chat-form" @submit.prevent="send">
@@ -220,10 +232,14 @@ watch(() => `${props.contextType}:${props.entityId}`, restore, { immediate: true
   min-height: 0;
 }
 
-.chat-log {
+.chat-scroll {
   flex: 1;
   min-height: 80px;
   overflow-y: auto;
+  padding-inline-end: 6px;
+}
+
+.chat-log {
   padding: 4px 2px;
 }
 
@@ -258,6 +274,18 @@ watch(() => `${props.contextType}:${props.entityId}`, restore, { immediate: true
 
 .chat-text.markdown :deep(p) {
   margin: 0.3em 0;
+}
+
+/* An answer's headings stay the size of the column's own text. */
+.chat-text.markdown :deep(h1),
+.chat-text.markdown :deep(h2),
+.chat-text.markdown :deep(h3),
+.chat-text.markdown :deep(h4),
+.chat-text.markdown :deep(h5),
+.chat-text.markdown :deep(h6) {
+  margin: 0.8em 0 0.3em;
+  font-size: inherit;
+  line-height: 1.3;
 }
 
 .chat-text.markdown :deep(ul),
