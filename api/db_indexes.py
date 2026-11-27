@@ -15,7 +15,12 @@ import logging
 import requests
 from typing import Dict
 from api.db_config import get_couchdb_uri
-from api.db_constants import ARTICLE_SEARCH_INDEX, ARTICLE_SEARCH_INDEX_FIELDS
+from api.db_constants import (
+    ARTICLE_SEARCH_GAPS_INDEX,
+    ARTICLE_SEARCH_GAPS_SELECTOR,
+    ARTICLE_SEARCH_INDEX,
+    ARTICLE_SEARCH_INDEX_FIELDS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +100,19 @@ def create_articles_indexes() -> int:
             "index": {"fields": ARTICLE_SEARCH_INDEX_FIELDS},
             "name": ARTICLE_SEARCH_INDEX,
             "ddoc": ARTICLE_SEARCH_INDEX,
+            "type": "json",
+        },
+        # The articles the search index cannot hold, normally none (#387).
+        # Start-up (tasks/init.py) creates the same index and repairs what it
+        # lists; it is created here too, so that a database prepared with
+        # this script has it before the first start.
+        {
+            "index": {
+                "fields": ["published"],
+                "partial_filter_selector": ARTICLE_SEARCH_GAPS_SELECTOR,
+            },
+            "name": ARTICLE_SEARCH_GAPS_INDEX,
+            "ddoc": ARTICLE_SEARCH_GAPS_INDEX,
             "type": "json",
         },
     ]
