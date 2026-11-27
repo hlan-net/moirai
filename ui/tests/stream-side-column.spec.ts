@@ -93,7 +93,12 @@ interface Calls {
 
 const mockApi = async (
   page: Page,
-  { loggedIn = true, stored = [] as object[] }: { loggedIn?: boolean; stored?: object[] } = {}
+  {
+    loggedIn = true,
+    stored = [] as object[],
+    // The subject the stored conversation is about; every subject when unset.
+    storedFor,
+  }: { loggedIn?: boolean; stored?: object[]; storedFor?: string } = {}
 ): Promise<Calls> => {
   const calls: Calls = { stream: 0, api: [], chatBodies: [], saved: [] }
   if (loggedIn) {
@@ -118,7 +123,8 @@ const mockApi = async (
       return issue ? route.fulfill({ json: issue }) : route.fulfill({ status: 404, json: {} })
     }
     if (url.pathname === '/api/chat/history' && method === 'GET') {
-      return route.fulfill({ json: stored })
+      const mine = !storedFor || url.searchParams.get('entity_id') === storedFor
+      return route.fulfill({ json: mine ? stored : [] })
     }
     if (url.pathname === '/api/chat/history' && method === 'POST') {
       return route.fulfill({ json: { _id: 'session-1', messages: [] } })
@@ -229,6 +235,7 @@ test('an earlier conversation about the same subject continues', async ({ page }
 
 test('the summary scrolls with the conversation, as its beginning', async ({ page }) => {
   await mockApi(page, {
+    storedFor: 'https://example.com/derby',
     stored: [
       {
         _id: 'session-9',
@@ -258,9 +265,11 @@ test('the summary scrolls with the conversation, as its beginning', async ({ pag
   await scroller.evaluate((element) => (element.scrollTop = 0))
   await expect(summary).toBeInViewport()
 
-  // Another subject starts from its own text, at the top.
+  // Another subject, without a conversation yet, starts from its own text.
   await discuss(page, 'Opera Premiere').click()
+  await expect(panel(page).getByRole('log')).toHaveText('Ask about this article…')
   await expect(panel(page).getByText('Opera Premiere summary')).toBeInViewport()
+  expect(await scroller.evaluate((element) => element.scrollTop)).toBe(0)
 })
 
 test('an event opens from its dot, and from the article that lists it', async ({ page }) => {
